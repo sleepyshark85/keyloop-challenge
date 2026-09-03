@@ -15,11 +15,11 @@
 
 | | |
 |---|---|
-| Last commit | `f957a84 docs: correct two false enforcement claims in METHODOLOGY §4` |
+| Last commit | `3bcaafc Merge pull request #2 from sleepyshark85/phase/02-architecture` |
 | Gates decided | A, B |
 | Agent runs recorded | 4 |
 | ADRs accepted | 10 |
-| Slices defined | 0 |
+| Slices defined | 13 |
 | Open DCRs | none |
 
 ## What happens next
