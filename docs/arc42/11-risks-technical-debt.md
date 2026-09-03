@@ -15,9 +15,10 @@ construction, a debt item traceable to the decision that created it.
 | Run migrations with node-pg-migrate, written as plain .sql files | [ADR-0007](../adr/0007-node-pg-migrate-with-sql-files.md) | deferred improvement |
 | Decompose into five layered modules around a dependency-free policy core | [ADR-0008](../adr/0008-module-decomposition.md) | deferred improvement |
 | Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 | [ADR-0009](../adr/0009-candidate-ordering-and-attempt-cap.md) | deferred improvement |
+| Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | [ADR-0010](../adr/0010-github-actions-and-check-run-collection.md) | deferred improvement |
 <!-- /generated:debt-register -->
 
-**Read that table with one correction, until Gate B closes.** ADR-0005 to ADR-0009 are the *founding*
+**Read that table with one correction, until Gate B closes.** ADR-0005 to ADR-0010 are the *founding*
 decisions of this architecture, not deferred improvements. They carry `status: proposed` because
 Gate B is where the human ratifies them, and the register is generated from that status, so it
 currently reports them under the wrong heading. When they are accepted the register empties, and
@@ -114,6 +115,25 @@ type edit produces code that compiles and is wrong.
 | R-7d | Down migrations are written and never run (ADR-0007), so they are unverified by construction | The deployment is a fresh container; rollback in anger is not a story this system has |
 | R-7e | The retry loop must not be wrapped in a transaction (§6). Nothing structural enforces it | QS-3 fails immediately if it is — `25P02` on the second attempt |
 | R-7f | Docker is required for everything but the `src/domain` suite (TC-9) | A consequence of §2.2 being right about where the invariant lives |
+
+### R-8 · Four things CI is *said* to enforce, and does not yet
+
+ADR-0010 founds the pipeline (§7.4), and writing it turned up a set of claims made in prose that no
+tool implements. They are listed here rather than quietly fixed later, because the failure mode of an
+unenforced enforcement claim is that everyone stops checking by hand.
+
+| Claimed | Claimed by | State today |
+|---|---|---|
+| `check.run` is emitted by tooling, tier `derived` | METHODOLOGY §400 | **Not emitted.** ADR-0010 decides the mechanism — a collector reading the GitHub API at each gate — but `tools/team-log/collect-ci.mjs` does not exist, so phase-4 criterion **C1 remains unpassable**. This is the largest of the four |
+| The diagram scripts `self_check.py` and `verify-geometry.py` run in CI | METHODOLOGY §4 | **Cannot run.** They live in a `diagram-design` plugin cache outside the repository and nothing vendors them. CI checks the honest subset: every `.html` has a committed `.svg`, and every diagram link resolves |
+| Link integrity and ADR existence are enforced | METHODOLOGY §4 | No tool. CI checks diagram links only; the rest of the documentation's relative links are unchecked |
+| `QS-*` names a real test, or CI fails | METHODOLOGY §4, §10.2, §0 | No tool, and nothing to check against until `tests/` exists. It is the traceability chain's last link and should land with the first slice that has tests |
+
+A fifth is a fact about tooling rather than a gap: **`npm run log:audit` cannot run in CI.** Its
+ground truth is subagent transcripts under `~/.claude/projects/`, which exist only on the maintainer's
+machine; on a fresh checkout it reports every honest agent run as `UNSUPPORTED` and exits 1. That is
+correct behaviour, and it is why §9 calls it a gate-time command. CI substitutes two structural
+checks it *can* make — the log is append-only, and every record validates against the schema.
 
 ## 11.3 What production would additionally require
 

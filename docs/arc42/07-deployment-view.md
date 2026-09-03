@@ -2,10 +2,10 @@
 
 > Owner: architect · Written: phase 2
 
-**Deliberately minimal, and this section stays thin on purpose.** Three containers on one machine.
-What a production deployment would additionally require is §11.3, named honestly there rather than
-invented here — three paragraphs of speculative Kubernetes topology would be padding, and OC-1 bounds
-scope by what can be demonstrated and defended.
+**Deliberately minimal, and this section stays thin on purpose.** Three containers on one machine,
+and one pipeline (§7.4). What a production deployment would additionally require is §11.3, named
+honestly there rather than invented here — three paragraphs of speculative Kubernetes topology would
+be padding, and OC-1 bounds scope by what can be demonstrated and defended.
 
 ## 7.1 The runtime environment
 
@@ -80,3 +80,39 @@ missing or malformed value fails the process rather than surfacing as a request 
 
 There are no secrets, because there is nothing to authenticate to (ADR-0002) — which is a fact about
 the scope, not a security posture, and §11.3 says so.
+
+## 7.4 The pipeline
+
+A fourth environment, and the only one that is not a container on the maintainer's machine:
+**GitHub Actions on `ubuntu-latest`** ([ADR-0010](../adr/0010-github-actions-and-check-run-collection.md)),
+defined in [`.github/workflows/verify.yml`](../../.github/workflows/verify.yml).
+
+It belongs in the deployment view rather than in a tooling appendix because **the runner is a
+correctness prerequisite, not a convenience**. TC-9 requires Docker; §2.2 forbids substituting the
+database; so a runner without a Docker daemon cannot run the tests that prove this system correct —
+only the ones that would pass anyway. `ubuntu-latest` ships a daemon, and §7.2's Testcontainers
+starts its own `postgres:16` inside it, which is why the pipeline needs no `services:` block.
+
+**Compose and the test path are separate, and conflating them is the easy mistake.** Nothing in §7.2
+reads `docker-compose.yml`:
+
+| Environment | PostgreSQL comes from | Exists for |
+|---|---|---|
+| Local run | `docker compose up` (§7.1) | the service, the cURL harness, `otel-lgtm` |
+| Test, local or CI | Testcontainers, one container per run (§7.2) | the suite — including every concurrency scenario |
+| CI, today | nothing; there is no application code yet | docs currency, the tools suite, diagram export, event-log integrity |
+
+Node on the runner is **22.x** — §7.1's deployment runtime, not the maintainer's local Node 24, so
+CI agrees with what runs in production rather than with a laptop. `npm ci --engine-strict` turns
+TC-10's pin from a note into a build failure.
+
+The workflow is **phased**: it contains only what passes before the application exists, because
+METHODOLOGY §261 puts CI *before* slice 00's step 3 and therefore before the code it will eventually
+check. What gets wired in at phase 4 — `typecheck`, `lint:arch` (QS-10), the Vitest suite, the
+`red-proof` job and the `check.run` run summary — is listed in the workflow itself and argued in
+ADR-0010. Two consequences belong here rather than in the ADR. **QS-14's latency budget is stated
+*"on the CI container"***, so its numbers mean *a standard GitHub-hosted `ubuntu-latest` runner*, and
+changing runner class silently changes what that scenario asserts. And the pipeline holds
+`contents: read` only, so nothing in CI can write to the repository whose git history is itself an
+assessed artifact (OC-7) — which is why `check.run` is collected at each gate rather than committed
+by the workflow.
