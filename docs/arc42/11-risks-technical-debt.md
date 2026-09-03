@@ -8,16 +8,23 @@ Generated: every ADR with `status: proposed` and every deferred-improvement slic
 construction, a debt item traceable to the decision that created it.
 
 <!-- generated:debt-register -->
-_No deferred improvements recorded._
+| Item | Origin | Why deferred |
+|---|---|---|
+| Treat /health as an operational probe outside the API contract, not as a sixth operation | [ADR-0011](../adr/0011-health-is-an-operational-probe.md) | deferred improvement |
 <!-- /generated:debt-register -->
 
-The register is empty, and that is the correct reading rather than an omission. Between the architect
-writing this section and Gate B closing it reported ADR-0005 to ADR-0010 as debt, because it is
-generated from `status: proposed` and those were the *founding* decisions awaiting ratification, not
-deferred improvements. **The human accepted all six at Gate B on 2026-09-04**, so the register
-emptied on its own. Every entry that appears here from now on is genuinely a deferred improvement —
-a `(b)` DCR ruling under `CLAUDE.md` §6, which is what the register exists to make impossible to
-lose.
+The register held nothing until slice 00a, and that was the correct reading rather than an omission.
+Between the architect writing this section and Gate B closing it reported ADR-0005 to ADR-0010 as
+debt, because it is generated from `status: proposed` and those were the *founding* decisions
+awaiting ratification, not deferred improvements. **The human accepted all six at Gate B on
+2026-09-04**, so the register emptied on its own.
+
+The single entry above is the first genuine one: **ADR-0011** was raised by the architect at slice
+00a step 1 and is `proposed` because it is the human's to rule at that slice's gate, not the
+architect's to close inline. It is debt in the narrow sense the register means — an open decision
+with a recommendation attached — and it leaves the register the moment it is accepted or rejected.
+Every other entry that appears here is a deferred improvement from a `(b)` DCR ruling under
+`CLAUDE.md` §6, which is what the register exists to make impossible to lose.
 
 ## 11.2 Known risks
 

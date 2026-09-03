@@ -75,6 +75,7 @@ without taking anyone's word for it.
 - [**ADR-0008**](adr/0008-module-decomposition.md) — Decompose into five layered modules around a dependency-free policy core *(accepted)*
 - [**ADR-0009**](adr/0009-candidate-ordering-and-attempt-cap.md) — Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 *(accepted)*
 - [**ADR-0010**](adr/0010-github-actions-and-check-run-collection.md) — Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow *(accepted)*
+- [**ADR-0011**](adr/0011-health-is-an-operational-probe.md) — Treat /health as an operational probe outside the API contract, not as a sixth operation *(proposed)*
 
 ---
 
