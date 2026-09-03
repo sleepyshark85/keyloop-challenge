@@ -315,6 +315,35 @@ scenario:  bay 7 booked 09:00–10:00; a request for 10:00–11:00 is refused, b
 **A comment with no attribution line is the human's.** That asymmetry is deliberate — the human
 types comments by hand and should not have to remember a convention.
 
+### What the PR thread must carry
+
+The prompt library records what each agent was *asked* and what it *returned*. It does not record
+what the team **decided between those two points**, and that reasoning is a graded artifact: the
+brief asks for the process of guiding and verifying AI output, not only its results. The PR thread
+is where that lives, because it is the one place a decision sits beside the diff it applies to and
+carries its own timestamp.
+
+Every slice PR therefore opens at **step 3**, when the red commit is pushed — not at the end. A PR
+opened after the work is a publication; a PR opened before it is a venue.
+
+| Step | Posted by | Carries |
+|---|---|---|
+| 1 Design | orchestrator, for the architect | The design's key decisions, the ambiguities it flagged, and what it expects to be argued |
+| 2 **Agree** | orchestrator, for each of test-engineer and implementer | An explicit **agree** or **object**, per role. An objection names the acceptance criterion or design statement it disputes. Silence is not agreement and may not be recorded as one |
+| 3 Red | orchestrator | The red commit SHA and the CI run that observed it failing, with the failing assertion quoted — evidence for C1 |
+| 5 Review | orchestrator, for the reviewer | Findings with `claim:` and `scenario:` lines per §290's format, plus surviving mutants. An explicit no-findings review must report a mutation score |
+| 6 Gate | **the human, unattributed** | The ruling and its rationale. This comment plus the merge *is* the gate artifact |
+| — DCR | orchestrator, for the raising role | The mismatch, the round of discussion, and the architect's ruling with its `(a)`–`(d)` outcome |
+
+Step 2 is the one most easily skipped, and skipping it is measured: `process-criteria.md` C3 treats a
+reviewer who produces no substance as a failure, and the same reasoning applies here — **an agree
+step that has never produced an objection is rubber-stamping**, and the pilot retro reads it as
+defect-escape distance. Two agents agreeing at step 2 costs a comment; the same ambiguity found at
+step 5 costs a full cycle plus a loopback.
+
+Agents do not post. They return structured reports, and the orchestrator posts on their behalf under
+§290's attribution line — the same asymmetry that makes an unattributed comment the human's.
+
 Naming the **agent definition and its commit SHA** is worth more than a bot identity would be: it
 says which *version* of the reviewer produced the finding, so tightening a role's prompt mid-project
 leaves before-and-after distinguishable rather than smeared together.
@@ -441,6 +470,15 @@ is cheap to close before phase 5.
 **Prompts, tokens, cost.** Prompts are written **before** invocation to
 `docs/team-log/prompts/<slice>-<agent>-<n>.md` with the report beside them, so the record cannot
 drift from what ran; the prompt library is the primary evidence for *strategy for directing AI*.
+
+*Corrected 2026-09-04.* That rule was enforced by the orchestrator's discipline, and the discipline
+failed: phases 2 and 3 ran with no prompt files at all, and no report was ever written beside one.
+Both halves are now hooks — `capture-prompt.mjs` on `PreToolUse:Task` writes the prompt as sent,
+before the agent runs; `log-agent-finish.mjs` on `SubagentStop` extracts the report from the agent's
+own transcript. Neither is typed by hand, so neither can drift. The five prompts that predate the
+hooks are backfilled and labelled as backfilled in their own headers. P3 applies to this
+methodology as much as to the system it builds: a rule whose only enforcement is discipline records
+nothing on the day it matters.
 Each event records the **SHA of the agent definition used**, so tuning a role yields comparable
 before/after rather than anecdote.
 

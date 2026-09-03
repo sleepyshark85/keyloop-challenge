@@ -19,7 +19,7 @@
  * Never blocks. A logging failure must not prevent an agent from stopping, so
  * every path exits 0 and problems are written to the sidecar error file.
  */
-import { readFileSync, existsSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const ROLES = new Set(['architect', 'test-engineer', 'implementer', 'reviewer', 'scribe']);
@@ -61,9 +61,12 @@ try {
   let duration = null;
   let tokens = null;
   let resumed = false;
+  // Hoisted: the report capture at the foot of this file reads the same parsed
+  // transcript rather than re-reading the file.
+  let lines = [];
 
   if (existsSync(subPath)) {
-    const lines = readFileSync(subPath, 'utf8').split('\n').filter(Boolean)
+    lines = readFileSync(subPath, 'utf8').split('\n').filter(Boolean)
       .flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
 
     const stamps = lines.map((l) => Date.parse(l.timestamp ?? l.ts)).filter((n) => !Number.isNaN(n));
@@ -125,6 +128,46 @@ try {
     ...(resumed ? { duration_caveat: 'agent was resumed; span includes idle time between invocations' } : {}),
     message: meta.description ?? '',
   }, { allowDerived: true });
+
+  // ---- the report, beside its prompt --------------------------------------
+  // METHODOLOGY §9 asks for the prompt "with the report beside them".  The
+  // report is the subagent's final assistant turn, which is already in the
+  // transcript read above — so it is derived from what ran, not retyped by the
+  // orchestrator, and cannot drift from it.
+  try {
+    const tag = scope.slice ? `s${scope.slice}` : `p${scope.phase ?? '0'}`;
+    const dir = join(cwd, 'docs/team-log/prompts');
+    if (existsSync(dir) && lines.length) {
+      const prefix = `${tag}-${role}-`;
+      // Pair with the highest-numbered prompt for this role and scope: the hook
+      // that wrote it ran at the spawn this stop corresponds to.
+      const n = readdirSync(dir)
+        .filter((f) => f.startsWith(prefix) && /-(\d+)\.md$/.test(f))
+        .reduce((max, f) => Math.max(max, Number(f.match(/-(\d+)\.md$/)[1])), 0);
+      const last = [...lines].reverse().find((l) => l.type === 'assistant' && l.message?.content);
+      const text = (last?.message?.content ?? [])
+        .filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+      if (n && text) {
+        writeFileSync(join(dir, `${prefix}${n}.report.md`), [
+          `# Report · ${scope.slice ? `slice ${scope.slice}` : `phase ${scope.phase ?? '0'}`} · ${role} · invocation ${n}`,
+          '',
+          'Extracted from the agent transcript by `.claude/hooks/log-agent-finish.mjs`.',
+          'This is the report **as returned** — it is derived, not retyped, so it cannot drift.',
+          '',
+          `- Task: ${meta.description ?? '—'}`,
+          `- Returned: ${new Date().toISOString()}`,
+          duration !== null ? `- Duration: ${Math.round(duration / 1000)}s` : '- Duration: —',
+          '',
+          '---',
+          '',
+          text,
+          '',
+        ].join('\n'), 'utf8');
+      }
+    }
+  } catch (err) {
+    note(`report capture failed for ${role}/${agentId}: ${err.message}`);
+  }
 } catch (err) {
   note(`failed to log ${role}/${agentId}: ${err.message}`);
 }
