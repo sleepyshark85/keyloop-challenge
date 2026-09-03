@@ -1,6 +1,6 @@
 # Phase 4 — pre-registered process criteria
 
-**Status: awaiting human approval. Must be committed before slice 00 runs.**
+**Status: AGREED. Committed before slice 00 runs.**
 
 Phase 4 runs the full pipeline on a deliberately trivial slice and judges **the machine, not the
 code**. These are the criteria it is judged against, written and committed *before* the pilot, so
@@ -30,12 +30,12 @@ C8 is a human judgement and is declared as one. The rest are mechanical.
 
 ---
 
-## Thresholds needing agreement
+## Agreed thresholds
 
-Two numbers cannot be set from the code, and pre-registration is meaningless without them.
-**Both need your figure before the pilot runs.**
+Two numbers that cannot be derived from the code. Agreed before the pilot, which is the only
+way a ceiling constrains anything.
 
-| | Proposed | Meaning |
+| | Agreed | Meaning |
 |---|---|---|
 | Wall-clock ceiling | **≤ 45 min** for slice 00 | Extrapolates to roughly 10 hours over 13 slices |
 | Cost ceiling | **≤ $8** for slice 00 | Extrapolates to roughly $100 total |
@@ -80,6 +80,6 @@ Stated plainly, because these are the ways a pre-registered test gets quietly de
 
 | | |
 |---|---|
-| Criteria agreed by | *(human — pending)* |
-| Date | *(pending)* |
-| Commit preceding first slice-00 event | *(filled after commit)* |
+| Criteria agreed by | human (repository owner) |
+| Date | 2026-09-03 |
+| Ordering proof | this file's commit precedes the first slice-00 event in `events.jsonl`; verify with `git log --diff-filter=M -- docs/team-log/` |

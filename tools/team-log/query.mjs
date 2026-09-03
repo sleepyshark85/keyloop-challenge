@@ -124,8 +124,9 @@ console.log(
 );
 for (const r of rows) {
   const t = new Date(r.ts).toISOString().slice(11, 19);
+  const scope = r.slice ?? (r.phase ? `P${r.phase}` : '--');
   const line =
-    `${t}  ${(r.slice ?? '--').padEnd(3)} ` +
+    `${t}  ${scope.padEnd(3)} ` +
     `${(r.actor ?? '').padEnd(13)} ` +
     `${MARK[r.source] ?? ' '}${r.event.padEnd(17)} ` +
     `${dur(r.duration_ms).padEnd(6)} ` +

@@ -272,6 +272,15 @@ acceptance test, attributed to them.
 
 ## 8. Commits
 
+**What gets a PR.** Everything from phase 1 onward; `main` takes no direct commits after phase 0.
+
+| Work | Vehicle | Why |
+|---|---|---|
+| Phase 0 | direct to `main` | No agent ran, no acceptance test, no gate. A PR with no reviewer is ceremony |
+| Phases 1–3 | PR per phase (`phase/NN-name`) | Each ends in a human gate. **The PR is the gate artifact** — approval and rationale become the record rather than something the orchestrator reports |
+| Phase 5 | PR per slice (`slice/NN-name`) | |
+| Phases 6–7 | PR | Gate F |
+
 One branch and PR per slice; the slice file is the PR body. **Exactly one red commit per slice**, by
 the test-engineer (`test(acceptance): … (red)`); **every implementer commit green** (unit test plus
 the code it drives); `main` receives only green merges. Conventional Commits referencing the slice.
@@ -297,7 +306,16 @@ waterfall; `/health`, `/ready`; one `grafana/otel-lgtm` container. Metrics are d
 `availability_query_duration_seconds`.
 
 **Team plane.** Append-only `docs/team-log/events.jsonl`, trace-shaped so it renders as a waterfall
-now and exports to OTLP later. Per record: `ts`, `slice`, `trace_id`, `span_id`, `parent_span_id`,
+now and exports to OTLP later.
+
+Every record is scoped to a **`slice`** or a **`phase`**, and the schema rejects one that is neither.
+Phases 1–3 have no slice but produce the requirements and architecture reasoning — the most
+substantial evidence in the submission — so they are logged as `phase-N` traces. **Phase 0 is
+deliberately not backfilled:** writing events after the fact for work that predates the log would be
+narration dressed as history, which is the fabrication the trust model exists to prevent. Its
+evidence is its git history, which is derived and therefore better.
+
+Per record: `ts`, `slice` or `phase`, `trace_id`, `span_id`, `parent_span_id`,
 `actor`, `event`, `board{from,to}`, `duration_ms`, `inputs[]`, `outputs[]`,
 `git{commits,files,+,-}`, `checks{}`, `agent_sha`, `transcript`, and `message`.
 

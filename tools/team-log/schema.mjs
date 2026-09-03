@@ -50,7 +50,15 @@ export const EVENTS = {
   'slice.done':       [],
 };
 
-const UNIVERSAL_REQUIRED = ['ts', 'slice', 'event', 'source'];
+const UNIVERSAL_REQUIRED = ['ts', 'event', 'source'];
+
+/**
+ * Work is scoped to either a slice or a phase, never neither. Phases 1-3 produce
+ * arc42 and the backlog and have no slice, but their agent runs and gate
+ * decisions are the evidence base for §13 — losing them would start the record
+ * at slice 00 and throw away the architecture reasoning.
+ */
+export const PHASES = ['0', '1', '2', '3', '4', '6', '7'];
 
 const SEVERITIES = ['BLOCKING', 'MAJOR', 'MINOR'];
 const RESOLUTIONS = ['fixed', 'disputed', 'accepted', 'deferred'];
@@ -70,6 +78,13 @@ export function validate(e) {
   };
 
   for (const f of UNIVERSAL_REQUIRED) need(f);
+
+  if (!e.slice && !e.phase) {
+    errors.push('every record must be scoped: give it a `slice` or a `phase`');
+  }
+  if (e.phase && !PHASES.includes(String(e.phase))) {
+    errors.push(`invalid phase: ${e.phase} (expected ${PHASES.join(' | ')}; slice work uses \`slice\`, not phase 5)`);
+  }
 
   if (e.event && !(e.event in EVENTS)) {
     errors.push(`unknown event: ${e.event} (expected one of ${Object.keys(EVENTS).join(', ')})`);
@@ -121,11 +136,17 @@ export function normalize(e, priorEvents = []) {
   const out = { ...e };
   out.ts ??= new Date().toISOString();
   out.source ??= 'reported';
-  if (out.slice !== undefined) {
-    out.slice = String(out.slice).padStart(2, '0');
-    out.trace_id ??= `slice-${out.slice}`;
+  // A record is scoped to a slice or a phase; the trace is named after whichever.
+  const scope = out.slice !== undefined && out.slice !== null
+    ? { key: (out.slice = String(out.slice).padStart(2, '0')), prefix: 'slice', stem: 's' }
+    : out.phase !== undefined && out.phase !== null
+      ? { key: (out.phase = String(out.phase)), prefix: 'phase', stem: 'p' }
+      : null;
+
+  if (scope) {
+    out.trace_id ??= `${scope.prefix}-${scope.key}`;
     if (!out.span_id) {
-      const stem = `s-${out.slice}-${out.actor ?? out.event.split('.')[0]}`;
+      const stem = `${scope.stem}-${scope.key}-${out.actor ?? out.event.split('.')[0]}`;
       const n = priorEvents.filter((p) => (p.span_id ?? '').startsWith(`${stem}-`)).length + 1;
       out.span_id = `${stem}-${n}`;
     }
@@ -135,7 +156,7 @@ export function normalize(e, priorEvents = []) {
 
 /** Ordered field list, so appended lines stay readable in a git diff. */
 export const FIELD_ORDER = [
-  'ts', 'slice', 'trace_id', 'span_id', 'parent_span_id', 'actor', 'event',
+  'ts', 'slice', 'phase', 'trace_id', 'span_id', 'parent_span_id', 'actor', 'event',
   'source', 'outcome', 'board', 'duration_ms', 'inputs', 'outputs', 'git',
   'checks', 'agent_sha', 'transcript', 'message',
 ];
