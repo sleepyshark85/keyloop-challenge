@@ -12,3 +12,7 @@ docs/board.html
 # OS / editor
 .DS_Store
 *.swp
+
+# Transient orchestrator state
+docs/team-log/.scope
+docs/team-log/.hook-errors

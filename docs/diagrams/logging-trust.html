@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logging trust surface · Layer stack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --color-paper:#f5f5f5;--color-ink:#2d3142;--color-muted:#4f5d75;--color-accent:#eb6c36;
+      --font-sans:'Geist',system-ui,sans-serif;--font-serif:'Instrument Serif',serif;
+      --font-mono:'Geist Mono',ui-monospace,monospace}
+    body{font-family:var(--font-sans);background:var(--color-paper);color:var(--color-ink);
+      min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3rem 2rem}
+    .frame{max-width:1000px;width:100%}
+    .eyebrow{font-family:var(--font-mono);font-size:.66rem;font-weight:500;letter-spacing:.18em;
+      text-transform:uppercase;color:var(--color-muted);margin-bottom:.5rem}
+    h1{font-family:var(--font-serif);font-size:clamp(1.5rem,2.4vw + .75rem,2rem);font-weight:400;
+      letter-spacing:-.02em;line-height:1.15;margin-bottom:.375rem}
+    .subtitle{font-size:.8125rem;color:var(--color-muted);margin-bottom:1.5rem}
+    svg{width:100%;min-width:820px;display:block}
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Layer stack · Observability</p>
+    <h1>What the record can be trusted for</h1>
+    <p class="subtitle">Each layer compensates for the gaps in the one below it. Residual risk propagates downward.</p>
+
+    <svg viewBox="0 0 1000 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logging-trust-title logging-trust-desc">
+      <title id="logging-trust-title">What the record can be trusted for</title>
+      <desc id="logging-trust-desc">Four stacked layers of event-log trustworthiness, from a harness hook that records agent runs automatically, through tooling that is not yet wired, to the orchestrator whose records are omittable, with an audit layer that reconciles the orchestrator's claims against transcripts and git history.</desc>
+
+      <defs>
+        <marker id="arrow-up" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#7a8399"/>
+        </marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- direction indicator, OUTSIDE the stack on the left margin -->
+      <line x1="60" y1="368" x2="60" y2="124" stroke="#7a8399" stroke-width="1" marker-end="url(#arrow-up)"/>
+      <text x="76" y="252" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.08em">can be trusted</text>
+
+      <!-- ============ LAYERS — full width, same x, hairline dividers ============ -->
+
+      <!-- L1 · HARNESS -->
+      <rect x="120" y="112" width="800" height="64" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+      <text x="140" y="139" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">L1</text>
+      <text x="140" y="156" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">HARNESS</text>
+      <text x="272" y="141" fill="#2d3142" font-size="14" font-weight="600" font-family="'Geist', sans-serif">SubagentStop hook</text>
+      <text x="272" y="158" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">agent.finish · duration + tokens from the agent's own transcript</text>
+      <text x="900" y="141" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">CANNOT be omitted</text>
+      <text x="900" y="156" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">CANNOT be fabricated</text>
+
+      <!-- L2 · TOOLING — FOCAL: the unwired gap -->
+      <rect x="120" y="176" width="800" height="64" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <text x="140" y="203" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">L2</text>
+      <text x="140" y="220" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">TOOLING</text>
+      <text x="272" y="205" fill="#2d3142" font-size="14" font-weight="600" font-family="'Geist', sans-serif">CI · test reporter · post-commit</text>
+      <text x="272" y="222" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">check.run · diffstat — computes its own facts</text>
+      <text x="900" y="205" fill="#eb6c36" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">NOT WIRED YET</text>
+      <text x="900" y="220" fill="#eb6c36" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">no test command until slice 00</text>
+
+      <!-- L3 · ORCHESTRATOR -->
+      <rect x="120" y="240" width="800" height="64" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+      <text x="140" y="267" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">L3</text>
+      <text x="140" y="284" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ORCHESTR.</text>
+      <text x="272" y="269" fill="#2d3142" font-size="14" font-weight="600" font-family="'Geist', sans-serif">The model</text>
+      <text x="272" y="286" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">handoff · board.move · dcr.* · gate.* · review.*</text>
+      <text x="900" y="269" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">omittable</text>
+      <text x="900" y="284" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">`derived` tier refused here</text>
+
+      <!-- L4 · AUDIT -->
+      <rect x="120" y="304" width="800" height="64" fill="rgba(45,49,66,0.05)" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+      <text x="140" y="331" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">L4</text>
+      <text x="140" y="348" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">AUDIT</text>
+      <text x="272" y="333" fill="#2d3142" font-size="14" font-weight="600" font-family="'Geist', sans-serif">npm run log:audit</text>
+      <text x="272" y="350" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">reconciles L3 against subagent transcripts + git history</text>
+      <text x="900" y="333" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">OMISSION · UNSUPPORTED</text>
+      <text x="900" y="348" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">MISMATCH</text>
+
+      <!-- outer silhouette, drawn last so it reads as one stack -->
+      <rect x="120" y="112" width="800" height="256" fill="none" stroke="#4f5d75" stroke-width="1"/>
+
+      <!-- ============ EDITORIAL CALLOUT ============ -->
+      <text x="976" y="60" fill="#eb6c36" font-size="14" font-style="italic"
+            font-family="'Instrument Serif', serif" text-anchor="end">criterion C1 cannot pass today</text>
+      <path d="M 800 68 Q 880 130 916 188" fill="none" stroke="rgba(235,108,54,0.50)" stroke-width="1" stroke-dasharray="4,3"/>
+      <circle cx="916" cy="188" r="2" fill="#eb6c36"/>
+
+      <!-- ============ LEGEND ============ -->
+      <line x1="120" y1="424" x2="920" y2="424" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="120" y="440" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <rect x="120" y="460" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <text x="140" y="468" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Known gap</text>
+
+      <rect x="280" y="460" width="14" height="10" rx="2" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+      <text x="300" y="468" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Emitting today</text>
+
+      <rect x="460" y="460" width="14" height="10" rx="2" fill="rgba(45,49,66,0.05)" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+      <text x="480" y="468" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Compensating control — run at every gate</text>
+    </svg>
+  </div>
+</body>
+</html>
