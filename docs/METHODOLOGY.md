@@ -119,7 +119,10 @@ unexplained.
 
 **Three tiers of trust.** *Generated* (cannot drift): module graph from `dependency-cruiser`,
 OpenAPI from route schemas, §11's debt register from `proposed` ADRs and deferred slices,
-`system-design.md` from section files. *Enforced* (CI): link integrity, ADR existence, `QS-*` → test.
+`system-design.md` from section files. *Enforced* (CI): the assembly matches its section files,
+every diagram has its export and every diagram link resolves, the event log is append-only and
+schema-valid. Link integrity beyond diagrams, ADR existence and `QS-*` → test are **claimed here
+but not yet enforced** — arc42 §11.2 R-8 carries the gap.
 *Written* (drifts, so keep small and about **why**): §4, §9, §11 commentary.
 
 **As-designed → as-built.** arc42 is written as-designed at Gate B and corrected at each merge. The
@@ -138,9 +141,17 @@ and each drawing costs several hundred lines of mandatory reference reading. Der
 
 **Both the `.html` source and the exported `.svg` are committed**, and arc42 references the `.svg`.
 An evaluator reading the repository on GitHub has no plugin installed; without the exported file the
-§6 runtime view is invisible to exactly the audience it exists for. The skill's `self_check.py` and
-`verify-geometry.py` run in CI, which puts diagrams in the **enforced** tier rather than the written
-one — they are the only part of the documentation that validates its own layout.
+§6 runtime view is invisible to exactly the audience it exists for. CI enforces that much: every
+committed `.html` has its exported `.svg`, and every diagram link under `docs/` resolves.
+
+**Layout itself is not enforced.** The skill's `self_check.py` and `verify-geometry.py` do validate
+it — no clipped label masks, no overlapping nodes — but they live in the `diagram-design` plugin
+cache outside the repository, so a fresh checkout does not contain them and CI cannot run them. The
+architect runs both at authoring time; that result is *reported*, not proven. Diagrams therefore sit
+in the **enforced** tier for existence and linkage, and the **written** tier for layout. Vendoring
+the two scripts was considered and rejected: ~560 lines of third-party code forked into a repository
+that is itself under assessment, to enforce a property of drawings refreshed once at phase 6.
+Recorded as arc42 §11.2 R-8.
 
 *Rejected: a second specification framework.* Spec-Kit and BMAD both overlap arc42; adopting either
 alongside it creates two answers to "what is a task" plus a pipeline to keep them in sync. What was
