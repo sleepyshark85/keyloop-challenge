@@ -272,7 +272,7 @@ acceptance test, attributed to them.
 | Work | Vehicle | Why |
 |---|---|---|
 | Phase 0 | direct to `main` | No agent ran, no acceptance test, no gate. A PR with no reviewer is ceremony |
-| Phases 1–3 | PR per phase (`phase/NN-name`) | Each ends in a human gate. **The PR is the gate artifact** — approval and rationale become the record rather than something the orchestrator reports |
+| Phases 1–3 | PR per phase (`phase/NN-name`) | Each ends in a human gate. **The PR is the gate artifact** — the decision and its rationale become the record rather than something the orchestrator reports |
 | Phase 5 | PR per slice (`slice/NN-name`) | |
 | Phases 6–7 | PR | Gate F |
 
@@ -285,6 +285,18 @@ This resolves what would otherwise conflict — auditable TDD needs a visible re
 deliverable" forbids one. The single red commit is authored by a **different agent** than the
 implementer, so the evidence is stronger than a self-reported cycle and mainline discipline is
 untouched. Reviewer↔implementer conversation lives in PR threads.
+
+**Merge commits only — squash and rebase are disabled at the repository.** This is not a style
+preference. Squashing collapses the red commit and the green commits into one, destroying the trail
+that criteria C1 and C2 are measured from. Rebasing rewrites SHAs, and the event log records SHAs in
+`git.commits`, so every logged reference would dangle and `log:audit` would report false omissions.
+`required_linear_history` stays off for the same reason — it would force one or the other.
+
+**On gate approval.** GitHub does not permit approving one's own pull request, and with a single
+account no configuration changes that; requiring approvals would hard-block every merge. The gate
+artifact is therefore the **merge plus a comment carrying the human's rationale** — the same
+evidence a formal approval would give, timestamped and attached to the diff. Branch protection
+requires a PR with *zero* required approvals, and `enforce_admins` stays off so the author can merge.
 
 ---
 
