@@ -24,6 +24,13 @@ const TEST_OWNED = [
   'tests/acceptance/', 'tests/contract/', 'tests/property/', 'tests/concurrency/',
   // Ruled to the test-engineer at Gate B; CLAUDE.md §5 carries the reasoning.
   'tests/architecture/', 'tests/performance/',
+  // The harness is part of the test.  Both reviewers flagged this gap independently
+  // at slice 00a step 2: AC-1's assertion IS that the container starts and the suite
+  // connects, so an implementer able to edit globalSetup, the shared spawn helper or
+  // the Vitest config can turn a failing acceptance test green without touching the
+  // behaviour under test.  Criterion C2 is measured from hook denials, so an
+  // unenforced boundary here makes a fatal criterion self-reported.
+  'tests/setup/', 'tests/support/', 'vitest.config.ts',
 ];
 
 /** role -> { write: [prefixes], read: [prefixes], note } */
@@ -130,7 +137,21 @@ if (tool === 'Bash') {
   const writeish = /(^|[\s;&|])(>{1,2}|tee\b|sed\s+-i|truncate\b|dd\b|cp\b|mv\b|rm\b|install\b)/;
   if (writeish.test(cmd)) {
     for (const prefix of guarded) {
-      if (cmd.includes(prefix)) {
+      // Anchor the match to a path that would actually resolve inside the repo.
+      // A bare substring test denied any command merely CONTAINING `src/` —
+      // including fixture work under /tmp, which slice 00a's AC-4 requires. The
+      // test-engineer hit this at step 2 and had to build its probe through a
+      // node script concatenating 's' + 'rc' to evade the heuristic. A guard
+      // whose normal workaround is obfuscation teaches the wrong habit and
+      // makes the reviewer's job harder, so the match now requires the prefix
+      // to appear at a token boundary and NOT under an absolute path outside
+      // the project.
+      const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const inRepo = new RegExp(`(^|[\\s;&|='"\`])(\\./)?${escaped}`);
+      // An ABSOLUTE path elsewhere (/tmp/probe-1/src/...) is someone else's tree.
+      // `./src/` is not: the leading `/` is required, so a relative path still bites.
+      const underAbsolute = new RegExp(`(^|[\\s;&|='"\`])/[\\w.-]+(/[\\w.-]+)*/${escaped}`);
+      if (inRepo.test(cmd) && !underAbsolute.test(cmd)) {
         deny(`${role} may not modify ${prefix}* — the command appears to write there via the shell. ${policy.note}`);
       }
     }
