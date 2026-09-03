@@ -7,8 +7,9 @@
 Generated: every ADR with `status: proposed` and every deferred-improvement slice is, by
 construction, a debt item traceable to the decision that created it.
 
-| Item | Origin | Why deferred |
-|---|---|---|
+<!-- generated:debt-register -->
+_No deferred improvements recorded._
+<!-- /generated:debt-register -->
 
 ## 11.2 Known risks
 

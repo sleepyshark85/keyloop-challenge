@@ -178,15 +178,10 @@ The `arc42:` field is what prevents slice work from silently rewriting architect
 
 ## 6. The slice loop
 
-```
-        ┌────────────────────────────────────────────────┐
-        ▼                                                │ loopback
-1 DESIGN ─▶ 2 AGREE ─▶ 3 RED ─▶ 4 GREEN ─▶ 5 REVIEW ─▶ 6 GATE ─▶ 7 AS-BUILT
-architect   all roles  test-eng  implementer  reviewer    human    architect
-   ▲           │          │          │           │          │
-   └───────────┴──────────┴──────────┴───────────┴──────────┘
-              DCR raised → slice BLOCKED → architect adjudicates
-```
+![The slice loop](diagrams/slice-loop.svg)
+
+*Source: [`diagrams/slice-loop.html`](diagrams/slice-loop.html) · regenerate the SVG with
+`npm run diagram:export`*
 
 | # | Step | Role | Produces |
 |---|---|---|---|
@@ -277,7 +272,7 @@ acceptance test, attributed to them.
 | Work | Vehicle | Why |
 |---|---|---|
 | Phase 0 | direct to `main` | No agent ran, no acceptance test, no gate. A PR with no reviewer is ceremony |
-| Phases 1–3 | PR per phase (`phase/NN-name`) | Each ends in a human gate. **The PR is the gate artifact** — approval and rationale become the record rather than something the orchestrator reports |
+| Phases 1–3 | PR per phase (`phase/NN-name`) | Each ends in a human gate. **The PR is the gate artifact** — the decision and its rationale become the record rather than something the orchestrator reports |
 | Phase 5 | PR per slice (`slice/NN-name`) | |
 | Phases 6–7 | PR | Gate F |
 
@@ -290,6 +285,48 @@ This resolves what would otherwise conflict — auditable TDD needs a visible re
 deliverable" forbids one. The single red commit is authored by a **different agent** than the
 implementer, so the evidence is stronger than a self-reported cycle and mainline discipline is
 untouched. Reviewer↔implementer conversation lives in PR threads.
+
+### Attribution in PR threads
+
+Every comment posts under the repository owner's account, because the agents have no identity of
+their own. Left alone that would make a PR thread unreadable as evidence — the reviewer's findings
+and the human's judgement would look like the same person talking to themselves. So every comment
+made **on behalf of an agent** opens with an attribution line:
+
+```
+**reviewer** · `.claude/agents/reviewer.md@6f70521` · MAJOR
+src/domain/availability.ts:44
+claim:     a slot ending exactly at another slot's start is treated as overlapping
+scenario:  bay 7 booked 09:00–10:00; a request for 10:00–11:00 is refused, but tstzrange is half-open
+```
+
+**A comment with no attribution line is the human's.** That asymmetry is deliberate — the human
+types comments by hand and should not have to remember a convention.
+
+Naming the **agent definition and its commit SHA** is worth more than a bot identity would be: it
+says which *version* of the reviewer produced the finding, so tightening a role's prompt mid-project
+leaves before-and-after distinguishable rather than smeared together.
+
+Honest limit: the header is self-asserted text, so the orchestrator could in principle attribute a
+comment to an agent that never ran. It is partially corroborated — `log:audit` would show no
+matching `agent.finish` or transcript — which puts it on the same footing as `handoff` and
+`board.move` in §9's coverage table rather than on the footing of `agent.finish`.
+
+*A machine account would make identity forgery-proof and would allow branch protection to require an
+approval, mechanically enforcing Gate E. Rejected for this project: it adds credential management to
+a solo assessment for a gain the audit already partly covers. Worth revisiting for a real team.*
+
+**Merge commits only — squash and rebase are disabled at the repository.** This is not a style
+preference. Squashing collapses the red commit and the green commits into one, destroying the trail
+that criteria C1 and C2 are measured from. Rebasing rewrites SHAs, and the event log records SHAs in
+`git.commits`, so every logged reference would dangle and `log:audit` would report false omissions.
+`required_linear_history` stays off for the same reason — it would force one or the other.
+
+**On gate approval.** GitHub does not permit approving one's own pull request, and with a single
+account no configuration changes that; requiring approvals would hard-block every merge. The gate
+artifact is therefore the **merge plus a comment carrying the human's rationale** — the same
+evidence a formal approval would give, timestamped and attached to the diff. Branch protection
+requires a PR with *zero* required approvals, and `enforce_admins` stays off so the author can merge.
 
 ---
 
@@ -344,6 +381,49 @@ not evidence. Three mechanisms close that:
 
 Agent reports are schema-validated or the slice cannot advance. Only `message` is narration, and the
 view marks it as such.
+
+![What the record can be trusted for](diagrams/logging-trust.svg)
+
+### Coverage — what is logged, and how far it can be trusted
+
+`Writer`: **H** harness hook · **T** tooling · **O** orchestrator. *Corroborated* means an
+independent artifact could contradict a false record.
+
+| Step | Event | Tier | Writer | Corroborated by | Residual risk |
+|---|---|---|---|---|---|
+| any agent finishes | `agent.finish` | derived | **H** | its own transcript | **none** — automatic |
+| agent invoked | `agent.start` | reported | O | transcript first-timestamp | low — audit could check, doesn't yet |
+| step transitions | `handoff` | reported | O | — | **omittable, unverifiable** |
+| board column change | `board.move` | reported | O | — | **omittable, unverifiable** |
+| slice opens / closes | `slice.ready` `slice.done` | reported | O | slice-file `status` | low |
+| CI run, incl. step-3 red proof | `check.run` | derived | **T** | — | **NOT EMITTED YET** — C1 cannot pass |
+| commits | `git` on other events | reported | O | `git log` | low — audit reports unreferenced commits |
+| step 5 findings and replies | `review.finding` `review.response` | reported | O | PR threads | low once PRs are live |
+| DCR raised | `dcr.raised` | reported | O | — | **omittable** |
+| DCR ruled | `dcr.resolved` | reported | O | superseding ADR | medium — ruling (c) needs `failing_criterion` (enforced) |
+| loopback | `loopback` | reported | O | ADR supersession chain | medium |
+| gates | `gate.opened` `gate.decided` | reported | O | PR approval | low once PRs are live |
+| ADR written | `adr.recorded` | reported | O | `docs/adr/*.md` | low — audit could check, doesn't yet |
+| arc42 corrected | `arc42.updated` | reported | O | `git diff docs/arc42/` | low — audit could check, doesn't yet |
+| escalation | `escalation` | reported | O | — | **omittable** |
+
+Read honestly, that table says: **one** event type is fully trustworthy; **one** is not emitted at
+all, which makes criterion C1 unpassable until slice 00 produces a test command; **four** are
+omittable and unverifiable — if they go unwritten nothing notices, and that is the residual trust
+surface; and **three** have ground truth sitting on disk that `log:audit` does not yet read, which
+is cheap to close before phase 5.
+
+### Commands
+
+| | |
+|---|---|
+| `npm run board` | the four panels — board, waterfall, thread, metrics |
+| `npm run log -- --slice 03` | the same data in the terminal |
+| `npm run log:audit` | **reconcile the log against reality — run at every gate** |
+| `npm run slice:check 03` | Ready / Done gate; `UNVERIFIED` blocks Done |
+| `npm run test:tools` | path-guard regression suite |
+| `npm run docs:build` | assemble `docs/system-design.md` from arc42 sections |
+| `npm run diagram:export <f.html>` | re-export a diagram's SVG |
 
 **Prompts, tokens, cost.** Prompts are written **before** invocation to
 `docs/team-log/prompts/<slice>-<agent>-<n>.md` with the report beside them, so the record cannot

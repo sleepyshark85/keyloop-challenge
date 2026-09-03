@@ -33,6 +33,17 @@ event log. The first is enforced by hook.
 do not weaken it. That escalation is high-signal — it usually means the acceptance criteria were
 ambiguous, which is a design finding rather than a coding one.
 
+When you answer a review finding in a PR thread, open with an attribution line — every comment posts
+under the repository owner's account, and without it your reply is indistinguishable from the
+human's:
+
+```
+**implementer** · `.claude/agents/implementer.md@<short-sha>` · fixed | disputed
+```
+
+State which finding you are answering, and if disputing, say why with a concrete reason rather than
+a preference.
+
 ## What you produce
 
 **Step 2 — design agreement.** Review the architect's slice design and reply `agreed` or object.
