@@ -286,6 +286,36 @@ deliverable" forbids one. The single red commit is authored by a **different age
 implementer, so the evidence is stronger than a self-reported cycle and mainline discipline is
 untouched. Reviewer↔implementer conversation lives in PR threads.
 
+### Attribution in PR threads
+
+Every comment posts under the repository owner's account, because the agents have no identity of
+their own. Left alone that would make a PR thread unreadable as evidence — the reviewer's findings
+and the human's judgement would look like the same person talking to themselves. So every comment
+made **on behalf of an agent** opens with an attribution line:
+
+```
+**reviewer** · `.claude/agents/reviewer.md@6f70521` · MAJOR
+src/domain/availability.ts:44
+claim:     a slot ending exactly at another slot's start is treated as overlapping
+scenario:  bay 7 booked 09:00–10:00; a request for 10:00–11:00 is refused, but tstzrange is half-open
+```
+
+**A comment with no attribution line is the human's.** That asymmetry is deliberate — the human
+types comments by hand and should not have to remember a convention.
+
+Naming the **agent definition and its commit SHA** is worth more than a bot identity would be: it
+says which *version* of the reviewer produced the finding, so tightening a role's prompt mid-project
+leaves before-and-after distinguishable rather than smeared together.
+
+Honest limit: the header is self-asserted text, so the orchestrator could in principle attribute a
+comment to an agent that never ran. It is partially corroborated — `log:audit` would show no
+matching `agent.finish` or transcript — which puts it on the same footing as `handoff` and
+`board.move` in §9's coverage table rather than on the footing of `agent.finish`.
+
+*A machine account would make identity forgery-proof and would allow branch protection to require an
+approval, mechanically enforcing Gate E. Rejected for this project: it adds credential management to
+a solo assessment for a gain the audit already partly covers. Worth revisiting for a real team.*
+
 **Merge commits only — squash and rebase are disabled at the repository.** This is not a style
 preference. Squashing collapses the red commit and the green commits into one, destroying the trail
 that criteria C1 and C2 are measured from. Rebasing rewrites SHAs, and the event log records SHAs in

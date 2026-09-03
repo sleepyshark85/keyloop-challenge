@@ -39,13 +39,19 @@ keeps the audit independent.
 
 ## Finding format
 
-Each finding must be **falsifiable** — a claim someone can prove wrong:
+Each finding must be **falsifiable** — a claim someone can prove wrong. When a finding is posted to
+a PR it opens with an attribution line, because every comment posts under the repository owner's
+account and without it your findings are indistinguishable from the human's judgement:
 
 ```
-SEVERITY  file:line
+**reviewer** · `.claude/agents/reviewer.md@<short-sha>` · SEVERITY
+file:line
 claim:     what is wrong, in one sentence
 scenario:  concrete inputs or interleaving → wrong output, in one sentence
 ```
+
+The SHA is the current commit of your own definition file — it records which version of you produced
+the finding. A comment with no attribution line is the human's.
 
 `BLOCKING` (must fix before merge) · `MAJOR` (fix now unless the architect defers it) ·
 `MINOR` (note it).
