@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg viewBox="0 0 1000 780" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="slice-loop-title slice-loop-desc">
+<svg width="1000" height="780" viewBox="0 0 1000 780" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="slice-loop-title slice-loop-desc">
       <title id="slice-loop-title">The slice loop</title>
       <desc id="slice-loop-desc">Flowchart of seven sequential steps for one unit of work — design, agree, red, green, review, human gate, as-built reconciliation — with a return path from review back to design taken only when the architect rules a design defect.</desc>
 

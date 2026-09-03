@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg viewBox="0 0 1000 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logging-trust-title logging-trust-desc">
+<svg width="1000" height="540" viewBox="0 0 1000 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logging-trust-title logging-trust-desc">
       <title id="logging-trust-title">What the record can be trusted for</title>
       <desc id="logging-trust-desc">Four stacked layers of event-log trustworthiness, from a harness hook that records agent runs automatically, through tooling that is not yet wired, to the orchestrator whose records are omittable, with an audit layer that reconciles the orchestrator's claims against transcripts and git history.</desc>
 
