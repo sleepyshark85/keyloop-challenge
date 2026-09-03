@@ -1,0 +1,170 @@
+# The founding pipeline.  Decision record: docs/adr/0010-github-actions-and-check-run-collection.md
+#
+# It contains only what passes with no `src/` in the repository, on purpose.
+# METHODOLOGY §261 — "the board cannot leave `red` until CI has recorded the acceptance
+# test failing" — puts CI *before* slice 00 step 3, which is earlier than the code it will
+# eventually check.  Everything that needs `src/` is at the foot of this file as a clearly
+# marked PHASE 4 block: `npm run lint:arch` and `npm run graph:modules` fail today with
+# "Can't open 'src' for reading", and a pipeline that is red by design teaches everyone to
+# ignore it.
+name: verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Read only.  ADR-0010 Decision 2: `check.run` is *collected* from the API at each gate by
+# tools/team-log/collect-ci.mjs, never committed from here — this repository's git history
+# is itself under assessment (OC-7), and handing a workflow write access to the artifact
+# being graded, in order to record that it was checked, is a poor trade.
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  # Deliberately NOT cancel-in-progress.  A superseded run can be the only record of a red
+  # state (ADR-0010 Decision 3).  Runs here are cheap; evidence is not.
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: docs, tools and log integrity
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The append-only check diffs against the pull request's merge base.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          # §7.1's deployment runtime, not the maintainer's local Node 24: CI should agree
+          # with what runs in production rather than with a laptop.  This literal and the
+          # `engines` range in package.json are duplicated, but the duplication is checked
+          # rather than silent — raise the floor above 22 and the next step fails.
+          node-version: '22.x'
+          cache: npm
+
+      - name: install, with the engines pin enforced (TC-10)
+        # TC-10 records that Node and npm are pinned; `engines` is advisory until something
+        # enforces it, and this is that something.  Also asserts package-lock.json agrees
+        # with package.json.
+        run: npm ci --engine-strict
+
+      - name: system-design.md is current with its section files
+        # METHODOLOGY §4, generated tier: the assembly cannot drift from its sources.
+        run: npm run docs:check
+
+      - name: tools regression suite
+        run: npm run test:tools
+
+      - name: every diagram is exported, and every diagram link resolves
+        # METHODOLOGY §4: "an evaluator reading the repository on GitHub has no plugin
+        # installed" — an un-exported diagram is invisible to the audience it was drawn for.
+        # This is the honest subset of that section's claim: the skill's self_check.py and
+        # verify-geometry.py live in a plugin cache outside the repository and cannot run
+        # here.  See ADR-0010 Decision 4 and arc42 §11.
+        shell: bash
+        run: |
+          fail=0
+          for html in docs/diagrams/*.html; do
+            [ -f "${html%.html}.svg" ] || {
+              echo "::error file=$html::committed without its exported .svg"
+              fail=1
+            }
+          done
+          while IFS= read -r ref; do
+            file=${ref%%:*}
+            path=${ref#*:}
+            [ -f "$(dirname "$file")/$path" ] || {
+              echo "::error file=$file::diagram link does not resolve -> $path"
+              fail=1
+            }
+          done < <(grep -roE '\]\([^)]*diagrams/[^)]+\)' docs --include='*.md' \
+                   | sed -E 's/\]\(//; s/\)$//')
+          [ "$fail" -eq 0 ] && echo "diagrams: exported and linked"
+          exit $fail
+
+      - name: the event log is append-only
+        # METHODOLOGY §9.  Append-only is currently a property of the orchestrator's
+        # discipline; here it becomes a property of the build.
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          log=docs/team-log/events.jsonl
+          removed=$(git diff --unified=0 "$BASE_SHA...HEAD" -- "$log" | grep -c '^-[^-]' || true)
+          if [ "${removed:-0}" -ne 0 ]; then
+            echo "::error file=$log::$removed existing record(s) removed or altered — the log is append-only"
+            git diff --unified=0 "$BASE_SHA...HEAD" -- "$log" | grep '^-[^-]' || true
+            exit 1
+          fi
+          added=$(git diff --unified=0 "$BASE_SHA...HEAD" -- "$log" | grep -c '^+[^+]' || true)
+          echo "append-only: ok (${added:-0} record(s) added, 0 removed)"
+
+      - name: every event-log record validates against the schema
+        # append.mjs validates on the write path, so this catches the one way round it:
+        # a line edited by hand.  Ten lines of inline node is acceptable; if this grows it
+        # becomes a tools/ script with a test in tools/test/ (ADR-0010, Consequences).
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { validate } from "./tools/team-log/schema.mjs";
+            const file = "docs/team-log/events.jsonl";
+            const lines = readFileSync(file, "utf8").split("\n").filter(Boolean);
+            let bad = 0;
+            lines.forEach((line, i) => {
+              let e;
+              try { e = JSON.parse(line); }
+              catch { console.log("::error file=" + file + ",line=" + (i + 1) + "::not valid JSON"); bad++; return; }
+              const { ok, errors } = validate(e);
+              if (!ok) { console.log("::error file=" + file + ",line=" + (i + 1) + "::" + errors.join("; ")); bad++; }
+            });
+            console.log(lines.length + " record(s) checked, " + bad + " invalid");
+            if (bad) process.exit(1);
+          '
+
+# ---------------------------------------------------------------------------------------
+# PHASE 4 — wired in when `src/` and the test suite arrive.  Not commented out because it
+# is unfinished, but because the commands it runs do not yet have anything to run against.
+# Full reasoning in ADR-0010 Decision 4.
+#
+#   typecheck:                tsc --noEmit
+#   lint:arch:                npm run lint:arch                 # CLAUDE.md §2.3, QS-10
+#   test:                     npm test                          # Vitest + Testcontainers
+#
+# The test job needs Docker (TC-9), which is why the platform decision was a correctness
+# decision and not a convenience: §2.2 forbids substituting the database, so a Docker-less
+# runner can only run the tests that would pass anyway.  `ubuntu-latest` ships a working
+# daemon, so no `services:` block is needed — Testcontainers starts its own PostgreSQL.
+#
+#   red-proof:  runs only when the head commit subject matches ^test\(.+\): .*\(red\)$
+#               (CLAUDE.md §7 — exactly one such commit per slice, authored by the
+#               test-engineer, so the marker cannot be self-awarded by the implementer).
+#               It asserts the *shape* of the failure, not merely that there was one:
+#                 - the acceptance suite MUST exit non-zero, and
+#                 - install, typecheck, lint:arch, docs, tools and unit MUST all pass.
+#               A branch that does not compile is a broken run, not a red proof, and the
+#               job says which.  The job therefore SUCCEEDS when the required failure was
+#               observed — so a correctly red slice is not blocked behind a spurious
+#               failure — and the check name makes that inversion visible rather than
+#               hiding it in `continue-on-error`.  On any other commit there is no
+#               inversion: a failing acceptance test is a failing build.
+#
+#   check-run summary:        write a machine-readable run summary and upload it as an
+#               artifact (retention 90 days).  tools/team-log/collect-ci.mjs reads it — or
+#               `gh run view --json` — at each gate and appends the `check.run` record with
+#               source "derived" via appendRecords(..., { allowDerived: true }).  The
+#               durable evidence is that record in git plus the red commit's SHA; the
+#               artifact is corroboration and expires.
+#
+# Deliberately never here, with reasons in ADR-0010 Decision 4: Stryker (a reviewer's
+# findings, not a threshold), `npm run log:audit` (its ground truth is subagent transcripts
+# on the human's machine — on a fresh checkout it reports every honest run as UNSUPPORTED),
+# and `npm run status` (regenerates a resume point that changes with every commit).
+# ---------------------------------------------------------------------------------------
