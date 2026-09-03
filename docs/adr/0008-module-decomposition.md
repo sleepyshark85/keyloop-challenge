@@ -1,7 +1,7 @@
 ---
 id: "0008"
 title: Decompose into five layered modules around a dependency-free policy core
-status: proposed
+status: accepted
 date: 2026-09-04
 supersedes: null
 superseded_by: null
@@ -11,7 +11,8 @@ arc42: ["§4.3", "§5.2", "§5.3", "§8.5", "§10"]
 proposed-by: architect
 decided-by: human
 ai-input: >
-  Proposed by the architect at Gate B; awaiting the human's decision. The architect
+  ACCEPTED as recommended at Gate B on 2026-09-04, unmodified.
+  Proposed by the architect at Gate B. The architect
   reached for ports-and-adapters first, as the default for a system with an
   interesting domain, and rejected it on a specific ground rather than a stylistic
   one: a repository port that can be implemented in memory is a port whose

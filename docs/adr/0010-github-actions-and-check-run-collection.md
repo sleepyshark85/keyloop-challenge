@@ -1,7 +1,7 @@
 ---
 id: "0010"
 title: Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow
-status: proposed
+status: accepted
 date: 2026-09-04
 supersedes: null
 superseded_by: null
@@ -11,9 +11,10 @@ arc42: ["§2.2", "§7.4", "§11.2"]
 proposed-by: architect
 decided-by: human
 ai-input: >
+  ACCEPTED as recommended at Gate B on 2026-09-04, unmodified.
   Raised by the orchestrator on the Gate B pull request as a gap with no phase and no ADR, with
   GitHub Actions recommended; the human ruled that CI is required and asked for the decision record
-  before merge. The architect wrote this ADR, and the platform choice was the easy part of it. The
+  before merge, then accepted this ADR at Gate B. The architect wrote this ADR, and the platform choice was the easy part of it. The
   three sub-decisions below — how `check.run` is emitted, how a deliberately-red run is told apart
   from a broken one, and what is deliberately *not* wired in yet — are the architect's, and the
   first of them reverses the obvious answer: the workflow does not write to the event log.

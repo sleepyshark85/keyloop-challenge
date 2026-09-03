@@ -1,7 +1,7 @@
 ---
 id: "0006"
 title: Use Kysely as a typed SQL builder over node-postgres, and adopt no ORM
-status: proposed
+status: accepted
 date: 2026-09-04
 supersedes: null
 superseded_by: null
@@ -11,7 +11,8 @@ arc42: ["§4.2", "§5.2", "§6", "§8.2", "§8.6"]
 proposed-by: architect
 decided-by: human
 ai-input: >
-  Proposed by the architect at Gate B; awaiting the human's decision. This is the
+  ACCEPTED as recommended at Gate B on 2026-09-04, unmodified.
+  Proposed by the architect at Gate B. This is the
   decision with the least freedom in it: `CLAUDE.md` §2.1 and ADR-0003 between them
   disqualify most of the field before preference enters, and the ADR is written to
   show that the elimination is forced rather than chosen. The architect's own

@@ -1,7 +1,7 @@
 ---
 id: "0005"
 title: Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them
-status: proposed
+status: accepted
 date: 2026-09-04
 supersedes: null
 superseded_by: null
@@ -11,7 +11,8 @@ arc42: ["§4.2", "§5.2", "§7", "§8.6"]
 proposed-by: architect
 decided-by: human
 ai-input: >
-  Proposed by the architect at Gate B; awaiting the human's decision. `CLAUDE.md` §3
+  ACCEPTED as recommended at Gate B on 2026-09-04, unmodified.
+  Proposed by the architect at Gate B. `CLAUDE.md` §3
   reserves the HTTP framework to the architect, so this is the architect's
   recommendation in full rather than a summary of one. The deciding argument is not
   performance — it is that METHODOLOGY §4 places the OpenAPI document in the

@@ -90,6 +90,7 @@ Enforced by path, symmetrically. Each role owns directories; neither crosses.
 
 ```
 tests/acceptance/    tests/contract/    tests/property/    tests/concurrency/
+tests/architecture/  tests/performance/
         ^-- test-engineer only. The implementer MUST NOT create, edit or delete these.
 
 tests/unit/
@@ -100,8 +101,11 @@ tests/integration/
 ```
 
 Rationale: unit tests are a design tool and must be freely writable during refactor, so the
-implementer owns them. Acceptance, contract, property and concurrency tests define *done* and must
-be written by someone who has not seen the implementation.
+implementer owns them. `tests/architecture/` and `tests/performance/` were unowned until Gate B and
+were ruled to the test-engineer on the same reasoning as the other outside-in directories: QS-10
+asserts the layering the implementer must not be able to relax, and QS-14's budget is an acceptance
+threshold rather than an optimisation target. The outside-in directories define *done* and must be
+written by someone who has not seen the implementation.
 
 If the implementer believes an acceptance test is wrong, it **raises a DCR**. It does not edit the
 test. That escalation is a signal — it usually means the slice's acceptance criteria were ambiguous.

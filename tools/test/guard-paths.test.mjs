@@ -27,6 +27,16 @@ const CASES = [
     { tool_name: 'Write', agent_type: 'implementer', file_path: 'tests/property/p.spec.ts' }],
   ['implementer may not delete an acceptance test via the shell', DENY,
     { tool_name: 'Bash', agent_type: 'implementer', command: 'rm tests/acceptance/03.spec.ts' }],
+  // Ruled to the test-engineer at Gate B (CLAUDE.md §5). QS-10 asserts the layering the
+  // implementer must not be able to relax, so it is guarded like the other outside-in dirs.
+  ['implementer may not write an architecture test (QS-10)', DENY,
+    { tool_name: 'Write', agent_type: 'implementer', file_path: 'tests/architecture/layering.spec.ts' }],
+  ['implementer may not write a performance test (QS-14)', DENY,
+    { tool_name: 'Write', agent_type: 'implementer', file_path: 'tests/performance/availability-budget.spec.ts' }],
+  ['test-engineer writes architecture tests', ALLOW,
+    { tool_name: 'Write', agent_type: 'test-engineer', file_path: 'tests/architecture/layering.spec.ts' }],
+  ['test-engineer writes performance tests', ALLOW,
+    { tool_name: 'Write', agent_type: 'test-engineer', file_path: 'tests/performance/availability-budget.spec.ts' }],
   ['test-engineer may not READ src/ — independence is a read rule', DENY,
     { tool_name: 'Read', agent_type: 'test-engineer', file_path: 'src/domain/availability.ts' }],
   ['test-engineer may not write unit tests', DENY,

@@ -1,7 +1,7 @@
 ---
 id: "0007"
 title: Run migrations with node-pg-migrate, written as plain .sql files
-status: proposed
+status: accepted
 date: 2026-09-04
 supersedes: null
 superseded_by: null
@@ -11,7 +11,8 @@ arc42: ["§4.2", "§5.2", "§7", "§8.2"]
 proposed-by: architect
 decided-by: human
 ai-input: >
-  Proposed by the architect at Gate B; awaiting the human's decision. The architect
+  ACCEPTED as recommended at Gate B on 2026-09-04, unmodified.
+  Proposed by the architect at Gate B. The architect
   initially separated "SQL-first migrations" from "a maintained runner" as competing
   goals and was heading for a hand-rolled runner; the resolution — node-pg-migrate
   executes `.sql` files natively — removes the conflict, and the ADR is written

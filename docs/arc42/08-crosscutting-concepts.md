@@ -273,13 +273,14 @@ Two structural supports rather than conventions:
 - **Isolation is by data, not by truncation** (§7.2). Each test seeds its own dealership, so the
   suite parallelises and every test is implicitly asserting A-9's scoping.
 
-Two directories in §10 are **not** in `CLAUDE.md` §5's ownership table and need a ruling:
-`tests/architecture/` (QS-10, QS-12) and `tests/performance/` (QS-14). Both assert properties of the
-design rather than of a slice, and neither needs to read `src/` to be written — the assertions come
-from arc42 §5 and from ADR-0008. **The architect's proposal is that both belong to the test-engineer**,
-on the same reasoning as the other outside-in directories. This is flagged for the human at Gate B
-rather than assumed; until it is ruled, the hook treats them as unowned and either role could write
-them, which is exactly the ambiguity `CLAUDE.md` §5 exists to remove.
+Two directories in §10 were **not** in `CLAUDE.md` §5's ownership table: `tests/architecture/`
+(QS-10, QS-12) and `tests/performance/` (QS-14). Both assert properties of the design rather than of
+a slice, and neither needs to read `src/` to be written — the assertions come from arc42 §5 and from
+ADR-0008. The architect proposed both to the test-engineer, on the same reasoning as the other
+outside-in directories, and **the human ruled that way at Gate B on 2026-09-04**. §5 now lists them,
+and `.claude/hooks/guard-paths.mjs` guards them: the ruling is enforced by path like every other
+ownership rule, with four cases in `tools/test/guard-paths.test.mjs` proving it fires in both
+directions.
 
 ## 8.6 Error handling and API semantics
 

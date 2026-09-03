@@ -1,7 +1,7 @@
 ---
 id: "0009"
 title: Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16
-status: proposed
+status: accepted
 date: 2026-09-04
 supersedes: null
 superseded_by: null
@@ -11,7 +11,8 @@ arc42: ["§4.1", "§5.2", "§6.2", "§8.4", "§10", "§11"]
 proposed-by: architect
 decided-by: human
 ai-input: >
-  Proposed by the architect at Gate B; awaiting the human's decision. ADR-0004
+  ACCEPTED as recommended at Gate B on 2026-09-04, unmodified.
+  Proposed by the architect at Gate B. ADR-0004
   explicitly deferred candidate ordering, the retry mechanism and the cap's value to
   the architect at Gate B, so this ADR closes parameters the human already delegated
   rather than reopening a Gate A ruling. The pruning rule is the architect's own

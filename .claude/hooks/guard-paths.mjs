@@ -8,9 +8,9 @@
  *
  * Two boundaries matter most, and neither survives as a polite request:
  *
- *   1. The implementer may not edit acceptance/contract/property/concurrency
- *      tests. Those define *done*; an implementer that can weaken them has not
- *      been verified by them.
+ *   1. The implementer may not edit the outside-in tests — acceptance, contract,
+ *      property, concurrency, architecture and performance. Those define *done*;
+ *      an implementer that can weaken them has not been verified by them.
  *   2. The test-engineer may not even READ src/. Independence is a read
  *      restriction as much as a write one — tests derived from an implementation
  *      restate it rather than check it.
@@ -22,6 +22,8 @@ import { relative, resolve, isAbsolute } from 'node:path';
 
 const TEST_OWNED = [
   'tests/acceptance/', 'tests/contract/', 'tests/property/', 'tests/concurrency/',
+  // Ruled to the test-engineer at Gate B; CLAUDE.md §5 carries the reasoning.
+  'tests/architecture/', 'tests/performance/',
 ];
 
 /** role -> { write: [prefixes], read: [prefixes], note } */

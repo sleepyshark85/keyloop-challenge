@@ -8,22 +8,16 @@ Generated: every ADR with `status: proposed` and every deferred-improvement slic
 construction, a debt item traceable to the decision that created it.
 
 <!-- generated:debt-register -->
-| Item | Origin | Why deferred |
-|---|---|---|
-| Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them | [ADR-0005](../adr/0005-fastify-with-typebox-schemas.md) | deferred improvement |
-| Use Kysely as a typed SQL builder over node-postgres, and adopt no ORM | [ADR-0006](../adr/0006-kysely-as-typed-sql-builder.md) | deferred improvement |
-| Run migrations with node-pg-migrate, written as plain .sql files | [ADR-0007](../adr/0007-node-pg-migrate-with-sql-files.md) | deferred improvement |
-| Decompose into five layered modules around a dependency-free policy core | [ADR-0008](../adr/0008-module-decomposition.md) | deferred improvement |
-| Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 | [ADR-0009](../adr/0009-candidate-ordering-and-attempt-cap.md) | deferred improvement |
-| Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | [ADR-0010](../adr/0010-github-actions-and-check-run-collection.md) | deferred improvement |
+_No deferred improvements recorded._
 <!-- /generated:debt-register -->
 
-**Read that table with one correction, until Gate B closes.** ADR-0005 to ADR-0010 are the *founding*
-decisions of this architecture, not deferred improvements. They carry `status: proposed` because
-Gate B is where the human ratifies them, and the register is generated from that status, so it
-currently reports them under the wrong heading. When they are accepted the register empties, and
-every entry that appears in it afterwards will genuinely be a deferred improvement — a `(b)` DCR
-ruling under `CLAUDE.md` §6, which is what the register exists to make impossible to lose.
+The register is empty, and that is the correct reading rather than an omission. Between the architect
+writing this section and Gate B closing it reported ADR-0005 to ADR-0010 as debt, because it is
+generated from `status: proposed` and those were the *founding* decisions awaiting ratification, not
+deferred improvements. **The human accepted all six at Gate B on 2026-09-04**, so the register
+emptied on its own. Every entry that appears here from now on is genuinely a deferred improvement —
+a `(b)` DCR ruling under `CLAUDE.md` §6, which is what the register exists to make impossible to
+lose.
 
 ## 11.2 Known risks
 
