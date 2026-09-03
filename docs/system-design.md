@@ -46,13 +46,13 @@ plan that reads as though it never was. §11 and §13 discuss the material delta
 | **1** | [Introduction and goals](arc42/01-introduction-goals.md) | A service-appointment scheduler for automotive dealerships. |
 | **2** | [Architecture constraints](arc42/02-constraints.md) | A constraint is something **imposed** — by the brief, by the constitution, or by the environment. |
 | **3** | [Context and scope](arc42/03-context-scope.md) | The system sits alone. It has human actors and one persistent store, and **no neighbouring systems** — that is the single most consequential fact about the c… |
-| **4** | [Solution strategy](arc42/04-solution-strategy.md) | *awaiting phase 2* |
-| **5** | [Building block view](arc42/05-building-blocks.md) | *awaiting phase 2, corrected at each merge* |
-| **6** | [Runtime view](arc42/06-runtime-view.md) | *awaiting phase 2* |
-| **7** | [Deployment view](arc42/07-deployment-view.md) | *awaiting phase 2* |
-| **8** | [Cross-cutting concepts](arc42/08-crosscutting-concepts.md) | *awaiting phase 2, extended per slice* |
+| **4** | [Solution strategy](arc42/04-solution-strategy.md) | Five decisions. Everything in §5 to §8 follows from them, and each links to the record that argues it. |
+| **5** | [Building block view](arc42/05-building-blocks.md) | The decomposition and the reasons for it are ADR-0008. |
+| **6** | [Runtime view](arc42/06-runtime-view.md) | Five scenarios. The first is the one the whole design exists to make safe, so it is documented before the happy path. |
+| **7** | [Deployment view](arc42/07-deployment-view.md) | Versions are pinned here because TC-10 deliberately left them open at Gate A: **Node ≥ 22.11 < 25** and **npm ≥ 10.9** in `package.json` `engines`, **Postgre… |
+| **8** | [Cross-cutting concepts](arc42/08-crosscutting-concepts.md) | Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API writes, and `opening_hours` is the only one that exists becaus… |
 | **9** | [Architecture decisions](arc42/09-architecture-decisions.md) | Decisions live as individual MADR files under `docs/adr/`. |
-| **10** | [Quality requirements](arc42/10-quality-requirements.md) | Each scenario is written so it can be executed, and names the test that enforces it. |
+| **10** | [Quality requirements](arc42/10-quality-requirements.md) | The §1.2 ranking, refined into the scenarios below it. |
 | **11** | [Risks and technical debt](arc42/11-risks-technical-debt.md) | Generated: every ADR with `status: proposed` and every deferred-improvement slice is, by construction, a debt item traceable to the decision that created it. |
 | **12** | [Glossary](arc42/12-glossary.md) | Domain terms only. Process vocabulary lives in `docs/METHODOLOGY.md`. |
 | **13** | [AI collaboration](arc42/13-ai-collaboration.md) | Sourced from artifacts, never from memory: the ADR set, PR threads, `docs/team-log/events.jsonl`, the prompt library under `docs/team-log/prompts/`, and git… |
@@ -69,6 +69,12 @@ without taking anyone's word for it.
 - [**ADR-0002**](adr/0002-service-advisor-actor-no-authentication.md) — Treat the service advisor as the actor and leave authentication out of scope *(accepted)*
 - [**ADR-0003**](adr/0003-cancellation-and-rescheduling-in-scope.md) — Support cancellation and rescheduling, and move an appointment with one atomic UPDATE *(accepted)*
 - [**ADR-0004**](adr/0004-retry-across-remaining-candidates.md) — On exclusion violation, try the next candidate and refuse only when the list is exhausted *(accepted)*
+- [**ADR-0005**](adr/0005-fastify-with-typebox-schemas.md) — Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them *(accepted)*
+- [**ADR-0006**](adr/0006-kysely-as-typed-sql-builder.md) — Use Kysely as a typed SQL builder over node-postgres, and adopt no ORM *(accepted)*
+- [**ADR-0007**](adr/0007-node-pg-migrate-with-sql-files.md) — Run migrations with node-pg-migrate, written as plain .sql files *(accepted)*
+- [**ADR-0008**](adr/0008-module-decomposition.md) — Decompose into five layered modules around a dependency-free policy core *(accepted)*
+- [**ADR-0009**](adr/0009-candidate-ordering-and-attempt-cap.md) — Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 *(accepted)*
+- [**ADR-0010**](adr/0010-github-actions-and-check-run-collection.md) — Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow *(accepted)*
 
 ---
 

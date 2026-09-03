@@ -11,29 +11,31 @@
 
 ## Where we are
 
-**Phase 2 — Architecture**, which closes at Gate B.
+**Phase 3 — Backlog**, which closes at Gate C.
 
 | | |
 |---|---|
-| Last commit | `acac5c4 feat(status): committed resume point, and phases on the board` |
-| Gates decided | A |
-| Agent runs recorded | 2 |
-| ADRs accepted | 4 |
+| Last commit | `f957a84 docs: correct two false enforcement claims in METHODOLOGY §4` |
+| Gates decided | A, B |
+| Agent runs recorded | 4 |
+| ADRs accepted | 10 |
 | Slices defined | 0 |
 | Open DCRs | none |
 
 ## What happens next
 
-- Branch `phase/02-architecture`, set the scope marker to `{"phase":"2"}`.
-- The architect writes arc42 §4–§8, §10 and §11, the founding `.dependency-cruiser.js`, and the presentation diagrams.
-- §10 must pin three obligations inherited from Gate A: the atomic-`UPDATE` reschedule (ADR-0003), no-spurious-refusal under retry (ADR-0004), and a move onto an interval overlapping the appointment's own current interval must succeed.
-- **Gate B**: plan-mode approval; the stack is confirmed here.
+- Slice the backlog into ~14 files (rescheduling added one at Gate A).
+- **Gate C**: approve scope and ordering.
 
 ## Gate decisions
 
 **Gate A** · 2026-09-03 · resolved-4-open-questions
 
 > OQ-1 opening hours as request validation (400), no shift modelling — a static rule about the request cannot reintroduce check-then-act. OQ-2 service advisor, no auth — absent from the stated criteria and a solved problem. OQ-3 BOTH cancellation and rescheduling in scope, expanding on the architect's recommendation. OQ-4 retry remaining candidates then refuse — the candidate read stays advisory, correctness still comes from the insert. Quality-goal ranking ratified as proposed.
+
+**Gate B** · 2026-09-03 · accepted-all-adrs-and-three-rulings
+
+> ADR-0005 to ADR-0010 accepted as recommended, unmodified: Fastify+TypeBox, Kysely over pg with no ORM, node-pg-migrate running .sql files, five layered modules with no repository port, seeded-shuffle candidate ordering with a cap of 16, and GitHub Actions with check.run collected from the API rather than committed by the workflow. Three open rulings decided alongside them. (1) tests/architecture/ and tests/performance/ belong to the test-engineer, on the same reasoning as the other outside-in directories; CLAUDE.md section 5 and the path guard now carry it. (2) Slice 00 splits into 00a, a walking skeleton carrying compose, the first migration, /health and the phase-4 CI steps, before the pilot slice proper — so the pilot measures the loop rather than scaffolding friction. (3) TC-10 bites locally as well as in CI via .npmrc engine-strict=true. Separately, METHODOLOGY section 4 was corrected: it claimed the diagram-design skill scripts run in CI and they cannot, since they live outside the repository.
 
 ## Decisions on record
 
@@ -43,6 +45,12 @@
 | [0002](adr/0002-service-advisor-actor-no-authentication.md) | Treat the service advisor as the actor and leave authentication out of scope | accepted | — |
 | [0003](adr/0003-cancellation-and-rescheduling-in-scope.md) | Support cancellation and rescheduling, and move an appointment with one atomic UPDATE | accepted | — |
 | [0004](adr/0004-retry-across-remaining-candidates.md) | On exclusion violation, try the next candidate and refuse only when the list is exhausted | accepted | — |
+| [0005](adr/0005-fastify-with-typebox-schemas.md) | Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them | accepted | — |
+| [0006](adr/0006-kysely-as-typed-sql-builder.md) | Use Kysely as a typed SQL builder over node-postgres, and adopt no ORM | accepted | — |
+| [0007](adr/0007-node-pg-migrate-with-sql-files.md) | Run migrations with node-pg-migrate, written as plain .sql files | accepted | — |
+| [0008](adr/0008-module-decomposition.md) | Decompose into five layered modules around a dependency-free policy core | accepted | — |
+| [0009](adr/0009-candidate-ordering-and-attempt-cap.md) | Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 | accepted | — |
+| [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | accepted | — |
 
 ## Agent runs
 
@@ -50,7 +58,9 @@
 |---|---|---|---|---|
 | 2026-09-03 15:16 | architect | 6m22 | 48 / 2,997 / 1,090,821 | `derived` |
 | 2026-09-03 15:37 | architect | 9m59 | 120 / 2,396 / 3,889,958 | `derived` |
-| | **total** | **16m21** | **168 / 5,393 / 4,980,779** | |
+| 2026-09-03 17:32 | architect | 30m29 | 214 / 1,994 / 15,080,691 | `derived` |
+| 2026-09-03 17:58 | architect | 13m48 | 192 / 2,138 / 7,743,192 | `derived` |
+| | **total** | **60m38** | **574 / 9,525 / 27,804,662** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Keyloop technical assessment — Scenario A, Unified Service Scheduler (backend)",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.11.0 <25",
+    "npm": ">=10.9.0"
   },
   "scripts": {
     "log": "node tools/team-log/query.mjs",
@@ -17,7 +18,12 @@
     "docs:check": "node tools/docs/build.mjs --check",
     "log:audit": "node tools/team-log/audit.mjs",
     "diagram:export": "node tools/docs/export-diagram.mjs",
+    "lint:arch": "depcruise src tests --config .dependency-cruiser.js",
+    "graph:modules": "depcruise src --config .dependency-cruiser.js --output-type mermaid",
     "status": "node tools/status/generate.mjs",
     "test:docs": "node tools/test/docs-build.test.mjs"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "18.2.0"
   }
 }

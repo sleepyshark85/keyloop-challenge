@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The scheduler, and where its invariant lives · Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --color-paper:#f5f5f5;--color-ink:#2d3142;--color-muted:#4f5d75;--color-accent:#eb6c36;
+      --font-sans:'Geist',system-ui,sans-serif;--font-serif:'Instrument Serif',serif;
+      --font-mono:'Geist Mono',ui-monospace,monospace}
+    body{font-family:var(--font-sans);background:var(--color-paper);color:var(--color-ink);
+      min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3rem 2rem}
+    .frame{max-width:1100px;width:100%}
+    .eyebrow{font-family:var(--font-mono);font-size:.66rem;font-weight:500;letter-spacing:.18em;
+      text-transform:uppercase;color:var(--color-muted);margin-bottom:.5rem}
+    h1{font-family:var(--font-serif);font-size:clamp(1.5rem,2.4vw + .75rem,2rem);font-weight:400;
+      letter-spacing:-.02em;line-height:1.15;margin-bottom:.375rem}
+    .subtitle{font-size:.8125rem;color:var(--color-muted);margin-bottom:1.5rem}
+    svg{width:100%;min-width:900px;display:block}
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · arc42 §5</p>
+    <h1>The scheduler, and where its invariant lives</h1>
+    <p class="subtitle">One dependency direction, a policy core that imports nothing, and a database that is not a swappable detail.</p>
+
+    <svg viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="building-blocks-title building-blocks-desc">
+      <title id="building-blocks-title">The scheduler, and where its invariant lives</title>
+      <desc id="building-blocks-desc">Container and component view of the appointment scheduler: a stubbed client calls a Node service whose five modules are the HTTP edge, the use cases, a dependency-free policy core, a persistence module holding all SQL, and a platform leaf; only the persistence module reaches PostgreSQL, which is where the double-booking invariant is enforced.</desc>
+
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+        <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- ============================ ZONE (drawn before arrows and nodes) ============================ -->
+      <rect x="64" y="144" width="576" height="400" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <rect x="80" y="148" width="180" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="170" y="157" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">SCHEDULER SERVICE · NODE</text>
+
+      <!-- ================================ ARROWS (behind the boxes) ================================ -->
+
+      <!-- client → http : shared x, plain line -->
+      <line x1="200" y1="112" x2="200" y2="172" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <rect x="210" y="116" width="88" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="214" y="125" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">REST · JSON</text>
+
+      <!-- http → application -->
+      <line x1="200" y1="240" x2="200" y2="276" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <!-- application → domain -->
+      <line x1="200" y1="344" x2="200" y2="380" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- application → persistence : shared y, plain line. The edge with no port on it. -->
+      <line x1="304" y1="312" x2="404" y2="312" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="328" y="292" width="56" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="356" y="301" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NO PORT</text>
+
+      <!-- persistence → domain : down then left, rounded elbow r=8 -->
+      <path d="M 512,344 V 408 Q 512,416 504,416 H 308" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="372" y="396" width="72" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="408" y="405" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">TYPES ONLY</text>
+
+      <!-- persistence → PostgreSQL : the focal edge -->
+      <line x1="616" y1="312" x2="756" y2="312" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <rect x="650" y="292" width="76" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="688" y="301" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SQL · 23P01</text>
+
+      <!-- platform → collector : passive, dashed -->
+      <line x1="616" y1="492" x2="756" y2="492" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <rect x="668" y="472" width="40" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="688" y="481" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">OTLP</text>
+
+      <!-- ==================================== NODES ==================================== -->
+
+      <!-- Stubbed client -->
+      <rect x="96" y="48" width="208" height="64" rx="6" fill="#f5f5f5"/>
+      <rect x="96" y="48" width="208" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+      <rect x="104" y="56" width="36" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="122" y="65" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STUB</text>
+      <text x="200" y="88" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Stubbed client</text>
+      <text x="200" y="103" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">OpenAPI · cURL harness</text>
+
+      <!-- src/http -->
+      <rect x="96" y="176" width="208" height="64" rx="6" fill="#f5f5f5"/>
+      <rect x="96" y="176" width="208" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="104" y="184" width="36" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="122" y="193" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EDGE</text>
+      <text x="200" y="216" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">src/http</text>
+      <text x="200" y="231" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Fastify · TypeBox · problem+json</text>
+
+      <!-- src/application -->
+      <rect x="96" y="280" width="208" height="64" rx="6" fill="#f5f5f5"/>
+      <rect x="96" y="280" width="208" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="104" y="288" width="52" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="130" y="297" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">USE CASE</text>
+      <text x="200" y="320" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">src/application</text>
+      <text x="200" y="335" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">retry loop · spans</text>
+
+      <!-- src/domain -->
+      <rect x="96" y="384" width="208" height="64" rx="6" fill="#f5f5f5"/>
+      <rect x="96" y="384" width="208" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="104" y="392" width="36" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="122" y="401" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PURE</text>
+      <text x="200" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">src/domain</text>
+      <text x="200" y="439" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">imports nothing at all</text>
+
+      <!-- src/persistence -->
+      <rect x="408" y="280" width="208" height="64" rx="6" fill="#f5f5f5"/>
+      <rect x="408" y="280" width="208" height="64" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+      <rect x="416" y="288" width="32" height="12" rx="2" fill="transparent" stroke="rgba(79,93,117,0.40)" stroke-width="0.8"/>
+      <text x="432" y="297" fill="rgba(79,93,117,0.90)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SQL</text>
+      <text x="512" y="320" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">src/persistence</text>
+      <text x="512" y="335" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Kysely · pg · pgError.ts</text>
+
+      <!-- src/platform -->
+      <rect x="96" y="472" width="520" height="40" rx="6" fill="#f5f5f5"/>
+      <rect x="96" y="472" width="520" height="40" rx="6" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="356" y="490" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">src/platform</text>
+      <text x="356" y="504" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">config · pino · OpenTelemetry — a leaf: imported by all, imports none</text>
+
+      <!-- PostgreSQL : the one focal node -->
+      <rect x="760" y="280" width="192" height="64" rx="6" fill="#f5f5f5"/>
+      <rect x="760" y="280" width="192" height="64" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
+      <rect x="768" y="288" width="28" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8"/>
+      <text x="782" y="297" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+      <text x="856" y="320" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">PostgreSQL 16</text>
+      <text x="856" y="335" fill="#eb6c36" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">EXCLUDE USING gist</text>
+
+      <!-- Telemetry collector -->
+      <rect x="760" y="472" width="192" height="40" rx="6" fill="#f5f5f5"/>
+      <rect x="760" y="472" width="192" height="40" rx="6" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="856" y="490" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">otel-lgtm</text>
+      <text x="856" y="504" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">traces · metrics · may be absent</text>
+
+      <!-- ==================================== LEGEND ==================================== -->
+      <line x1="64" y1="568" x2="952" y2="568" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="64" y="588" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+
+      <rect x="140" y="580" width="12" height="12" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <text x="160" y="589" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">The invariant is enforced here — not in any module above it</text>
+
+      <rect x="576" y="580" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="596" y="589" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Module</text>
+
+      <line x1="672" y1="586" x2="704" y2="586" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="712" y="589" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Passive · absence must not fail a booking</text>
+
+      <text x="64" y="616" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">EVERY EDGE ABSENT FROM THIS DIAGRAM IS FORBIDDEN BY .dependency-cruiser.js AND FAILS CI</text>
+    </svg>
+  </div>
+</body>
+</html>

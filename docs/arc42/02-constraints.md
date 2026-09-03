@@ -33,8 +33,8 @@ the design space rather than adding to it.
 | **TC-6** | Vitest, Testcontainers, `fast-check`, Stryker | `CLAUDE.md` §3 | The test strategy is fixed at four levels; mutation score is an available signal and §10 may rely on it |
 | **TC-7** | `dependency-cruiser` for layering, authored by the architect | `CLAUDE.md` §2.3, §3 | Whatever decomposition §5 defines must be expressible as a machine-checkable rule set. A layering that cannot be written down as rules is not an acceptable layering |
 | **TC-8** | OpenTelemetry with `pino`, correlated by trace id | `CLAUDE.md` §3, METHODOLOGY §9 | Instrumentation is designed in, not retrofitted; §8 must name the spans and metrics |
-| **TC-9** | Docker must be present to run the tests | METHODOLOGY §0 — Testcontainers and the local `grafana/otel-lgtm` stack | The test suite is not runnable in a Docker-less CI runner. Stated as a constraint because it is the most likely reason a reader's first `npm test` fails |
-| **TC-10** | Node and npm versions are pinned at Gate B | METHODOLOGY §0 | Left open here on purpose; recorded so its absence is not read as an oversight |
+| **TC-9** | Docker must be present to run the tests | METHODOLOGY §0 — Testcontainers and the local `grafana/otel-lgtm` stack | The test suite is not runnable in a Docker-less CI runner. Stated as a constraint because it is the most likely reason a reader's first `npm test` fails. It is also what makes the CI runner a **correctness** choice rather than a convenience one — see ADR-0010 and §7.4 |
+| **TC-10** | Node and npm versions are pinned at Gate B | METHODOLOGY §0 | Pinned in `package.json` `engines` (§7.1) and **enforced** by `npm ci --engine-strict` in CI (ADR-0010). Enforcement is CI-only: making it bite locally as well needs `.npmrc`, which ADR-0010 recommends and leaves to the human |
 
 **Not constraints — reserved decisions.** `CLAUDE.md` §3 explicitly leaves the **HTTP framework**, the
 **query layer / ORM**, the **migration tool** and the **module decomposition** to the architect at
