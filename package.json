@@ -10,6 +10,8 @@
   "scripts": {
     "log": "node tools/team-log/query.mjs",
     "log:append": "node tools/team-log/append.mjs",
-    "board": "node tools/board/generate.mjs"
+    "board": "node tools/board/generate.mjs",
+    "test:tools": "node tools/test/guard-paths.test.mjs",
+    "slice:check": "node tools/slice/check.mjs"
   }
 }

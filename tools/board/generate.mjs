@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, watch } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { BOARD_COLUMNS, DCR_RULINGS } from '../team-log/schema.mjs';
+import { frontmatter } from '../lib/frontmatter.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (n, d) => { const i = argv.indexOf(`--${n}`); return i === -1 ? d : argv[i + 1]; };
@@ -36,26 +37,6 @@ function loadEvents() {
   return readFileSync(LOG, 'utf8').split('\n').filter(Boolean)
     .flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } })
     .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
-}
-
-/** Minimal frontmatter reader — scalars, inline arrays, quoted strings. */
-function frontmatter(text) {
-  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!m) return {};
-  const out = {};
-  for (const line of m[1].split('\n')) {
-    const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
-    if (!kv) continue;
-    let [, k, v] = kv;
-    v = v.replace(/\s+#.*$/, '').trim();
-    if (v === '' || v === 'null') { out[k] = null; continue; }
-    if (v.startsWith('[')) {
-      out[k] = v.slice(1, -1).split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
-      continue;
-    }
-    out[k] = v.replace(/^["']|["']$/g, '');
-  }
-  return out;
 }
 
 function loadSlices() {
