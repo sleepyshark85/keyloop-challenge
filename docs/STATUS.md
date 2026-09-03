@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `21d772f Merge pull request #1 from sleepyshark85/phase/01-requirements` |
+| Last commit | `acac5c4 feat(status): committed resume point, and phases on the board` |
 | Gates decided | A |
 | Agent runs recorded | 2 |
 | ADRs accepted | 4 |
