@@ -76,7 +76,19 @@ const ok = (name, cond, detail = '') => {
   ok('a research spike is not in the prompt library', prompts(dir).length === 0);
 
   run(dir, { tool_name: 'Bash', cwd: dir, tool_input: { command: 'ls' } });
-  ok('a non-Task tool is ignored', prompts(dir).length === 0);
+  ok('a non-spawn tool is ignored', prompts(dir).length === 0);
+}
+
+// --- both spawn tool names, because matching one captured nothing ------------
+// The hook shipped matching only `Task`; this build's spawn tool is `Agent`, so
+// the first two step-2 prompts were lost. Regression case.
+{
+  for (const tool of ['Task', 'Agent']) {
+    const dir = sandbox({ slice: '00a' });
+    run(dir, { tool_name: tool, cwd: dir,
+      tool_input: { subagent_type: 'test-engineer', description: 'd', prompt: 'X' } });
+    ok(`the ${tool} spawn tool is captured`, prompts(dir).length === 1, prompts(dir).join(','));
+  }
 }
 
 // --- never blocks the work it records ---------------------------------------

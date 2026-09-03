@@ -23,7 +23,11 @@ const ROLES = new Set(['architect', 'test-engineer', 'implementer', 'reviewer', 
 let payload;
 try { payload = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { process.exit(0); }
 
-if ((payload.tool_name ?? '') !== 'Task') process.exit(0);
+// The subagent-spawn tool is `Task` in some Claude Code builds and `Agent` in
+// others.  Matching only one silently captured nothing — which is how the very
+// first pair of step-2 prompts went unrecorded after this hook was written.
+const SPAWN_TOOLS = new Set(['Task', 'Agent']);
+if (!SPAWN_TOOLS.has(payload.tool_name ?? '')) process.exit(0);
 
 const cwd = payload.cwd ?? process.cwd();
 const input = payload.tool_input ?? {};

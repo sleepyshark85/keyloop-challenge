@@ -27,6 +27,13 @@ sent during phases 2 and 4 while §9's rule depended on the orchestrator remembe
 and it did not. They are reproduced verbatim from the session transcript and are labelled as
 backfilled in their own headers.
 
+A second, smaller gap follows immediately: `s00a-test-engineer-1` and `s00a-implementer-1` were sent
+*after* the hook existed and were still not captured, because the hook matched only the tool name
+`Task` and this build spawns agents with `Agent`. The matcher now accepts both and the test suite
+carries a regression case for each. Writing the mechanism was not the same as verifying it fired —
+which is the same lesson QS-10 exists to teach about `dependency-cruiser`, arriving here by the same
+route.
+
 That gap is the reason the rule became a hook. A rule enforced only by discipline records nothing on
 the day it matters, and the repository's own principle P3 — *executable beats asserted* — applies to
 its own process as much as to the system it builds. From `s00a-architect-2` onward, capture is
