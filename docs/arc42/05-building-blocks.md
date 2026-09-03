@@ -150,7 +150,7 @@ The graph is rendered here from the first implementation slice onward; until `sr
 nothing to draw, and drawing the intended graph by hand would be exactly the claim this subsection
 exists to avoid making.
 
-`.dependency-cruiser.js` carries eleven rules. Six describe the layering above; the rest are the
+`.dependency-cruiser.js` carries thirteen rules. Six describe the layering above; the rest are the
 ones that do the real work:
 
 | Rule | Forbids | Why it is not merely hygiene |
