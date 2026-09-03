@@ -328,9 +328,22 @@ Each record carries a `source` naming its trust tier — `derived`, `reported` o
 the schema **rejects** a `dcr.resolved` with ruling `(c)` that does not name a `failing_criterion`.
 The forcing function in §6 is enforced by the log, not by the architect's restraint.
 
-**Trust (P5).** Derived facts — commits, diffstat, test counts, mutation scores, timings — are
-appended by a `post-commit` hook and the test reporter. Agent reports are schema-validated or the
-slice cannot advance. Only `message` is narration, and the view marks it as such.
+**Trust (P5).** The log is written by the orchestrator, so on its own it would depend on the
+orchestrator's diligence — and a record that depends on the diligence of the thing being recorded is
+not evidence. Three mechanisms close that:
+
+- **`derived` cannot be asserted.** The tier claiming a fact came from tooling is refused from the
+  orchestrator's write path entirely; only collectors that compute the fact may set it.
+- **A `SubagentStop` hook records every role-agent run automatically**, outside the model's context,
+  with duration and token counts computed from the agent's own transcript. It fires whether or not
+  the orchestrator remembers or wants it to.
+- **`npm run log:audit` reconciles the log against artifacts the orchestrator does not author** —
+  subagent transcripts and git history — reporting `OMISSION` (a run the log is silent about),
+  `UNSUPPORTED` (a run nothing corroborates) and `MISMATCH` (a duration that disagrees). Omissions
+  catch forgetting; unsupported records catch invention. Run it at every gate.
+
+Agent reports are schema-validated or the slice cannot advance. Only `message` is narration, and the
+view marks it as such.
 
 **Prompts, tokens, cost.** Prompts are written **before** invocation to
 `docs/team-log/prompts/<slice>-<agent>-<n>.md` with the report beside them, so the record cannot
