@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `6178ef2 docs(arc42): §5.3 states the real rule count` |
+| Last commit | `1bf908a docs(arc42): §7.4 the pipeline, TC-9/TC-10 enforcement, and R-8` |
 | Gates decided | A |
-| Agent runs recorded | 3 |
+| Agent runs recorded | 4 |
 | ADRs accepted | 4 |
 | Slices defined | 0 |
 | Open DCRs | none |
@@ -48,6 +48,7 @@
 | [0007](adr/0007-node-pg-migrate-with-sql-files.md) | Run migrations with node-pg-migrate, written as plain .sql files | proposed | — |
 | [0008](adr/0008-module-decomposition.md) | Decompose into five layered modules around a dependency-free policy core | proposed | — |
 | [0009](adr/0009-candidate-ordering-and-attempt-cap.md) | Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 | proposed | — |
+| [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | proposed | — |
 
 ## Agent runs
 
@@ -56,7 +57,8 @@
 | 2026-09-03 15:16 | architect | 6m22 | 48 / 2,997 / 1,090,821 | `derived` |
 | 2026-09-03 15:37 | architect | 9m59 | 120 / 2,396 / 3,889,958 | `derived` |
 | 2026-09-03 17:32 | architect | 30m29 | 214 / 1,994 / 15,080,691 | `derived` |
-| | **total** | **46m50** | **382 / 7,387 / 20,061,470** | |
+| 2026-09-03 17:58 | architect | 13m48 | 192 / 2,138 / 7,743,192 | `derived` |
+| | **total** | **60m38** | **574 / 9,525 / 27,804,662** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
