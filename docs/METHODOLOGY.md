@@ -178,15 +178,10 @@ The `arc42:` field is what prevents slice work from silently rewriting architect
 
 ## 6. The slice loop
 
-```
-        ┌────────────────────────────────────────────────┐
-        ▼                                                │ loopback
-1 DESIGN ─▶ 2 AGREE ─▶ 3 RED ─▶ 4 GREEN ─▶ 5 REVIEW ─▶ 6 GATE ─▶ 7 AS-BUILT
-architect   all roles  test-eng  implementer  reviewer    human    architect
-   ▲           │          │          │           │          │
-   └───────────┴──────────┴──────────┴───────────┴──────────┘
-              DCR raised → slice BLOCKED → architect adjudicates
-```
+![The slice loop](diagrams/slice-loop.svg)
+
+*Source: [`diagrams/slice-loop.html`](diagrams/slice-loop.html) · regenerate the SVG with
+`npm run diagram:export`*
 
 | # | Step | Role | Produces |
 |---|---|---|---|
@@ -344,6 +339,49 @@ not evidence. Three mechanisms close that:
 
 Agent reports are schema-validated or the slice cannot advance. Only `message` is narration, and the
 view marks it as such.
+
+![What the record can be trusted for](diagrams/logging-trust.svg)
+
+### Coverage — what is logged, and how far it can be trusted
+
+`Writer`: **H** harness hook · **T** tooling · **O** orchestrator. *Corroborated* means an
+independent artifact could contradict a false record.
+
+| Step | Event | Tier | Writer | Corroborated by | Residual risk |
+|---|---|---|---|---|---|
+| any agent finishes | `agent.finish` | derived | **H** | its own transcript | **none** — automatic |
+| agent invoked | `agent.start` | reported | O | transcript first-timestamp | low — audit could check, doesn't yet |
+| step transitions | `handoff` | reported | O | — | **omittable, unverifiable** |
+| board column change | `board.move` | reported | O | — | **omittable, unverifiable** |
+| slice opens / closes | `slice.ready` `slice.done` | reported | O | slice-file `status` | low |
+| CI run, incl. step-3 red proof | `check.run` | derived | **T** | — | **NOT EMITTED YET** — C1 cannot pass |
+| commits | `git` on other events | reported | O | `git log` | low — audit reports unreferenced commits |
+| step 5 findings and replies | `review.finding` `review.response` | reported | O | PR threads | low once PRs are live |
+| DCR raised | `dcr.raised` | reported | O | — | **omittable** |
+| DCR ruled | `dcr.resolved` | reported | O | superseding ADR | medium — ruling (c) needs `failing_criterion` (enforced) |
+| loopback | `loopback` | reported | O | ADR supersession chain | medium |
+| gates | `gate.opened` `gate.decided` | reported | O | PR approval | low once PRs are live |
+| ADR written | `adr.recorded` | reported | O | `docs/adr/*.md` | low — audit could check, doesn't yet |
+| arc42 corrected | `arc42.updated` | reported | O | `git diff docs/arc42/` | low — audit could check, doesn't yet |
+| escalation | `escalation` | reported | O | — | **omittable** |
+
+Read honestly, that table says: **one** event type is fully trustworthy; **one** is not emitted at
+all, which makes criterion C1 unpassable until slice 00 produces a test command; **four** are
+omittable and unverifiable — if they go unwritten nothing notices, and that is the residual trust
+surface; and **three** have ground truth sitting on disk that `log:audit` does not yet read, which
+is cheap to close before phase 5.
+
+### Commands
+
+| | |
+|---|---|
+| `npm run board` | the four panels — board, waterfall, thread, metrics |
+| `npm run log -- --slice 03` | the same data in the terminal |
+| `npm run log:audit` | **reconcile the log against reality — run at every gate** |
+| `npm run slice:check 03` | Ready / Done gate; `UNVERIFIED` blocks Done |
+| `npm run test:tools` | path-guard regression suite |
+| `npm run docs:build` | assemble `docs/system-design.md` from arc42 sections |
+| `npm run diagram:export <f.html>` | re-export a diagram's SVG |
 
 **Prompts, tokens, cost.** Prompts are written **before** invocation to
 `docs/team-log/prompts/<slice>-<agent>-<n>.md` with the report beside them, so the record cannot
