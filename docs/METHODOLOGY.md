@@ -242,6 +242,11 @@ problem, not a design problem.
 implementer's red→green→refactor until the outer test passes on its own. Same division real teams
 use — the tester's assertions define *done*, the developer's define *how*.
 
+**The test-engineer never reads `src/`.** Independence is a read restriction, not just a write one —
+tests derived from an implementation restate it rather than check it. It derives only from the slice
+file, arc42 and the ADRs, and the rule holds on loopbacks too, when an implementation does already
+exist.
+
 **Enforced by path**, symmetrically, via a `PreToolUse` hook (`agent_id` is present in the payload
 only for subagents, so per-role file permissions are mechanically enforceable):
 
@@ -296,9 +301,14 @@ now and exports to OTLP later. Per record: `ts`, `slice`, `trace_id`, `span_id`,
 `actor`, `event`, `board{from,to}`, `duration_ms`, `inputs[]`, `outputs[]`,
 `git{commits,files,+,-}`, `checks{}`, `agent_sha`, `transcript`, and `message`.
 
-Events: `slice.ready` · `agent.start` · `agent.finish` · `handoff` · `review.finding` ·
-`review.response` · `dcr.raised` · `dcr.discussed` · `dcr.resolved` · `loopback` · `escalation` ·
-`gate.opened` · `gate.decided` · `check.run` · `adr.recorded` · `arc42.updated` · `slice.done`
+Events: `slice.ready` · `board.move` · `agent.start` · `agent.finish` · `handoff` ·
+`review.finding` · `review.response` · `dcr.raised` · `dcr.discussed` · `dcr.resolved` ·
+`loopback` · `escalation` · `gate.opened` · `gate.decided` · `check.run` · `adr.recorded` ·
+`arc42.updated` · `slice.done`
+
+Each record carries a `source` naming its trust tier — `derived`, `reported` or `narrated` — and
+the schema **rejects** a `dcr.resolved` with ruling `(c)` that does not name a `failing_criterion`.
+The forcing function in §6 is enforced by the log, not by the architect's restraint.
 
 **Trust (P5).** Derived facts — commits, diffstat, test counts, mutation scores, timings — are
 appended by a `post-commit` hook and the test reporter. Agent reports are schema-validated or the
