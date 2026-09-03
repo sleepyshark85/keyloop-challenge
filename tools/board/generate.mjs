@@ -39,6 +39,11 @@ function loadEvents() {
     .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
 }
 
+const PHASE_TITLES = {
+  '0': 'Foundation', '1': 'Requirements', '2': 'Architecture', '3': 'Backlog',
+  '4': 'Pilot + retro', '6': 'Consolidation', '7': 'Video',
+};
+
 function loadSlices() {
   if (!existsSync(SLICE_DIR)) return [];
   return readdirSync(SLICE_DIR)
@@ -46,6 +51,28 @@ function loadSlices() {
     .map((f) => ({ file: f, ...frontmatter(readFileSync(join(SLICE_DIR, f), 'utf8')) }))
     .filter((s) => s.id)
     .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+}
+
+/**
+ * Phases have no slice file, so the board rendered none of phases 0-4 — all of
+ * the requirements and architecture work was invisible to the one view meant to
+ * show where things are. Synthesise a unit of work per phase present in the log
+ * so the existing waterfall and thread machinery covers them.
+ */
+function loadPhases(events) {
+  const seen = [...new Set(events.filter((e) => e.phase).map((e) => e.phase))].sort();
+  return seen.map((p) => {
+    const ev = events.filter((e) => e.phase === p);
+    const closed = ev.some((e) => e.event === 'gate.decided');
+    return {
+      id: p,
+      key: `P${p}`,
+      isPhase: true,
+      title: `Phase ${p} · ${PHASE_TITLES[p] ?? ''}`.trim(),
+      status: closed ? 'done' : 'green',
+      arc42: [], quality_scenarios: [],
+    };
+  });
 }
 
 // --------------------------------------------------------------- derive ----
@@ -57,7 +84,9 @@ const fmtDur = (ms) => {
 };
 
 function summarise(slice, events) {
-  const ev = events.filter((e) => e.slice === slice.id);
+  const ev = slice.isPhase
+    ? events.filter((e) => e.phase === slice.id)
+    : events.filter((e) => e.slice === slice.id);
   const moves = ev.filter((e) => e.board?.to);
   const status = moves.length ? moves.at(-1).board.to : (slice.status ?? 'ready');
 
@@ -135,7 +164,7 @@ function threadLine(e) {
 // ---------------------------------------------------------------- render ---
 
 function render(slices, events) {
-  const active = slices.filter((s) => !['done', 'ready'].includes(s.status));
+  const active = slices.filter((s) => !s.isPhase && !['done', 'ready'].includes(s.status));
   const cols = BOARD_COLUMNS.filter((c) => c !== 'blocked');
   const blocked = slices.filter((s) => s.status === 'blocked');
 
@@ -143,7 +172,7 @@ function render(slices, events) {
     const inCol = slices.filter((s) => s.status === col);
     return `<div class="col"><div class="col-h">${col}<span>${inCol.length}</span></div>
       ${inCol.map((s) => `<div class="card ${s.status}">
-        <div class="cid">${esc(s.id)}</div>
+        <div class="cid">${esc(s.key ?? s.id)}</div>
         <div class="ct">${esc(s.title)}</div>
         <div class="cm">${s.commits ? `${s.commits} commits` : '&mdash;'}${
           s.loopbacks ? ` · <span class="lb">⟲${s.loopbacks}</span>` : ''}</div>
@@ -154,7 +183,7 @@ function render(slices, events) {
     const bars = spans(s);
     const loops = s.events.filter((e) => e.event === 'loopback');
     return `<section class="wf">
-      <h3>${esc(s.id)} · ${esc(s.title)}
+      <h3>${esc(s.key ?? s.id)} · ${esc(s.title)}
         <span class="meta">${fmtDur(s.wall)} · ${s.commits} commits${
           s.loopbacks ? ` · <span class="lb">⟲ ${s.loopbacks} loopback</span>` : ''}</span></h3>
       ${bars.map((b) => `<div class="row">
@@ -181,7 +210,7 @@ function render(slices, events) {
   }).join('');
 
   const metrics = slices.filter((s) => s.events.length).map((s) => `<tr>
-    <td class="mono">${esc(s.id)}</td><td>${esc(s.title)}</td>
+    <td class="mono">${esc(s.key ?? s.id)}</td><td>${esc(s.title)}</td>
     <td class="num">${fmtDur(s.wall)}</td><td class="num">${s.commits}</td>
     <td class="num">${s.findings}${s.disputed ? ` <span class="dim">(${s.disputed} disp)</span>` : ''}</td>
     <td class="num">${s.mutation !== undefined ? `${Math.round(s.mutation * 100)}%` : '—'}</td>
@@ -282,7 +311,8 @@ ${thread || '<p class="dim">No events yet.</p>'}
 
 function build() {
   const events = loadEvents();
-  const slices = loadSlices().map((s) => summarise(s, events));
+  const units = [...loadPhases(events), ...loadSlices()].map((s) => summarise(s, events));
+  const slices = units;
   writeFileSync(OUT, render(slices, events), 'utf8');
   const rel = OUT.replace(process.cwd() + '/', '');
   console.log(`board → ${rel}  (${slices.length} slice(s), ${events.length} event(s))`);

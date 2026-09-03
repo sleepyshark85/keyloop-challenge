@@ -16,6 +16,7 @@
     "docs:build": "node tools/docs/build.mjs",
     "docs:check": "node tools/docs/build.mjs --check",
     "log:audit": "node tools/team-log/audit.mjs",
-    "diagram:export": "node tools/docs/export-diagram.mjs"
+    "diagram:export": "node tools/docs/export-diagram.mjs",
+    "status": "node tools/status/generate.mjs"
   }
 }

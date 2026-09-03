@@ -98,6 +98,7 @@ at slice 9 that it does not work.
 | Decisions | `docs/adr/` (MADR) | architect |
 | Units of work | `docs/slices/` (doubles as PR body) | orchestrator |
 | Team telemetry | `docs/team-log/` | orchestrator |
+| Where the project is | `docs/STATUS.md` (generated) | orchestrator |
 | Build/run/test, AI narrative | `README.md` | scribe |
 | Operative rules | `CLAUDE.md` | human (derived, §12) |
 
@@ -417,7 +418,8 @@ is cheap to close before phase 5.
 
 | | |
 |---|---|
-| `npm run board` | the four panels — board, waterfall, thread, metrics |
+| `npm run status` | **regenerate `docs/STATUS.md` — the committed resume point; run before ending a session** |
+| `npm run board` | the four panels — board, waterfall, thread, metrics (local, gitignored) |
 | `npm run log -- --slice 03` | the same data in the terminal |
 | `npm run log:audit` | **reconcile the log against reality — run at every gate** |
 | `npm run slice:check 03` | Ready / Done gate; `UNVERIFIED` blocks Done |
