@@ -69,6 +69,11 @@ without taking anyone's word for it.
 - [**ADR-0002**](adr/0002-service-advisor-actor-no-authentication.md) — Treat the service advisor as the actor and leave authentication out of scope *(accepted)*
 - [**ADR-0003**](adr/0003-cancellation-and-rescheduling-in-scope.md) — Support cancellation and rescheduling, and move an appointment with one atomic UPDATE *(accepted)*
 - [**ADR-0004**](adr/0004-retry-across-remaining-candidates.md) — On exclusion violation, try the next candidate and refuse only when the list is exhausted *(accepted)*
+- [**ADR-0005**](adr/0005-fastify-with-typebox-schemas.md) — Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them *(proposed)*
+- [**ADR-0006**](adr/0006-kysely-as-typed-sql-builder.md) — Use Kysely as a typed SQL builder over node-postgres, and adopt no ORM *(proposed)*
+- [**ADR-0007**](adr/0007-node-pg-migrate-with-sql-files.md) — Run migrations with node-pg-migrate, written as plain .sql files *(proposed)*
+- [**ADR-0008**](adr/0008-module-decomposition.md) — Decompose into five layered modules around a dependency-free policy core *(proposed)*
+- [**ADR-0009**](adr/0009-candidate-ordering-and-attempt-cap.md) — Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 *(proposed)*
 
 ---
 
