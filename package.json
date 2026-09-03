@@ -1,0 +1,15 @@
+{
+  "name": "keyloop-service-scheduler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Keyloop technical assessment — Scenario A, Unified Service Scheduler (backend)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "log": "node tools/team-log/query.mjs",
+    "log:append": "node tools/team-log/append.mjs",
+    "board": "node tools/board/generate.mjs"
+  }
+}
