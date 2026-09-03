@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+reports/
+.env
+.env.*
+!.env.example
+
+# Generated views — regenerate with `npm run board`
+docs/board.html
+
+# OS / editor
+.DS_Store
+*.swp
