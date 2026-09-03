@@ -62,6 +62,11 @@ const parts = sections.map((f) => {
   if (f.startsWith('11-')) {
     text = text.replace(/^\| Item \|[\s\S]*?\n\n/m, `${debtTable}\n\n`);
   }
+  // Rebase relative links. Sections live in docs/arc42/ and correctly link to
+  // ../adr/…; the assembled document lives in docs/, where that resolves one
+  // directory too high. Flattening the files has to flatten their links too.
+  text = text.replace(/\]\(\.\.\//g, '](');
+
   // Demote every heading one level: the assembled document owns the H1.
   return text.replace(/^(#{1,5}) /gm, '#$1 ');
 });
