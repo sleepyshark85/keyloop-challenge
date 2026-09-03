@@ -323,14 +323,16 @@ brief asks for the process of guiding and verifying AI output, not only its resu
 is where that lives, because it is the one place a decision sits beside the diff it applies to and
 carries its own timestamp.
 
-Every slice PR therefore opens at **step 3**, when the red commit is pushed — not at the end. A PR
-opened after the work is a publication; a PR opened before it is a venue.
+Every slice PR therefore opens as a **draft at step 1**, as soon as the design is committed, and is
+marked ready for review when the red commit lands at step 3. A PR opened after the work is a
+publication; a PR opened before it is a venue — and steps 1 and 2 are precisely the ones whose
+reasoning is otherwise lost, because they produce discussion rather than diff.
 
 | Step | Posted by | Carries |
 |---|---|---|
 | 1 Design | orchestrator, for the architect | The design's key decisions, the ambiguities it flagged, and what it expects to be argued |
 | 2 **Agree** | orchestrator, for each of test-engineer and implementer | An explicit **agree** or **object**, per role. An objection names the acceptance criterion or design statement it disputes. Silence is not agreement and may not be recorded as one |
-| 3 Red | orchestrator | The red commit SHA and the CI run that observed it failing, with the failing assertion quoted — evidence for C1 |
+| 3 Red | orchestrator | The red commit SHA and the CI run that observed it failing, with the failing assertion quoted — evidence for C1. The PR leaves draft here |
 | 5 Review | orchestrator, for the reviewer | Findings with `claim:` and `scenario:` lines per §290's format, plus surviving mutants. An explicit no-findings review must report a mutation score |
 | 6 Gate | **the human, unattributed** | The ruling and its rationale. This comment plus the merge *is* the gate artifact |
 | — DCR | orchestrator, for the raising role | The mismatch, the round of discussion, and the architect's ruling with its `(a)`–`(d)` outcome |
