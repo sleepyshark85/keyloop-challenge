@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `77f2412 chore(gate-e): slice 00a done — all checks pass` |
-| Gates decided | A, B, C, E, E |
-| Agent runs recorded | 29 |
+| Last commit | `6a8e2fd Merge pull request #6 from sleepyshark85/slice/00-schema-and-constraints` |
+| Gates decided | A, B, C, E, E, E |
+| Agent runs recorded | 46 |
 | ADRs accepted | 10 |
 | Slices defined | 13 |
 | Open DCRs | none |
@@ -49,6 +49,10 @@
 
 > Supersedes s-00a-human-gate, which carried the same ruling under decision approved-and-merged. tools/slice/check.mjs line 137 requires the literal string approved and nothing documents or validates that; the earlier record was correct in substance and failed the gate on a string contract. Ruling unchanged: slice 00a approved and merged as b14c5df. Definition of Done met on records — red at 03:01 with a green after, tests green from run 33844632820, mutation 0.9577 against 0.75, layering clean, arc42 reconciled at step 7, zero loopbacks. R-11 adopted as a general rule for future slices rather than applied retroactively to a merged slice file. Eleven open reviewer findings carried to the phase-4 retro for triage, since R-3, R-5 and R-10 bear directly on C6 and C7.
 
+**Gate E** · 2026-09-04 · approved
+
+> Slice 00, the phase-4 pilot, approved and merged as 6a8e2fd. The invariant exists and is proven with no application code holding it: both exclusion constraints, btree_gist, four composite foreign keys, ten acceptance criteria, 112 tests. Definition of Done met on records — C1 measured LIVE rather than backfilled, red at 08:59 and green after from collected runs; red-proof ran as a live job on a tests/integration-only red commit and classified it correctly, exercising the broad reading of AC-6 that the implementer O-1 escalation produced; layering clean; mutation N/A because the slice changed no mutable file, which is the third gate state ruled at this gate rather than a pass on a score measuring the previous slice. Zero loopbacks across twelve findings. PR 5 was merged alongside as its commits were already contained in PR 6 — the orchestrator branched slice 00 from the bookkeeping branch rather than waiting, which made the second PR redundant and should have been said at the time. Two human rulings during the slice: AC-10 added at step 5, recovering the UPDATE property ADR-0003 rests on which arc42 named in three places and carried in none; and N/A as a distinct gate state, separating we cannot know from there is nothing to know.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -64,6 +68,7 @@
 | [0009](adr/0009-candidate-ordering-and-attempt-cap.md) | Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 | accepted | — |
 | [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | accepted | — |
 | [0011](adr/0011-health-is-an-operational-probe.md) | Treat /health as an operational probe outside the API contract, not as a sixth operation | proposed | — |
+| [0012](adr/0012-seed-fixtures-are-a-test-owned-loader.md) | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | proposed | — |
 
 ## Agent runs
 
@@ -98,7 +103,24 @@
 | 2026-09-04 06:21 | reviewer | 15m20 | 238 / 15,620 / 16,253,209 | `derived` |
 | 2026-09-04 06:29 | test-engineer | 146m08 | 416 / 20,886 / 30,481,090 | `derived` |
 | 2026-09-04 06:48 | architect | 164m19 | 298 / 3,088 / 19,690,446 | `derived` |
-| | **total** | **1624m54** | **7,734 / 496,477 / 609,675,063** | |
+| 2026-09-04 08:12 | architect | 21m24 | 192 / 34,327 / 10,745,645 | `derived` |
+| 2026-09-04 08:26 | test-engineer | 9m35 | 82 / 6,454 / 3,543,282 | `derived` |
+| 2026-09-04 08:28 | implementer | 11m19 | 160 / 13,405 / 6,613,350 | `derived` |
+| 2026-09-04 08:35 | architect | 44m04 | 196 / 34,331 / 10,780,687 | `derived` |
+| 2026-09-04 08:48 | architect | 56m42 | 342 / 39,245 / 28,941,746 | `derived` |
+| 2026-09-04 08:57 | test-engineer | 41m04 | 156 / 23,645 / 9,695,429 | `derived` |
+| 2026-09-04 09:02 | architect | 70m51 | 350 / 39,259 / 29,274,442 | `derived` |
+| 2026-09-04 09:07 | test-engineer | 50m27 | 194 / 23,805 / 13,268,043 | `derived` |
+| 2026-09-04 10:06 | architect | 135m01 | 354 / 39,273 / 29,274,442 | `derived` |
+| 2026-09-04 10:12 | architect | 141m09 | 434 / 39,544 / 41,637,838 | `derived` |
+| 2026-09-04 10:14 | implementer | 117m35 | 294 / 16,591 / 16,570,192 | `derived` |
+| 2026-09-04 10:28 | architect | 157m02 | 438 / 39,552 / 41,637,838 | `derived` |
+| 2026-09-04 10:35 | architect | 163m40 | 512 / 39,799 / 53,083,742 | `derived` |
+| 2026-09-04 10:43 | reviewer | 277m56 | 700 / 32,490 / 62,829,042 | `derived` |
+| 2026-09-04 11:00 | test-engineer | 163m49 | 284 / 24,116 / 23,909,782 | `derived` |
+| 2026-09-04 11:07 | test-engineer | 171m00 | 322 / 27,344 / 29,300,388 | `derived` |
+| 2026-09-04 11:23 | architect | 211m53 | 572 / 40,007 / 62,900,812 | `derived` |
+| | **total** | **3469m25** | **13,316 / 1,009,664 / 1,083,681,763** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
