@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **24** |
-| Severity | 9 blocking · 11 major · 4 minor |
-| Verdicts | 4 narrowed · 18 accepted · 1 escalated · 1 deferred |
-| Raised by | test-engineer 10 · implementer 9 · architect 3 · orchestrator 2 |
-| Awaiting a ruling | none |
-| Mean escape distance | 1.21 step(s) |
+| Findings recorded | **36** |
+| Severity | 9 blocking · 18 major · 9 minor |
+| Verdicts | 4 narrowed · 19 accepted · 1 escalated · 1 deferred |
+| Raised by | reviewer 12 · test-engineer 10 · implementer 9 · architect 3 · orchestrator 2 |
+| Awaiting a ruling | **11** |
+| Mean escape distance | 1.14 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -59,6 +59,18 @@ rather than narrated.*
 | **O-3** | MAJOR | 4 *(+4)* | orchestrator | log:audit reports 12 false discrepancies because it assumes one agent.finish per transcript | deferred |
 | **O-4** | BLOCKING | 4 *(+0)* | orchestrator | The unit tests are far weaker than a green suite suggests: mutation score 0.0634 against a Definition-of-Done threshold of 0.75 | accepted |
 | **O-5** | BLOCKING | 4 *(+0)* | implementer | The 0.0634 mutation score ruled BLOCKING was a harness artifact, not a measurement of the tests | accepted |
+| **R-1** | MAJOR | 5 *(+1)* | reviewer | The setup\|support\|architecture\|performance widening does real work and no wired test would fail if deleted | **open** |
+| **R-2** | MAJOR | 5 *(+1)* | reviewer | depcruiseOf is asserted in the pass direction only; both failing values are produced and asserted by nothing | **open** |
+| **R-3** | MAJOR | 5 *(+1)* | reviewer | The cancel-in-progress comment states a guarantee the concurrency group does not provide, falsified by this branch own history | **open** |
+| **R-4** | MAJOR | 5 *(+1)* | reviewer | The Bash guard is bypassed by an absolute path into the repository | **open** |
+| **R-5** | MAJOR | 5 *(+1)* | reviewer | The token accumulator can be deleted and the whole test:tools chain stays green | **open** |
+| **R-6** | MAJOR | 5 *(+1)* | reviewer | Two constitutional amendments on this branch have no recorded human ruling | accepted |
+| **R-7** | MAJOR | 5 *(+1)* | reviewer | AC-5 is not demonstrated: the append it names has never run and has no test | **open** |
+| **R-8** | MINOR | 5 *(+1)* | reviewer | validated on the way out is false for schema constants: they are substituted, not validated | **open** |
+| **R-9** | MINOR | 5 *(+1)* | reviewer | The reason the file labels load-bearing is the false one | **open** |
+| **R-10** | MINOR | 5 *(+1)* | reviewer | The audit git-linkage check is inert by construction and C7 reads its output | **open** |
+| **R-11** | MINOR | 5 *(+1)* | reviewer | Authored prose moved in an arc42 section the slice did not declare | **open** |
+| **R-12** | MINOR | 5 *(+1)* | reviewer | contract and property are RED_ZONE members with no committed case | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -205,6 +217,67 @@ rather than narrated.*
 - *scenario:* stryker-mutator/vitest-runner 10.0.0 does not activate mutants under vitest 5.0.0. Its peer range is vitest >=2.0.0, so npm warns about nothing. 118 of the 130 reported survivors carried testsCompleted 0 — Stryker ran no test against them and recorded them as survived. Only 21 of 142 mutants were tested at all. Decisive check: checkHealth.ts scored 0 of 6 against a file with six dedicated tests, and activating one of those mutants by hand in Stryker own unmodified sandbox with STRYKER_ACTIVE_MUTANT set killed it via 5 existing failing tests. The true baseline was 76.06, not 6.34. Same shape as dependency-cruiser typescript range: a tool reporting a number over work it never did, with nothing warning.
 - *file:* `stryker.config.mjs`
 - *accepted* by orchestrator — Correct, verified independently, and it is a finding against the orchestrator. I provisioned Stryker, watched it instrument 142 mutants and emit a score, and treated that score as a measurement without checking that any mutant had been activated — while writing a commit message about not working around missing tools. The sixth instance of this slice own rule and the first one I committed myself: a cruise that exits 0 says nothing about what it examined, and a mutation score says nothing about tests that were never run. The switch to the command runner is accepted; the implementer flagged the edit to a file it does not own rather than slipping it in. The underlying finding stands regardless of the bad number: the work was ruled on a false 6.34, but the true 76.06 was still below the 0.75 gate only marginally, and four of the individual weaknesses it found were real.
+
+**R-1** — The setup\|support\|architecture\|performance widening does real work and no wired test would fail if deleted
+
+- *scenario:* A fixture with tests/setup/ and tests/support/ importing src/persistence/schema.js reports two outside-in violations with the real config and NONE with the alternation cut back. With that mutant applied, lint:arch exits 0 over 40 modules and nodb passes 85/85. Slice 00 seeding helpers would then type against src/ through globalSetup and provide() it to an acceptance test, spending the independence C2 measures.
+- *file:* `.dependency-cruiser.js`
+
+**R-2** — depcruiseOf is asserted in the pass direction only; both failing values are produced and asserted by nothing
+
+- *scenario:* Delete the fail branch. A run whose layering step concluded failure records checks.depcruise pass; check.mjs compares === pass and reports layering clean PASS; C4 records a clean architecture for a slice whose layering failed. All 52 collect-ci assertions still pass, because no fixture has a failing layering step.
+- *file:* `tools/team-log/collect-ci.mjs`
+
+**R-3** — The cancel-in-progress comment states a guarantee the concurrency group does not provide, falsified by this branch own history
+
+- *scenario:* Six commits (b13ba0d 73f9ead eebd4f9 e1d9ea4 6daa4ff 493d395) have runs with conclusion cancelled and jobs empty — cancelled while pending, before any job started. GitHub cancels a pending run when a newer one queues, independently of cancel-in-progress. Push a red commit and a follow-up within the queue window and the red run is cancelled unrun: section 2.4 observation destroyed by the mechanism written to preserve it, and red-proof --results never produced.
+- *file:* `.github/workflows/verify.yml`
+
+**R-4** — The Bash guard is bypassed by an absolute path into the repository
+
+- *scenario:* Measured against the hook: rm ABSPATH/tests/acceptance/health.test.ts is ALLOWED while rm tests/acceptance/health.test.ts is DENIED. C2 is measured from git history and hook denials, so a boundary crossed by absolute path leaves no denial. All 37 guard-paths cases pass with the underAbsolute exemption deleted entirely, because the allow-case it exists for is already carried by the token-boundary rule.
+- *file:* `.claude/hooks/guard-paths.mjs`
+
+**R-5** — The token accumulator can be deleted and the whole test:tools chain stays green
+
+- *scenario:* Set tokens = null and 216 of 216 assertions pass; no case reads the emitted record tokens field. A change in the transcript usage shape would silently zero every token count in events.jsonl, and C6 — the budget is real, measured from the token collector — would extrapolate a 13-slice cost from records that are all zero, indistinguishable from agents that were cheap.
+- *file:* `.claude/hooks/log-agent-finish.mjs`
+
+**R-6** — Two constitutional amendments on this branch have no recorded human ruling
+
+- *scenario:* 084a34b added a NON-NEGOTIABLE and ae26cf5 added section 2 to the (c) test; events.jsonl held zero human events between the phase-3 gate and the AC-6 escalation. Section 6 says every override is recorded with rationale, and the design section 0 said of the (c) wording that it is being put to the human separately — it was then applied one commit before the red commit, so in the record the amendment was self-granted.
+- *file:* `CLAUDE.md`
+- *accepted* by orchestrator — Correct and it is the orchestrator omission, not a self-granted amendment. The human ruled both in session — the adjudication NON-NEGOTIABLE when it said the architect should re-think before agreeing, and the section 2 wording by choosing it from three options — and the orchestrator never wrote either to the log. Both are now recorded as escalation events explicitly marked logged late, carrying the reasoning and the ordering note the reviewer supplied: 0622b67 precedes ae26cf5, so S-1 ruling rested on section 2 standing authority and the wording followed. The reviewer framing is exact: the gap is the record, not the reasoning.
+
+**R-7** — AC-5 is not demonstrated: the append it names has never run and has no test
+
+- *scenario:* All four CLI cases pass --dry-run, so everything past the dry-run branch — idempotence, appendRecords, allowDerived, the exit-1-on-append-failure path — is unexercised. Remove allowDerived true and the real CLI exits 1 appending zero records, write.mjs rejecting the derived tier, with 52 of 52 still passing. The gate backfill will be the first real execution of that path.
+- *file:* `tools/team-log/collect-ci.mjs`
+
+**R-8** — validated on the way out is false for schema constants: they are substituted, not validated
+
+- *scenario:* A handler sending status empty and database empty produces the byte-identical 200 body, because fast-json-stringify emits a const schema constant and ignores the handler value. Measured on a live Fastify instance. The route docblock, the design section 3 and the unit test docblock all describe the literals as the contract.
+- *file:* `src/http/routes/health.ts`
+
+**R-9** — The reason the file labels load-bearing is the false one
+
+- *scenario:* Reason 2 says including the architecture tests would raise the score without any mutant being killed. Mutation score is killed over total mutants; test count is not in the formula, and under the command runner there is no per-test attribution at all. An always-passing extra test file cannot change any exit code or verdict. Reason 1 — the sandbox breaks the subprocess cruise — is true, measured, and sufficient alone.
+- *file:* `vitest.mutation.config.ts`
+
+**R-10** — The audit git-linkage check is inert by construction and C7 reads its output
+
+- *scenario:* The legend defines OMISSION as an agent ran OR A COMMIT EXISTS and the log does not say so, but zero events carry a git key of any kind, so all commits are unreferenced, the commit half is printed dimmed outside the discrepancy count, and it gates nothing.
+- *file:* `tools/team-log/audit.mjs`
+
+**R-11** — Authored prose moved in an arc42 section the slice did not declare
+
+- *scenario:* The slice declares 11.2; 11.1 narration was rewritten by 8 minus and 15 plus lines. The design anticipated the generated register block regenerating and called that trivial, but not the surrounding prose, which said the register is empty and had to change because it no longer is. The edit is correct — leaving it would make 11.1 false — but it is an authored arc42 edit outside declared scope.
+- *file:* `docs/arc42/11-risks-technical-debt.md`
+
+**R-12** — contract and property are RED_ZONE members with no committed case
+
+- *scenario:* Both can be deleted and red-proof.test.mjs stays 37 of 37. Slice 03 red commit reddens tests/contract/ alone; with that regression red-proof reports no test-engineer-owned suite failed and exits 1 on a correct red commit — O-1 failure mode reintroduced for two of the seven directories the O-1 fix was written to protect. Loud rather than silent, hence MINOR.
+- *file:* `tools/ci/red-proof.mjs`
 
 </details>
 
