@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `1a7752e Merge pull request #3 from sleepyshark85/phase/03-backlog` |
+| Last commit | `be195dc test(00a): the ruleset's alternation, asserted from both sides (R-1)` |
 | Gates decided | A, B, C |
-| Agent runs recorded | 4 |
+| Agent runs recorded | 28 |
 | ADRs accepted | 10 |
 | Slices defined | 13 |
 | Open DCRs | none |
@@ -55,6 +55,7 @@
 | [0008](adr/0008-module-decomposition.md) | Decompose into five layered modules around a dependency-free policy core | accepted | — |
 | [0009](adr/0009-candidate-ordering-and-attempt-cap.md) | Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 | accepted | — |
 | [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | accepted | — |
+| [0011](adr/0011-health-is-an-operational-probe.md) | Treat /health as an operational probe outside the API contract, not as a sixth operation | proposed | — |
 
 ## Agent runs
 
@@ -64,7 +65,31 @@
 | 2026-09-03 15:37 | architect | 9m59 | 120 / 2,396 / 3,889,958 | `derived` |
 | 2026-09-03 17:32 | architect | 30m29 | 214 / 1,994 / 15,080,691 | `derived` |
 | 2026-09-03 17:58 | architect | 13m48 | 192 / 2,138 / 7,743,192 | `derived` |
-| | **total** | **60m38** | **574 / 9,525 / 27,804,662** | |
+| 2026-09-03 18:54 | architect | 13m17 | 86 / 1,127 / 3,238,327 | `derived` |
+| 2026-09-03 23:53 | test-engineer | 7m18 | 72 / 1,830 / 2,456,784 | `derived` |
+| 2026-09-03 23:56 | implementer | 9m54 | 132 / 8,233 / 4,668,458 | `derived` |
+| 2026-09-04 00:11 | architect | 13m41 | 46 / 18,381 / 1,376,739 | `derived` |
+| 2026-09-04 00:35 | architect | 36m51 | 170 / 30,448 / 11,519,516 | `derived` |
+| 2026-09-04 01:54 | architect | 116m02 | 182 / 30,464 / 11,921,786 | `derived` |
+| 2026-09-04 02:00 | architect | 121m54 | 266 / 30,806 / 22,191,883 | `derived` |
+| 2026-09-04 02:52 | test-engineer | 30m11 | 290 / 13,145 / 20,939,329 | `derived` |
+| 2026-09-04 03:13 | architect | 195m22 | 288 / 31,892 / 24,090,714 | `derived` |
+| 2026-09-04 03:18 | architect | 200m11 | 342 / 32,724 / 31,972,451 | `derived` |
+| 2026-09-04 03:29 | implementer | 18m59 | 276 / 23,112 / 16,049,617 | `derived` |
+| 2026-09-04 03:33 | test-engineer | 2m56 | 58 / 1,150 / 1,097,312 | `derived` |
+| 2026-09-04 04:02 | implementer | 51m36 | 582 / 37,362 / 55,341,592 | `derived` |
+| 2026-09-04 04:10 | test-engineer | 6m40 | 96 / 9,598 / 3,057,287 | `derived` |
+| 2026-09-04 04:10 | architect | 6m36 | 86 / 529 / 2,695,112 | `derived` |
+| 2026-09-04 04:15 | implementer | 65m11 | 638 / 38,531 / 63,608,063 | `derived` |
+| 2026-09-04 04:17 | architect | 13m21 | 160 / 1,913 / 7,529,918 | `derived` |
+| 2026-09-04 04:18 | test-engineer | 15m03 | 184 / 10,938 / 8,136,823 | `derived` |
+| 2026-09-04 04:33 | test-engineer | 29m25 | 316 / 19,934 / 19,652,168 | `derived` |
+| 2026-09-04 04:37 | implementer | 87m25 | 676 / 38,851 / 69,319,666 | `derived` |
+| 2026-09-04 04:48 | test-engineer | 45m03 | 372 / 20,547 / 25,471,035 | `derived` |
+| 2026-09-04 05:42 | implementer | 151m35 | 890 / 45,843 / 109,111,076 | `derived` |
+| 2026-09-04 06:21 | reviewer | 15m20 | 238 / 15,620 / 16,253,209 | `derived` |
+| 2026-09-04 06:29 | test-engineer | 146m08 | 416 / 20,886 / 30,481,090 | `derived` |
+| | **total** | **1460m35** | **7,436 / 493,389 / 589,984,617** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
