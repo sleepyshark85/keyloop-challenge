@@ -86,9 +86,15 @@ const jobKey = (name) => JOB_KEYS.get(name) ?? slug(name);
  */
 const passFail = (conclusion) => (conclusion === 'success' ? 'PASS' : 'FAIL');
 
-function jobsOf(ghRun) {
+function jobsOf(ghRun, done = true) {
   const jobs = {};
-  for (const job of ghRun.jobs ?? []) jobs[jobKey(job.name)] = passFail(job.conclusion);
+  for (const job of ghRun.jobs ?? []) {
+    // A job still running has `conclusion: null`, which is not a failure. Only a completed
+    // run's jobs are classified at all; anything else would put a FAIL in the record for a
+    // job that has not yet had the chance to pass.
+    if (!done && job.status !== 'completed') continue;
+    jobs[jobKey(job.name)] = passFail(job.conclusion);
+  }
   return jobs;
 }
 
@@ -123,14 +129,20 @@ function redProofOf(ghRun) {
  * @param {{ slice: string, collectedVia: 'gh-cli' | 'run-artifact' }} opts
  */
 export function toCheckRunRecord(ghRun, { slice, collectedVia }) {
-  const conclusion = ghRun.conclusion ?? ghRun.status ?? 'unknown';
-  const jobs = jobsOf(ghRun);
+  // `gh` reports an unfinished run as `conclusion: ""` — an empty STRING, so `??` does not
+  // fall through it. Found by running this against a live branch: the record for a run
+  // still executing came back `conclusion: ""` with every job FAIL, which would have put a
+  // fabricated failure into the log and, through constraint 2, into C1's red-before-green
+  // reading. The CLI skips unfinished runs outright; this is the second line of defence.
+  const done = ghRun.status === 'completed';
+  const conclusion = (ghRun.conclusion || undefined) ?? ghRun.status ?? 'unknown';
+  const jobs = jobsOf(ghRun, done);
 
-  // Constraint 2, enforced rather than assumed. A run whose conclusion is a failure and
-  // whose every job reads PASS would stringify without FAIL and be read as green by the
-  // gate; that is the corruption this whole section exists to prevent, so it is a hard
-  // error rather than a silently repaired record.
-  if (conclusion !== 'success' && !Object.values(jobs).includes('FAIL')) {
+  // Constraint 2, enforced rather than assumed. A COMPLETED run whose conclusion is a
+  // failure and whose every job reads PASS would stringify without FAIL and be read as
+  // green by the gate; that is the corruption this whole section exists to prevent. It is
+  // deliberately conditioned on `done`: a run that has not finished has not failed.
+  if (done && conclusion !== 'success' && !Object.values(jobs).includes('FAIL')) {
     jobs[jobKey(ghRun.workflowName ?? 'run')] = 'FAIL';
   }
 
@@ -193,15 +205,31 @@ function parseArgs(argv) {
   return args;
 }
 
-/** `--slice`, else docs/team-log/.scope — the convention the SubagentStop hook uses. */
+/**
+ * A slice id: two digits and an optional letter, `00a` or `07`. Checked, because the log
+ * schema is not going to check it — `validate()` accepts any non-empty string for `slice`,
+ * so a malformed value is written silently and every query scoped to the slice then misses
+ * it. Found the hard way: reading `.scope` raw produced `slice: "{\"slice\":\"00a\"}"`,
+ * a record that validated cleanly and was scoped to a slice that does not exist.
+ */
+const SLICE_ID = /^\d{2}[a-z]?$/;
+
+/**
+ * `--slice`, else `docs/team-log/.scope` — which holds JSON, `{"slice":"00a"}` or
+ * `{"phase":"2"}`, exactly as `.claude/hooks/log-agent-finish.mjs` writes and reads it.
+ * It is NOT a bare id, and treating it as one is how the malformed record above happened.
+ */
 function resolveSlice(explicit) {
   if (explicit) return explicit;
-  const scope = resolve('docs/team-log/.scope');
-  if (existsSync(scope)) {
-    const value = readFileSync(scope, 'utf8').trim();
-    if (value) return value;
+
+  const marker = resolve('docs/team-log/.scope');
+  if (!existsSync(marker)) return undefined;
+  try {
+    const scope = JSON.parse(readFileSync(marker, 'utf8'));
+    return scope?.slice === undefined ? undefined : String(scope.slice);
+  } catch {
+    return undefined;
   }
-  return undefined;
 }
 
 /**
@@ -268,7 +296,16 @@ function main(argv) {
 
   const slice = resolveSlice(args.slice);
   if (!slice) {
-    console.error('collect-ci: no slice. Pass --slice, or write one into docs/team-log/.scope.');
+    console.error(
+      'collect-ci: no slice. Pass --slice, or put {"slice":"00a"} in docs/team-log/.scope.',
+    );
+    return 2;
+  }
+  if (!SLICE_ID.test(slice)) {
+    console.error(
+      `collect-ci: ${JSON.stringify(slice)} is not a slice id (two digits, optional letter). ` +
+        'The log schema would accept it and every query scoped to the slice would then miss it.',
+    );
     return 2;
   }
 
@@ -282,7 +319,16 @@ function main(argv) {
     return 2;
   }
 
-  const records = toCheckRunRecords(runs, { slice, collectedVia });
+  // A verdict on a run that has not finished is not a measurement. Skipped loudly rather
+  // than silently, because "collect at the gate" is a thing someone does while a run is
+  // still going and the omission should be visible.
+  const finished = [];
+  for (const run of runs) {
+    if (run.status === 'completed') finished.push(run);
+    else console.log(`skipped  ${run.databaseId}  still ${run.status ?? 'unfinished'}`);
+  }
+
+  const records = toCheckRunRecords(finished, { slice, collectedVia });
 
   // Idempotence lives here and only here: it needs the log, which is I/O. `log:audit`'s
   // OMISSION reconciliation depends on this being safe to re-run at every gate.
