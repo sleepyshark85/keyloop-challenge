@@ -316,6 +316,59 @@ describe('withinOpeningHours — the time parser: field-overflow rejection is pe
   });
 });
 
+describe('withinOpeningHours — the parser accepts HH:MM as well as HH:MM:SS (§3.2)', () => {
+  it('HH:MM (no seconds group) parses as seconds=0, not as a rejection and not as NaN', () => {
+    // Kills the regex's optional-seconds-group-made-mandatory mutant (a bare HH:MM would then
+    // fail to match) and the `match[3] === undefined ? 0 : ...` -> `false ? 0 : ...` mutant
+    // (which would compute Number(undefined) = NaN for the seconds component instead).
+    const weekly = weekOpen('09:00', '17:00');
+    const start = Date.parse('2026-06-15T08:00:00Z'); // 09:00 BST, exactly at opensAt
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly).kind).toBe('within');
+  });
+
+  it('a match anchored at the string start rejects a value with leading garbage', () => {
+    // Kills the mutant that drops the regex's leading `^` anchor.
+    const weekly = weekOpen('x09:00:00', '17:00:00');
+    const start = Date.parse('2026-06-15T10:00:00Z');
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly)).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 1,
+    });
+  });
+
+  it('a match anchored at the string end rejects a value with trailing garbage', () => {
+    // Kills the mutant that drops the regex's trailing `$` anchor.
+    const weekly = weekOpen('09:00:00x', '17:00:00');
+    const start = Date.parse('2026-06-15T10:00:00Z');
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly)).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 1,
+    });
+  });
+});
+
+describe('withinOpeningHours — 24:00:00 is the ONE exact value accepted, not "hours 24 with anything else" (DA-2)', () => {
+  it('24:15:00 (hour 24, non-zero minutes) is rejected, not treated as 86400', () => {
+    // Kills the `minutes === 0` -> `true` mutant in the 24:00:00 special case.
+    const weekly = weekOpen('05:00:00', '24:15:00');
+    const start = Date.parse('2026-06-15T10:00:00Z');
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly)).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 1,
+    });
+  });
+
+  it('24:00:15 (hour 24, non-zero seconds) is rejected, not treated as 86400', () => {
+    // Kills the `seconds === 0` -> `true` mutant in the 24:00:00 special case.
+    const weekly = weekOpen('05:00:00', '24:00:15');
+    const start = Date.parse('2026-06-15T10:00:00Z');
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly)).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 1,
+    });
+  });
+});
+
 describe('withinOpeningHours — the seconds-of-day arithmetic is hours*3600 + minutes*60 + seconds, exactly', () => {
   it('a window with non-zero minutes and seconds components draws its boundary at the exact second (kills ArithmeticOperator and getter-swap mutants)', () => {
     const weekly = weekOpen('09:15:30', '09:45:10');
