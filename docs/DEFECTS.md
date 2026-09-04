@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **55** |
-| Severity | 9 blocking · 32 major · 14 minor |
-| Verdicts | 4 narrowed · 23 accepted · 1 escalated · 4 deferred |
-| Raised by | reviewer 17 · test-engineer 15 · implementer 12 · architect 6 · orchestrator 5 |
+| Findings recorded | **56** |
+| Severity | 9 blocking · 32 major · 15 minor |
+| Verdicts | 4 narrowed · 24 accepted · 1 escalated · 4 deferred |
+| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · architect 6 · orchestrator 5 |
 | Awaiting a ruling | **23** |
-| Mean escape distance | 1.49 step(s) |
+| Mean escape distance | 1.46 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -331,6 +331,7 @@ rather than narrated.*
 | **R00-3** | MAJOR | 5 *(+1)* | reviewer | appointment_technician_in_dealership is never asserted to fire — six of seven constraints are proven, the seventh only exists | **open** |
 | **R00-4** | MAJOR | 5 *(+1)* | reviewer | AC-1 and AC-2 have no positive control and the design stated reason for exempting them is false | **open** |
 | **R00-5** | MINOR | 5 *(+1)* | reviewer | Four reference-table constraints that arc42 specifies are asserted by nothing | **open** |
+| **T-9** | MINOR | 5 *(+0)* | test-engineer | AC-10 fixture clause contradicts its assertion clause, and the test-engineer authored both | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -417,6 +418,12 @@ rather than narrated.*
 
 - *scenario:* Case 0 inspects constraints on appointment only and no case attempts a row violating any constraint on the other eight tables. Measured live, all four exist and fire: opening_hours closes_at less-than-opens_at gives 23514, day_of_week 9 gives 23514, service_type duration_minutes 0 gives 23514, duplicate vehicle vin gives 23505. Every other reference-table constraint is structurally self-enforcing because the UNIQUE pairs and the qualification PK are FK targets, so dropping one fails migration 0003. These four are not. Drop any and all 110 tests pass. Slice 01 policy code will assume duration_minutes greater than zero and closes_at greater than opens_at hold.
 - *file:* `src/persistence/migrations/0002_reference_data.sql`
+
+**T-9** — AC-10 fixture clause contradicts its assertion clause, and the test-engineer authored both
+
+- *scenario:* AC-10 said A and B are on the same bay AND technician and asserted rejection at 23P01 on no_bay_overlap. Sharing the technician makes no_technician_overlap violable too, and section 11.2 A-2 says which of two simultaneously violable exclusion constraints PostgreSQL reports is index order and not a guarantee. Measured: the literal fixture passes on 16.15 for exactly that reason. The wording came from the test-engineer own step-5 recommendation and the human ruled on it in good faith. In its words, a defect I introduced at the moment I was arguing hardest that nobody should rest an assertion on A-2.
+- *file:* `docs/slices/00-schema-and-exclusion-constraints.md`
+- *accepted* by human — Ruled (a) clarification by the human: delete and technician from AC-10. Everything the criterion asserts is preserved — consequence 4, the rejection at no_bay_overlap, B unchanged — and no_bay_overlap becomes the only violable constraint, so the assertion is evidence rather than a coin flip. The committed test already matches the clarified wording, because the test-engineer wrote the case correctly and raised the contradiction instead of following the criterion into a fixture it knew was wrong. Two alternatives rejected: widening the assertion to accept either constraint name, which would stop discriminating a constraint keyed on the wrong column and reopen T-4; and making the test match the AC literally, which would have it pass by index order.
 
 </details>
 
