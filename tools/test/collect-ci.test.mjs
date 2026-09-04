@@ -236,6 +236,68 @@ if (collector) {
         && records?.[1]?.ts === DERIVED_GREEN.run.updatedAt,
       JSON.stringify(records?.map((r) => r.ts)));
   }
+
+  // -- conformance: the job names in verify.yml and the keys the DoD reads ---------------
+  //
+  // A SIXTH constraint, and it is the shape this slice keeps producing: a constraint imposed
+  // in one place and enforced in another that is never run. `collect-ci.mjs` maps a job's
+  // DISPLAY NAME to the key it records under; `.github/workflows/verify.yml` owns those
+  // display names; nothing connects them. Rename `name: docs, tools and log integrity`
+  // today and the mapping falls through to the slug, `checks.jobs.verify` silently becomes
+  // `checks.jobs["docs-tools-and-log-integrity"]`, and every consumer that reads the old key
+  // reads `undefined` — a green nothing, not an error.
+  //
+  // Asserted BEHAVIOURALLY, through toCheckRunRecord, rather than by importing the map: the
+  // observable contract is the key that lands in the record, and a test that reads the
+  // internal constant would still pass if the record stopped using it. No YAML parser — the
+  // block is scanned by indentation, which is enough for a two-level structure and adds no
+  // dependency to a repository whose point is that its tooling runs offline.
+  const WORKFLOW = '.github/workflows/verify.yml';
+  const workflowJobs = (() => {
+    const lines = readFileSync(resolve(WORKFLOW), 'utf8').split('\n');
+    const start = lines.findIndex((line) => line === 'jobs:');
+    if (start === -1) return [];
+    const jobs = [];
+    for (const line of lines.slice(start + 1)) {
+      if (/^\S/.test(line)) break;                       // a new top-level key ends `jobs:`
+      const key = /^  ([A-Za-z0-9_-]+):\s*$/.exec(line);  // `  red-proof:`
+      if (key) { jobs.push({ key: key[1], name: null }); continue; }
+      const name = /^    name:\s*(\S.*?)\s*$/.exec(line); // `    name: red-proof`
+      if (name && jobs.length > 0 && jobs.at(-1).name === null) jobs.at(-1).name = name[1];
+    }
+    return jobs;
+  })();
+
+  // Coverage before verdict, again: a regex that matched nothing would make every assertion
+  // below vacuously true, which is the exact defect this case exists to prevent elsewhere.
+  check('conformance precondition — verify.yml parsed, every job carrying a display name',
+    workflowJobs.length >= 3 && workflowJobs.every((job) => typeof job.name === 'string'),
+    `scanned ${WORKFLOW} and found ${JSON.stringify(workflowJobs)}`);
+
+  if (workflowJobs.length >= 3 && typeof toCheckRunRecord === 'function') {
+    const record = toCheckRunRecord(
+      {
+        ...DERIVED_GREEN.run,
+        jobs: workflowJobs.map((job) => ({
+          name: job.name, conclusion: 'success', status: 'completed', steps: [],
+        })),
+      },
+      { slice: '00a', collectedVia: 'gh-cli' },
+    );
+
+    check('every job in verify.yml records under its own YAML key',
+      JSON.stringify(Object.keys(record?.checks?.jobs ?? {}))
+        === JSON.stringify(workflowJobs.map((job) => job.key)),
+      `a display name with no mapping falls through to the slug, so the key drifts silently `
+      + `and the old one reads undefined. workflow ${JSON.stringify(
+        workflowJobs.map((job) => `${job.key} = ${job.name}`))}, recorded ${JSON.stringify(
+        Object.keys(record?.checks?.jobs ?? {}))}`);
+
+    check('…including the two keys the Definition of Done reads by name',
+      record?.checks?.jobs?.verify === 'PASS' && record?.checks?.jobs?.test === 'PASS',
+      `check.mjs reads jobs.verify for "tests green" and §7 reads jobs.test; a rename that `
+      + `moved either is a silent DoD failure. got ${JSON.stringify(record?.checks?.jobs)}`);
+  }
 }
 
 // -- fixture provenance is part of the evidence, not decoration -------------------------

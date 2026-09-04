@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import ts from 'typescript';
@@ -34,11 +34,27 @@ import ts from 'typescript';
  *   summary.environment.issues[0].name = "missing-typescript-transpiler"
  *
  * Four planted violations, none reported, exit 0, and under `--output-type json` no other
- * signal. So: STUB WHAT THE RULES POINT AT (`pg`, `kysely`), RESOLVE WHAT DOES THE ANALYSIS
- * (`typescript`, by symlink — the fixture root is a temp directory, so Node's upward
- * resolution walks /tmp/<fixture>/node_modules, /tmp/node_modules, /node_modules and never
- * reaches the repository. "The fixture resolves the real compiler" is not a mechanism; a
- * symlink is).
+ * signal. So: STUB WHAT THE RULES POINT AT (`pg`, `kysely`), and make sure the ANALYSER is
+ * the repository's own.
+ *
+ * The asymmetry is real; the mechanism first written for its second half was not. This file
+ * used to symlink `node_modules/typescript` into the fixture root, on the stated grounds
+ * that a temp fixture root defeats Node's upward resolution. The architect checked the
+ * resolution in `dependency-cruiser@18.2.0` source at step 4: EVERY `typescript` resolution
+ * site goes through `src/utl/try-import.mjs` or `src/extract/transpile/try-import-available
+ * .mjs`, both using `createRequire(import.meta.url)` — from the PACKAGE's own location. The
+ * working directory is never consulted, so `depcruise` spawned from
+ * `<repo>/node_modules/.bin` finds `<repo>/node_modules/typescript` whatever `cwd` is, and
+ * the symlink was six lines of machinery with a false explanation attached (§11.6).
+ *
+ * What IS load-bearing is one line down: `DEPCRUISE` is an ABSOLUTE PATH into this
+ * repository's `node_modules/.bin`. Never a bare `depcruise` off PATH and never `npx`, which
+ * would fetch a different dependency-cruiser from the network — resolving the compiler from
+ * the analyser's location is only a guarantee once the analyser itself is pinned.
+ *
+ * If that reading of the resolution is wrong, this is not a silent failure: the guard below
+ * fires and names `missing-typescript-transpiler`. The symlink then comes back, with a true
+ * explanation.
  *
  * Every cruise below therefore runs `guardTheCruiseHappened` BEFORE reading any violation.
  */
@@ -123,17 +139,16 @@ function newFixture(label: string): string {
     )}\n`,
   );
 
-  // THE ASYMMETRY IS THE POINT. Stubs for what the rules point at …
+  // THE ASYMMETRY IS THE POINT, and only this half of it needs building. `pg` and `kysely`
+  // are resolved by enhanced-resolve FROM THE WORKING DIRECTORY, so a stub here is what
+  // makes the reported path `node_modules/kysely` and the rule anchor match; resolve them
+  // upward to the repository instead and the path is `../node_modules/kysely`, the anchor
+  // misses, and `sql-only-in-persistence` silently does not fire.
+  //
+  // The compiler needs nothing: dependency-cruiser resolves it from its own package
+  // location, not from cwd (see the header). No symlink.
   stubPackage(root, 'kysely', 'export declare class Kysely<DB> { readonly __db?: DB }\n');
   stubPackage(root, 'pg', 'export declare class Pool { connect(): Promise<void> }\n');
-
-  // … and the real compiler for what does the analysis.
-  mkdirSync(join(root, 'node_modules'), { recursive: true });
-  symlinkSync(
-    resolve(REPO_ROOT, 'node_modules/typescript'),
-    join(root, 'node_modules/typescript'),
-    'dir',
-  );
 
   return root;
 }

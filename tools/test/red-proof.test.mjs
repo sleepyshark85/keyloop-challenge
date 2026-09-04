@@ -4,9 +4,10 @@
  *
  *   node tools/test/red-proof.test.mjs
  *
- * AUTHORED BY THE TEST-ENGINEER, and deliberately NOT wired into `npm run test:tools`
- * (docs/slices/00a-design.md §11.4) — see the header of collect-ci.test.mjs for why that is
- * load-bearing twice.
+ * AUTHORED BY THE TEST-ENGINEER, unwired at the red commit (docs/slices/00a-design.md
+ * §11.4) and wired into `npm run test:tools` by the implementer in the green commit that
+ * created tools/ci/red-proof.mjs — see the header of collect-ci.test.mjs for why the delay
+ * was load-bearing twice, and what it cost the one file that stayed unwired.
  *
  * This file matters more than an ordinary tool test. `red-proof` cannot judge the commit
  * that introduces it as a live job, so §7's evidence item 3 offers a REPLAY of the discrim-
@@ -38,7 +39,7 @@
  * The job SUCCEEDS when the required failure was observed. That inversion is visible in the
  * check's name rather than hidden in `continue-on-error`.
  */
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -54,6 +55,21 @@ const check = (desc, ok, detail = '') => {
 };
 
 const scratch = mkdtempSync(join(tmpdir(), 'red-proof-'));
+
+/**
+ * The RED RUN'S OWN ARTIFACT, captured with `gh run download 33831214774 -n test-results`.
+ *
+ * §6 of collect-ci.test.mjs states the rule this file broke: "a fixture captured from the
+ * tool beats a fixture that encodes someone's belief about the tool". It was honoured for
+ * the `gh` payloads and not for the Vitest JSON — every case below builds names with
+ * `resolve()`, which makes them absolute against the LOCAL cwd, so `repoRelative` was only
+ * ever exercised on its first branch (the file is inside cwd, `relative()` answers). The
+ * branch that handles a path from ANOTHER machine — the one this tool exists to read, since
+ * red-proof replays a downloaded artifact — was never run.
+ */
+const CAPTURED_RED = JSON.parse(
+  readFileSync(resolve('tools/test/fixtures/vitest-red-run.captured.json'), 'utf8'),
+);
 
 /** The shape Vitest's json reporter emits: one testResults[] entry per test FILE. */
 function vitestResults(files) {
@@ -140,6 +156,82 @@ if (tool) {
         + 'rather than a status code');
     }
   }
+
+  // ──────────────────────── failedFilesFrom, on RUNNER-ABSOLUTE names (J-3) ──
+  //
+  // `judge` takes failedFiles already normalised, so every case above tested the RULE and
+  // none tested the READER that produces its input. That reader is the half that has to
+  // cope with a path from another machine, because red-proof's whole purpose is to be run
+  // against a downloaded artifact.
+
+  const { failedFilesFrom } = tool;
+  check('exports failedFilesFrom(vitestResults, cwd) → the failing files, repo-relative',
+    typeof failedFilesFrom === 'function',
+    'the normalisation is the half of this tool that reads a foreign machine\'s paths, and '
+    + 'it was reachable from the CLI only');
+
+  if (typeof failedFilesFrom === 'function') {
+    // COVERAGE BEFORE VERDICT. If this fixture ever stopped carrying runner-absolute names
+    // — recaptured from a local run, say — every assertion below would quietly fall back to
+    // the trivial branch and keep passing while proving nothing. That is this slice's
+    // recurring failure mode, so it is asserted rather than assumed.
+    const capturedNames = (CAPTURED_RED.results?.testResults ?? []).map((entry) => entry.name);
+    check('fixture precondition — the captured artifact carries RUNNER-absolute names',
+      capturedNames.length === 3
+        && capturedNames.every((name) => name.startsWith('/home/runner/work/')),
+      `Vitest records the absolute path of the machine that ran the suite; a fixture with `
+      + `repo-relative names encodes a belief about the tool that is false. got `
+      + JSON.stringify(capturedNames));
+
+    // The cwd is this machine's repo root and the paths are the runner's. THE MISMATCH IS
+    // THE CASE: `relative(cwd, name)` escapes upward, so the second branch has to answer.
+    const failed = failedFilesFrom(CAPTURED_RED.results, process.cwd());
+    check('the red run\'s failing files normalise to repo-relative paths',
+      JSON.stringify([...failed].sort()) === JSON.stringify([
+        'tests/acceptance/health.test.ts',
+        'tests/architecture/layering.test.ts',
+      ]),
+      `un-normalised, every name starts /home/runner/… and matches neither RED_ZONE nor `
+      + `MUST_PASS, so red-proof would report "nothing failed" on a run that failed twice. `
+      + `got ${JSON.stringify(failed)}`);
+
+    check('a PASSING file in the same artifact is not reported as failing',
+      !failed.some((file) => file.includes('postgres-harness')),
+      `tests/integration/postgres-harness.test.ts passed in run 33831214774 and is inside `
+      + `the red zone, so a reader that ignored status would still look right. got `
+      + JSON.stringify(failed));
+
+    // §7 evidence item 3, which was a one-off manual replay, now wired in as a regression.
+    const replay = judge({
+      subject: RED_SUBJECT, verifyConclusion: 'success', failedFiles: failed,
+    });
+    check('AC-6 holds against the red run\'s own artifact, end to end',
+      replay?.ok === true,
+      `the replay that discharges §7 evidence item 3 is now a test rather than a transcript. `
+      + `got ${JSON.stringify(replay)}`);
+
+    // "relative to cwd when inside it, otherwise from the LAST /tests/ segment" — LAST,
+    // because a checkout directory may itself be called `tests`. A first-match reader
+    // returns tests/tests/tests/acceptance/health.test.ts here, which matches no anchor.
+    const nested = failedFilesFrom({
+      testResults: [{
+        name: '/home/runner/work/tests/tests/tests/acceptance/health.test.ts',
+        status: 'failed',
+      }],
+    }, '/somewhere/else');
+    check('normalisation takes the LAST /tests/ segment, not the first',
+      nested[0] === 'tests/acceptance/health.test.ts',
+      `a repository checked out into a directory called "tests" is the case this choice is `
+      + `for. got ${JSON.stringify(nested)}`);
+
+    const noMarker = failedFilesFrom({
+      testResults: [{ name: '/elsewhere/spec/health.test.ts', status: 'failed' }],
+    }, '/somewhere/else');
+    check('a path with no /tests/ segment is returned whole rather than mangled',
+      noMarker[0] === '/elsewhere/spec/health.test.ts',
+      `it will match no anchor either way, but it must reach the reason string intact so a `
+      + `human can see what was read. got ${JSON.stringify(noMarker)}`);
+  }
 }
 
 // ────────────────────────────────────────────────────────── the invocation contract ──
@@ -168,11 +260,19 @@ const unitRedResults = resultsFile('unit-red', [
   ['tests/unit/checkHealth.test.ts', 'failed'],
 ]);
 
+// The red run's artifact, written back out VERBATIM — runner-absolute names and all. Every
+// other file here is built by vitestResults(), which resolve()s names against the local cwd
+// and therefore cannot reach the normalisation branch the CLI needs in CI.
+const capturedRedResults = join(scratch, 'captured-red.json');
+writeFileSync(capturedRedResults, JSON.stringify(CAPTURED_RED.results, null, 2));
+
 const run = (args) => spawnSync(process.execPath, [TOOL, ...args], { encoding: 'utf8' });
 
 const cliCases = [
   ['exit 0 — the rule is satisfied', 0,
     ['--subject-file', subjectFile, '--verify', 'success', '--results', redResults]],
+  ['exit 0 — THE RED RUN\'S OWN ARTIFACT, runner-absolute names, through the CLI', 0,
+    ['--subject-file', subjectFile, '--verify', 'success', '--results', capturedRedResults]],
   ['exit 0 — not applicable on an unmarked subject', 0,
     ['--subject-file', unmarkedSubjectFile, '--verify', 'failure', '--results', greenResults]],
   ['exit 1 — red-marked but nothing failed', 1,
