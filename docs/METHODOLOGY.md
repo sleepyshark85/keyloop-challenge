@@ -334,6 +334,21 @@ the test-engineer (`test(acceptance): … (red)`); **every implementer commit gr
 the code it drives); `main` receives only green merges. Conventional Commits referencing the slice.
 Past ~150 changed lines it should have been two commits.
 
+**Every role commits by explicit pathspec — `git commit --only <paths>`, never a bare `git commit`
+or `git add -A`.** The git index is shared by every agent in the worktree, and roles run
+concurrently when their *files* are disjoint. At slice 00 the architect's `git add` and the
+implementer's staging interleaved, and a bare `git commit` took the index as it found it: the record
+briefly showed **the architect committing `src/`**, which is an authority violation on its face and
+would have corrupted **C2**, measured from git history. It was caught on the commit stat and
+recommitted pathspec-pinned, so nothing was lost.
+
+Two things that near-miss establishes. Parallelism was chosen for file disjointness, and **the index
+is not a file** — the shared resource was never reasoned about. And `guard-paths.mjs` cannot see git
+operations at all: it denies the architect a `Write` under `src/`, and cannot deny it a `git add`
+that stages the same path. So the hook enforces authorship at the point of authoring and nothing
+enforces it at the point of recording, which is the artifact every other record reconciles against.
+`--only` closes it by construction rather than by timing.
+
 This resolves what would otherwise conflict — auditable TDD needs a visible red state, "every commit
 deliverable" forbids one. The single red commit is authored by a **different agent** than the
 implementer, so the evidence is stronger than a self-reported cycle and mainline discipline is
