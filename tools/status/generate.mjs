@@ -119,7 +119,7 @@ const doc = `# Status
 
 ## What happens next
 
-${nextActions(current, events)}
+${nextActions(current, events, slices)}
 
 ## Gate decisions
 
@@ -165,11 +165,13 @@ Verify this file's figures against ground truth: \`npm run log:audit\`.*
  * narration, so it has to be right about the inside of a phase, not only about
  * which phase it is.
  *
- * Only phase 4 branches today, because it is the only phase with a decidable
- * mid-point in the log. The others become derived the first time one of them is
- * wrong about itself.
+ * Phases 4 and 5 branch. The others become derived the first time one of them is
+ * wrong about itself — which is how phase 5 got here: the moment Gate D closed
+ * phase 4, this file's advice became "work slices one at a time, WIP 1", naming
+ * no slice, on the one page a resuming session is told to trust. That is O-11's
+ * shape exactly, one phase later, and it was static for the same reason.
  */
-function nextActions(phase, events = []) {
+function nextActions(phase, events = [], slices = []) {
   const done = (id) => events.some((e) => e.event === 'slice.done' && String(e.slice) === id);
   const retroHeld = events.some(
     (e) => e.event === 'handoff' && String(e.artifact ?? '').includes('phase-4-retro'),
@@ -194,6 +196,40 @@ function nextActions(phase, events = []) {
     ].join('\n');
   }
 
+  // Phase 5 — the slice loop. Derived from the backlog and the log together:
+  // which slices are done, which has been started, and which one's dependencies
+  // are satisfied. A static string here cannot know any of that, and the WIP
+  // limit of 1 means naming the wrong slice is not a cosmetic error.
+  if (phase === '5') {
+    const backlog = [...slices].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    const started = (s) => events.some((e) => String(e.slice) === String(s.id));
+    const open = backlog.filter((s) => !done(String(s.id)));
+    const inFlight = open.filter(started);
+    const nextUp = open.find((s) => (s.depends_on ?? []).every((d) => done(String(d))));
+    const folded = backlog.flatMap((s) => s.absorbs ?? []);
+    const link = (s) => `[\`${s.id}\`](slices/${s.file})`;
+
+    if (!open.length) {
+      return '- **Every slice is done.** Phase 6: as-built arc42, README and §13.\n- **Gate F**: final read.';
+    }
+    const lines = [];
+    if (inFlight.length) {
+      lines.push(`- **Slice ${inFlight.map(link).join(', ')} is in flight** — ${inFlight[0].title}.`);
+      lines.push('- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.');
+    } else if (nextUp) {
+      lines.push(`- **Next: slice ${link(nextUp)} — ${nextUp.title}**`);
+      lines.push(`- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.`);
+      if (nextUp.quality_scenarios?.length) {
+        lines.push(`- It claims ${nextUp.quality_scenarios.join(', ')}.`);
+      }
+    } else {
+      lines.push(`- **No slice is startable** — ${open.length} open, none with its dependencies merged. That is a backlog defect, not a waiting state.`);
+    }
+    lines.push(`- ${open.length} slice(s) remain of ${backlog.length} defined${folded.length ? `; Gate D folded ${folded.length} (${folded.join(', ')}) into their successors` : ''}.`);
+    lines.push('- **Gate E** on each, then `npm run slice:close`.');
+    return lines.join('\n');
+  }
+
   const map = {
     '0': '- Finish phase 0 instrumentation, then start phase 1.',
     '1': '- The architect writes arc42 §1–§3 and surfaces assumptions and open questions.\n- **Gate A**: the human resolves the open questions; answers become ADRs.',
@@ -204,7 +240,6 @@ function nextActions(phase, events = []) {
       '- **Gate B**: plan-mode approval; the stack is confirmed here.',
     ].join('\n'),
     '3': '- Slice the backlog into ~14 files (rescheduling added one at Gate A).\n- **Gate C**: approve scope and ordering.',
-    '5': '- Work slices one at a time, WIP 1. **Gate E** on each.',
     '6': '- As-built arc42 pass, presentation diagrams refreshed, README and §13 written.\n- **Gate F**: final read.',
     '7': '- Record the video from `docs/video-shotlist.md`.',
   };

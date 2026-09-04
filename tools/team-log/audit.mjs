@@ -15,11 +15,31 @@
  *
  * It reports in BOTH directions, which is the point:
  *
- *   OMISSION     an agent ran, or a commit exists, and the log does not say so
+ *   OMISSION     an agent ran, or a slice commit exists, and the log is silent
  *   UNSUPPORTED  the log claims an agent run that no transcript corroborates
+ *   MISMATCH     the log claims MORE time than the transcript spans
  *
  * Omissions catch forgetting. Unsupported records catch invention. Run it at
  * every gate; a clean audit is what makes the numbers in §13 worth quoting.
+ *
+ * Two corrections out of the phase-4 retro, both instances of the same shape —
+ * a check that reported over work it had not done:
+ *
+ *   O-3  Runs were paired to transcripts by timestamp proximity, one-to-one.
+ *        A resumed agent stops once per resume and writes one agent.finish each,
+ *        but all resumes share ONE transcript, so every resume after the first
+ *        was reported UNSUPPORTED and its duration MISMATCHed. 27 discrepancies
+ *        against an honest log. Pairing is now by `agent_id`, which the hook has
+ *        always written, and MISMATCH is directional: a log span SHORTER than
+ *        the transcript is what a resume predicts, while a log claiming more
+ *        time than the transcript spans is the direction invention runs in.
+ *
+ *   R-10 The git half of OMISSION was inert by construction: it required events
+ *        to carry a `git` field and no event has ever carried one, so every
+ *        commit was "unreferenced", printed dimmed, and gated nothing. Linkage
+ *        is now DERIVED from the Conventional Commit scope — a commit scoped to
+ *        a known slice id whose slice has no events in the log is a real
+ *        omission and counts. Nothing needs backfilling for that to work.
  */
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -79,6 +99,28 @@ function subagentRuns() {
   return { runs: runs.sort((a, b) => (a.start ?? 0) - (b.start ?? 0)), sessions: sessions.length };
 }
 
+// ---------------------------------------------------- ground truth: slices --
+// The backlog's own ids, so a commit scope can be recognised as a slice rather
+// than as a phase or an area. Read from the files rather than hardcoded: a new
+// slice must not silently fall outside the audit.
+function sliceIds() {
+  const dir = join(process.cwd(), 'docs/slices');
+  if (!existsSync(dir)) return new Set();
+  const ids = new Set();
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.md'))) {
+    const src = readFileSync(join(dir, f), 'utf8');
+    const m = src.match(/^id:\s*"?([^"\n]+)"?/m);
+    if (m) ids.add(m[1].trim());
+    // A slice folded into another keeps its id recognisable here even though the
+    // tombstone carries no `id:`. Gate D folded 03 into 02 and 10 and 11 into 09;
+    // a commit still scoped `feat(03):` afterwards is a mistake worth catching,
+    // and dropping the id from the audit is how it would stop being caught.
+    const a = src.match(/^absorbs:\s*\[([^\]]*)\]/m);
+    if (a) for (const id of a[1].match(/"([^"]+)"/g) ?? []) ids.add(id.replace(/"/g, ''));
+  }
+  return ids;
+}
+
 // ------------------------------------------------------ ground truth: git --
 function commits() {
   try {
@@ -104,11 +146,28 @@ const loggedFinishes = log.filter((e) => e.event === 'agent.finish' && ROLES.has
 
 const findings = [];
 
+// O-3. Pair by agent_id, which the SubagentStop hook has always written, rather
+// than by timestamp proximity. One transcript may legitimately carry SEVERAL
+// agent.finish records — an agent resumed via SendMessage stops once per resume
+// and writes one each, while all of them append to the single transcript for
+// that agent_id. Proximity pairing called every resume after the first an
+// invention. Ids are matched against ALL runs on disk, not the --since window,
+// so a resume inside the window whose transcript began before it is still paired.
+const runById = new Map(runs.map((r) => [r.id, r]));
+const pairOf = (e) => {
+  if (e.agent_id) return runById.get(e.agent_id) ?? null;
+  // Records written before the hook carried agent_id fall back to the old
+  // heuristic. Nothing in the log needs rewriting for the fix to apply.
+  return teamRuns.find((r) =>
+    r.type === e.actor && Math.abs(Date.parse(e.ts) - (r.end ?? 0)) < 10 * 60 * 1000) ?? null;
+};
+const finishesFor = (r) => loggedFinishes.filter((e) =>
+  e.agent_id ? e.agent_id === r.id
+             : e.actor === r.type && Math.abs(Date.parse(e.ts) - (r.end ?? 0)) < 10 * 60 * 1000);
+
 // (1) an agent ran and the log is silent
 for (const r of teamRuns) {
-  const match = loggedFinishes.find((e) =>
-    e.actor === r.type && Math.abs(Date.parse(e.ts) - (r.end ?? 0)) < 10 * 60 * 1000);
-  if (!match) {
+  if (!finishesFor(r).length) {
     findings.push({
       kind: 'OMISSION',
       what: `${r.type} ran for ${fmt(r.duration)} (${r.description || 'no description'}) — no agent.finish in the log`,
@@ -119,33 +178,63 @@ for (const r of teamRuns) {
 
 // (2) the log claims a run nothing corroborates
 for (const e of loggedFinishes.filter((e) => recent(Date.parse(e.ts)))) {
-  const match = teamRuns.find((r) =>
-    r.type === e.actor && Math.abs(Date.parse(e.ts) - (r.end ?? 0)) < 10 * 60 * 1000);
-  if (!match) {
+  if (!pairOf(e)) {
     findings.push({
       kind: 'UNSUPPORTED',
-      what: `log records ${e.actor} finishing at ${new Date(e.ts).toISOString().slice(11, 16)} — no subagent transcript corroborates it`,
+      what: `log records ${e.actor} finishing at ${new Date(e.ts).toISOString().slice(11, 16)}`
+          + `${e.agent_id ? ` as ${e.agent_id}` : ''} — no subagent transcript corroborates it`,
       when: Date.parse(e.ts),
     });
   }
 }
 
-// (3) durations that disagree with the transcript
+// (3) durations that claim more than the transcript spans
+// Directional, per O-3. A resumed agent's record covers ONE invocation while the
+// transcript spans them all, so log < transcript is what an honest resume looks
+// like and firing on it is what made the audit cry wolf. A record claiming MORE
+// time than its transcript spans cannot be explained that way, and that is the
+// direction invention runs in.
 for (const e of loggedFinishes) {
-  const r = teamRuns.find((r) =>
-    r.type === e.actor && Math.abs(Date.parse(e.ts) - (r.end ?? 0)) < 10 * 60 * 1000);
-  if (r && e.duration_ms && r.duration && Math.abs(e.duration_ms - r.duration) > 60_000) {
+  const r = pairOf(e);
+  if (r && e.duration_ms && r.duration && e.duration_ms - r.duration > 60_000) {
     findings.push({
       kind: 'MISMATCH',
-      what: `${e.actor}: log says ${fmt(e.duration_ms)}, transcript says ${fmt(r.duration)}`,
+      what: `${e.actor}: log claims ${fmt(e.duration_ms)}, transcript spans only ${fmt(r.duration)}`,
       when: Date.parse(e.ts),
     });
   }
 }
 
-// (4) commits nothing in the log points at
+// (4) R-10. Commits the log cannot account for.
+// The `git.commits` field this once relied on has never been written by anything,
+// so the check was inert and every commit read as unreferenced. Linkage is now
+// derived from the Conventional Commit scope §7 already mandates: a commit
+// scoped to a known slice id belongs to that slice's work, so if the log holds
+// no events for that slice, the log is missing work that demonstrably happened.
+// That is an OMISSION under the legend's own wording, and it now counts as one.
+const ids = sliceIds();
+const scopeOf = (subject) => subject.match(/^[a-z]+\(([^)]+)\)!?:/)?.[1] ?? null;
+const slicesInLog = new Set(log.filter((e) => e.slice != null).map((e) => String(e.slice)));
 const referenced = new Set(log.flatMap((e) => e.git?.commits ?? []).map((c) => c.slice(0, 7)));
-const unreferenced = gitCommits.filter((c) => recent(c.ts) && !referenced.has(c.sha));
+
+for (const c of gitCommits.filter((c) => recent(c.ts) && !referenced.has(c.sha))) {
+  const scope = scopeOf(c.subject);
+  if (scope && ids.has(scope) && !slicesInLog.has(scope)) {
+    findings.push({
+      kind: 'OMISSION',
+      what: `commit ${c.sha} is scoped to slice ${scope} (${c.subject}) — the log has no events for that slice`,
+      when: c.ts,
+    });
+  }
+}
+
+// Everything else — phase work, orchestrator tooling, merges — is reported for
+// information and does not gate. Stated plainly rather than dressed as a check.
+const unreferenced = gitCommits.filter((c) => {
+  if (!recent(c.ts) || referenced.has(c.sha)) return false;
+  const scope = scopeOf(c.subject);
+  return !(scope && ids.has(scope));
+});
 
 // ---------------------------------------------------------------- report ---
 function fmt(ms) {

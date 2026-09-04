@@ -1,51 +1,30 @@
 ---
-id: "03"
-title: The error taxonomy — every failure has one status, one type, and a test
-status: ready
-depends_on: ["02"]
-arc42: ["§8.6"]
-adr: [1, 2, 5]
-quality_scenarios: [QS-11]
-loopbacks: 0
+folded_into: "02"
+folded_at: 2026-09-04
+folded_by: gate-D
 ---
 
-## Goal
+# Slice 03 — folded into slice 02
 
-Every row of §8.6's status table is reachable and produces exactly that status and that `type`, as
-RFC 9457 `application/problem+json`. A client distinguishes an out-of-hours request from a contended
-one from an unknown vehicle without parsing prose.
+**This is a tombstone. It is not a slice and carries no `id:`, so no tool counts it, schedules it or
+waits on it.** The file is kept rather than deleted because the backlog's shape is part of the record:
+Gate C approved thirteen slices with its reasoning stated, and Gate D cut them. Deleting the evidence
+of the first decision to make the second look tidy is the kind of quiet change `CLAUDE.md` §4 exists
+to prevent.
 
-## Acceptance criteria
+**Was:** The error taxonomy — every failure has one status, one type, and a test (QS-11)
 
-- **AC-1** — Given a request whose derived interval leaves the dealership's opening hours, when it is
-  booked, then `400` with `type=/problems/outside-opening-hours` — **not** `409`. The decision is
-  made by `domain/openingHours.ts`, which reads no booking (GC-1).
-- **AC-2** — Given a malformed body or an unparseable timestamp, when it is submitted, then `400`
-  with `type=/problems/malformed-request`, rejected by the route schema before any handler runs.
-- **AC-3** — Given an unknown dealership, service type, customer or vehicle, when it is named, then
-  `422` with `type=/problems/unknown-reference` carrying `reference` — **not** `404`.
-- **AC-4** — Given a vehicle that is not the named customer's, when it is booked, then `422` with
-  `type=/problems/vehicle-not-owned` — **not** `403`. It is validation, not authorisation (ADR-0002).
-- **AC-5** — Given a contended booking, when every candidate is refused, then `409` with
-  `type=/problems/no-capacity` carrying `resource` set to the contended resource.
-- **AC-6** — Given every row of §8.6's table, when the contract test runs, then each is reachable and
-  no two rows collide — the taxonomy is total and stable. *(QS-11)*
+**Why it was folded.** Phase 4's pre-registered criterion C6 — "the budget is real" — failed by more
+than an order of magnitude: 15.1 hours elapsed across the two pilot slices against a ceiling that
+extrapolated to 10 hours over the whole backlog. C6's own wording says the response is to cut slices
+or reduce agent count, not to proceed and hope. At Gate D the human ruled the first and declined the
+second, so the backlog went from 11 remaining slices to 8 with the team and the loop unchanged.
 
-## In scope
+**Where the work went.** All six acceptance criteria moved into slice 02 as AC-7 to AC-12, unchanged in substance, together with the contract test, the problem+json serialiser and the §8.6 outcome mapping. QS-11 is now claimed by slice 02 and, for the OpenAPI half, by slice 09.
 
-- `tests/contract/error-taxonomy.test.ts`.
-- The problem+json serialiser, and the outcome-not-exception mapping of §8.6.
+**What was NOT cut, and why it matters.** The orchestrator's first proposed cut also folded slice 07
+into slice 06. That was withdrawn: Gate C defended the 06/07 seam by name — *"so the atomic move is
+separated from the two concurrency scenarios that catch a cancel-then-insert"* — and a cut that
+reverses a recorded ruling has to say so rather than arrive inside a list of three. The seam stands.
 
-## Out of scope
-
-- `appointment-not-confirmed` (`409` on moving a cancelled appointment) — it needs rescheduling, so
-  it lands with slice 06 and extends this test.
-- Asserting the emitted OpenAPI document matches the committed one — slice 09, where the document
-  exists.
-
-## Definition of done
-
-Beyond `CLAUDE.md` §10:
-
-- §8.6's recorded tension is left recorded, not harmonised: out-of-hours stays `400` although `422`
-  would sit more naturally beside the reference failures. Changing it means superseding ADR-0001.
+See `docs/team-log/events.jsonl`, span `p-4-gate-d`, for the ruling as recorded.
