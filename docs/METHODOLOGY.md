@@ -343,6 +343,27 @@ step that has never produced an objection is rubber-stamping**, and the pilot re
 defect-escape distance. Two agents agreeing at step 2 costs a comment; the same ambiguity found at
 step 5 costs a full cycle plus a loopback.
 
+### Answering an objection
+
+*Added 2026-09-04, after the first real use of step 2 produced five objections and the adjudicating
+prompt asked the architect to rule and amend in a single run.* That is a defect in the process, not
+in the architect: an adjudicator drafting the amendment while deciding whether it is warranted has
+already conceded. `CLAUDE.md` §6 now makes the separation NON-NEGOTIABLE, and the thread is where it
+is visible:
+
+| | |
+|---|---|
+| **Reply first, edit second** | One verdict per objection — AGREE or DISAGREE, with reasoning — posted **before** any file changes. Agreement states the exact amendment; it does not make it |
+| **Finding ≠ remedy** | A measured finding is a fact. The fix proposed beside it is an argument, and may be rejected on its own merits or narrowed |
+| **Disagreement opens a loop** | The objector answers once. Still deadlocked, the architect may call a **vote**: a third role owning neither side returns a reasoned verdict — advisory to the architect on architecture, to the human on scope, recorded either way |
+| **Then amend, in one pass** | With the rulings attached, so step 3 builds against one current document rather than a design plus a thread of corrections |
+
+The reason this is worth the extra round: the brief grades *the process for verifying and refining*
+AI output. A design that was argued into shape, with the losing arguments preserved, is stronger
+evidence than the same design arrived at by an agent agreeing with whoever spoke last. **A vote is
+also the only mechanism here that lets a role be outnumbered rather than overruled** — which is what
+keeps the architect's authority (§6) from collapsing into the last reviewer's preference.
+
 Agents do not post. They return structured reports, and the orchestrator posts on their behalf under
 §290's attribution line — the same asymmetry that makes an unattributed comment the human's.
 

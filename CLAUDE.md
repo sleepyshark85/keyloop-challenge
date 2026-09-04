@@ -146,6 +146,32 @@ would fail**. If it cannot name one, the outcome is (b). Preference is not a blo
 **Max 2 loopbacks per slice.** A third auto-escalates: a slice needing three design changes is a
 slicing problem, not a design problem.
 
+### Adjudication is reasoned before it is applied — NON-NEGOTIABLE
+
+Deliberating and conceding are separate acts and must be separate steps. An adjudicator that rules
+and edits in one pass has already half-written the amendment by the time it decides whether the
+objection was right, which makes agreement the path of least resistance.
+
+So a role receiving an objection **replies before it edits**:
+
+1. **Re-think, then reply per objection.** One verdict each — **AGREE** or **DISAGREE** — with the
+   reasoning stated. Where it agrees, it states the exact change it would make. It does not make it.
+2. **Judge the finding and the remedy separately.** A correct measurement does not make the fix
+   proposed alongside it correct. Accepting that a problem is real while rejecting the offered
+   remedy, or accepting a narrower one, is a legitimate and common outcome.
+3. **Disagreement is expected and is not failure.** No role is obliged to concede to keep a slice
+   moving. An adjudication round that has never produced a disagreement is not consensus, it is
+   deference, and the retro reads it the same way it reads a reviewer with no findings.
+4. **A disagreement opens a review loop.** The objector may answer once. If the two still disagree,
+   the architect may **call a vote**: a third role — one that owns neither side of the dispute — is
+   given both positions and returns a reasoned verdict. Votes are advisory to the architect on
+   architecture, and to the human on scope; they are recorded either way.
+5. **Only then is the design amended**, in one pass, with the rulings attached.
+
+Every reply, disagreement and vote goes on the PR under §9's attribution convention, because the
+reasoning is the graded artifact — the record of *how* a design was argued into shape is worth more
+than the amended design alone.
+
 ### Authority
 
 - **Architect** decides architecture: interfaces, layering, data model, patterns.
