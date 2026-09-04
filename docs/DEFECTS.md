@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **50** |
-| Severity | 9 blocking · 28 major · 13 minor |
+| Findings recorded | **55** |
+| Severity | 9 blocking · 32 major · 14 minor |
 | Verdicts | 4 narrowed · 23 accepted · 1 escalated · 4 deferred |
-| Raised by | test-engineer 15 · implementer 12 · reviewer 12 · architect 6 · orchestrator 5 |
-| Awaiting a ruling | **18** |
-| Mean escape distance | 1.54 step(s) |
+| Raised by | reviewer 17 · test-engineer 15 · implementer 12 · architect 6 · orchestrator 5 |
+| Awaiting a ruling | **23** |
+| Mean escape distance | 1.49 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -326,6 +326,11 @@ rather than narrated.*
 | **O-10** | MAJOR | 4 *(+4)* | architect | Concurrent agents on one worktree make a bare git commit unsafe, and it nearly recorded an authority violation in git | accepted |
 | **I-11** | MINOR | 4 *(+1)* | implementer | Every db run emits a pg deprecation warning that becomes an error at pg 9 | deferred |
 | **A-7f** | MAJOR | 4 *(+1)* | architect | Case 0 constraint-set filter breaks on PostgreSQL 18, and it breaks in the direction that gets the assertion loosened | accepted |
+| **R00-1** | MAJOR | 5 *(+1)* | reviewer | Every slice file is status: ready, so the pilot Definition of Ready has been failing throughout and nobody read it | **open** |
+| **R00-2** | MAJOR | 5 *(+1)* | reviewer | The mutation gate passes on a measurement that could not have failed | **open** |
+| **R00-3** | MAJOR | 5 *(+1)* | reviewer | appointment_technician_in_dealership is never asserted to fire — six of seven constraints are proven, the seventh only exists | **open** |
+| **R00-4** | MAJOR | 5 *(+1)* | reviewer | AC-1 and AC-2 have no positive control and the design stated reason for exempting them is false | **open** |
+| **R00-5** | MINOR | 5 *(+1)* | reviewer | Four reference-table constraints that arc42 specifies are asserted by nothing | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -387,6 +392,31 @@ rather than narrated.*
 - *scenario:* At step 3 the architect accepted contype not-equal-p on the reasoning that a later PostgreSQL surfacing NOT NULL as pg_constraint rows would fail loudly in the same commit as the bump. Measured across three majors and independently reproduced by the orchestrator: 16.15 and 17.11 return the named constraints only; 18 returns six extra contype-n rows, appointment_id_not_null and five siblings. That is not a loud failure, it is a FALSE POSITIVE naming six constraints nobody wrote — so whoever bumps the image sees case 0 fail, concludes the assertion is too strict, and loosens the one thing section 6.2 depends on. The failure direction is the finding. Remedy is an allowlist, contype IN (c,f,u,x), which ignores a constraint type the PLATFORM introduces while still catching every constraint a DEVELOPER can add; verified on 18 to return only the real constraint.
 - *file:* `tests/integration/exclusion-constraints.test.ts`
 - *accepted* by orchestrator — Accepted and verified. Not urgent — the image is pinned to postgres:16 and postgres-harness.test.ts asserts caret-16, so nothing can fail today — but accepted rather than deferred because the remedy is one token and the deferred version of this finding is a trap that fires on a routine bump and teaches the wrong lesson when it does. Sequenced after step 5 rather than now, on the architect own advice, so the reviewer is not reviewing a file that moves under it. The architect measuring an assumption it had created and assigned to someone else, rather than carrying it, is the behaviour section 0.1 was written to produce.
+
+**R00-1** — Every slice file is status: ready, so the pilot Definition of Ready has been failing throughout and nobody read it
+
+- *scenario:* Slice 00a was approved and merged at its human gate but no commit ever set status: done in its frontmatter. git log -S"status: done" on that file is EMPTY. check.mjs line 75 tests dep.status !== done, so slice:check 00 reports FAIL dependencies merged, not done: 00a — and the whole loop ran anyway. All thirteen slice files are status: ready and each depends_on its predecessor, so the failure propagates to every remaining slice. CLAUDE.md section 10 says a slice does not reach done because an agent says so, and section 8 WIP limit says no slice starts until the previous one has passed its human gate. The machine that adjudicates both has been answering FAIL on the pilot since it began.
+- *file:* `docs/slices/00a-walking-skeleton.md`
+
+**R00-2** — The mutation gate passes on a measurement that could not have failed
+
+- *scenario:* slice:check 00 reports PASS mutation score 0.9577 for a slice whose diff contains no mutable TypeScript. CLAUDE.md section 10 Definition of Done is mutation score above threshold ON CHANGED FILES; the gate checks a number, not the clause. Stryker instruments the identical 142 mutants as slice 00a — same eight files, same 136 killed, same six survivors — because mutate is scoped to src TypeScript and this slice adds only .sql plus tests. The logged record is honest, its note field says UNCHANGED and vacuously so, but check.mjs reads only checks.mutation_score, so the honesty sits in a field the gate never opens. This is O-6 shape one turn on: c7a716d taught two predicates that a mutation record is not a CI run and left the third reading by log position with no discriminator for whether the score measures anything this slice wrote.
+- *file:* `tools/slice/check.mjs`
+
+**R00-3** — appointment_technician_in_dealership is never asserted to fire — six of seven constraints are proven, the seventh only exists
+
+- *scenario:* Every expectRejection call in the file covers no_bay_overlap three times, no_technician_overlap, appointment_interval_ordered, appointment_technician_qualified, appointment_vehicle_owned_by_customer and appointment_bay_in_dealership. appointment_technician_in_dealership appears nowhere. AC-7 is worded a bay at dealership X and the test asserts the bay constraint, so the technician half of assumption A-9 rides on case 0 alone. Measured on the live schema: booking D1 technician under D2 IS correctly rejected 23503 on that constraint, so it works — but drop it from the migration and case 0 set-equality is the only assertion that fails; key it on the wrong column pair and case 0 def-equality is again the only one. Remedy is four lines against the two-dealership fixture AC-7 already seeds.
+- *file:* `tests/integration/exclusion-constraints.test.ts`
+
+**R00-4** — AC-1 and AC-2 have no positive control and the design stated reason for exempting them is false
+
+- *scenario:* T-5 remedy was applied to AC-5 through AC-8. Section 4.6 exempts AC-1 and AC-2 because section 4.3 already reads the first row back — but the read-back validates a DIFFERENT row than the one whose rejection is asserted. AC-1 reads back techA/standard then asserts rejection on techB/quick; AC-2 reads back bayA and asserts on bayB, and bays.bayB appears exactly once in the whole file, in the rejected row. Because exclusion constraints fire before FK triggers — the design own measurement M-2, and the premise of AC-8 argument that it needs its control most — a techB outside the dealership, or a missing techB-quick qualification, leaves AC-1 reporting no_bay_overlap and passing green. That is T-5 exact failure mode, unremedied in the two cases carrying the slice headline invariant.
+- *file:* `docs/slices/00-design.md`
+
+**R00-5** — Four reference-table constraints that arc42 specifies are asserted by nothing
+
+- *scenario:* Case 0 inspects constraints on appointment only and no case attempts a row violating any constraint on the other eight tables. Measured live, all four exist and fire: opening_hours closes_at less-than-opens_at gives 23514, day_of_week 9 gives 23514, service_type duration_minutes 0 gives 23514, duplicate vehicle vin gives 23505. Every other reference-table constraint is structurally self-enforcing because the UNIQUE pairs and the qualification PK are FK targets, so dropping one fails migration 0003. These four are not. Drop any and all 110 tests pass. Slice 01 policy code will assume duration_minutes greater than zero and closes_at greater than opens_at hold.
+- *file:* `src/persistence/migrations/0002_reference_data.sql`
 
 </details>
 
