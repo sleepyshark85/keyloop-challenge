@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **57** |
-| Severity | 9 blocking · 33 major · 15 minor |
-| Verdicts | 4 narrowed · 25 accepted · 1 escalated · 4 deferred |
-| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · architect 6 · orchestrator 5 · human 1 |
-| Awaiting a ruling | **23** |
-| Mean escape distance | 1.54 step(s) |
+| Findings recorded | **58** |
+| Severity | 9 blocking · 34 major · 15 minor |
+| Verdicts | 4 narrowed · 29 accepted · 1 escalated · 3 deferred |
+| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · architect 6 · orchestrator 6 · human 1 |
+| Awaiting a ruling | **21** |
+| Mean escape distance | 1.62 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -56,19 +56,19 @@ rather than narrated.*
 | **T-2** | MAJOR | 4 *(+0)* | architect | repoRelative is not tested at all, and its fixtures encode a false belief about the tool | accepted |
 | **I-7** | MAJOR | 4 *(+0)* | implementer | Most of two CLIs carry rules that survive their own deletion with no test failing | accepted |
 | **T-3** | MINOR | 4 *(+0)* | test-engineer | The compiler diagnosis reports no compiler when one is installed | accepted |
-| **O-3** | MAJOR | 4 *(+4)* | orchestrator | log:audit reports 12 false discrepancies because it assumes one agent.finish per transcript | deferred |
+| **O-3** | MAJOR | 4 *(+4)* | orchestrator | log:audit reports 12 false discrepancies because it assumes one agent.finish per transcript | accepted |
 | **O-4** | BLOCKING | 4 *(+0)* | orchestrator | The unit tests are far weaker than a green suite suggests: mutation score 0.0634 against a Definition-of-Done threshold of 0.75 | accepted |
 | **O-5** | BLOCKING | 4 *(+0)* | implementer | The 0.0634 mutation score ruled BLOCKING was a harness artifact, not a measurement of the tests | accepted |
 | **R-1** | MAJOR | 5 *(+1)* | reviewer | The setup\|support\|architecture\|performance widening does real work and no wired test would fail if deleted | **open** |
 | **R-2** | MAJOR | 5 *(+1)* | reviewer | depcruiseOf is asserted in the pass direction only; both failing values are produced and asserted by nothing | **open** |
 | **R-3** | MAJOR | 5 *(+1)* | reviewer | The cancel-in-progress comment states a guarantee the concurrency group does not provide, falsified by this branch own history | **open** |
 | **R-4** | MAJOR | 5 *(+1)* | reviewer | The Bash guard is bypassed by an absolute path into the repository | **open** |
-| **R-5** | MAJOR | 5 *(+1)* | reviewer | The token accumulator can be deleted and the whole test:tools chain stays green | **open** |
+| **R-5** | MAJOR | 5 *(+1)* | reviewer | The token accumulator can be deleted and the whole test:tools chain stays green | accepted |
 | **R-6** | MAJOR | 5 *(+1)* | reviewer | Two constitutional amendments on this branch have no recorded human ruling | accepted |
 | **R-7** | MAJOR | 5 *(+1)* | reviewer | AC-5 is not demonstrated: the append it names has never run and has no test | **open** |
 | **R-8** | MINOR | 5 *(+1)* | reviewer | validated on the way out is false for schema constants: they are substituted, not validated | **open** |
 | **R-9** | MINOR | 5 *(+1)* | reviewer | The reason the file labels load-bearing is the false one | **open** |
-| **R-10** | MINOR | 5 *(+1)* | reviewer | The audit git-linkage check is inert by construction and C7 reads its output | **open** |
+| **R-10** | MINOR | 5 *(+1)* | reviewer | The audit git-linkage check is inert by construction and C7 reads its output | accepted |
 | **R-11** | MINOR | 5 *(+1)* | reviewer | Authored prose moved in an arc42 section the slice did not declare | **open** |
 | **R-12** | MINOR | 5 *(+1)* | reviewer | contract and property are RED_ZONE members with no committed case | **open** |
 | **O-6** | MAJOR | 6 *(+6)* | orchestrator | tests green and red before green accept any check.run record, including one that carries no test result at all | accepted |
@@ -206,7 +206,7 @@ rather than narrated.*
 
 - *scenario:* A resumed agent stops once per resume, writing one agent.finish each, but all resumes share a single subagent transcript. The audit pairs records to transcripts one-to-one, so it reports UNSUPPORTED for every resume after the first and MISMATCH on duration because the transcript spans all of them. Slice 00a resumed the architect six times, so the audit now reports the honest record as untrustworthy — which is worse than not auditing, because C7 reads this output.
 - *file:* `tools/team-log/audit.mjs`
-- *deferred* by orchestrator — Real and mine, but out of scope for slice 00a: audit.mjs is orchestrator tooling and the fix is not a slice deliverable. Recorded rather than silently tolerated, because an audit that cries wolf twelve times is one nobody reads. Same root cause as the report-capture overwrite fixed in bdb32c1 — both tools were written assuming one spawn equals one run, and SendMessage resumes break that. Carried to the phase-4 retro under C7.
+- *accepted* by orchestrator — Supersedes the slice-00a deferral, which was correct at the time — audit.mjs is orchestrator tooling and was not a slice deliverable — and which carried it to this retro under C7. Fixed as 5eb3e14. Runs are now paired to transcripts by agent_id, which the SubagentStop hook has always written, instead of by timestamp proximity one-to-one; records predating the field keep the old heuristic so nothing needs rewriting. MISMATCH is now directional: a log span shorter than its transcript is what an honest resume looks like, while a record claiming MORE time than the transcript spans is the direction invention runs in. On the real log 27 discrepancies to 0, with 46 agent.finish records across 21 transcripts.
 
 **O-4** — The unit tests are far weaker than a green suite suggests: mutation score 0.0634 against a Definition-of-Done threshold of 0.75
 
@@ -244,6 +244,7 @@ rather than narrated.*
 
 - *scenario:* Set tokens = null and 216 of 216 assertions pass; no case reads the emitted record tokens field. A change in the transcript usage shape would silently zero every token count in events.jsonl, and C6 — the budget is real, measured from the token collector — would extrapolate a 13-slice cost from records that are all zero, indistinguishable from agents that were cheap.
 - *file:* `.claude/hooks/log-agent-finish.mjs`
+- *accepted* by orchestrator — Fixed on tune/phase-4-remedies as e07d651, per the Gate D ruling to tune before slice 01. Eleven cases now read the emitted record's tokens field, and three mutants were run rather than reasoned about: the accumulator never assigning (R-5's own) fails 8 of 11, dropping cache_read fails 1, reading thinking from the flat field fails 1. The hook also gained the case the test was written around — a transcript with turns but no readable usage now emits no tokens field and notes it to the sidecar, because tokens:{in:0} is indistinguishable from an agent that was genuinely cheap and a 13-slice budget extrapolated from zeros reads as success. This is what unblocks C6 from being measurable at slice 01, which the Gate D ruling depends on.
 
 **R-6** — Two constitutional amendments on this branch have no recorded human ruling
 
@@ -270,6 +271,7 @@ rather than narrated.*
 
 - *scenario:* The legend defines OMISSION as an agent ran OR A COMMIT EXISTS and the log does not say so, but zero events carry a git key of any kind, so all commits are unreferenced, the commit half is printed dimmed outside the discrepancy count, and it gates nothing.
 - *file:* `tools/team-log/audit.mjs`
+- *accepted* by orchestrator — Fixed as 5eb3e14. The git half of OMISSION required a git field no event has ever carried, so every commit read as unreferenced, printed dimmed outside the discrepancy count, and gated nothing while the legend claimed it did. Linkage is now derived from the Conventional Commit scope section 7 already mandates: a commit scoped to a known slice id whose slice has no events in the log is work the log is missing, and it counts. No backfill and no schema change. Seventeen cases pin both fixes, and they kill the two mutants that make the audit QUIETER — reverting this linkage, and disabling UNSUPPORTED — as readily as they kill the original bug, because turning a noisy check silent is how O-3 comes back.
 
 **R-11** — Authored prose moved in an arc42 section the slice did not declare
 
@@ -301,6 +303,7 @@ rather than narrated.*
 |---|---|---|---|---|---|
 | **O-8** | MAJOR | 6 *(+6)* | orchestrator | The committed resume point advances the phase on a per-slice gate, so the first slice of the slice loop reports the project as finished building | accepted |
 | **O-11** | MAJOR | 6 *(+6)* | human | The committed resume point told a fresh session to do work that was already done and merged | accepted |
+| **O-12** | MAJOR | 6 *(+6)* | orchestrator | The resume point went static again the moment Gate D closed phase 4 — the third time this file has been wrong about where the project is | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -315,6 +318,12 @@ rather than narrated.*
 - *scenario:* STATUS.md what-happens-next was a static string per phase. After both pilot slices were done and the retro written, it still read Run slice 00 end-to-end, then hold the retro against process-criteria.md. A fresh session reading the file the project designates as its resume point — and whose own header says to trust it over narration — would have re-run a completed slice. Found by the human asking whether a fresh session would know where to start, which is the second time that question has caught this file: O-8 was the same file advancing the phase on a per-slice gate.
 - *file:* `tools/status/generate.mjs`
 - *accepted* by orchestrator — Fixed rather than deferred, for the same reason O-8 was: this file misreports where the project is to a session with no other context. The next action is now derived from the log — which pilot slices carry slice.done, and whether the retro handoff exists — so it reports Gate D open and undecided with the failing criteria named. Nine cases pin it, including the exact regression: with both slices done it must NOT still say run slice 00 end-to-end. Note the shape, which is the retro own finding one level up: a static string is a claim about the world that nothing re-derives, so it is right until the world moves and then wrong silently. Both O-8 and O-11 were caught by the human asking whether a fresh session would know where to start, not by the suite; now the suite asks it.
+
+**O-12** — The resume point went static again the moment Gate D closed phase 4 — the third time this file has been wrong about where the project is
+
+- *scenario:* O-11 derived phase 4's next action from the log but left every other phase a static string, with a comment saying the others become derived the first time one of them is wrong about itself. Gate D advanced STATUS.md to phase 5, whose entry read 'Work slices one at a time, WIP 1. Gate E on each.' — true of every day of phase 5 and naming no slice. With a WIP limit of 1 a resuming session that picks the wrong slice, or cannot tell which is next, is not making a cosmetic error. Caught by regenerating the file and reading it, which is the same question that caught O-8 and O-11, asked one step earlier.
+- *file:* `tools/status/generate.mjs`
+- *accepted* by orchestrator — Fixed rather than deferred, for the third time on the same file and the same reasoning: it misreports where the project is to a session with no other context. Phase 5's action is now derived from the backlog and the log together — which slices are done, which has been started, which one's dependencies are satisfied — and names slice 01 by id and title, cites the WIP limit when a slice is in flight, and reports what Gate D folded. Fifteen cases now pin the file, up from nine. Worth recording beyond the fix: the first mutant run against the new cases SURVIVED. Replacing the dependency scan with 'take the lowest open id' passed all twenty, because the fixture backlog was a straight chain where those two answers coincide. That is a defect in the test, not the code, and it is the same shape the retro's tier-1 finding describes — a mechanism that looks like it discriminates because the discriminating case was never constructed. Two cases were added on a forked backlog where the lowest open id is blocked; the mutant now fails four.
 
 </details>
 

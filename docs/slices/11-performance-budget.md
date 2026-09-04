@@ -1,48 +1,30 @@
 ---
-id: "11"
-title: The stated performance budget — a goal ranked last is still a goal with a number
-status: ready
-depends_on: ["10"]
-arc42: ["§10.2", "§11.1"]
-adr: [6]
-quality_scenarios: [QS-14]
-loopbacks: 0
+folded_into: "09"
+folded_at: 2026-09-04
+folded_by: gate-D
 ---
 
-## Goal
+# Slice 11 — folded into slice 09
 
-Performance is ranked fifth of five, deliberately and with its cost stated: the chosen correctness
-mechanism serialises conflicting writes at the database. This slice puts a number on it anyway,
-because a goal with no number is a goal nobody can fail — and records the scale at which the trade
-would need revisiting.
+**This is a tombstone. It is not a slice and carries no `id:`, so no tool counts it, schedules it or
+waits on it.** The file is kept rather than deleted because the backlog's shape is part of the record:
+Gate C approved thirteen slices with its reasoning stated, and Gate D cut them. Deleting the evidence
+of the first decision to make the second look tidy is the kind of quiet change `CLAUDE.md` §4 exists
+to prevent.
 
-## Acceptance criteria
+**Was:** The stated performance budget — a goal ranked last is still a goal with a number (QS-14)
 
-- **AC-1** — Given a seeded schedule of 5 bays, 20 technicians and 500 appointments in one dealership
-  over one week, when an availability query over a one-day window runs 100 times on the CI container,
-  then p95 is **under 200 ms**. *(QS-14)*
-- **AC-2** — Given the same fixture, when an uncontended booking is measured, then p95 is **under
-  100 ms** and it issues **exactly one** `INSERT`.
-- **AC-3** — Given the booking path, when its queries are counted, then no N+1 pattern exists in
-  candidate selection — one read of the candidate set, not one read per candidate.
-- **AC-4** — Given the measured write throughput for a single contended resource, when it is recorded
-  in §11, then the figure and the dealership scale at which it would become binding are both stated.
+**Why it was folded.** Phase 4's pre-registered criterion C6 — "the budget is real" — failed by more
+than an order of magnitude: 15.1 hours elapsed across the two pilot slices against a ceiling that
+extrapolated to 10 hours over the whole backlog. C6's own wording says the response is to cut slices
+or reduce agent count, not to proceed and hope. At Gate D the human ruled the first and declined the
+second, so the backlog went from 11 remaining slices to 8 with the team and the loop unchanged.
 
-## In scope
+**Where the work went.** All four acceptance criteria moved into slice 09 as AC-12 to AC-15, with the seeded fixture, the performance test and the §11 entry recording the measured ceiling.
 
-- `tests/performance/availability-budget.test.ts` and its seeded fixture.
-- The §11 entry recording the measured ceiling — turning §1.2's stated-but-unquantified cost into a
-  number.
+**What was NOT cut, and why it matters.** The orchestrator's first proposed cut also folded slice 07
+into slice 06. That was withdrawn: Gate C defended the 06/07 seam by name — *"so the atomic move is
+separated from the two concurrency scenarios that catch a cancel-then-insert"* — and a cut that
+reverses a recorded ruling has to say so rather than arrive inside a list of three. The seam stands.
 
-## Out of scope
-
-- Optimising to beat the budget. If it passes, nothing changes: goal 3 beats goal 5, and §1.2 says to
-  prefer the decomposition that isolates an ambiguity over the one that saves a query.
-- Load testing beyond a single dealership, connection-pool tuning, or read replicas. §11 carries them.
-
-## Definition of done
-
-Beyond `CLAUDE.md` §10:
-
-- The budget is asserted on the CI container and the run's machine class is recorded with the figure,
-  so a later regression is comparable rather than merely alarming.
+See `docs/team-log/events.jsonl`, span `p-4-gate-d`, for the ruling as recorded.

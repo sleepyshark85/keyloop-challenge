@@ -108,8 +108,15 @@ function sliceIds() {
   if (!existsSync(dir)) return new Set();
   const ids = new Set();
   for (const f of readdirSync(dir).filter((f) => f.endsWith('.md'))) {
-    const m = readFileSync(join(dir, f), 'utf8').match(/^id:\s*"?([^"\n]+)"?/m);
+    const src = readFileSync(join(dir, f), 'utf8');
+    const m = src.match(/^id:\s*"?([^"\n]+)"?/m);
     if (m) ids.add(m[1].trim());
+    // A slice folded into another keeps its id recognisable here even though the
+    // tombstone carries no `id:`. Gate D folded 03 into 02 and 10 and 11 into 09;
+    // a commit still scoped `feat(03):` afterwards is a mistake worth catching,
+    // and dropping the id from the audit is how it would stop being caught.
+    const a = src.match(/^absorbs:\s*\[([^\]]*)\]/m);
+    if (a) for (const id of a[1].match(/"([^"]+)"/g) ?? []) ids.add(id.replace(/"/g, ''));
   }
   return ids;
 }

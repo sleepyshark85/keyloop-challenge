@@ -1,49 +1,30 @@
 ---
-id: "10"
-title: The OpenAPI document and the cURL harness — the stubbed client layer
-status: ready
-depends_on: ["09"]
-arc42: ["§3.1", "§8.6"]
-adr: [5]
-quality_scenarios: [QS-11]
-loopbacks: 0
+folded_into: "09"
+folded_at: 2026-09-04
+folded_by: gate-D
 ---
 
-## Goal
+# Slice 10 — folded into slice 09
 
-The contract the brief asks for, and a way to exercise it by hand. The OpenAPI document is
-**emitted** from the TypeBox route schemas rather than hand-authored — one source of truth, which is
-the deciding argument in ADR-0005 and what puts the document in METHODOLOGY §4's *generated* tier.
+**This is a tombstone. It is not a slice and carries no `id:`, so no tool counts it, schedules it or
+waits on it.** The file is kept rather than deleted because the backlog's shape is part of the record:
+Gate C approved thirteen slices with its reasoning stated, and Gate D cut them. Deleting the evidence
+of the first decision to make the second look tidy is the kind of quiet change `CLAUDE.md` §4 exists
+to prevent.
 
-## Acceptance criteria
+**Was:** The OpenAPI document and the cURL harness — the stubbed client layer (QS-11)
 
-- **AC-1** — Given the route schemas, when the document is generated, then it matches the committed
-  `openapi.json` byte for byte; a drifted document fails CI. *(QS-11, second half)*
-- **AC-2** — Given the document, when it is validated, then it is a valid OpenAPI 3.1 description
-  covering all five operations of §8.6.
-- **AC-3** — Given every error `type` in §8.6, when the document is read, then each is described as
-  an `application/problem+json` response on the operations that can produce it.
-- **AC-4** — Given a running service seeded with fixtures, when the cURL harness is executed
-  end to end, then it books, reads, reschedules and cancels, and prints the status and `type` of each
-  response.
-- **AC-5** — Given the harness, when the double-booking script is run, then it fires concurrent
-  requests for one slot and shows exactly one `201` and the rest `409` — the invariant demonstrated
-  from a terminal, without the test suite.
+**Why it was folded.** Phase 4's pre-registered criterion C6 — "the budget is real" — failed by more
+than an order of magnitude: 15.1 hours elapsed across the two pilot slices against a ceiling that
+extrapolated to 10 hours over the whole backlog. C6's own wording says the response is to cut slices
+or reduce agent count, not to proceed and hope. At Gate D the human ruled the first and declined the
+second, so the backlog went from 11 remaining slices to 8 with the team and the loop unchanged.
 
-## In scope
+**Where the work went.** All five acceptance criteria moved into slice 09 as AC-7 to AC-11, with the emitted document, the drift test and the harness/ scripts. Cheapest of the three folds: ADR-0005 emits the document from the TypeBox route schemas, so slices 02 to 08 have already written most of it by the time slice 09 runs.
 
-- Emitting and committing the OpenAPI document; the contract test asserting it matches.
-- `harness/` — cURL scripts covering the five operations plus the contention demonstration.
+**What was NOT cut, and why it matters.** The orchestrator's first proposed cut also folded slice 07
+into slice 06. That was withdrawn: Gate C defended the 06/07 seam by name — *"so the atomic move is
+separated from the two concurrency scenarios that catch a cancel-then-insert"* — and a cut that
+reverses a recorded ruling has to say so rather than arrive inside a list of three. The seam stands.
 
-## Out of scope
-
-- A client SDK, a UI, or a Postman collection. `CLAUDE.md` §1 stubs the client layer at the contract
-  and the harness.
-- Reference-data endpoints. A-7 keeps seeding to migrations and fixtures precisely so this surface
-  stays the five operations that carry risk.
-
-## Definition of done
-
-Beyond `CLAUDE.md` §10:
-
-- The README's build-and-run section is proven by following it on a clean checkout, not by reading it.
+See `docs/team-log/events.jsonl`, span `p-4-gate-d`, for the ruling as recorded.
