@@ -38,6 +38,7 @@
     "vitest": "5.0.0"
   },
   "dependencies": {
+    "kysely": "0.29.5",
     "pg": "8.23.0",
     "pino": "10.3.1"
   }
