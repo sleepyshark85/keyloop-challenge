@@ -37,6 +37,13 @@ export const EVENTS = {
   'handoff':          ['from', 'to', 'artifact'],
   'review.finding':   ['severity', 'file', 'claim', 'scenario'],
   'review.response':  ['finding_ref', 'resolution'],
+  // A finding raised by ANY role at ANY step, not only the reviewer at step 5.
+  // Slice 00a produced ~25 of these at steps 2-4 and none of them was recordable:
+  // `review.finding` is the reviewer's, and a DCR puts the slice `blocked`, which
+  // none of them did. So defect-escape distance — the metric the phase-4 retro is
+  // built on — had no data. `ref` is the human-facing id used in the PR thread.
+  'finding.raised':   ['actor', 'ref', 'severity', 'claim', 'scenario', 'step'],
+  'finding.ruled':    ['actor', 'ref', 'verdict', 'rationale'],
   'dcr.raised':       ['actor', 'reason', 'step'],
   'dcr.discussed':    ['actor', 'position'],
   'dcr.resolved':     ['ruling', 'rationale'],
@@ -62,6 +69,14 @@ export const PHASES = ['0', '1', '2', '3', '4', '6', '7'];
 
 const SEVERITIES = ['BLOCKING', 'MAJOR', 'MINOR'];
 const RESOLUTIONS = ['fixed', 'disputed', 'accepted', 'deferred'];
+/**
+ * A finding's outcome. `rejected` is deliberately here: a finding argued down on
+ * reasoning is evidence the adjudication worked, and the register keeps it with
+ * the ruling. Slice 00a's sharpest example was an accepted finding whose proposed
+ * remedy was rejected — the two are separate verdicts, which is why `narrowed`
+ * exists rather than forcing that case into `accepted`.
+ */
+const VERDICTS = ['accepted', 'narrowed', 'rejected', 'deferred', 'escalated'];
 
 /**
  * Validate a record. Returns { ok, errors }.
@@ -110,6 +125,12 @@ export function validate(e) {
   }
   if (e.event === 'review.finding' && e.severity && !SEVERITIES.includes(e.severity)) {
     errors.push(`invalid severity: ${e.severity} (expected ${SEVERITIES.join(' | ')})`);
+  }
+  if (e.event === 'finding.raised' && e.severity && !SEVERITIES.includes(e.severity)) {
+    errors.push(`invalid severity: ${e.severity} (expected ${SEVERITIES.join(' | ')})`);
+  }
+  if (e.event === 'finding.ruled' && e.verdict && !VERDICTS.includes(e.verdict)) {
+    errors.push(`invalid verdict: ${e.verdict} (expected ${VERDICTS.join(' | ')})`);
   }
   if (e.event === 'review.response' && e.resolution && !RESOLUTIONS.includes(e.resolution)) {
     errors.push(`invalid resolution: ${e.resolution} (expected ${RESOLUTIONS.join(' | ')})`);

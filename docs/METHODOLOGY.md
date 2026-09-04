@@ -226,6 +226,37 @@ architect convenes **one** round, then rules:
 | **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede the ADR; **revise** prior work, never delete |
 | **(d) Escalate** | Genuine trade-off or scope question | Human decides |
 
+### Where defects live
+
+*Added 2026-09-04, after slice 00a produced ~25 findings that existed only in PR prose.*
+
+`review.finding` is the reviewer's, at step 5. A **DCR** blocks the slice. Neither fits the ordinary
+case — a finding one role raises about another's work at step 2, 3 or 4, which is argued and
+resolved without ever blocking anything. So those had no home, `log:audit` could not see them, and
+**defect-escape distance — the shift-left measure this section's own criteria table names — had no
+data at all.**
+
+They are now `finding.raised` / `finding.ruled` events, and [`DEFECTS.md`](DEFECTS.md) is generated
+from them by `npm run defects`, checked in CI by `npm run defects:check`. Generated tier: the
+register cannot drift from the record, because it *is* the record.
+
+| | |
+|---|---|
+| **What is recorded** | Anything crossing a role boundary, including a role's finding against its own earlier work. A role's in-flight self-correction is **not** a defect — recording those would make a careful role look worse than a careless one |
+| **Severity** | `BLOCKING` · `MAJOR` · `MINOR`, as for reviewer findings |
+| **Verdict** | `accepted` · `narrowed` · `rejected` · `deferred` · `escalated` |
+| **Rejected findings stay** | With their ruling. A finding argued down on reasoning is evidence the adjudication worked |
+
+**`narrowed` is the load-bearing verdict** and it exists because of a specific case. Slice 00a's
+most valuable finding was one whose *measurement was correct* and whose *proposed remedy would have
+broken the following slice* — the implementer's `red-proof` red zone, where excluding
+`tests/integration/` would have made slice 00's only test file unclassifiable. A taxonomy with only
+accept and reject forces that into one bucket or the other and loses the distinction §6's
+adjudication rules exist to produce. **The finding and the remedy are separate verdicts.**
+
+Escape distance is `step_found − step_introduced`, and zero is the target: caught in the step that
+produced it. It is the one number that says whether steps 2 and 5 are earning their cost.
+
 **To rule (c) the architect must name the acceptance criterion, `QS-*`, or `CLAUDE.md` §2 standing
 invariant that would fail.** If it cannot, the ruling is (b) — a forcing function against dramatising
 preference into blockage.

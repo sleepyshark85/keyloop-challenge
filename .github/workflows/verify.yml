@@ -83,6 +83,11 @@ jobs:
       - name: tools regression suite
         run: npm run test:tools
 
+      - name: the defect register is current with the log
+        # Ruled at slice 00a: findings live in the event log and DEFECTS.md is
+        # derived, so the register cannot drift from the record. Generated tier.
+        run: npm run defects:check
+
       - name: every diagram is exported, and every diagram link resolves
         # METHODOLOGY §4: "an evaluator reading the repository on GitHub has no plugin
         # installed" — an un-exported diagram is invisible to the audience it was drawn for.
