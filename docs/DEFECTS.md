@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **49** |
-| Severity | 9 blocking · 27 major · 13 minor |
-| Verdicts | 4 narrowed · 22 accepted · 1 escalated · 4 deferred |
-| Raised by | test-engineer 15 · implementer 12 · reviewer 12 · architect 5 · orchestrator 5 |
+| Findings recorded | **50** |
+| Severity | 9 blocking · 28 major · 13 minor |
+| Verdicts | 4 narrowed · 23 accepted · 1 escalated · 4 deferred |
+| Raised by | test-engineer 15 · implementer 12 · reviewer 12 · architect 6 · orchestrator 5 |
 | Awaiting a ruling | **18** |
-| Mean escape distance | 1.55 step(s) |
+| Mean escape distance | 1.54 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -325,6 +325,7 @@ rather than narrated.*
 | **O-9** | MAJOR | 3 *(+3)* | architect | tests/integration/ is unguarded, so the implementer can edit a test-engineer-owned assertion to green its own commit and nothing denies it | deferred |
 | **O-10** | MAJOR | 4 *(+4)* | architect | Concurrent agents on one worktree make a bare git commit unsafe, and it nearly recorded an authority violation in git | accepted |
 | **I-11** | MINOR | 4 *(+1)* | implementer | Every db run emits a pg deprecation warning that becomes an error at pg 9 | deferred |
+| **A-7f** | MAJOR | 4 *(+1)* | architect | Case 0 constraint-set filter breaks on PostgreSQL 18, and it breaks in the direction that gets the assertion loosened | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -380,6 +381,12 @@ rather than narrated.*
 - *scenario:* DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Emitted on every npx vitest run --project db, from the shared Client in exclusion-constraints.test.ts or tests/support/seed.ts. Harmless today, an error at pg 9, and test-engineer-owned so the implementer flagged rather than touched it.
 - *file:* `tests/integration/exclusion-constraints.test.ts`
 - *deferred* by orchestrator — Correct to flag rather than touch — tests/integration/ and tests/support/ are the test-engineer own, and the implementer raising instead of editing is exactly the section 5 discipline O-9 shows the hook would not have enforced. Deferred to the test-engineer at the slice that next touches those files, or to the pg 9 bump, whichever comes first. Recorded now because a warning that becomes an error on a routine dependency bump is the kind of thing nobody attributes when it finally fires.
+
+**A-7f** — Case 0 constraint-set filter breaks on PostgreSQL 18, and it breaks in the direction that gets the assertion loosened
+
+- *scenario:* At step 3 the architect accepted contype not-equal-p on the reasoning that a later PostgreSQL surfacing NOT NULL as pg_constraint rows would fail loudly in the same commit as the bump. Measured across three majors and independently reproduced by the orchestrator: 16.15 and 17.11 return the named constraints only; 18 returns six extra contype-n rows, appointment_id_not_null and five siblings. That is not a loud failure, it is a FALSE POSITIVE naming six constraints nobody wrote — so whoever bumps the image sees case 0 fail, concludes the assertion is too strict, and loosens the one thing section 6.2 depends on. The failure direction is the finding. Remedy is an allowlist, contype IN (c,f,u,x), which ignores a constraint type the PLATFORM introduces while still catching every constraint a DEVELOPER can add; verified on 18 to return only the real constraint.
+- *file:* `tests/integration/exclusion-constraints.test.ts`
+- *accepted* by orchestrator — Accepted and verified. Not urgent — the image is pinned to postgres:16 and postgres-harness.test.ts asserts caret-16, so nothing can fail today — but accepted rather than deferred because the remedy is one token and the deferred version of this finding is a trap that fires on a routine bump and teaches the wrong lesson when it does. Sequenced after step 5 rather than now, on the architect own advice, so the reviewer is not reviewing a file that moves under it. The architect measuring an assumption it had created and assigned to someone else, rather than carrying it, is the behaviour section 0.1 was written to produce.
 
 </details>
 
