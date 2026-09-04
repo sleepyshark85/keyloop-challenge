@@ -100,7 +100,7 @@ const RELATIONS = [
  * seven NAMED constraints are exactly right, and — with the set-equality assertion in case 0
  * (d) — that `appointment` carries no eighth. It proves nothing about a missing NOT NULL, a
  * wrong column type, or the constraints on the other eight tables, and nothing about whether
- * any of them FIRE. Cases 1 to 9 prove firing.
+ * any of them FIRE. The ten AC cases below prove firing — all seven constraints, after R00-3.
  */
 const EXPECTED_CONSTRAINT_DEFS: Readonly<Record<string, string>> = {
   no_bay_overlap:
@@ -323,7 +323,8 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
          from pg_constraint c
          join pg_class t on t.oid = c.conrelid
          join pg_namespace n on n.oid = t.relnamespace
-        where n.nspname = 'public' and t.relname = 'appointment' and c.contype <> 'p'`,
+        where n.nspname = 'public' and t.relname = 'appointment'
+          and c.contype in ('c', 'f', 'u', 'x')`,
     );
 
     // EXACTLY these seven and no others — coverage before result, and the assertion that
@@ -338,11 +339,19 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
     // `422 /problems/unknown-reference` BY CONSTRAINT NAME — and a second `23503` reaching
     // the same insert makes which name arrives a matter of declaration order.
     //
-    // Measured on postgres:16 — `pg_constraint` for this table returns these seven plus
-    // `appointment_pkey`, so `contype <> 'p'` is a clean filter today. ASSUMED, NOT MEASURED:
-    // whether a later major version surfaces `NOT NULL` as `pg_constraint` rows. If one does,
-    // this fails loudly in the same commit as the bump, alongside the definition assertions
-    // below, which is the same bounded fragility already accepted for those.
+    // THE FILTER IS AN ALLOWLIST, AND THAT IS THE WHOLE OF A-7f. At step 3 this read
+    // `contype <> 'p'` — a denylist — under a comment labelling as ASSUMED, NOT MEASURED
+    // whether a later major version surfaces NOT NULL as `pg_constraint` rows, and claiming
+    // that if one did it would "fail loudly in the same commit as the bump". Both halves were
+    // wrong. Measured since: clean on 16.15 and 17.11, and on **PostgreSQL 18 the denylist
+    // returns six extra `contype = 'n'` rows** — `appointment_id_not_null` and five siblings.
+    //
+    // The FAILURE DIRECTION is the finding, not the failure. A denylist breaks as a FALSE
+    // POSITIVE naming six constraints nobody wrote, so the person bumping the image reads
+    // the assertion as too strict and loosens it — and the one thing §6.2 depends on is the
+    // thing they loosen. An allowlist of `c`, `f`, `u`, `x` ignores a constraint type the
+    // PLATFORM introduces while still catching every constraint a DEVELOPER can add to this
+    // table, which is the only class §6.2 is about. Verified on 18 to return the real seven.
     //
     // Deliberately NOT extended to the other eight tables: no case in this file discriminates
     // on their constraints, and doing so is the first step back toward the whole-`\d` snapshot
@@ -407,7 +416,43 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
     );
     expectRejection(err, 'AC-1', '23P01', 'no_bay_overlap');
 
-    // 3. The invariant is a property of the table, not of the error message.
+    // 3. POSITIVE CONTROL — R00-4, and §4.6's exemption for AC-1 and AC-2 was wrong.
+    //
+    //    §4.6 exempted these two because "§4.3 already reads the first row back". But the
+    //    read-back at step 1 validates a DIFFERENT ROW than the one whose rejection step 2
+    //    asserts: it reads techA/standard and asserts on techB/quick. Nothing else in this
+    //    case touches techB, `quick`, or bayB at all.
+    //
+    //    That is T-5's exact failure mode, in the two cases carrying the slice's headline
+    //    invariant. Because the exclusion constraints fire BEFORE the foreign-key triggers
+    //    (M-2) — the same precedence AC-8's control rests on — a techB that had drifted out
+    //    of the dealership, or a missing `(techB, quick)` qualification row, leaves step 2
+    //    reporting `no_bay_overlap` and this case PASSING GREEN while proving nothing about
+    //    the bay. The drift is caught today only incidentally and cross-case, by AC-5's
+    //    control and AC-9's counts, which is the accidental enforcement T-5 exists to remove.
+    //
+    //    The control is the rejected row with ONE column repaired — the bay. It succeeds only
+    //    if techB is in the dealership, `(techB, quick)` is a real qualification, vehA is
+    //    custA's, and bayB is a bay of this dealership. Run AFTER the negative sibling, per
+    //    §4.6's ordering rule.
+    await insertAppointment(
+      client,
+      validRow(f, {
+        id: idFor('ac1', 'control'),
+        bayId: f.bays.bayB,
+        technicianId: f.technicians.techB,
+        serviceTypeId: f.serviceTypes.quick,
+        startsAt: at(f, 30),
+        endsAt: at(f, 90),
+      }),
+    );
+    expect(
+      (await readBack(client, idFor('ac1', 'control')))?.status,
+      'AC-1 control: the rejected row with only the BAY repaired must be bookable — if it is not, the fixture is violating something other than no_bay_overlap and the rejection above proves nothing about the bay',
+    ).toBe('confirmed');
+
+    // 4. The invariant is a property of the table, not of the error message. The control sits
+    //    in bayB, so it is outside this window by construction.
     expect(
       await countLive(client, 'bay_id', f.bays.bayA, at(f, 0), at(f, 90)),
       'bayA must still hold exactly one live appointment across the overlapping window',
@@ -444,6 +489,35 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
     );
     expectRejection(err, 'AC-2', '23P01', 'no_technician_overlap');
 
+    // POSITIVE CONTROL — R00-4, and the same argument as AC-1's. `f.bays.bayB` appeared
+    // exactly once in this whole file before this control existed: in the row above, the one
+    // asserted to be REJECTED. Nothing proved bayB was a bay of this dealership at all, so a
+    // bayB that had drifted out of it would leave this case reporting `no_technician_overlap`
+    // — the exclusion constraints fire before the foreign-key triggers — and passing green
+    // while proving nothing about the technician.
+    //
+    // The repaired coordinate here is the INTERVAL, not a resource, and the asymmetry with
+    // AC-1 is forced by the fixture rather than chosen. What makes `no_technician_overlap`
+    // violable is the pair (technician, interval); freeing the technician means techB, and
+    // techB is deliberately qualified for `quick` only (§3.3), so a technician swap would
+    // drag `service_type_id` with it and change two columns rather than one. Moving the
+    // interval clear of the first row repairs exactly one coordinate and leaves every
+    // identifier — bayB included — under test.
+    await insertAppointment(
+      client,
+      validRow(f, {
+        id: idFor('ac2', 'control'),
+        bayId: f.bays.bayB,
+        startsAt: at(f, 120),
+        endsAt: at(f, 180),
+      }),
+    );
+    expect(
+      (await readBack(client, idFor('ac2', 'control')))?.status,
+      'AC-2 control: the rejected row with only the INTERVAL repaired must be bookable — if it is not, bayB or the technician is violating something other than no_technician_overlap and the rejection above proves nothing about the technician',
+    ).toBe('confirmed');
+
+    // The control sits at [anchor+2h, anchor+3h), outside this window by construction.
     expect(
       await countLive(client, 'technician_id', f.technicians.techA, at(f, 0), at(f, 90)),
       'techA must still hold exactly one live appointment across the overlapping window',
@@ -739,6 +813,73 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
     ).toBe('confirmed');
   });
 
+  it('AC-7 (technician half) — an appointment naming a technician from another dealership is rejected 23503 on appointment_technician_in_dealership', async () => {
+    // R00-3. A-9 has TWO halves — "resources never span dealerships" is a claim about the
+    // bay AND about the technician — and `appointment_technician_in_dealership` appeared in
+    // no rejection assertion in this file. Six of the seven constraints were proven to FIRE;
+    // the seventh was proven only to EXIST. Drop it from the migration and case 0's
+    // set-equality is the only assertion that fails; key it on the wrong column pair and
+    // case 0's definition-equality is again the only one. That is precisely the state case 0
+    // exists to be a precondition FOR rather than a substitute for: arc42 §8.2 consequence 3,
+    // and QS-10's "a ruleset that has never rejected anything is not evidence".
+    //
+    // The AC's own wording is "a bay at dealership X", so this is a sibling case rather than
+    // a widening of AC-7's assertion. It costs one case and no new fixture: AC-7 already
+    // seeds two dealerships.
+    const d1 = await seedDealership(client, 'ac7t-d1');
+    const d2 = await seedDealership(client, 'ac7t-d2');
+
+    // Everything is D2's except the technician, which is D1's — and D1's SERVICE TYPE travels
+    // with it, because `appointment_technician_qualified` references the pair
+    // (technician_id, service_type_id) and (D1.techA, D2.standard) is not a qualification
+    // that exists. Using D2's service type here would make a SECOND foreign key violable and
+    // §11.2 A-2 says which of two is reported is not guaranteed. `service_type` carries no
+    // dealership of its own (§3.5), so D1's service type in a D2 appointment violates
+    // nothing by itself — which is exactly why it is the right compensating change.
+    const err = await rejection(
+      'AC-7 technician half',
+      insertAppointment(client, {
+        id: idFor('ac7t', 'foreign-technician'),
+        dealershipId: d2.dealershipId,
+        customerId: d2.customers.custA,
+        vehicleId: d2.vehicles.vehA,
+        serviceTypeId: d1.serviceTypes.standard,
+        technicianId: d1.technicians.techA,
+        bayId: d2.bays.bayA,
+        startsAt: at(d2, 0),
+        endsAt: at(d2, 60),
+      }),
+    );
+    expectRejection(err, 'AC-7 technician half', '23503', 'appointment_technician_in_dealership');
+
+    // POSITIVE CONTROL — the technician coordinate repaired, and it is a coordinate rather
+    // than a column for the reason above: the qualification composite makes
+    // (technician_id, service_type_id) one key, so the pair moves together or not at all.
+    // Everything the negative row could have been silently wrong about — D2's dealership,
+    // bay, customer and vehicle — is held identical and is what this insert proves bookable.
+    await insertAppointment(client, {
+      id: idFor('ac7t', 'control'),
+      dealershipId: d2.dealershipId,
+      customerId: d2.customers.custA,
+      vehicleId: d2.vehicles.vehA,
+      serviceTypeId: d2.serviceTypes.standard,
+      technicianId: d2.technicians.techA,
+      bayId: d2.bays.bayA,
+      startsAt: at(d2, 0),
+      endsAt: at(d2, 60),
+    });
+    expect(
+      (await readBack(client, idFor('ac7t', 'control')))?.status,
+      'AC-7 technician-half control: the same row with D2\'s own technician must be bookable',
+    ).toBe('confirmed');
+
+    // Like AC-5 and AC-7's bay half, this constraint is unreachable from HTTP: under A-10 the
+    // SYSTEM allocates the technician, so only an allocator bug can violate it, and §8.6's
+    // taxonomy correctly gives it no row. This slice is the only place it can be shown to
+    // fire at all — which is the whole argument of §6.3, and the reason leaving it unfired
+    // would have been permanent rather than temporary.
+  });
+
   it('AC-8 — an appointment with ends_at <= starts_at is rejected 23514 on appointment_interval_ordered', async () => {
     const f = await seedDealership(client, 'ac8');
 
@@ -790,46 +931,57 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
     // genuinely partial — every case's rows land in those three tables side by side. An
     // assertion over them must scope by returned id and NEVER by a table-wide count, or it
     // becomes a race against every other case in the run.
-    const counts = await Promise.all([
-      scalar(client, 'select count(*)::text from dealership where id = $1', [f.dealershipId]),
-      scalar(client, 'select count(*)::text from opening_hours where dealership_id = $1', [
-        f.dealershipId,
-      ]),
-      scalar(client, 'select count(*)::text from service_type where id = any($1::uuid[])', [
-        [f.serviceTypes.standard, f.serviceTypes.quick],
-      ]),
-      scalar(client, 'select count(*)::text from service_bay where dealership_id = $1', [
-        f.dealershipId,
-      ]),
-      scalar(client, 'select count(*)::text from technician where dealership_id = $1', [
-        f.dealershipId,
-      ]),
-      scalar(
-        client,
+    // ONE query per table, sequentially. `Promise.all` over a single `pg.Client` fires
+    // overlapping `client.query()` calls, which pg serialises internally and warns about —
+    // "Calling client.query() when the client is already executing a query is deprecated and
+    // will be removed in pg@9.0". Found by reading this file's own run output at step 5. The
+    // parallelism bought nothing: the client is one connection either way.
+    const COUNTS: ReadonlyArray<readonly [string, string, unknown[]]> = [
+      ['dealership', 'select count(*)::text from dealership where id = $1', [f.dealershipId]],
+      [
+        'opening_hours',
+        'select count(*)::text from opening_hours where dealership_id = $1',
+        [f.dealershipId],
+      ],
+      [
+        'service_type',
+        'select count(*)::text from service_type where id = any($1::uuid[])',
+        [[f.serviceTypes.standard, f.serviceTypes.quick]],
+      ],
+      [
+        'service_bay',
+        'select count(*)::text from service_bay where dealership_id = $1',
+        [f.dealershipId],
+      ],
+      [
+        'technician',
+        'select count(*)::text from technician where dealership_id = $1',
+        [f.dealershipId],
+      ],
+      [
+        'technician_qualification',
         'select count(*)::text from technician_qualification where technician_id = any($1::uuid[])',
         [[f.technicians.techA, f.technicians.techB]],
-      ),
-      scalar(client, 'select count(*)::text from customer where id = any($1::uuid[])', [
-        [f.customers.custA, f.customers.custB],
-      ]),
-      scalar(client, 'select count(*)::text from vehicle where id = any($1::uuid[])', [
-        [f.vehicles.vehA, f.vehicles.vehB],
-      ]),
-    ]);
+      ],
+      [
+        'customer',
+        'select count(*)::text from customer where id = any($1::uuid[])',
+        [[f.customers.custA, f.customers.custB]],
+      ],
+      [
+        'vehicle',
+        'select count(*)::text from vehicle where id = any($1::uuid[])',
+        [[f.vehicles.vehA, f.vehicles.vehB]],
+      ],
+    ];
+
+    const counted: Record<string, number> = {};
+    for (const [table, sql, params] of COUNTS) {
+      counted[table] = await scalar(client, sql, params);
+    }
 
     expect(
-      Object.fromEntries(
-        [
-          'dealership',
-          'opening_hours',
-          'service_type',
-          'service_bay',
-          'technician',
-          'technician_qualification',
-          'customer',
-          'vehicle',
-        ].map((table, index) => [table, counts[index]]),
-      ),
+      counted,
       'every reference table of arc42 §8.1 must be populated by one seedDealership call',
     ).toEqual({
       dealership: 1,
