@@ -99,3 +99,27 @@ describe('GET /health', () => {
     expect(response.statusCode).toBe(404);
   });
 });
+
+/**
+ * `buildServer` puts the injected logger into Fastify, and until mutation testing said so
+ * nothing checked it: `Fastify({ loggerInstance: deps.logger })` could become `Fastify({})`
+ * and every test still passed, because none of them ever looked at what the server logged
+ * through. A server with no logger answers requests exactly the same way and produces no
+ * operational output at all — the failure you notice in production and not in CI.
+ */
+describe('buildServer', () => {
+  it('logs through the injected logger rather than discarding it', () => {
+    const logger = createLogger({ logLevel: 'warn' });
+    const app = buildServer({ logger, checkHealth: async () => ({ kind: 'ok' }) });
+    apps.push(app);
+
+    // `app.log` is typed FastifyBaseLogger, which declares neither `level` nor
+    // `isLevelEnabled`; Fastify's own instance IS the pino logger it was handed, so the
+    // assertion is on that, narrowed here rather than by widening the production type.
+    const log = app.log as unknown as ReturnType<typeof createLogger>;
+    expect(log.level).toBe('warn');
+    expect(log.isLevelEnabled('info'), 'the server is not logging through the injected logger').toBe(
+      false,
+    );
+  });
+});
