@@ -4,9 +4,9 @@
  *
  *   node tools/test/lint-arch.test.mjs
  *
- * AUTHORED BY THE TEST-ENGINEER, and deliberately NOT wired into `npm run test:tools`
- * (docs/slices/00a-design.md §11.4). The implementer wires it in with the green commit that
- * creates tools/ci/lint-arch.mjs and repoints the `lint:arch` script at it.
+ * AUTHORED BY THE TEST-ENGINEER, unwired at the red commit (docs/slices/00a-design.md
+ * §11.4) and wired into `npm run test:tools` by the implementer in the green commit that
+ * created tools/ci/lint-arch.mjs and repointed the `lint:arch` script at it.
  *
  * ────────────────────────────────────────────────────────────────────────────────────────
  * WHY THE GUARD EXISTS AT ALL
@@ -29,7 +29,22 @@
  * off in silence. So the guard has to live inside whatever produces that "pass", which is
  * the `lint:arch` step itself, and not only inside tests/architecture/layering.test.ts.
  *
- * `judgeCruiseResult(summary)` is the pure rule, so it is testable without running a cruise.
+ * `judgeCruiseResult(cruiseResult, roots)` is the pure rule, so it is testable without
+ * running a cruise.
+ *
+ * ── J-1: this file was written before the step-3 ruling, and could not exercise F2 ──────
+ *
+ * The cases below were authored against the step-2 signature and pass a bare `summary`.
+ * F2's remedy — "exits non-zero if any ROOT passed on the command line contributed no
+ * modules, naming the root" (design §5) — cannot be reached from a summary: `modules[]` is a
+ * SIBLING of `summary` in the `--output-type json` payload, and a summary alone carries
+ * `totalCruised` and no file list. So every case here judged the F2 rule vacuously.
+ *
+ * That is F2's own defect a second time: a constraint imposed in one place and enforced in
+ * another that is never run. The per-root block at the bottom is the fix — full cruise
+ * results, explicit roots, and an assertion that the missing root is NAMED, because "the
+ * cruise examined nothing under src" and "the cruise examined nothing" are different
+ * failures and only the first tells a maintainer where to look.
  */
 import { resolve } from 'node:path';
 
@@ -67,7 +82,7 @@ const tool = await import(TOOL).catch((error) => {
 
 if (tool) {
   const { judgeCruiseResult } = tool;
-  check('exports a pure judgeCruiseResult(summary) → { ok, reason }',
+  check('exports a pure judgeCruiseResult(cruiseResult, roots) → { ok, reason }',
     typeof judgeCruiseResult === 'function',
     'so the rule is unit-testable without running a cruise');
 
@@ -140,6 +155,82 @@ if (tool) {
       }))?.reason?.includes('typescript'),
       'zero violations over zero modules is the exact signature of the failure, so the '
       + 'reason must name the environment rather than the empty result');
+
+    // ── F2: per-ROOT coverage (J-1) ────────────────────────────────────────────────────
+    //
+    // The cases above pass a bare summary, which has no `modules[]` and therefore cannot
+    // reach this rule at all. These pass the real payload shape.
+
+    /** A `--output-type json` result: modules[] is a SIBLING of summary, not inside it. */
+    const cruise = (sources, overrides = {}) => ({
+      modules: sources.map((source) => ({ source, dependencies: [], dependents: [] })),
+      summary: summary({ totalCruised: sources.length, ...overrides }),
+    });
+
+    const srcAndTests = ['src/domain/interval.ts', 'src/http/server.ts', 'tests/unit/a.test.ts'];
+
+    check('a cruise covering every root → ok',
+      judgeCruiseResult(cruise(srcAndTests), ['src', 'tests'])?.ok === true,
+      JSON.stringify(judgeCruiseResult(cruise(srcAndTests), ['src', 'tests'])));
+
+    // THE CASE F2 EXISTS FOR. Overall the count is non-zero, so the pre-F2 guard passed it.
+    const testsOnly = judgeCruiseResult(cruise(['tests/unit/a.test.ts']), ['src', 'tests']);
+    check('a root that contributed NO modules → not ok, though the overall count is non-zero',
+      testsOnly?.ok === false,
+      'this is F2: `tests/` alone keeps totalCruised > 0 while `src/` — the thing QS-10 is '
+      + `about — goes unexamined behind a green gate. got ${JSON.stringify(testsOnly)}`);
+    check('…and the reason NAMES the uncovered root',
+      typeof testsOnly?.reason === 'string' && testsOnly.reason.includes('src'),
+      '"the cruise examined nothing under src" and "the cruise examined nothing" are '
+      + `different failures; only the first says where to look. got ${testsOnly?.reason}`);
+
+    // Constraint 1 of §5: the roots come from the wrapper's own argv. A rule hardcoded to
+    // ['src','tests'] passes the case above and silently stops covering a third root — the
+    // same bug a fourth time, inside the guard against it.
+    const thirdRoot = judgeCruiseResult(cruise(srcAndTests), ['src', 'tests', 'tools']);
+    check('a THIRD root with no modules → not ok, naming it (roots come from argv)',
+      thirdRoot?.ok === false && thirdRoot?.reason?.includes('tools'),
+      'src and tests are covered here, so a rule hardcoded to that pair reports ok. '
+      + `got ${JSON.stringify(thirdRoot)}`);
+
+    // A root is a PATH PREFIX, not a string prefix: "srcery/" must not count as covering
+    // "src". A substring test reads this tree as fully cruised.
+    const notABoundary = judgeCruiseResult(
+      cruise(['srcery/x.ts', 'tests/unit/a.test.ts']), ['src', 'tests']);
+    check('a module under a directory that merely starts with the root name does not cover it',
+      notABoundary?.ok === false && notABoundary?.reason?.includes('src'),
+      `"srcery/x.ts" is not under "src". got ${JSON.stringify(notABoundary)}`);
+
+    check('an environment issue is judged BEFORE coverage, too',
+      judgeCruiseResult(
+        cruise([], {
+          environment: {
+            ...summary().environment,
+            issues: [{ severity: 'warn', name: 'missing-typescript-transpiler', description: 'x' }],
+          },
+        }),
+        ['src', 'tests'],
+      )?.reason?.includes('typescript'),
+      'an unresolvable compiler produces an empty modules[], so the per-root rule would '
+      + 'also fire — and would send the maintainer to look at `src/` for a problem that is '
+      + 'in their toolchain');
+
+    // An error-severity violation must still be reported when coverage is fine, so the new
+    // rule cannot mask the old one.
+    const violating = judgeCruiseResult(
+      cruise(srcAndTests, {
+        error: 1,
+        violations: [{
+          from: 'src/domain/interval.ts',
+          to: 'src/persistence/db.ts',
+          rule: { name: 'domain-is-pure', severity: 'error' },
+        }],
+      }),
+      ['src', 'tests'],
+    );
+    check('a covered cruise with a real violation → not ok, naming the rule',
+      violating?.ok === false && violating?.reason?.includes('domain-is-pure'),
+      JSON.stringify(violating));
   }
 }
 

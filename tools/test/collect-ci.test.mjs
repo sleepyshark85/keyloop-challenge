@@ -4,15 +4,21 @@
  *
  *   node tools/test/collect-ci.test.mjs
  *
- * AUTHORED BY THE TEST-ENGINEER, and deliberately NOT wired into `npm run test:tools`
- * (docs/slices/00a-design.md §11.4). `test:tools` is a literal `&&` chain of named files, so
- * a new file here does not run in CI until someone wires it in; the implementer does that in
- * the green commit that makes it pass. Two things depend on that: criterion C2 holds for
- * AC-5 instead of being excepted, and the `verify` job stays green on the red commit — which
- * §7 needs twice over, because a failure here would abort `verify` before the run that
- * observes the red is complete.
+ * AUTHORED BY THE TEST-ENGINEER, and at the red commit deliberately NOT wired into
+ * `npm run test:tools` (docs/slices/00a-design.md §11.4). `test:tools` is a literal `&&`
+ * chain of named files, so a new file here does not run in CI until someone wires it in.
+ * Two things depended on that: criterion C2 held for AC-5 instead of being excepted, and the
+ * `verify` job stayed green on the red commit — which §7 needed twice over, because a
+ * failure here would abort `verify` before the run observing the red was complete.
  *
- * The reviewer's step-5 checklist carries the line that closes the hole this opens: every
+ * NOW WIRED IN, and the delay cost something worth recording. While unwired this file never
+ * ran, so an assertion it carried — "a green→red pair is not test-first", fed the red→green
+ * pair in reversed array order — went four commits without anyone discovering that NO
+ * correct collector could satisfy it (see the DoD-predicate block below). An outside-in test
+ * that cannot run is indistinguishable from one that passes. That is the same failure the
+ * design's §5 table names three times over: an exit code standing in for work never done.
+ *
+ * The reviewer's step-5 checklist carries the line that closes the hole generally: every
  * file matching tools/test/*.test.mjs must be named in the `test:tools` chain by merge.
  *
  * ────────────────────────────────────────────────────────────────────────────────────────
@@ -161,17 +167,50 @@ if (collector) {
       + `fails, and C1 reports FAIL on a correctly test-first slice. got `
       + `${JSON.stringify({ red: red?.ts, green: green?.ts })}`);
 
-    // -- the DoD predicate, on the pair --------------------------------------------------
+    // -- the DoD predicate, on a log -----------------------------------------------------
+    //
+    // C1 and its inverse. The inverse needs a green run whose ts PRECEDES the red's, which
+    // the red→green pair cannot supply in either array order: check.mjs finds `failing` by
+    // regex (uniquely determined when the log holds one red) and then `passingAfter` by a
+    // strict timestamp compare, so reordering those two records cannot change the verdict.
+    //
+    // The green that precedes the red is the CAPTURED pre-00a run — a real verify run of
+    // 2026-09-04, against a red derived to 2026-09-05. It is used rather than a third
+    // derived fixture on purpose: a captured payload that already has the property is
+    // better evidence than one hand-edited until the assertion comes out right.
+    //
+    // That ordering is a PRECONDITION of the inverse, so it is asserted rather than assumed.
+    // Design §5's rule — no assertion about a verdict without a prior assertion that the
+    // thing being judged is what you think it is — applies to this file too: recapture the
+    // fixture from a later run and the inverse case would start passing vacuously.
     if (redness) {
+      check('fixture precondition — the captured green run precedes the derived red run',
+        Date.parse(preSlice?.ts) < Date.parse(red?.ts)
+          && Date.parse(red?.ts) < Date.parse(green?.ts),
+        JSON.stringify({ captured: preSlice?.ts, red: red?.ts, green: green?.ts }));
+
       check('slice:check classifies the red→green pair as test-first',
         classifyRedBeforeGreen([red, green]),
         'this is the criterion the whole slice exists to make passable');
       check('slice:check does NOT classify a green-only log as test-first',
         !classifyRedBeforeGreen([green]),
         'a slice with no recorded red must not read as red-before-green');
-      check('slice:check does NOT classify a green→red pair as test-first',
-        !classifyRedBeforeGreen([green, red]),
-        'order matters, and it is decided by ts');
+
+      // C1's inverse, and the case that actually protects the criterion.
+      check('slice:check does NOT classify green-then-red as test-first',
+        !classifyRedBeforeGreen([preSlice, red]),
+        'a green run PRECEDING the red is implementation-first. The existence of a passing '
+        + 'run is not the criterion; its position in time is');
+      check('…and that verdict is decided by ts, not by array position',
+        !classifyRedBeforeGreen([red, preSlice]),
+        'the same two records reordered must give the same answer. The earlier form of this '
+        + 'assertion fed the red→green pair reversed and expected FALSE — unsatisfiable by '
+        + 'any correct collector, and it went unnoticed because this file was not yet named '
+        + 'in the `test:tools` chain and therefore never ran');
+      check('an earlier green does not spoil a genuine red→green',
+        classifyRedBeforeGreen([preSlice, red, green]),
+        'a branch whose CI was green before its red commit is still test-first for that '
+        + 'red; C1 must not be defeated by unrelated history in the log');
     }
   }
 
