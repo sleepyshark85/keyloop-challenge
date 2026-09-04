@@ -31,7 +31,8 @@
     "test:docs": "node tools/test/docs-build.test.mjs",
     "defects": "node tools/defects/generate.mjs",
     "defects:check": "node tools/defects/generate.mjs --check",
-    "mutation": "stryker run"
+    "mutation": "stryker run",
+    "slice:close": "node tools/slice/close.mjs"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^10.0.0",

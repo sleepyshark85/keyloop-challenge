@@ -111,5 +111,38 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
     row(out, 'tests green').includes('UNVERIFIED'), row(out, 'tests green'));
 }
 
+// --- the three states, which are three different facts ----------------------
+// PASS on a vacuous score let a slice clear §10's "on changed files" clause on a
+// number about the previous slice. UNVERIFIED blocked a SQL-only slice forever.
+// N/A is the third: the criterion does not reach this diff.
+{
+  const vacuous = mutationRun({ checks: { mutation_score: 0.95, mutation_measures_changed_files: false } });
+  const out = run([ciRun({}), vacuous]);
+  const line = row(out, 'mutation score');
+  ok('a vacuous score is N/A, not PASS', line.startsWith('N/A'), line);
+  ok('...and says whose score it actually is', line.includes('measures the slice before it'), line);
+  // Not "the fixture has no unverified rows" — it has others. The claim is that
+  // N/A does not ADD one, which is what blocking would mean.
+  const countUnverified = (o) => Number((o.match(/(\d+) unverified/) ?? [0, 0])[1]);
+  ok('...and does NOT block done: N/A adds no unverified row',
+    countUnverified(out) === countUnverified(run([ciRun({}), mutationRun({ checks: { mutation_score: 0.95, mutation_measures_changed_files: true } })])),
+    `vacuous=${countUnverified(out)} vs measured=${countUnverified(run([ciRun({}), mutationRun({ checks: { mutation_score: 0.95, mutation_measures_changed_files: true } })]))}`);
+  ok('...and the summary names it as not applicable', out.includes('not applicable'), out.split('\n').slice(-3).join(' | '));
+
+  const real = mutationRun({ checks: { mutation_score: 0.95, mutation_measures_changed_files: true } });
+  ok('a score that DOES measure the diff still passes',
+    row(run([ciRun({}), real]), 'mutation score').startsWith('PASS'),
+    row(run([ciRun({}), real]), 'mutation score'));
+
+  const low = mutationRun({ checks: { mutation_score: 0.4, mutation_measures_changed_files: true } });
+  ok('...and still fails when below threshold',
+    row(run([ciRun({}), low]), 'mutation score').startsWith('FAIL'),
+    row(run([ciRun({}), low]), 'mutation score'));
+
+  ok('a missing score is UNVERIFIED and DOES block done',
+    row(run([ciRun({})]), 'mutation score').startsWith('UNVERIFIED') && run([ciRun({})]).includes('unverified'),
+    row(run([ciRun({})]), 'mutation score'));
+}
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
