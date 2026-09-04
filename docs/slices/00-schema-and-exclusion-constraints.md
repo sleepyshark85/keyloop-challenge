@@ -1,7 +1,7 @@
 ---
 id: "00"
 title: The schema, the exclusion constraints, and seed data — the invariant before any code
-status: ready
+status: done
 depends_on: ["00a"]
 arc42: ["§8.1", "§8.2"]
 adr: [1, 2, 3, 7]
