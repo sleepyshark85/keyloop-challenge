@@ -128,8 +128,9 @@ conceding a finding is not the same as conceding a remedy:
   — is **not** done here. Changing the gate tool in the slice that first feeds it is how a gate ends
   up agreeing with its own bug (§11.5).
 - **O1**'s *"the fixture resolves the real compiler"* stated an outcome and no mechanism, which is
-  the defect it was complaining about. §5 now names the mechanism, and asserts something stronger
-  than `totalCruised > 0`.
+  the defect it was complaining about. §5 then named a mechanism — and at step 4 the named mechanism
+  turned out to be **false** (see the step-4 findings below). What survives is the assertion, which
+  is stronger than `totalCruised > 0`. What did not survive is the causal story attached to it.
 
 **Findings of the architect's own**, surfaced while ruling and applied below: the migration seam
 would have crashed 00a's red run in `globalSetup` (§4); AC-4 is green on arrival and that is honest
@@ -142,9 +143,46 @@ construction (§7).
 which *"costs a full cycle plus a loopback"*. At step 2 there is no prior work to revise and no
 accepted ADR to supersede, so (c)'s effect — *loop back to step 1* — **is** this amendment. The
 architect's reading is that `loopbacks:` stays at **0**; the counter is the orchestrator's field.
+The step-3 and step-4 rounds do not move it either: every step-4 ruling is **(a)**, and (a) resumes
+from the raising step rather than returning to step 1. In each of those cases the work already in the
+tree is correct and it was this design's *explanation* that was wrong — the cheapest kind of defect
+there is, and a reason to say so plainly rather than to round it up.
 
 `docs/team-log/process-criteria.md` is untouched. It is pre-registered, and a criterion edited after
 seeing a result is not a criterion.
+
+### Step 4 findings, ruled 2026-09-04
+
+Commits 7–9 landed green and CI on the branch tip is green with the full phase-4 block live.
+**Evidence item 3 is discharged**: `red-proof.mjs` was replayed offline against the red commit's own
+artifact (run 33831214774) and exited 0, reporting the two failing suites, no unit failure, and
+`verify` success. The replay §7 designed works.
+
+Four findings came back, three of them carrying a **measurement against a claim this design had made
+without one**. All four are **(a)**.
+
+| # | Finding | Outcome | Reasoning, in one line |
+|---|---|---|---|
+| **§5 symlink** | The stated mechanism for the fixture's compiler symlink is wrong: `dependency-cruiser` resolves `typescript` with `createRequire(import.meta.url)` from its own location, never from the cwd | **(a) clarification**, and the symlink is **removed** | The outcome was right and the explanation was false. Verified independently: every resolution site in 18.2.0 routes through `try-import.mjs` or `try-import-available.mjs`, both location-relative. What is load-bearing is that the spawned `depcruise` binary is the repository's own |
+| **J-1** | `judgeCruiseResult(summary, roots)` cannot express F2's remedy — `modules[]` is a **sibling** of `summary` — and the committed test passes bare summaries with one argument, so every case judged the F2 rule vacuously | **(a) clarification**, remedy narrowed | **F2's own defect inside F2's own remedy.** The signature becomes `(cruiseResult, roots)`. `roots` stays **optional**: making it mandatory would force the summary-only cases to fail on coverage *before* reaching the rule under test, and a stricter signature that degrades its own test is not a win |
+| **J-2** | *"made repo-relative"* breaks the replay it exists to enable — Vitest records the running machine's absolute path, so `relative(cwd, …)` yields `../../../home/runner/…` and a genuinely red run replays as "no suite failed" | **(a) clarification** | The design named a normalisation that could not work, on the one path that exists to check it. The last-`/tests/`-segment fallback is adopted as the design; two alternatives were considered and rejected (§7) |
+| **J-3** | §6's record shows `jobs.verify`, but `gh run view --json jobs` returns **display names** only — the REST API does not expose the YAML key | **(a) clarification** | The design showed a record and never said how a key was to be obtained. Mapping, slugify-not-drop and a name-matched layering step are adopted; `"not-run"` is the right third value because `check.mjs` reads anything but `pass` as FAIL, so it **fails closed** |
+
+**A-1, the architect's own, raised here rather than left to step 5.** `tools/ci/lint-arch.mjs` spawns
+`existsSync(local) ? local : 'depcruise'` **two lines below its own comment** saying *"a guard against
+the wrong analyser running must not be able to run the wrong analyser."* A `depcruise` found on
+`PATH` is a separate installation with its own `node_modules` and — per the §5 correction — its own
+`typescript` resolution. That is the different-analyser case the comment forbids, minus the network.
+Ruled (a): the fallback becomes `return 2`, naming the missing local install (§5).
+
+**Three of these four are one shape, and it is not the shape §5's table catches.** See *The second
+rule this slice keeps rediscovering* in §5. It is the more consequential of the two tables, because
+the sentences it catches are this design's own.
+
+**Who applies what, and it is not the architect.** The symlink deletion and a runner-absolute fixture
+case go to the **test-engineer** (`tests/architecture/`, `tools/test/`); A-1's `return 2`, the
+missing-`modules[]` verdict and the `jobsOf` key-collision fix go to the **implementer** (`tools/`).
+This document describes them as ruled; it does not make them.
 
 ---
 
@@ -544,11 +582,32 @@ contain, at the fixture root:
 - `tsconfig.json`, mirroring the repository's `compilerOptions` — `.dependency-cruiser.js` resolves
   `tsConfig.fileName` relative to the working directory, and `tsPreCompilationDeps` needs a real
   TypeScript configuration to be meaningful;
-- **the real compiler, by symlink**: `node_modules/typescript` → the repository's own
-  `node_modules/typescript`, created by the fixture builder with `fs.symlinkSync`. The mechanism has
-  to be named, not the outcome: the fixture root is a temp directory, so Node's upward resolution
-  walks `/tmp/<fixture>/node_modules`, `/tmp/node_modules`, `/node_modules` and never reaches the
-  repository. "The fixture resolves the real compiler" is not a design line; a symlink is;
+- **nothing at all for the compiler — and that is a ruling, not an omission (step 4).**
+  `dependency-cruiser` resolves `typescript` with `createRequire(import.meta.url)` **from its own
+  location**, never from the working directory: in 18.2.0 every resolution site routes through
+  `src/utl/try-import.mjs` or `src/extract/transpile/try-import-available.mjs`, both constructed that
+  way, and `tryImport`'s dynamic `await import(pModuleName)` resolves against the importing module's
+  URL too. Measured at step 4: a temp fixture with **no** `typescript` in its `node_modules` cruises
+  normally.
+
+  So the compiler a cruise gets is fixed by **which `depcruise` binary is spawned**, and the
+  load-bearing line is `DEPCRUISE = resolve(REPO_ROOT, 'node_modules/.bin/depcruise')` — an absolute
+  path to the repository's own binary, never a `PATH` lookup and never `npx`.
+
+  The step-2 draft required a `node_modules/typescript` symlink and explained it by Node's upward
+  resolution walking `/tmp/<fixture>/node_modules` and never reaching the repository. **That
+  explanation was false**, and false in exactly the way O1 complained about — a confident mechanism
+  nobody ran. The symlink is therefore **removed** rather than demoted to belt-and-braces: no
+  scenario was found in which it helps, including the one specifically looked for (a `PATH`
+  `depcruise`, where the binary's own installation is what resolves the compiler and the fixture
+  symlink is still irrelevant), and §11.6's standing objection to inert machinery is that a future
+  maintainer preserves it for a reason that is not true.
+
+  **The deletion is safe to attempt because its failure mode is loud.** If this reading is wrong,
+  `guardTheCruiseHappened` fires and names `missing-typescript-transpiler` — in the owning role's own
+  test, on the next run. A deletion whose failure mode is a named test failure is a different kind of
+  decision from one that fails silently, and that difference is why it can be ruled on a measurement
+  instead of deferred out of caution. If it fires, the symlink comes back — with a true explanation;
 - **stub packages** at `node_modules/kysely/` and `node_modules/pg/` — a `package.json`, an index and
   a `.d.ts` that actually **declares `Kysely`**, so the type-only case resolves. This is the detail
   most likely to be got wrong: the rule matches `^node_modules/(pg|…|kysely)`, and if the fixture
@@ -556,9 +615,13 @@ contain, at the fixture root:
   `../node_modules/kysely`, the anchor does not match, and **`sql-only-in-persistence` silently does
   not fire**.
 
-  The asymmetry between the two bullets above is deliberate and is the whole of O1: **stub what the
-  rules point at, resolve what does the analysis.** A stubbed compiler is not an isolated fixture, it
-  is no fixture at all;
+  The asymmetry between the bullets above is deliberate and is the whole of O1 — but step 4 forced it
+  to be restated in the other direction: **stub what the rules point at, and do not try to isolate
+  what does the analysis.** `pg` and `kysely` go through enhanced-resolve **from the cwd**, which is
+  why the fixture can and must control them; the compiler does not, which is why the fixture
+  **cannot** isolate it. The step-2 wording implied the compiler was isolable and that we chose not
+  to isolate it. It is not isolable — and a fixture that appeared to isolate it was measuring
+  something else;
 - import specifiers written the way `src/` writes them (explicit `.js`), so resolution behaves
   identically and `not-to-unresolvable` does not fire in place of the rule under test.
 
@@ -656,6 +719,35 @@ passes by never running (§11.4). A `verify` job that never executed the suite i
 each case the signal is an exit code standing in for a claim about work that was never done. **The
 fourth instance should be caught by reading this table, not by measuring.**
 
+### The second rule this slice keeps rediscovering
+
+The table above catches **green things that proved nothing**. Step 4 found its sibling, and the first
+table had not caught a single instance of it:
+
+> **A stated mechanism is a claim, and a claim with no test and no recorded measurement behind it is
+> a guess written in the indicative.** Every causal sentence — *"because X, Y"* — in this design or
+> in a docblock under `tools/` either cites something that ran, or is one measurement away from
+> being false.
+
+| Instance | The sentence, and what was actually true |
+|---|---|
+| **F1** (step 3) | *"AC-3's red comes from `depcruise` failing to open `src`"* — §4's `mkdirSync` creates it, so the command succeeds over an empty directory |
+| **§5 symlink** (step 4) | *"the fixture root is a temp directory, so Node's upward resolution never reaches the repository"* — `dependency-cruiser` resolves the compiler from its own location and never consults the cwd |
+| **J-2** (step 4) | *"failing files, made repo-relative"* — `relative(cwd, …)` on a replayed artifact yields `../../../home/runner/…`, which matches no rule, so a red run replays as green |
+| **J-3** (step 4) | *"`checks.jobs` carries `jobs.verify`"* — `gh` returns display names and the REST API does not expose the YAML key, so that record could not be produced at all |
+
+**Every one of these four sentences is this design's own**, written confidently, and every one was
+found by a role that *ran* the thing rather than reading it. That is what makes this the more
+consequential of the two tables: the first polices the tooling, this one polices the architect. The
+first table's own warning — that the fourth instance should be caught by reading rather than by
+measuring — applied here and did not fire, because it was watching for the wrong shape.
+
+The discipline attached to it is cheap. A causal sentence in this document, or in a docblock under
+`tools/`, must be traceable to one of three things: **a test that would fail if it were false**, **a
+measurement recorded with its date and its subject**, or an explicit **"assumed, not measured"**. The
+third is honest and costs nothing — §11.5's step-3 refusal to claim which symptom an out-of-range
+compiler produces is exactly what it looks like, and step 4 then went and measured it (§11.5).
+
 ### The same failure mode in production: `lint:arch`
 
 O1's third consequence is the one that reaches past this slice, and it is why the remedy is not
@@ -670,8 +762,18 @@ The guard therefore has to live inside whatever produces that `pass`, which is t
 itself. **`lint:arch` becomes `node tools/ci/lint-arch.mjs`**, which:
 
 - spawns the same CLI with the same arguments — `depcruise src tests --config .dependency-cruiser.js`
-  — adding `--output-type json`, so the artifact under test is still the file CI runs;
-- exits non-zero, naming the cause, if `summary.environment.issues` is non-empty;
+  — adding `--output-type json`, so the artifact under test is still the file CI runs. **The binary
+  is the repository's own `node_modules/.bin/depcruise`, and there is no fallback (A-1).** If it is
+  absent the wrapper exits **2**, naming the missing install: a `depcruise` found on `PATH` is a
+  separate installation resolving its own `typescript` (see the fixture bullet above), which is
+  precisely the different-analyser case this wrapper exists to prevent. The step-4 build had that
+  fallback two lines below the comment forbidding it;
+- exits non-zero, naming the cause, if `summary.environment.issues` is non-empty — **and prints the
+  installed `typescript` version alongside it**, read with `createRequire` from the only place it can
+  be read. The cruise output cannot name it: an absent compiler and an out-of-range one are reported
+  identically, down to the description string (§11.5). Without this line a maintainer who bumped the
+  compiler past the supported range is told a compatible one is *missing*, and is not told which one
+  they just installed;
 - **exits non-zero if any root passed on the command line contributed no modules, naming the root.**
   Per **root**, not overall (F2): `depcruise` is handed `src` and `tests`, so a count over the whole
   result is satisfied by `tests/` alone while `src/` — the thing QS-10 is about — goes unexamined
@@ -679,8 +781,29 @@ itself. **`lint:arch` becomes `node tools/ci/lint-arch.mjs`**, which:
 - exits non-zero if any error-severity violation exists, re-rendering them readably (rule name,
   `from` → `to`) so the developer-facing output is no worse than today's;
 - exits 0 otherwise;
-- exports a pure **`judgeCruiseResult(summary, roots)` → `{ ok, reason }`**, so the rule is
-  unit-testable without running a cruise.
+- exports a pure **`judgeCruiseResult(cruiseResult, roots)` → `{ ok, reason }`**, so the rule is
+  unit-testable without running a cruise. It takes the **whole** `--output-type json` payload,
+  `{ modules, summary }`, and not the summary alone, because **coverage is a claim about a file list
+  and a summary has none**: `modules[]` is a *sibling* of `summary`, and `totalCruised` is the count
+  whose insufficiency is the whole of F2. The step-3 draft named `(summary, roots)`, a signature that
+  could not express the remedy it was ruling (**J-1**).
+
+  Three consequences, each of them a way this interface can be got wrong:
+
+  1. **A bare summary is a legitimate input, not a tolerated one.** Three of the four rules —
+     environment issues, `totalCruised`, violations — read only the summary, so a summary is a
+     *complete* input for them, and the unit test is better for exercising them without inventing a
+     `modules` array it would then have to keep in sync.
+  2. **`roots` is optional and defaults to `[]`, which means the coverage rule is not asserted** —
+     stated in the interface rather than left implicit. Making it mandatory was considered and
+     **rejected**: it would force the summary-only cases to pass `['src']` and then fail on coverage
+     *before* reaching the rule under test, leaving them green for the wrong reason. A stricter
+     signature that degrades its own test is not a win. The CLI is the only production caller and
+     refuses to run with no roots (exit 2), which is where the guarantee actually lives.
+  3. **A non-empty `roots` with no `modules[]` array is its own verdict**: `not ok`, with a reason
+     saying **coverage could not be checked, because the result carried no `modules[]`** — distinct
+     from *"examined no module under `src/`"*. Otherwise a caller who passes roots and a summary gets
+     a correct verdict with a diagnosis pointing at the tree instead of at the call.
 
 **Two constraints on how the per-root check is built**, both of which are ways to get it wrong:
 
@@ -708,8 +831,12 @@ different things on a laptop and in CI. Asserting it only inside `layering.test.
 **implementer's**, landing in **green commit 9**. They must *not* land in the red commit: at that
 commit `lint:arch` has to stay today's raw CLI, so AC-3's red comes from the tree rather than from a
 missing wrapper. `tools/test/lint-arch.test.mjs` is the test-engineer's, authored at step 3 under the
-O3 arrangement (§11.4) and feeding `judgeCruiseResult` four summaries: an environment issue, a root
-that contributed no modules, a real violation, and a clean cruise over both roots.
+O3 arrangement (§11.4). It must feed **both shapes**: bare summaries for the environment-issue,
+zero-cruised and violation rules, and **full cruise results with explicit roots** for the per-root
+rule — one covered, and one where a root contributed no modules, asserting that **the missing root is
+named**, because *"examined nothing under `src/`"* and *"examined nothing"* are different failures and
+only the first tells a maintainer where to look. As authored at step 3 the file passed bare summaries
+with one argument and so judged the F2 rule vacuously (**J-1**); that is the correction.
 
 **`graph:modules` has the identical failure mode** and would render an empty graph in silence. It is
 cosmetic and is deliberately **not** gated — but §5.3's first render is to be eyeballed rather than
@@ -778,6 +905,37 @@ this repeatedly at every gate.
 Schema-valid per `tools/team-log/schema.mjs`: `ts`, `event`, `source` universal; `slice` scopes it;
 `check.run` requires `checks`. Nothing else is mandatory, and `normalize()` fills `trace_id` and
 `span_id`.
+
+**Where the keys in `jobs` come from — because the record above does not say, and cannot be produced
+without knowing (J-3).** `gh run view --json jobs` returns each job's **display name**. It does not
+return the key the job has in the workflow YAML; the REST API does not expose it. A record carrying
+`jobs.verify` is therefore only producible by a **name → key map** over the names this repository
+actually uses — `docs, tools and log integrity` → `verify`, `suite (Testcontainers)` → `test`,
+`red-proof` → `red-proof`. Three rules govern it:
+
+- **unmapped names are slugified, never dropped.** An unmapped job must still reach `checks`, or a
+  failure in it is invisible to constraint 2 — which is the corruption this section exists to
+  prevent;
+- **a key collision must not let a `PASS` overwrite a `FAIL`.** Two jobs slugging to the same key
+  write the same property, last one wins, and constraint 2 breaks inside the function that enforces
+  it. Unlikely, one line, and the failure is silent;
+- **the map is checked against the workflow.** `JOB_KEYS` is a set of strings in a `.mjs` file keyed
+  off strings in a `.yml` file, with nothing asserting the two agree — *a constraint imposed in one
+  place and enforced in another that is never run*, which is F2's shape a fourth time. Rename a job's
+  `name:` and `jobs.verify` silently becomes `jobs["docs-tools-and-log-integrity"]`; rename
+  `red-proof` and `red_proof` reports `"not-applicable"` for a run in which it ran.
+  `tools/test/collect-ci.test.mjs` therefore asserts that every job `name:` in
+  `.github/workflows/verify.yml` is a key of `JOB_KEYS`, and every value of `JOB_KEYS` is a job key in
+  that file. No YAML parser is needed, and it turns a silent drift into a `verify` failure at the
+  moment of the rename.
+
+**Steps carry a name and no command either**, so `checks.depcruise` is decided by matching the
+`verify` step named `layering (QS-10)`. A run with no such step records **`"not-run"`**, never
+`"pass"`. That third value is chosen to **fail closed**: `check.mjs:128` reads anything other than
+`'pass'` as FAIL, so a run predating the phase-4 block reports a layering check that did not happen
+rather than one that passed — the exact silence C4 must not record. It is lowercase and carries no
+`FAIL` substring and no ratio, so constraints 1, 2 and 3 all hold. Its consequence for append order
+is in §7's backfill obligation, and it is not the one constraint 4 was written for.
 
 **Five constraints imposed by the consumer, `tools/slice/check.mjs`.** They are not obvious from the
 schema and getting them wrong makes the Definition of Done silently wrong. The first three were in
@@ -970,9 +1128,33 @@ Six details, each of which is a way to get this wrong:
    Exit codes: **0** rule satisfied, or not applicable · **1** rule violated, with the failing
    condition named on stdout · **2** usage or I/O error. The module exports a pure
    **`judge({ subject, verifyConclusion, failedFiles })` → `{ ok, reason }`**, mirroring §6's
-   `toCheckRunRecord` split, so every case is unit-testable without spawning a process. Failing files
-   are the distinct `testResults[]` entries with `status === "failed"`, made repo-relative and
-   POSIX-normalised.
+   `toCheckRunRecord` split, so every case is unit-testable without spawning a process.
+
+   **`failedFilesFrom` yields paths rooted at the repository (`tests/…`) whichever machine produced
+   the JSON — and that is a precondition of evidence item 3, not a detail of it.** Vitest records the
+   **absolute path of the machine that ran the suite**, so a replayed artifact names
+   `/home/runner/work/keyloop-challenge/keyloop-challenge/tests/…`. The step-2 wording said the
+   distinct failing `testResults[]` entries were *"made repo-relative"*, and `relative(cwd, name)` on
+   that input yields `../../../home/runner/…`, matching neither the red zone nor the must-pass set —
+   so **a genuinely red run replays as "no suite failed" and exits 1**, the discriminator reporting
+   the opposite of what happened, on the one path that exists to check it. It passes in CI only
+   because the `test` job shares the workspace (**J-2**).
+
+   The normalisation is therefore: **relative to the working directory when the file is inside it,
+   and otherwise from the last `/tests/` segment** — *last*, not first, because a checkout directory
+   may itself be called `tests`. Two alternatives were considered and rejected. A `--repo-root` flag
+   adds a fourth flag to a contract deliberately kept at three, and requires the replayer to know the
+   runner's workspace path. Matching the rule patterns against a path *suffix* drops the `^tests/`
+   anchor entirely and is strictly weaker.
+
+   **And it must be tested on the shape Vitest actually emits.** §6's own rule — *"a fixture captured
+   from the tool beats a fixture that encodes someone's belief about the tool"* — was honoured for
+   the `gh` payloads and not for the Vitest JSON: `tools/test/red-proof.test.mjs` never imports
+   `failedFilesFrom`, and its CLI cases feed names that are already repo-relative, which Vitest never
+   produces. The branch J-2 fixed is therefore exercised only on its trivial path and a regression in
+   it would be silent — J-1's shape a third time. At least one case, CLI and pure, must use
+   runner-absolute names lifted verbatim from run 33831214774's artifact, which turns a one-off manual
+   replay into a wired-in regression test.
 
 5. **The rule.** It exits 0 when:
    - the subject does **not** match `^test\(.+\): .*\(red\)$` — *not applicable*, nothing asserted; or
@@ -1082,7 +1264,14 @@ happen, and the criterion returns to unmeasured:
 1. At step 3, record the **run id** of the CI run on the red SHA in the step-3 log entry, alongside
    the SHA and the quoted assertion (`METHODOLOGY.md:335`).
 2. At the gate, after `collect-ci.mjs` exists (green commit 7), run it for **both** that red run and
-   the green run at the branch tip, in one invocation or in ascending `updatedAt` order.
+   the green run at the branch tip, in one invocation or in ascending `updatedAt` order. **This now
+   matters twice, not once.** The original reason was C1: `check.mjs:113` is `runs.at(-1)`,
+   positional in log order, so an out-of-order append judges *tests green* on a stale run. The second
+   reason arrived with J-3's `"not-run"` — the red run **predates the layering step**, so its record
+   carries `depcruise: "not-run"`, and `check.mjs:126` is `[...events].reverse().find(…)`, newest **by
+   log position**. Append the red run after the green one and the layering check reads `not-run` and
+   reports FAIL on a correct slice. It is constraint 4's bug on a different criterion, and the two are
+   mirror images: constraint 4 protects the red-before-green reading, this protects the layering one.
 3. For the red run, **`suites` is omitted, not invented.** `gh run view --json jobs` yields job and
    step conclusions only; per-suite results come from the Vitest JSON, which no collector parses.
    §6's rule stands — the collector writes nothing it did not compute — and an omitted field is
@@ -1427,12 +1616,37 @@ being background:
 The reviewer should read the commit sequence with that in mind rather than treating it as
 carelessness.
 
+**Measured at step 4, replacing what step 3 declined to claim: an absent `typescript` and an
+out-of-range one are byte-for-byte indistinguishable in the cruise output.** Measured on
+`dependency-cruiser@18.2.0` by stashing and then stubbing `node_modules/typescript`: same `exit 0`,
+same `totalCruised: 0`, same `transpilersFound[ts].currentVersion: "-"`, same
+`missing-typescript-transpiler` issue with an **identical description string** — because the
+description interpolates the *supported range*, and `typescript-wrap.mjs` short-circuits on the range
+check without ever loading the compiler to read its version.
+
+The step-3 draft deliberately refused to say which symptom an out-of-range compiler produces, because
+only an absent one had been measured. That refusal was right, and the measurement now lets this
+design say something **stronger** than it could then: nothing in the JSON names what is installed, so
+**no version-comparison guard can be built from that output at all.** Gating on
+`summary.environment.issues` is not one option among several — it is the only one available, and the
+second guard **cannot exist**. §5's two guards are not merely independent; one of them has no
+alternative.
+
 **A standing note that outlives this slice: re-check the supported-transpiler range on any bump.**
 Whenever `typescript` or `dependency-cruiser` moves, read
 `node_modules/dependency-cruiser/src/meta.cjs`'s `supportedTranspilers.typescript` range and confirm
 the pinned compiler falls inside it (§11.3, F4). It is not a `peerDependency`, so npm will not tell
-you; the symptom is a green `lint:arch` that examined nothing. This is the one maintenance obligation
-QS-10 carries into every later slice.
+you; the symptom is a green `lint:arch` that examined nothing, **and the tool's own message will tell
+the maintainer that a compatible compiler is missing without naming the one they just installed** —
+which is why `lint-arch.mjs` prints the installed version itself (§5). This is the one maintenance
+obligation QS-10 carries into every later slice.
+
+**A second standing note, from J-2: the red zone is anchored at `^tests/`.** `failedFilesFrom`
+normalises to a repository-rooted path, and `RED_ZONE` and `MUST_PASS` both anchor at the start, so a
+future monorepo layout — `packages/api/tests/unit/…` — would classify as neither red zone nor
+must-pass, and **a unit failure would become invisible to AC-6's must-pass clause**. Not a problem in
+a single-package repository. It becomes one the day the tree is split, and that split is the moment
+to re-read this paragraph.
 
 **A second note for the reviewer.** `guard-paths.mjs`'s Bash branch is a substring test: any
 write-ish shell command containing the literal `src/` is denied wherever the path points, so ordinary
