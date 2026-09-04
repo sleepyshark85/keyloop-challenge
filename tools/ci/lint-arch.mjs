@@ -49,9 +49,9 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const CONFIG = '.dependency-cruiser.js';
 
@@ -207,7 +207,7 @@ function main(argv) {
 
   const verdict = judgeCruiseResult(result, roots);
   console.log(verdict.reason);
-  if (!verdict.ok) console.log(installedTypescript());
+  if (!verdict.ok) console.log(describeCompilerEnvironment());
   return verdict.ok ? 0 : 1;
 }
 
@@ -220,22 +220,94 @@ function main(argv) {
  * check and never loads the compiler, so its version is never read. Measured on
  * dependency-cruiser@18.2.0 by stashing and then stubbing `node_modules/typescript`.
  *
- * So a maintainer who bumps typescript past the range gets a message telling them a
- * compatible compiler is missing and NOT telling them which one they installed. This adds
- * that, from the only place it can be read.
+ * So a maintainer who bumps typescript past the range is told a compatible compiler is
+ * missing and NOT told which one they installed. This says it, from the only place it can
+ * be read.
+ *
+ * ── Two things the first version of this got wrong ──────────────────────────────────────
+ *
+ * It read `<package>/package.json` through `require`. That works for typescript and throws
+ * ERR_PACKAGE_PATH_NOT_EXPORTED for dependency-cruiser, whose `exports` map publishes
+ * neither `./package.json` nor `./src/meta.cjs`. And all three reads shared ONE try/catch,
+ * so the dependency-cruiser failure claimed the typescript one had failed too: on a working
+ * toolchain with a real layering violation it printed "no typescript is resolvable from
+ * this installation at all" — sending a developer to reinstall instead of to the rule they
+ * broke. A diagnosis nobody had run, in the file this slice added to stop exactly that.
+ *
+ * So: resolve each package's ENTRY POINT and walk up to the directory holding its manifest
+ * — `import.meta.resolve` honours the `import` condition, and a path on disk is not subject
+ * to an `exports` map — and give every fact its own failure, so one unreadable version can
+ * never assert anything about another.
+ *
+ * Exported so it can be pinned: the correct assertion is that in an installation where
+ * `node_modules/typescript/package.json` exists, the returned string contains that version
+ * and does not claim the compiler is missing.
  */
-function installedTypescript() {
+export function describeCompilerEnvironment() {
+  const typescript = packageVersion('typescript');
+  const cruiser = packageVersion('dependency-cruiser');
+  const supported = supportedTypescriptRange();
+
+  if (typescript === undefined) {
+    return '  (no `typescript` is resolvable from this installation at all — run `npm ci`.)';
+  }
+
+  return (
+    `  (typescript ${typescript} is installed` +
+    (cruiser === undefined ? '' : `; dependency-cruiser@${cruiser}`) +
+    (supported === undefined ? '' : ` supports ${supported}`) +
+    '. An out-of-range compiler and an absent one are reported identically, so this line ' +
+    'is the only place the installed version appears.)'
+  );
+}
+
+/** The directory holding `<name>`'s package.json, found from its entry point. */
+function packageDir(name) {
+  let dir;
   try {
-    const require = createRequire(import.meta.url);
-    const { version } = require('typescript/package.json');
-    return (
-      `  (typescript ${version} is installed; dependency-cruiser@` +
-      `${require('dependency-cruiser/package.json').version} supports ` +
-      `${require('dependency-cruiser/src/meta.cjs').supportedTranspilers.typescript}. ` +
-      'An out-of-range compiler and an absent one are reported identically.)'
-    );
+    dir = dirname(fileURLToPath(import.meta.resolve(name)));
   } catch {
-    return '  (no `typescript` is resolvable from this installation at all.)';
+    return undefined;
+  }
+
+  for (;;) {
+    const manifest = join(dir, 'package.json');
+    if (existsSync(manifest)) {
+      try {
+        if (JSON.parse(readFileSync(manifest, 'utf8')).name === name) return dir;
+      } catch {
+        return undefined;
+      }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
+}
+
+function packageVersion(name) {
+  const dir = packageDir(name);
+  if (dir === undefined) return undefined;
+  try {
+    return JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).version;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `supportedTranspilers.typescript` from dependency-cruiser's own metadata — the range that
+ * decides whether a cruise happens at all. Read from an absolute path, which `exports` does
+ * not gate; its own try, because a future layout change here must not silence the line above.
+ */
+function supportedTypescriptRange() {
+  const dir = packageDir('dependency-cruiser');
+  if (dir === undefined) return undefined;
+  try {
+    return createRequire(import.meta.url)(join(dir, 'src/meta.cjs')).supportedTranspilers
+      ?.typescript;
+  } catch {
+    return undefined;
   }
 }
 
