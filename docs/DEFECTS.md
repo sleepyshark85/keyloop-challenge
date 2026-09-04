@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **22** |
-| Severity | 7 blocking · 11 major · 4 minor |
-| Verdicts | 4 narrowed · 16 accepted · 1 escalated · 1 deferred |
-| Raised by | test-engineer 10 · implementer 8 · architect 3 · orchestrator 1 |
+| Findings recorded | **23** |
+| Severity | 8 blocking · 11 major · 4 minor |
+| Verdicts | 4 narrowed · 17 accepted · 1 escalated · 1 deferred |
+| Raised by | test-engineer 10 · implementer 8 · architect 3 · orchestrator 2 |
 | Awaiting a ruling | none |
-| Mean escape distance | 1.32 step(s) |
+| Mean escape distance | 1.26 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -57,6 +57,7 @@ rather than narrated.*
 | **I-7** | MAJOR | 4 *(+0)* | implementer | Most of two CLIs carry rules that survive their own deletion with no test failing | accepted |
 | **T-3** | MINOR | 4 *(+0)* | test-engineer | The compiler diagnosis reports no compiler when one is installed | accepted |
 | **O-3** | MAJOR | 4 *(+4)* | orchestrator | log:audit reports 12 false discrepancies because it assumes one agent.finish per transcript | deferred |
+| **O-4** | BLOCKING | 4 *(+0)* | orchestrator | The unit tests are far weaker than a green suite suggests: mutation score 0.0634 against a Definition-of-Done threshold of 0.75 | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -191,6 +192,12 @@ rather than narrated.*
 - *scenario:* A resumed agent stops once per resume, writing one agent.finish each, but all resumes share a single subagent transcript. The audit pairs records to transcripts one-to-one, so it reports UNSUPPORTED for every resume after the first and MISMATCH on duration because the transcript spans all of them. Slice 00a resumed the architect six times, so the audit now reports the honest record as untrustworthy — which is worse than not auditing, because C7 reads this output.
 - *file:* `tools/team-log/audit.mjs`
 - *deferred* by orchestrator — Real and mine, but out of scope for slice 00a: audit.mjs is orchestrator tooling and the fix is not a slice deliverable. Recorded rather than silently tolerated, because an audit that cries wolf twelve times is one nobody reads. Same root cause as the report-capture overwrite fixed in bdb32c1 — both tools were written assuming one spawn equals one run, and SendMessage resumes break that. Carried to the phase-4 retro under C7.
+
+**O-4** — The unit tests are far weaker than a green suite suggests: mutation score 0.0634 against a Definition-of-Done threshold of 0.75
+
+- *scenario:* Stryker, installed at step 5 having been required by CLAUDE.md section 3 and section 10 since the constitution was written, reports 9 killed and 130 survived of 142 mutants over 43 unit tests. Four of seven source files kill nothing at all, including checkHealth.ts and persistence/db.ts which have dedicated unit test files. 24 BlockStatement mutants survive, meaning 24 places where an entire block can be replaced with an empty one and no test notices; 19 ConditionalExpression mutants survive, meaning branch conditions can be forced either way unobserved. Verified real rather than a configuration artifact by inspecting a survivor directly.
+- *file:* `tests/unit/`
+- *accepted* by human — Ruled by the human at step 4: strengthen the unit tests rather than relax the threshold or defer it as debt. The alternatives considered and rejected were ruling the 0.75 threshold not-applicable to a walking skeleton, which would be a Definition-of-Done change, and accepting the score as a recorded debt with a follow-up slice. The survivors are genuine weaknesses and finding them is why mutation testing is in the stack, so the work is the implementer own in tests/unit/.
 
 </details>
 
