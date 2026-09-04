@@ -181,9 +181,74 @@ const VIOLATING_SOURCES: Record<string, string> = {
     "import type { Db } from '../persistence/db.js';\nexport type RouteDeps = { db: Db };\n",
 
   // outside-in-tests-do-not-import-src: independence spent through an import.
+  //
+  // ONE FILE PER ALTERNATIVE IN THE RULE'S `from.path`, and the reason is R-1. The rule was
+  // widened at step 2 to eight directories; this fixture planted a violation under
+  // `tests/acceptance/` alone, so it exercised one alternative in eight. The reviewer
+  // measured the hole: cut the alternation back to `(acceptance|concurrency|contract|
+  // property)` in the real config and `npm run lint:arch` exits 0 over 40 modules while the
+  // whole suite passes. A rule that works today, in the file CLAUDE.md §2.3 makes the
+  // architecture's source of truth, with nothing behind it.
+  //
+  // A subset was considered and rejected. An alternation is a LIST of independent claims —
+  // there is no shared mechanism that makes covering one imply another, and any branch can
+  // be lost to a one-character edit — so "covering the interesting ones" would leave the
+  // rest exactly as unprotected as they were before this comment was written. Eight files
+  // and eight table rows cost nothing against a fixture that is already built.
+  //
+  // `setup/` and `support/` are named the way slice 00 will name them, because they are the
+  // concrete case: a globalSetup that types its seeding helpers against
+  // src/persistence/schema.ts, hands them to an acceptance test through `provide()`, and
+  // spends inside a file the test-engineer legitimately owns the independence C2 measures.
   'tests/acceptance/bad.test.ts':
     "import type { Thing } from '../../src/domain/thing.js';\nexport const thing: Thing = { id: 'x' };\n",
+  'tests/architecture/bad.test.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const thing: Thing = { id: 'x' };\n",
+  'tests/concurrency/bad.test.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const thing: Thing = { id: 'x' };\n",
+  'tests/contract/bad.test.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const thing: Thing = { id: 'x' };\n",
+  'tests/performance/bad.test.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const thing: Thing = { id: 'x' };\n",
+  'tests/property/bad.test.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const thing: Thing = { id: 'x' };\n",
+  // Not `.test.ts`: a globalSetup and a spawn helper are not test files, and the rule
+  // anchors on the DIRECTORY. A fixture that only ever planted `*.test.ts` would pass over
+  // a rule narrowed to test files.
+  'tests/setup/postgres.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const seeded: Thing = { id: 'x' };\n",
+  'tests/support/service.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const spawned: Thing = { id: 'x' };\n",
+
+  // AND THE TWO THAT ARE DELIBERATELY OUT. `tests/unit/` and `tests/integration/` import
+  // src/ legitimately — the implementer owns the first and the second asserts database
+  // invariants against the real schema. Widen the rule to a bare `^tests/` and all eight
+  // cases above still pass while slice 00's integration tests become unwritable. The
+  // positive cases cannot see that; these two are what make the alternation a boundary
+  // rather than a floor.
+  'tests/unit/legitimate.test.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const unit: Thing = { id: 'x' };\n",
+  'tests/integration/legitimate.test.ts':
+    "import type { Thing } from '../../src/domain/thing.js';\nexport const integration: Thing = { id: 'x' };\n",
 };
+
+/** The eight directories `outside-in-tests-do-not-import-src` covers, one file each. */
+const OUTSIDE_IN_VIOLATIONS: ReadonlyArray<[string, string]> = [
+  ['acceptance', 'tests/acceptance/bad.test.ts'],
+  ['architecture', 'tests/architecture/bad.test.ts'],
+  ['concurrency', 'tests/concurrency/bad.test.ts'],
+  ['contract', 'tests/contract/bad.test.ts'],
+  ['performance', 'tests/performance/bad.test.ts'],
+  ['property', 'tests/property/bad.test.ts'],
+  ['setup', 'tests/setup/postgres.ts'],
+  ['support', 'tests/support/service.ts'],
+];
+
+/** The two the rule must NOT reach, however it is edited. */
+const OUTSIDE_IN_EXEMPT: ReadonlyArray<[string, string]> = [
+  ['unit', 'tests/unit/legitimate.test.ts'],
+  ['integration', 'tests/integration/legitimate.test.ts'],
+];
 
 /** Shaped like arc42 §5.2, with only legal edges. The negative control. */
 const CONFORMING_SOURCES: Record<string, string> = {
@@ -305,7 +370,14 @@ describe('AC-4 — every layering rule fires by name against an injected violati
     ['domain-is-pure', 'src/domain/bad.ts', 'src/platform/config.ts'],
     ['sql-only-in-persistence', 'src/application/bad.ts', 'node_modules/kysely'],
     ['http-must-not-reach-persistence', 'src/http/bad.ts', 'src/persistence/db.ts'],
-    ['outside-in-tests-do-not-import-src', 'tests/acceptance/bad.test.ts', 'src/domain/thing.ts'],
+    ...OUTSIDE_IN_VIOLATIONS.map(
+      ([, from]) =>
+        ['outside-in-tests-do-not-import-src', from, 'src/domain/thing.ts'] as [
+          string,
+          string,
+          string,
+        ],
+    ),
   ])('reports %s by name, at error severity, on %s', (rule, from, to) => {
     guardTheCruiseHappened(result, planted);
 
@@ -326,10 +398,59 @@ describe('AC-4 — every layering rule fires by name against an injected violati
     expect(matching[0]?.to).toContain(to);
   });
 
-  it('counts the four injected violations at error severity', () => {
+  /**
+   * R-1's other half, and the positive cases cannot see it.
+   *
+   * Every case above is satisfied by a rule widened to a bare `^tests/`, which would fire on
+   * the two directories that import src/ LEGITIMATELY: `tests/unit/` is the implementer's
+   * design tool and `tests/integration/` asserts database invariants against the real
+   * schema. That mutation makes slice 00 unwritable, and eight green positives would say
+   * nothing about it. The alternation is a boundary, so it is asserted from both sides.
+   */
+  it.each(OUTSIDE_IN_EXEMPT)(
+    'does NOT fire on tests/%s/, which imports src/ legitimately',
+    (_directory, from) => {
+      guardTheCruiseHappened(result, planted);
+
+      const matching = result.summary.violations.filter(
+        (violation) =>
+          violation.rule.name === 'outside-in-tests-do-not-import-src' && violation.from === from,
+      );
+
+      expect(
+        matching.map((violation) => `${violation.rule.name} ${violation.from} -> ${violation.to}`),
+        `${from} imports src/ and must be allowed to. Widen the rule to ^tests/ and every ` +
+          'positive case still passes while the implementer and slice 00 lose the two ' +
+          'directories they need.',
+      ).toEqual([]);
+    },
+  );
+
+  it('reports exactly one violation per planted violating file, and none besides', () => {
     guardTheCruiseHappened(result, planted);
 
-    expect(result.summary.error).toBeGreaterThanOrEqual(4);
+    // Derived from the fixture rather than counted by hand: add a violating file and forget
+    // its assertion and this fails, which a `>= n` cannot do. It is also the assertion that
+    // catches a rule firing on a file nobody planted a violation in.
+    const expected = [
+      'src/domain/bad.ts',
+      'src/application/bad.ts',
+      'src/http/bad.ts',
+      ...OUTSIDE_IN_VIOLATIONS.map(([, from]) => from),
+    ].sort();
+
+    const actual = [
+      ...new Set(
+        result.summary.violations
+          .filter((violation) => violation.rule.severity === 'error')
+          .map((violation) => violation.from),
+      ),
+    ].sort();
+
+    expect(actual, 'error-severity violations, by the file they were reported on').toEqual(
+      expected,
+    );
+    expect(result.summary.error).toBeGreaterThanOrEqual(expected.length);
   });
 
   it('exits non-zero under the reporter lint:arch uses, so a violation fails the build', () => {
