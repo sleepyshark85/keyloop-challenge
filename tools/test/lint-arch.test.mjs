@@ -46,8 +46,9 @@
  * cruise examined nothing under src" and "the cruise examined nothing" are different
  * failures and only the first tells a maintainer where to look.
  */
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -361,6 +362,80 @@ check('no roots given → exit 2, distinct from a violation',
   wrapper(conformingRoot, []).status === 2,
   'a usage error and a rejected architecture must not be the same status: CI would report '
   + 'a mistyped script as a layering failure, and the reviewer would look in the wrong file');
+
+// ── the compiler diagnosis must not report a compiler that is there ────────────────────
+//
+// `describeCompilerEnvironment()` prints on every non-ok verdict, so it reaches a developer
+// exactly when they have a real layering violation. At 902abb8 it printed
+//
+//   (no `typescript` is resolvable from this installation at all.)
+//
+// with typescript 6.0.3 installed and working — three version reads shared one `try`, and
+// `dependency-cruiser`'s exports map publishes only "." under an `import` condition, so
+// `require('dependency-cruiser/package.json')` threw and the catch asserted that TYPESCRIPT
+// was missing. A developer who broke a layering rule was sent to reinstall their toolchain.
+//
+// THE ORACLES ARE READ OFF THE FILESYSTEM, not through a resolver. The tool locates packages
+// with `import.meta.resolve` and a manifest walk; `require` is the other resolver and shares
+// the exports-map behaviour that caused the bug. A path is neither, so a resolution failure
+// cannot make the expectation wrong in the same direction as the answer. (The implementer
+// suggested this too, for a different reason — that `require('typescript/package.json')`
+// would weaken the case. Measured: it returns 6.0.3, the same string, so it would not. The
+// reason to avoid it is independence, not the value.)
+const installedTypescript = JSON.parse(
+  readFileSync(resolve('node_modules/typescript/package.json'), 'utf8')).version;
+const installedCruiser = JSON.parse(
+  readFileSync(resolve('node_modules/dependency-cruiser/package.json'), 'utf8')).version;
+// An ABSOLUTE path bypasses the exports map — which is the whole reason the tool cannot
+// reach this file by package specifier, and why it walks to the directory first.
+const supportedRange = createRequire(import.meta.url)(
+  resolve('node_modules/dependency-cruiser/src/meta.cjs')).supportedTranspilers?.typescript;
+
+check('oracle precondition — typescript, dependency-cruiser and the range are all readable',
+  Boolean(installedTypescript) && Boolean(installedCruiser) && Boolean(supportedRange),
+  `read straight off node_modules/, so a failure here is a broken checkout rather than a `
+  + `broken tool. got ${JSON.stringify({ installedTypescript, installedCruiser, supportedRange })}`);
+
+const diagnosis = typeof tool?.describeCompilerEnvironment === 'function'
+  ? tool.describeCompilerEnvironment()
+  : '';
+
+check('exports describeCompilerEnvironment() so the diagnosis is testable without a cruise',
+  typeof tool?.describeCompilerEnvironment === 'function',
+  'it prints on every non-ok verdict; a string assembled inside main() could only be '
+  + 'checked by scraping stdout');
+
+check('the diagnosis NAMES the installed typescript rather than claiming there is none',
+  diagnosis.includes(installedTypescript)
+    && !/no `?typescript`? is resolvable/.test(diagnosis),
+  `this is the 902abb8 line, and it fired precisely when a developer had a working `
+  + `toolchain and a real violation. got ${JSON.stringify(diagnosis)}`);
+
+// THE HALF THE SUGGESTED ASSERTION LEFT OPEN, and it is the half the bug came from.
+// Collapsing the reads back under one `try` is caught by the line above — when the
+// dependency-cruiser read throws, the typescript version is discarded with it, which IS the
+// bug. But a read that fails only for dependency-cruiser degrades to a SHORTER TRUE line,
+// "(typescript 6.0.3 is installed.)", and nothing above notices. Measured on two mutants:
+// losing the manifest walk drops both dependency-cruiser facts; stubbing the range read
+// drops one. Both leave a line that is honest and useless.
+check('…and the dependency-cruiser version, so a partial read cannot pass as a whole one',
+  diagnosis.includes(installedCruiser),
+  `a reader that resolved only typescript prints "(typescript ${installedTypescript} is `
+  + `installed.)" — true, shorter, and it passes every assertion above. got `
+  + JSON.stringify(diagnosis));
+
+check('…and the SUPPORTED RANGE, which is the only fact that tells the two failures apart',
+  diagnosis.includes(supportedRange),
+  `dependency-cruiser reports an ABSENT compiler and an OUT-OF-RANGE one identically, so `
+  + `the range is what says which one this is — the line claims as much in its own text. `
+  + `Lose it and the diagnosis stays true and stops answering the question. got `
+  + JSON.stringify(diagnosis));
+
+check('the diagnosis reaches the developer on a real violation, not only in this test',
+  (onViolation.stdout ?? '').includes(installedTypescript)
+    && (onViolation.stdout ?? '').includes(supportedRange),
+  `main() prints it only when the verdict is not ok; that is the moment it exists for. `
+  + `got ${JSON.stringify((onViolation.stdout ?? '').trim())}`);
 
 for (const root of fixtureRoots) rmSync(root, { recursive: true, force: true });
 
