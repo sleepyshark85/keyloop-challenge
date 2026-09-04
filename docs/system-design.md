@@ -77,6 +77,7 @@ without taking anyone's word for it.
 - [**ADR-0010**](adr/0010-github-actions-and-check-run-collection.md) — Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow *(accepted)*
 - [**ADR-0011**](adr/0011-health-is-an-operational-probe.md) — Treat /health as an operational probe outside the API contract, not as a sixth operation *(proposed)*
 - [**ADR-0012**](adr/0012-seed-fixtures-are-a-test-owned-loader.md) — Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset *(proposed)*
+- [**ADR-0013**](adr/0013-outside-in-tests-exercise-the-built-artifact.md) — Outside-in tests reach a pure module through the built artifact, and property tests split by database need *(proposed)*
 
 ---
 
