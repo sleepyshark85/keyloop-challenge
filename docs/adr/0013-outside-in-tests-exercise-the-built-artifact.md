@@ -151,9 +151,13 @@ Scope of the ruling, so no later slice has to guess:
   test import `src/` invisibly. Nothing structural prevents it; only review does. arc42 §11 carries it.
 - **A dependency on the build.** A stale `dist/` produces a green or a confusing red. `pretest` and
   `pretest:nodb` close the two paths that exist today; a third would need the same treatment.
-- **One mechanical unknown**, to be verified before the red commit is pushed rather than assumed: that
-  Vitest's module runner honours a computed `file://` dynamic import of a plain `.js` file under
-  `dist/`. Fallbacks are `/* @vite-ignore */` and `server.deps.external`.
+- ~~One mechanical unknown~~ — **measured before this ADR was accepted**, not left as a promise: a
+  computed `file://` specifier built with `pathToFileURL(resolve('dist/domain/_spike.js')).href` both
+  typechecks and **executes under Vitest** (two tests passed under `--project nodb`, one asserting that
+  a computed import of a missing `dist/` module rejects at runtime), while the literal control
+  `await import('../../src/domain/duration.js')` fails `npm run typecheck` with `TS2307` and typecheck
+  returns clean once it is removed. The fallbacks `/* @vite-ignore */` and `server.deps.external` are
+  recorded as unneeded. This is the *Bad, or deferred* item that turned out not to be either.
 - A filename convention (`*.db.test.ts`) is a weaker guarantee than a directory the tooling enforces. A
   test that forgets the suffix runs without a container and fails on connection — loudly, which is the
   acceptable direction, but it is a convention rather than a constraint.

@@ -523,11 +523,16 @@ consequence is a side effect of the fix, not its purpose.
   covered. `npm run test:nodb` has no such hook: **`pretest:nodb` must be added** so the Docker-free
   path cannot run against a stale `dist`. npm runs `pre<name>` for any script name. That is a
   test-running concern and belongs in the red commit.
-- One mechanical unknown, and it must be **verified before the red commit is pushed**, the way 00a
-  verified per-project `globalSetup`: that Vitest's module runner honours a computed `file://` dynamic
-  import of a plain `.js` file under `dist/`. If it does not, the documented fallbacks are
-  `import(/* @vite-ignore */ specifier)` and `server.deps.external`. A design that assumed this would
-  be making exactly the kind of claim this project stopped making at slice 00.
+- The one mechanical unknown this design carried is now **measured**, before the red commit rather
+  than after it, the way 00a measured per-project `globalSetup`. Run by the orchestrator:
+  `pathToFileURL(resolve('dist/domain/_spike.js')).href` fed to `await import(...)` typechecks clean
+  **and Vitest executes it** — two tests passed under `vitest run --project nodb`, one of them
+  asserting that a computed import of a *missing* `dist/` module rejects at runtime rather than at
+  compile time, which is the exact behaviour §8.3 depends on. The control ran too: with a literal
+  `await import('../../src/domain/duration.js')` present, `npm run typecheck` exits 2 with
+  `TS2307: Cannot find module`; remove it and typecheck is clean again. So both halves of §6.1's claim
+  are measured on this runtime, not inferred from one another. The fallbacks
+  `import(/* @vite-ignore */ specifier)` and `server.deps.external` are recorded as unneeded.
 
 ### 6.3 `tests/property/` splits by whether the property needs a database
 
@@ -696,9 +701,11 @@ collection error and no hook error, because:
 That is C1's *"a real assertion failure rather than a missing import"*, satisfied structurally — the
 same way slice 00 satisfied it by ruling that `beforeAll` may only connect.
 
-**The verification owed before the commit is pushed** is §6.2's mechanical unknown, and it is the only
-one. Slice 00 and 00a both ended up recording that a stated mechanism nobody ran is not a mechanism;
-this design names the run rather than assuming the outcome.
+**Nothing here is owed to a later verification.** §6.2's mechanical unknown was the only one, and it
+has been run: the computed `file://` import executes under Vitest, and the literal specifier fails
+`typecheck` with `TS2307`, control included. Slice 00 and 00a both ended up recording that a stated
+mechanism nobody ran is not a mechanism; this one was run before the design was accepted rather than
+named as a promise.
 
 ---
 
@@ -777,9 +784,9 @@ input cannot distinguish step 4 from step 5, and the reordering mutants survive.
 
 | id | Assumption | If wrong |
 |---|---|---|
-| **DA-1** | Intra-`src/domain` type imports satisfy AC-6, because `domain-is-pure` does not fire on them and the literal reading makes AC-5 and AC-6 jointly unsatisfiable (§2.0) | A DCR at step 2; the human rules on AC-6, and the fallback is duplicated structural types, which is worse |
+| **DA-1** | Intra-`src/domain` type imports satisfy AC-6, because `domain-is-pure` does not fire on them and the literal reading makes AC-5 and AC-6 jointly unsatisfiable (§2.0). The ruleset half is **measured, by a second reader**: `from: '^src/domain/'` → `to: { pathNot: '^src/domain/' }` does not match an intra-domain edge. The *reading of AC-6* remains the assumption | A DCR at step 2; the human rules on AC-6, and the fallback is duplicated structural types, which is worse |
 | **DA-2** | PostgreSQL's `time` admits `24:00:00`, so the parser accepts it (§3.2) | One branch is dead. It is cheaper than the alternative error |
-| **DA-3** | Vitest's module runner honours a computed `file://` dynamic import of `dist/**.js` (§6.2) | **Must be verified before the red commit.** Fallbacks named in §6.2 |
+| ~~**DA-3**~~ | Vitest's module runner honours a computed `file://` dynamic import of `dist/**.js` (§6.2) | **No longer an assumption — measured**, with a control, before this design was accepted. See §6.2. Kept in the table struck through rather than deleted, so the record shows it was carried as an assumption and then discharged |
 | **DA-4** | The `pg` driver returns a `time` column as a string, which is why `DayHours` holds strings (§2.3) | The assembler adapts; the domain contract does not change. Nothing in slice 01 depends on it, since nothing queries |
 
 ### Open questions — recorded, not resolved
@@ -793,12 +800,28 @@ input cannot distinguish step 4 from step 5, and the reordering mutants survive.
 
 ### Findings raised by this design
 
-- **F-01-1 — arc42 §10 QS-9 still carries the wording the human corrected in AC-2.** QS-9 reads
-  *"the instant that is 08:30 local but 09:30 UTC"* — the same transposition O-13 ruled a defect on
-  2026-09-04, in the same words, in a document I own. The human's ruling settles the substance; §12.1
-  proposes the corresponding §10 edit at step 7. **Severity: minor** — no test was written against it
-  and no code depends on it — but it is a document contradicting a ruling, which is the retro's Tier 2,
-  and it was found by reading the two side by side.
+- **F-01-1 — arc42 §10 QS-9 carried the wording the human corrected in AC-2. CORRECTED at step 1,
+  not deferred to step 7.** QS-9 read *"the instant that is 08:30 local but 09:30 UTC"* — the same
+  transposition O-13 ruled a defect on 2026-09-04, in the same words, in a document I own. Found by
+  reading the two side by side, which is the retro's Tier 2.
+
+  **Why it was fixed now rather than at step 7, and on whose authority.** The orchestrator asked for
+  it immediately and gave the deciding reason: **QS-9, not AC-2, is what the test-engineer reads at
+  step 3** to write `tests/property/opening-hours-dst.test.ts`. Deferring would leave a known
+  contradiction in the document the next role works from, and the cost of the defect is not the two
+  lines to fix it but a property test written against a scenario that cannot occur. I agree, and the
+  authority reading holds: `CLAUDE.md` §6 reserves quality goals to the human, and the human has
+  already ruled the substance under O-13. Propagating an existing ruling into a second document that
+  contradicts it is not a new decision, and the edit cites O-13 as its authority rather than the
+  architect's judgement.
+
+  **The one qualification I would not let pass silently.** That reasoning is sound *because the two
+  texts were word-for-word the same defect*. It would not extend to a §10 scenario that merely
+  resembled a ruled criterion, and it does not make §10 generally amendable by the architect on the
+  strength of a ruling elsewhere — the substance of a quality scenario stays the human's. The edit is
+  therefore marked in §10 itself as propagated rather than decided, so a reader can see which it was.
+  If the human reads that as an overstep, the remedy is to revert the illustrative pair, not the
+  scenario: nothing else in §10 was touched.
 - **F-01-2 — AC-5's `time_zone` clause and `referenceRepository` will collide.** AC-5 confines *"use
   of a dealership's `time_zone`"* to `openingHours.ts`. `src/persistence/referenceRepository.ts` must
   `SELECT` that column. Slice 01 is unaffected (nothing queries, and migrations are `.sql`, outside the
@@ -818,7 +841,7 @@ input cannot distinguish step 4 from step 5, and the reordering mutants survive.
 | **§5.2** | Correct *"It imports nothing at all — no other module, no npm package, no `node:` builtin"* to *"no module outside `src/domain`, no npm package, no `node:` builtin"*, with §2.0's reason (AC-5 and AC-6 are otherwise jointly unsatisfiable) and the note that `import type` edges are visible to the cruise under `tsPreCompilationDeps`. Update the `interval.ts` / `duration.ts` / `openingHours.ts` rows to the as-built signatures, including that `withinOpeningHours` returns a verdict union rather than a boolean, and why. Extend the *As built* subsection with a `src/domain` row — it stops being empty at this slice, which §5.2 predicted |
 | **§8.3** | Add the measured DST facts: the two 2026 transition instants, AC-2's amended pair, AC-3's `00:30 → 02:30`, and the fall-back pair that renders identically. Add §4.2's fixed decision order, and the note that a fall-back day is legitimately longer in absolute terms than the wall clock says. Record the locale pin and `hourCycle: 'h23'` as measured constraints on the rendering |
 | **§8.5** | Record ADR-0013: outside-in tests reach a pure module through the built artifact, and `tests/property/` splits by database need. This is the section that already draws the line §2.2 of `CLAUDE.md` protects, and this ruling sits beside it |
-| **§10** | **F-01-1**: correct QS-9's illustrative pair to the human's O-13 wording. Narrow QS-9's *"generated instants"* clause to record what the test actually generates (§9.1). Add to QS-12 that the response measure is assumed, not measured (§9.2) |
+| **§10** | **F-01-1 is already done — corrected at step 1, not owed at step 7** (see §11). Still owed here: narrow QS-9's *"generated instants"* clause to record what the test actually generates (§9.1), and add to QS-12 that the response measure is assumed, not measured (§9.2). Both are as-built corrections and belong at merge, not before |
 | **§11** | ADR-0013 as `status: proposed` is a debt item and appears in the generated table. Add: `occupancyInterval` has no production call site until the booking path (§9.2); QS-12's corpus is nearly empty at this slice; QS-9 examines one zone and one year; and the ICU dependency the `Intl` global introduces |
 | **§12** | The glossary entries below |
 
