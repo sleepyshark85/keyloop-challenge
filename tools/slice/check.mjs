@@ -95,7 +95,18 @@ if (!onlyDone) {
 // --- Definition of Done ---
 if (!onlyReady) {
   // The red-commit trail: a failing acceptance run must precede any passing one.
-  const runs = events.filter((e) => e.event === 'check.run');
+  //
+  // `check.run` carries more than one kind of record — a CI run, and a mutation
+  // score. Only a CI run reports whether tests ran, and it is the one that carries
+  // `run_id`. Reading them alike made a mutation record — which contains no test
+  // outcome at all — satisfy both "tests green" and the green half of red-before-
+  // green. Recorded as O-6 at slice 00a and deferred with a sequencing workaround;
+  // it recurred immediately at slice 00 because the workaround was "append the CI
+  // run last", which depends on the orchestrator remembering it every time. A
+  // guard whose only enforcement is discipline is the failure this project has now
+  // catalogued eight times, so the discriminator is in the predicate instead.
+  const allRuns = events.filter((e) => e.event === 'check.run');
+  const runs = allRuns.filter((e) => e.checks?.run_id !== undefined);
   const failing = runs.find((e) => /FAIL|\b0\//.test(JSON.stringify(e.checks ?? {})));
   const passingAfter = failing && runs.find((e) =>
     Date.parse(e.ts) > Date.parse(failing.ts) && !/FAIL|\b0\//.test(JSON.stringify(e.checks ?? {})));
@@ -109,12 +120,15 @@ if (!onlyReady) {
     try { return Boolean(JSON.parse(readFileSync(resolve('package.json'), 'utf8')).scripts?.test); }
     catch { return false; }
   })();
-  const lastRun = runs.at(-1);
+  // Newest CI run by completion time, not by log position: a backfill may append
+  // an older run after a newer one (§7's ordering obligation exists for the same
+  // reason, and asking two mechanisms to agree is how they drift apart).
+  const lastRun = [...runs].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)).at(-1);
   check('done', 'tests green',
     !hasTestScript ? UNVERIFIED : !lastRun ? UNVERIFIED
       : /FAIL/.test(JSON.stringify(lastRun.checks)) ? FAIL : PASS,
     !hasTestScript ? 'no `npm test` script yet — nothing to run'
-      : !lastRun ? 'no check.run recorded' : JSON.stringify(lastRun.checks));
+      : !lastRun ? 'no CI run recorded' : JSON.stringify(lastRun.checks));
 
   const mut = [...events].reverse().find((e) => e.checks?.mutation_score !== undefined);
   check('done', `mutation score ≥ ${MUTATION_THRESHOLD}`,

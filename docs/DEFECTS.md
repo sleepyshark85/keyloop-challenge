@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **44** |
-| Severity | 9 blocking · 24 major · 11 minor |
-| Verdicts | 4 narrowed · 20 accepted · 1 escalated · 3 deferred |
-| Raised by | test-engineer 13 · reviewer 12 · implementer 11 · orchestrator 5 · architect 3 |
-| Awaiting a ruling | **16** |
-| Mean escape distance | 1.45 step(s) |
+| Findings recorded | **49** |
+| Severity | 9 blocking · 27 major · 13 minor |
+| Verdicts | 4 narrowed · 22 accepted · 1 escalated · 4 deferred |
+| Raised by | test-engineer 15 · implementer 12 · reviewer 12 · architect 5 · orchestrator 5 |
+| Awaiting a ruling | **18** |
+| Mean escape distance | 1.55 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -71,7 +71,7 @@ rather than narrated.*
 | **R-10** | MINOR | 5 *(+1)* | reviewer | The audit git-linkage check is inert by construction and C7 reads its output | **open** |
 | **R-11** | MINOR | 5 *(+1)* | reviewer | Authored prose moved in an arc42 section the slice did not declare | **open** |
 | **R-12** | MINOR | 5 *(+1)* | reviewer | contract and property are RED_ZONE members with no committed case | **open** |
-| **O-6** | MAJOR | 6 *(+6)* | orchestrator | tests green and red before green accept any check.run record, including one that carries no test result at all | deferred |
+| **O-6** | MAJOR | 6 *(+6)* | orchestrator | tests green and red before green accept any check.run record, including one that carries no test result at all | accepted |
 | **O-7** | MINOR | 6 *(+6)* | orchestrator | The human-approved gate check requires an undocumented literal string and fails closed on any other, including a more descriptive one | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
@@ -285,7 +285,7 @@ rather than narrated.*
 
 - *scenario:* check.mjs line 112 reads runs.at(-1) and tests /FAIL/ over its checks; line 99 finds the first record matching /FAIL/ and line 100 accepts any later record without FAIL as the green. Both treat every check.run alike. Appending a mutation-score record — which carries mutation_score, killed and survived and no test outcome whatsoever — made tests green report PASS by reading it, and satisfied red before green as the green half. Observed live while backfilling slice 00a: the gate reported PASS on a record that says nothing about whether any test ran. Any future record kind sharing the check.run event will do the same, and the Definition of Done is what reads it.
 - *file:* `tools/slice/check.mjs`
-- *deferred* by orchestrator — Real, observed live rather than reasoned, and mine. Deferred for the same reason O-2 deeper fix was declined by the architect: changing the gate tool in the slice that first feeds it is how you get a gate that agrees with its own bug. The remedy is a kind discriminator on check.run — the record already distinguishes itself by carrying run_id and jobs versus mutation_score — so the predicate can require a record that actually reports a test outcome. Sequencing for this slice avoids it: the final CI run is appended last, so runs.at(-1) is a real run. Carried to the phase-4 retro under C7 alongside O-3 and R-10, all three of which are the same class — a gate reading a record that does not mean what the gate assumes.
+- *accepted* by orchestrator — SUPERSEDES the slice 00a deferral. O-6 recurred at slice 00 the first time I forgot the workaround, which was append the CI run last — a mitigation depending on my memory every time. Observed live again: after appending the mutation score, tests green PASSed by reading a record carrying mutation_score, killed and survived and no test outcome at all. Fixed rather than deferred a second time. check.run carries two record kinds and only a CI run has run_id, so the predicates now filter on it, and tests green takes the newest CI run by timestamp rather than by log position — which also removes the dependency on section 7 append-ordering obligation, since asking two mechanisms to agree is how they drift apart. Seven cases in tools/test/slice-check.test.mjs pin both directions. Slice 00a re-checked: still all checks pass. The architect argument for the original deferral — do not change the gate tool in the slice that first feeds it — does not apply to the second slice that feeds it, and a deferred finding that recurs immediately is evidence the deferral was wrong.
 
 **O-7** — The human-approved gate check requires an undocumented literal string and fails closed on any other, including a more descriptive one
 
@@ -320,6 +320,11 @@ rather than narrated.*
 | **T-6** | MINOR | 2 *(+1)* | test-engineer | AC-3 step 5 is redundant with step 4 and its stated reason is false | **open** |
 | **I-8** | MAJOR | 2 *(+1)* | implementer | The design mitigation for a malformed migration is false: globalSetup silences the very diagnostic it relies on | **open** |
 | **I-9** | MAJOR | 2 *(+1)* | implementer | The singleTransaction divergence is db:migrate having drifted from ADR-0007, so the remedy is not where the design says it is | **open** |
+| **T-7** | MAJOR | 3 *(+2)* | test-engineer | A pre-existing harness assertion blocks the green commit, and the design do-not-modify list does not mention the file | **open** |
+| **T-8** | MINOR | 3 *(+2)* | test-engineer | Section 6.2 forbids singleton foreign keys for a stated reason, and nothing asserts that they are absent | **open** |
+| **O-9** | MAJOR | 3 *(+3)* | architect | tests/integration/ is unguarded, so the implementer can edit a test-engineer-owned assertion to green its own commit and nothing denies it | deferred |
+| **O-10** | MAJOR | 4 *(+4)* | architect | Concurrent agents on one worktree make a bare git commit unsafe, and it nearly recorded an authority violation in git | accepted |
+| **I-11** | MINOR | 4 *(+1)* | implementer | Every db run emits a pg deprecation warning that becomes an error at pg 9 | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -347,6 +352,34 @@ rather than narrated.*
 
 - *scenario:* ADR-0007 line 72 states the runner is invoked programmatically by node-pg-migrate Node API both by npm run db:migrate and by the Testcontainers fixture. package.json line 18 is the CLI binary node-pg-migrate -m src/persistence/migrations -t pgmigrations up, whose singleTransaction defaults true while the programmatic runner defaults false. Verified independently. So the divergence is a conformance drift from the governing ADR and its cause, not a pair of entry points with different natural defaults — and the remedy sits on the non-test-owned side of the seam, never needing to touch tests/setup/postgres.ts. The deferral stays right for this slice, but the recorded debt must name package.json and ADR-0007 conformance or it gets paid in the wrong file.
 - *file:* `package.json`
+
+**T-7** — A pre-existing harness assertion blocks the green commit, and the design do-not-modify list does not mention the file
+
+- *scenario:* postgres-harness.test.ts line 50 asserts pgmigrations holds zero rows with the message slice 00a applies no migrations. At slice 00 green commit it holds three, so all tests green is unreachable as specified and no step or role owns the update. Design section 4.1 cites this same file four lines above the failing assertion — the server_version matches caret 16 case is the evidence for T-4 bounded-fragility argument — so the file was read and the adjacent assertion was read past. Not fixed unilaterally because doing so falsifies section 9 claim that slice 00 red comes from one file with no second explanation available, which is part of the pilot C1 evidence.
+- *file:* `tests/integration/postgres-harness.test.ts`
+
+**T-8** — Section 6.2 forbids singleton foreign keys for a stated reason, and nothing asserts that they are absent
+
+- *scenario:* Section 6.2 says adding the singleton foreign keys would make the reported constraint non-deterministic in exactly the cases section 4.2 depends on being deterministic. Case 0 stated limit — it proves nothing about what else is in the schema — leaves that addition undetected, so an implementer adding appointment_customer_id_fkey for tidiness passes all ten cases while falsifying section 6.2 and reintroducing the ambiguity T-5 controls were added to remove. Remedy needs no new mechanism and not the whole-schema snapshot the design rejected: assert the SET of non-primary-key constraint names on appointment is exactly the seven.
+- *file:* `docs/slices/00-design.md`
+
+**O-9** — tests/integration/ is unguarded, so the implementer can edit a test-engineer-owned assertion to green its own commit and nothing denies it
+
+- *scenario:* TEST_OWNED lists nine paths and not tests/integration/. Verified: an implementer Write to tests/integration/postgres-harness.test.ts exits 0, ALLOW. T-7 option (b) was exactly this — the implementer updating a harness assertion that blocks its own green commit — and CLAUDE.md section 5 forbids it (if the implementer believes a test is wrong it raises a DCR, it does not edit the test), while the hook would not have stopped it. A blanket deny is wrong because section 5 makes the directory shared; the boundary is the structural rule settled at 00a step 7, that a tests/integration/ file reaching the database only through a connection string is the test-engineer own. C2 is a fatal criterion measured from git history AND hook denials, so an unenforced shared directory makes it partly self-reported. Same family as R-4 absolute-path bypass, and worse in kind: this one permits a crossing rather than mis-reporting one.
+- *file:* `.claude/hooks/guard-paths.mjs`
+- *deferred* by orchestrator — Real, mine, and not a one-line fix — which is why it is deferred rather than patched mid-slice. A blanket deny contradicts section 5 shared ruling. The enforceable form is the 00a step-7 structural rule: deny the implementer a write to an existing tests/integration/ file that does not import src/, since that is the test-engineer own by that rule, and allow one that does. That needs the hook to read file content, which is a new capability for the Write branch and wants its own cases in both directions. Carried to the phase-4 retro with R-4 under C2, where both belong: C2 is measured from hook denials and both findings say the denials are weaker than the criterion assumes.
+
+**O-10** — Concurrent agents on one worktree make a bare git commit unsafe, and it nearly recorded an authority violation in git
+
+- *scenario:* The orchestrator ran the architect and the implementer in parallel on the same worktree on the grounds that they touch disjoint files. They do — but the git INDEX is shared. The architect ran git add on its own path and the implementer staged three migration files in the window before the architect git commit, so the bare commit took the index as it found it and swept src/ into a docs commit. The git record would have shown the architect committing src/, which is an authority violation on its face and would have corrupted C2, a fatal criterion measured from git history. Caught on the post-commit stat, soft-reset, recommitted with git commit --only pathspec, and nothing was lost. The near miss is the finding: parallelism was chosen for file disjointness and the index is not a file.
+- *file:* `docs/METHODOLOGY.md`
+- *accepted* by orchestrator — Mine — I chose the parallelism and reasoned about file disjointness without reasoning about the shared index. The architect remedy is adopted: git commit --only pathspec becomes the required form for every role, not a recovery step, and it is immune to the race rather than merely unlikely to hit it. Accepted rather than deferred because unlike the gate-tooling cluster this one writes a false fact into git history, which is the artifact every other record reconciles against, and because the fix is a prompt-level change with no tooling to build. To land in METHODOLOGY and in each agent definition commit instructions.
+
+**I-11** — Every db run emits a pg deprecation warning that becomes an error at pg 9
+
+- *scenario:* DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Emitted on every npx vitest run --project db, from the shared Client in exclusion-constraints.test.ts or tests/support/seed.ts. Harmless today, an error at pg 9, and test-engineer-owned so the implementer flagged rather than touched it.
+- *file:* `tests/integration/exclusion-constraints.test.ts`
+- *deferred* by orchestrator — Correct to flag rather than touch — tests/integration/ and tests/support/ are the test-engineer own, and the implementer raising instead of editing is exactly the section 5 discipline O-9 shows the hook would not have enforced. Deferred to the test-engineer at the slice that next touches those files, or to the pg 9 bump, whichever comes first. Recorded now because a warning that becomes an error on a routine dependency bump is the kind of thing nobody attributes when it finally fires.
 
 </details>
 
