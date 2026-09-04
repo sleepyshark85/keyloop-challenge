@@ -15,24 +15,77 @@ This design settles *shape*. It does not restate the nine acceptance criteria an
 them (`CLAUDE.md` §6): AC-1 to AC-9 are the human's. Where one is ambiguous, §11 flags it rather than
 resolving it silently (`CLAUDE.md` §11).
 
-**Read §0 first.** Slice 00a produced two rules that this design is bound by, and §0 is this
-document's compliance with the second of them: every causal claim below is either measured, or
-labelled as unmeasured. There are more measurements here than in 00a's design because a database is
-cheap to interrogate and expensive to be wrong about.
+**Amended at step 2 on 2026-09-04**, after both reviewers objected. Five findings, five agreements —
+three of them against sentences this document asserted and had not checked. Every ruling is applied in
+the body: this is one current document, not a design plus a thread of corrections. The human widened
+the slice's `arc42:` field to **§8.1 · §8.2 · §7.2 · §11** on the same date, so §10's edits are in
+scope.
+
+**Read §0 first.** It is the audit trail, and **T-4** in it is the most consequential entry: the
+design as first written could not detect a wrongly-keyed exclusion constraint, which is the one defect
+this whole slice exists to make impossible.
 
 ---
 
-## 0. The two rules from 00a, and this design's compliance
+## 0. Step 2 rulings
 
-00a ended with two rules in the design record. Both bind here.
+Both the test-engineer and the implementer returned **OBJECT**. One round of discussion was convened
+per `CLAUDE.md` §6; these are the rulings. Four of the five carried **measurement rather than
+argument** — a role ran the thing this design specified and reported what happened — and the fifth was
+a two-line comparison between an ADR and `package.json` that the architect could have made and did
+not.
+
+| # | Objection | Outcome | Reasoning, in one line |
+|---|---|---|---|
+| **T-4** | Case 0 never asserts the column the constraints are keyed on, so a `no_bay_overlap` keyed on `dealership_id` survives all of AC-3 | **(a)** finding accepted; remedy accepted with two additions and a stated limit | Only AC-2 catches the mutant, and only through the behaviour §11.2 **A-2** says is not guaranteed — so on the design's own terms, nothing catches it |
+| **T-5** | The one-violable-constraint discipline is enforced non-uniformly by FK trigger order: a drifted AC-5 fixture passes silently where the equivalent AC-6 drift fails loudly | **(a)** accepted; remedy accepted **plus an ordering rule the remedy lacked** | Trigger order follows declaration order in `0003_appointment.sql`. A discipline whose enforcement depends on the order constraints happen to be listed in is not a discipline |
+| **T-6** | §4.4 step 5 is redundant with step 4 **and its stated reason is false** | **(a)** accepted; step **kept**, demoted, and its reason replaced with the admission | The reason conflated the range expression's two bounds with the test's two rows. Both steps reject the closed-range mutant, and no mutant separates them |
+| **I-8** | §8.2's mitigation 2 is false — the harness silences the logger the fallback depends on | **(a)** accepted; mitigation **replaced**, not merely corrected | `tests/setup/postgres.ts:68` passes `log: () => {}`. The architect read the mechanism in `db.js` and not the call site, having quoted that call site earlier in the same session |
+| **I-9** | The `singleTransaction` divergence is **conformance drift from ADR-0007**, not two entry points with different defaults — so the stated reason for deferring it was wrong | **(a)** accepted; deferral **held on corrected grounds**; debt relocated | ADR-0007's Decision says the runner is invoked programmatically on both paths; `package.json:18` is the CLI binary. The remedy is entirely on the non-test-owned side, so the seam-promise argument never applied |
+
+**No loopback was consumed.** All five are **(a) Clarification** under `CLAUDE.md` §6 — the design's
+substance held, its specification was incomplete or its stated reasons were false — so the slice stays
+at `loopbacks: 0`. That is what §6's *"objections here are cheap; the same ambiguity found at step 5
+costs a full cycle plus a loopback"* is for, and this round is the clearest demonstration of it the
+project has produced: **T-4 alone would have shipped a wrongly-keyed constraint undetectable until
+slice 07.**
+
+### Four things settled alongside the rulings
+
+- **§11.2 A-4 is closed.** Docker works in all three roles' shells, falsifying 00a §11.5's *"no
+  container runtime on either role's machine"*. §8.2's mitigation 1 is promoted from advice to the
+  stated step-4 loop, and what this does and does not falsify in 00a is recorded in arc42 §7.2.
+- **`tsc` emits only `.ts`, so `dist/persistence/` holds no migrations** — the built artifact cannot
+  migrate itself. Inert today; placed in arc42 §11 and **coupled to I-9**, because a conforming
+  programmatic `db:migrate` must resolve a directory the build actually populates or the fix ships
+  broken.
+- **The test-engineer declined the pre-concession this design offered on derived ids**, for a reason
+  the design had not stated and which is better than the one it had. §3.4 adopts it and withdraws the
+  fallback. A round that produces only agreement is deference; this one produced a refusal that
+  improved the decision.
+- **Vitest parallelises files, not cases.** *"The suite parallelises"* was doing work it cannot do at
+  case granularity. §3.2 and §3.4 now rest on **attributability**, which is what per-case namespaces
+  actually buy and which is load-bearing for §4.4's count assertion regardless of concurrency.
+
+## 0.1 The rules from 00a, and this design's compliance
+
+00a ended with two rules in the design record. Both bind here, and this round added the
+generalisation that sits behind the second (00a §5, *"the second rule this slice keeps
+rediscovering"*, amended 2026-09-04).
 
 > **Rule 1 — a green thing says nothing about what it examined.** Every assertion about a result must
 > be preceded by an assertion about coverage.
 
 Applied in §4: the test file's **first** case is a catalogue assertion — the nine relations, the
-extension, and all seven named constraints on `appointment` with their types and their definitions —
-and the AC cases are only evidence *given* that it passed. Applied again inside AC-3 and AC-4, where
-a "success" case is worthless unless the fixture is first proved capable of conflicting (§4.3, §4.4).
+extension, and all seven named constraints on `appointment` compared **by equality** against their
+normalised definitions — and the AC cases are only evidence *given* that it passed. Applied again
+inside every negative case, where a rejection is worthless unless the fixture is first proved
+bookable in every other respect (§4.6), and inside AC-3 and AC-4, where a success is worthless unless
+the fixture is first proved capable of conflicting (§4.4, §4.5).
+
+**T-4 is what happens when the rule is applied one level too shallow.** The first draft asserted
+constraint *names* and *types* and called that coverage. It was coverage of the wrong thing: it
+proved the objects existed, not that they were keyed on the columns that make them the invariant.
 
 > **Rule 2 — a stated mechanism nobody ran is not a mechanism.** Four of the architect's own causal
 > sentences in 00a were confident and wrong.
@@ -40,13 +93,33 @@ a "success" case is worthless unless the fixture is first proved capable of conf
 Applied by measuring. **Everything in §11.1 was executed by the architect on 2026-09-04** against
 `postgres:16` in a throwaway container, using this repository's pinned `pg@8.23.0` and
 `node-pg-migrate@9.0.0`. Nine of the claims this design would otherwise have asserted are measured
-facts; four remain labelled **assumed, not measured**, in §11.2. One of the measurements caught a bug
+facts; the rest are labelled **assumed, not measured**, in §11.2. One of the measurements caught a bug
 in the architect's own probe fixture before it became a sentence in this document, which is the
 mechanism working as intended.
 
 A caveat that rule 2 requires of the measurements themselves: they were made with `psql` and a
 `pg.Client`, **not** through this repository's harness. They establish what PostgreSQL does. They do
 not establish that the harness reaches it — that is what step 3 and step 4 are for.
+
+**And rule 2 was not enough.** Step 2 found three more false causal sentences in *this* document
+(T-6, I-8, and the parallelism claim), all written after rule 2 was quoted at the top of it. With
+00a's F1 that is four instances of one shape, and the generalisation is now recorded in 00a §5 rather
+than here:
+
+> **For a discrimination claim, name the mutant. For a mechanism claim, name the call site.**
+>
+> Each of the four explained why something works by naming a mechanism's **capability** instead of its
+> **configuration** or its **discriminating case**. `depcruise` *can* fail to open a directory —
+> unchecked against the `mkdirSync` that creates it. `node-pg-migrate`'s `db.query` *does* print a
+> caret — unchecked against the `log: () => {}` that swallows it. A range type *has* two bounds —
+> unchecked against a mutant that separates them. Vitest *is* parallel — unchecked at what
+> granularity.
+
+What makes that uncomfortable rather than merely instructive is that **this design already contains
+the technique, correctly applied**: §2's proof that `[)` and `(]` are indistinguishable names the
+discriminating case and shows there is none. The method was present, used on the constraint, and not
+turned on the document's own test steps. **An attention asymmetry, not a knowledge gap** — which is a
+harder thing to fix with a rule and the reason it is written down rather than resolved.
 
 ---
 
@@ -73,9 +146,15 @@ already makes, ending with `pgmigrations` holding `0001_extensions`, `0002_refer
 the call `globalSetup` makes — each migration is wrapped in **its own** transaction, so a failure in
 `0003` leaves `0001` and `0002` **committed and recorded**. Under the **CLI** — which is what
 `npm run db:migrate` invokes — `--single-transaction` defaults to `true`, so the same failure rolls
-back all three. Both measured (§11.1 M-4, M-5). One file would make the two entry points agree
-trivially; three files make them disagree on partial failure. See §11.3 for the ruling on that
-divergence, which is *not* to change the harness in this slice.
+back all three. Both measured (§11.1 M-4, M-5). One file would make the two paths agree trivially;
+three files make the difference observable.
+
+**That difference is not a property of the split — it is ADR-0007 conformance drift, and the step-1
+draft framed it wrongly (I-9).** ADR-0007 requires the runner to be invoked *programmatically on both
+paths*; `package.json:18` is the CLI binary, which is where the differing default comes from. The
+split is not the cause and changing it would not be the fix. See §10.2 for the correction and §11.3
+for the deferral, which rests on there being no cheap fully-conforming remedy — **not** on the cost of
+editing the harness.
 
 ### 1.2 Four mechanical facts about `.sql` migrations, measured
 
@@ -113,8 +192,8 @@ arc42 §7.2). So the three migrations land in **one implementer commit**, roughl
 — inside `CLAUDE.md` §7's ~150-line guidance, and indivisible in any case: a schema with a foreign
 key to a table that does not exist is not a smaller change, it is a broken one.
 
-This raises the value of the implementer running the suite locally before pushing, which §8.3 makes
-a step-2 action rather than a hope.
+This raises the value of the implementer running the suite locally before pushing — which §8.2 now
+makes the stated step-4 loop rather than a hope, A-4 having closed.
 
 ---
 
@@ -203,7 +282,7 @@ Three alternatives were considered and each fails on something concrete:
 
 | Option | Why not |
 |---|---|
-| **`0004_seed.sql`, a fourth migration** | It puts test fixtures into the schema history that ADR-0007 makes immutable, and — decisively — it gives the whole suite **one** dealership. arc42 §7.2 isolates by data precisely so the suite can run in parallel and so every test implicitly asserts A-9's scoping. A single shared fixture removes both and re-serialises the suite |
+| **`0004_seed.sql`, a fourth migration** | It puts test fixtures into the schema history that ADR-0007 makes immutable, and — decisively — it gives the whole suite **one** dealership. arc42 §7.2 isolates by data so that a row is attributable to the case that wrote it and so every test implicitly asserts A-9's scoping. A single shared fixture removes both, and §4.4's count assertions stop meaning anything |
 | **A loader module under `src/persistence/seed/`** | `outside-in-tests-do-not-import-src` forbids `tests/support/` from importing it, and `guard-paths.mjs` denies the test-engineer even *reading* `src/`. The fixtures the suite books against would be authored and owned by the role whose work they are meant to check |
 | **A checked-in `.sql` fixture under `src/`, executed by path** | Evades the import rule the way §8.5's `dependency-cruiser` precedent allows, but leaves the test-engineer executing a file it is forbidden to read. Independence is a read restriction as much as a write one |
 
@@ -231,6 +310,15 @@ slice with any data at all — so this is where 00a's stated-but-unexercised rul
 returned ids. AC-1 to AC-8 each get their own known starting state that way, and the "known" part is
 that the loader **returns** every id rather than the test discovering one. No test may write
 `select id from service_bay limit 1`; a fixture found by query is a fixture shared by accident.
+
+**What per-case namespaces buy is attributability, not concurrency, and the difference matters.**
+Vitest parallelises **files**, not cases: the nine cases in
+`tests/integration/exclusion-constraints.test.ts` run sequentially in one worker unless they are
+explicitly marked concurrent, and they are not. So across files a namespace buys disjointness; *within*
+this file it buys something the design depends on more heavily — **every row in the table is
+attributable to the case that wrote it.** §4.4 step 6 counts non-cancelled rows in `bayA` across a
+window, and that count is only a claim about AC-3 because no other case in the file can have written
+into that bay. Nothing here rests on the suite being parallel, and the step-1 draft said it did.
 
 **No transactions, no rollback, no cleanup.** Rows accumulate for the life of the run and die with
 the container. A test that wrapped its case in a rolled-back transaction would be asserting the
@@ -270,26 +358,36 @@ with dealership 1's bay.
 
 AC-9 requires the fixtures to be loadable into an empty database and the suite to "book against them
 deterministically". Two readings pull apart at the level of the id: fixed literal UUIDs are
-reproducible but collide across parallel cases; `randomUUID()` isolates but makes a failure message
+reproducible but collide across cases; `randomUUID()` isolates but makes a failure message
 different on every run.
 
 **Decision: ids are derived, not random and not literal.** `tests/support/ids.ts` exposes
 `uuidFor(namespace, name)` — a SHA-1 of `` `${namespace}/${name}` ``, truncated to sixteen bytes with
 the version and variant nibbles set, formatted as a UUID. Same for `vinFor`, since `vehicle.vin`
-carries a **global** `UNIQUE` and two parallel cases seeding a literal VIN would collide with `23505`
-(§11.2 A-3 — the collision is deduced from the schema, not observed).
+carries a **global** `UNIQUE` and two cases seeding a literal VIN would collide with `23505` (§11.2
+A-3 — the collision is deduced from the schema, not observed).
 
-That buys both properties: disjoint subtrees across cases, and ids that are a pure function of the
-case's own name, so a failure message names the same UUID on every run and in every log.
+That buys disjoint subtrees across cases, and ids that are a pure function of the case's own name.
+
+**The reason this is not a taste question is the test-engineer's, not the architect's.** The step-1
+draft called derived ids a legibility choice, pre-conceded `randomUUID()` as an acceptable fallback,
+and invited an objection. **The objection came, and it refused the concession** on a ground the draft
+had not stated:
+
+> In a suite that isolates by data with **no cleanup**, the UUID is the only handle on which subtree a
+> failing row belongs to.
+
+That is an argument about diagnosing a failure, not about reading one. Rows from all nine cases sit
+in one table for the life of the run; when a count assertion fails, the ids in the failure message are
+the only thing that says which rows were the case's own — and with `randomUUID()` they say nothing,
+are not recomputable offline, and differ on every run. **The pre-concession is withdrawn**:
+`randomUUID()` is no longer an acceptable fallback, and the reason above replaces the one the draft
+gave. Recorded at this length because the architect invited an objection and received a reasoned
+refusal that improved the decision, which is `CLAUDE.md` §6 point 3 working rather than a formality.
 
 **No `ON CONFLICT DO NOTHING` anywhere in the loader.** Two cases sharing a namespace must fail
 loudly on `dealership_pkey` rather than silently sharing a fixture, because a silently shared fixture
 is exactly how a vacuous pass is manufactured.
-
-**Honest about strength:** this is a legibility and reproducibility choice, not a correctness one.
-`randomUUID()` would be correct, because no test hard-codes an id — they all come from the return
-value. It costs about twenty lines. If the test-engineer objects at step 2 with a reason, the
-fallback is acceptable and the design does not defend it further.
 
 ### 3.5 What AC-9 asserts
 
@@ -302,9 +400,10 @@ count scoped as tightly as the table allows:
 - `dealership`, `service_type`, `customer`, `vehicle` — scoped by the returned ids, exact counts.
 
 **`service_type`, `customer` and `vehicle` are not dealership-scoped**, so §7.2's isolation-by-data
-is genuinely partial: parallel cases share those three tables. That is safe — none of them carries a
-constraint two seeds can collide on except `vehicle.vin`, handled above — but it is a real limit on
-the isolation rule and it should be recorded as such rather than implied away.
+is genuinely partial: every case's rows land in those three tables side by side. That is safe — none
+of them carries a constraint two seeds can collide on except `vehicle.vin`, handled above — but it
+means an assertion over those three tables must scope by returned id and never by table-wide count,
+and it is a real limit on the isolation rule rather than something to imply away.
 
 *"The suite can book against them deterministically"* is asserted by the same case performing one
 successful `INSERT` into `appointment` using only returned ids, and reading it back.
@@ -336,23 +435,62 @@ The first case asserts the schema under test **is** §8.1's schema, from the cat
 
 - `pg_extension` contains `btree_gist`;
 - `to_regclass` resolves all nine relations of §8.1;
-- `pg_constraint` on `appointment` contains, **by name and by `contype`**: `no_bay_overlap` (`x`),
-  `no_technician_overlap` (`x`), `appointment_interval_ordered` (`c`),
-  `appointment_technician_qualified` (`f`), `appointment_bay_in_dealership` (`f`),
-  `appointment_technician_in_dealership` (`f`), `appointment_vehicle_owned_by_customer` (`f`);
-- and `pg_get_constraintdef` for the two exclusion constraints contains `tstzrange(starts_at,
-  ends_at)`, `&&`, and the partial predicate.
+- and for **each of the seven** named constraints on `appointment`, the full normalised
+  `pg_get_constraintdef(oid)` is compared **by equality** against an expected string:
+  `no_bay_overlap`, `no_technician_overlap`, `appointment_interval_ordered`,
+  `appointment_technician_qualified`, `appointment_bay_in_dealership`,
+  `appointment_technician_in_dealership`, `appointment_vehicle_owned_by_customer`.
 
-**Assert against the normalised text, not the source text.** PostgreSQL re-renders a constraint
-definition: `WHERE (status <> 'cancelled')` comes back as
-`WHERE ((status <> 'cancelled'::appointment_status))`, with the cast added and the parentheses
-doubled (§11.1 M-3). A substring assertion written from the migration source would fail on a correct
-schema.
+**Equality, not substrings, and not `conname` plus `contype` — this is T-4.** The step-1 draft
+asserted names and constraint types and called that coverage. It is not: a `no_bay_overlap` keyed on
+`dealership_id WITH =` instead of `bay_id WITH =` has the right name, the right `contype`, and a
+definition containing `tstzrange(starts_at, ends_at)`, `&&` and the partial predicate. It passes every
+substring the draft specified. It then **passes all of AC-3** — the overlapping control is rejected,
+both adjacencies are accepted — because within one dealership a bay-keyed and a dealership-keyed
+constraint are behaviourally identical for every row AC-3 writes. The only case that separates them is
+AC-2, and it separates them only because PostgreSQL happened to report one of two simultaneously
+violable constraints, which **§11.2 A-2 says is not guaranteed**. On this design's own terms, nothing
+caught it.
 
-**What case 0 is and is not.** It proves the objects **exist and are shaped right**. It proves
-nothing about whether they **fire** — arc42 §8.2's own consequence 3, and QS-10's *"a ruleset that
-has never rejected anything is not evidence"* pointed at the database. Cases 1 to 8 prove firing;
-case 0 is what stops a green case 3 or case 9 meaning "there is no constraint here at all".
+The same gap covers the composite foreign keys: `contype = 'f'` cannot see whether
+`appointment_bay_in_dealership` references `service_bay (id, dealership_id)` or some other table's
+matching pair. Equality on the rendered definition closes both classes with one mechanism.
+
+Three requirements on how it is written, each of which decides whether the remedy works:
+
+1. **The expected strings are hand-written literals, transcribed from arc42 §8.1 and §8.2 — never
+   captured from the database under test.** A snapshot taken from the running schema asserts that the
+   schema equals itself, which is §6's own fixture rule turned against the architect's remedy.
+2. **Assert against the *normalised* text.** PostgreSQL re-renders a definition:
+   `WHERE (status <> 'cancelled')` comes back as
+   `WHERE ((status <> 'cancelled'::appointment_status))`, with the cast added and the parentheses
+   doubled; `CHECK (ends_at > starts_at)` comes back as `CHECK ((ends_at > starts_at))` (§11.1 M-3).
+   Literals transcribed from the migration source without that normalisation fail on a correct schema.
+3. **The failure message prints expected and actual in full.** A `pg_get_constraintdef` mismatch
+   shown as a truncated diff is unreadable, and an unreadable failure on the one artifact the
+   submission rests on is close to no failure at all.
+
+**The trade, judged rather than inherited.** Equality on rendered catalogue text is fragile against a
+PostgreSQL major-version bump, and the test-engineer accepted that fragility explicitly. The architect
+accepts it too, for a reason narrower than deference: the fragility is **bounded by two things already
+in the repository** — the image is pinned to `postgres:16`, and `tests/integration/postgres-harness.test.ts`
+already asserts `server_version` matches `^16\.`. A rendering change on a bump therefore fails seven
+assertions loudly, once, in the same commit as the bump, with the diff naming exactly what moved. That
+is a good failure. The alternative considered and rejected was reading `pg_constraint.conkey`,
+`confrelid` and `confkey` and resolving to column names: version-stable, but it needs three different
+mechanisms for exclusion constraints, foreign keys and checks, and **still** falls back to `pg_get_expr`
+for the range expression and the partial predicate. One mechanism covering all seven wins.
+
+**What case 0 is, and the limit of it.** It proves the seven **named** constraints are exactly right,
+and it proves nothing about whether they **fire** — arc42 §8.2's own consequence 3, and QS-10's *"a
+ruleset that has never rejected anything is not evidence"* pointed at the database. Cases 1 to 8 prove
+firing.
+
+It also proves nothing about **what else is in the schema**: an extra constraint, a missing `NOT
+NULL`, a wrong column type. Closing that would mean snapshotting the whole `\d` output, which is
+rejected — it is brittle against every unrelated change and would be edited into uselessness within
+three slices. The limit is stated so the next reader does not mistake case 0 for a whole-schema
+guarantee.
 
 ### 4.2 The isolation rule, which is where this file is most likely to go wrong
 
@@ -374,8 +512,35 @@ Three rules follow, and they are not stylistic:
    AC-4's overlapping control rows must use a **different technician** for the same reason.
 2. **Assert the constraint name, never merely the SQLSTATE.** `23503` is produced by four different
    constraints on this table; the name is the only thing that says which requirement was enforced.
-3. **A negative case's fixture must be valid in every other respect**, so that a green result cannot
-   be explained by a second, unintended violation.
+3. **A negative case's fixture must be proved valid in every other respect — by a positive control,
+   not by inspection.** This was a prose promise in the step-1 draft and is now an assertion; §4.6
+   specifies it, and T-5 below is why the promise was not enough.
+
+**Case 0 is a precondition of this section, not a companion to it — and that is T-4's real
+lesson.** Every rule above reasons about which constraints a *fixture* can trip, and every one of them
+silently assumes the constraints are keyed on the columns §8.1 names. They are not self-supporting: a
+wrongly-keyed constraint makes rule 1 unsatisfiable while looking satisfied, because the test has no
+way to know which columns it is isolating against. Stated plainly, because it is the kind of mistake
+that recurs:
+
+> **The isolation discipline presupposed the correctness it was supposed to help establish.**
+
+Case 0 by equality is what supplies that presupposition. Cases 1 to 8 are evidence only *given* case
+0, and the file's ordering should make that legible: if case 0 fails, nothing after it means anything.
+
+**A maintenance obligation follows, and it is a feature.** Case 0 is arc42 §8.1 and §8.2 restated in
+the catalogue's own vocabulary, so **when either section changes, case 0 changes in the same commit.**
+That is not an inconvenience to be engineered away; it is the coupling that makes the two documents
+verifiably the same schema.
+
+**T-5 — the isolation rule was enforced unevenly, and the unevenness was arbitrary.** Rules 1 and 3
+were, until step 2, enforced by nothing but care. The test-engineer showed why that is worse than it
+looks: when **two foreign keys** are violable at once, PostgreSQL reports one of them, and which one
+follows **trigger firing order, which follows declaration order in `0003_appointment.sql`.** So a
+drifted AC-5 fixture passes silently while the identical drift in AC-6 fails loudly, and the
+difference is nothing but the order the constraints happen to be listed in. A discipline whose
+enforcement depends on an arbitrary ordering is not a discipline; §4.6's positive controls replace it
+with an assertion.
 
 ### 4.3 AC-1, AC-2 — the two exclusion constraints
 
@@ -411,15 +576,27 @@ fourth). The required order:
    `no_bay_overlap`. This is the step that makes AC-3 falsifiable: it proves the constraint is live
    for *this bay* and *this neighbour*, so the adjacency result that follows is about adjacency.
 4. **The criterion.** Insert `[anchor+1h, anchor+2h)` in `bayA`. It succeeds. Read it back.
-5. **The other boundary.** Insert `[anchor-1h, anchor+0h)` in `bayA`. It succeeds. Read it back.
-6. Assert three non-cancelled rows now exist in `bayA` across `[anchor-1h, anchor+2h)`.
+5. **The same claim, in the other insertion order.** Insert `[anchor-1h, anchor+0h)` in `bayA`. It
+   succeeds. Read it back.
+6. **Coverage for steps 4 and 5.** Assert three non-cancelled rows now exist in `bayA` across
+   `[anchor-1h, anchor+2h)` — three inserts, three rows, no silent no-ops.
 
-Step 5 is not redundant with step 4: a range type is defined by two bounds and testing one of them is
-half the claim. Step 6 is the coverage assertion for steps 4 and 5 together — three inserts, three
-rows, no silent no-ops.
+**Step 5 is redundant with step 4, and that was checked rather than assumed (T-6).** The step-1 draft
+justified it as *"a range type is defined by two bounds and testing one of them is half the claim"*,
+which conflates the range expression's two bounds with the test's two rows. Both rows are produced by
+the **same** expression and `&&` is symmetric, so `upper(neighbour) = lower(new)` and
+`upper(new) = lower(neighbour)` are one predicate with the operands swapped. Against the closed-range
+mutant this section itself names, **both steps reject**; no mutant was found that step 5 catches and
+step 4 does not, including the asymmetric buffer mutants A-4 will eventually produce.
 
-Per §2, what this establishes is that the range is **not closed**. It cannot distinguish `[)` from
-`(]`, and the test's own message should not claim otherwise.
+It is kept, **demoted from a criterion to part of step 6's coverage**: three rows is a stronger count
+assertion than two, and step 5 exercises the seed's anchor arithmetic in the negative direction. It is
+not kept under a second invented reason. A measured negative result recorded in the design is worth
+more than a step quietly deleted; a step retained under a fresh justification is worth less than
+nothing.
+
+Per §2, what steps 4 and 5 establish is that the range is **not closed**. They cannot distinguish `[)`
+from `(]`, and the test's own message must not claim otherwise.
 
 ### 4.5 AC-4 — the partial predicate
 
@@ -452,16 +629,53 @@ AC-7's AC says only "rejected"; the design fixes the assertion at `23503` on
 constraints and would not be evidence for A-9. **Measured:** all three fire as specified with these
 fixtures (§11.1 M-2).
 
+#### Every negative case carries a positive control, and the order is not optional
+
+**This is T-5's remedy and it is the amendment most likely to be built wrong. Read the ordering rule
+before writing the case.**
+
+Each of AC-5, AC-6, AC-7 and AC-8 gains a **positive-control sibling**: the same row with the single
+intended defect repaired, asserted to **succeed** and read back. That is what turns §4.2's rule 3 from
+a promise about the fixture into an assertion about it — without it, a fixture that drifts into a
+second violation still reports the expected name whenever trigger order happens to favour it, and the
+case passes while proving something else.
+
+This is symmetry rather than an addition. §4.3 already reads the first row back, §4.4 has its negative
+control, §4.5 has its before-and-after pair. AC-5, AC-6 and AC-7 were the three that got prose
+instead.
+
+> ### The ordering rule
+>
+> **The negative case runs FIRST. The positive control runs after it, or in a disjoint interval.**
+>
+> The reason is §11.1 **M-2**: the exclusion constraints are evaluated **before** the foreign-key
+> triggers. A positive control run first **succeeds and occupies the interval**, so the negative
+> insert that follows it hits `23P01` on `no_bay_overlap` or `no_technician_overlap` instead of the
+> `23503` the case exists to assert. The control would break the very case it was added to validate,
+> and the failure would look like a schema defect rather than a test-ordering defect.
+>
+> A control in a disjoint interval is equally correct and sometimes clearer. What is never correct is
+> a control that precedes its negative sibling in the same interval on the same resources.
+
 ### 4.7 AC-8 — the interval ordering
 
 Two cases, both in an empty window: `ends_at = starts_at`, and `ends_at < starts_at`. Both must be
-rejected with `code === '23514'` and `constraint === 'appointment_interval_ordered'`.
+rejected with `code === '23514'` and `constraint === 'appointment_interval_ordered'`. Both carry a
+positive control under §4.6's rule — the same row with a valid interval, asserted to succeed.
 
 The inverted case had a plausible alternative outcome worth naming: `tstzrange(x, y)` with `y < x`
 raises `22000` *"range lower bound must be less than or equal to range upper bound"*, and if the
 exclusion index were evaluated before the CHECK, AC-8 would fail with the wrong SQLSTATE. **Measured
 as `23514` / `appointment_interval_ordered` in all three variants tried, including one that also
 violated a foreign key** (§11.1 M-1). The CHECK wins.
+
+**And that measurement, read correctly, makes AC-8 the case that needs its positive control most —
+which is the reverse of how the step-1 draft read it.** The draft recorded CHECK precedence as
+reassuring. It is not. Because a `CHECK` fires before every foreign key and before both exclusion
+constraints, **a drifted AC-8 fixture that also names an unqualified technician, a foreign bay and a
+mismatched vehicle still reports `23514` / `appointment_interval_ordered`.** The reported name masks
+every other defect the row carries, so AC-8's assertion is the **least** attributable of the nine. Its
+positive control is the only thing that establishes the rest of that row was ever bookable.
 
 ---
 
@@ -639,23 +853,40 @@ results at all**.
 
 Three things follow, in the order they should be tried:
 
-1. **The implementer should run the `db` project locally before pushing.** 00a §11.5 records that
-   *"`docker` and `podman` are both absent"* for both roles. **That is now contradicted by
-   measurement:** on 2026-09-04 the architect's own shell reached a working Docker daemon and started
-   `postgres:16`. Whether the implementer's and the test-engineer's shells can do the same has **not**
-   been measured (§11.2 A-4). **Action at step 2: both roles run `docker info` and report the
-   result.** It is one command, and for a slice that is nothing but database it changes the whole
-   inner loop — the difference between TDD and CI round-trips.
-2. **If Docker is genuinely unavailable, the mitigation is commit discipline, not tooling.** §1.3
-   already fixes the migrations at one commit; the fallback if that commit's CI run aborts in
-   `globalSetup` is to read the runner's own error, which names the failing file and prints the
-   failing statement with a caret (`node-pg-migrate`'s `db.query` does this — read from the source).
-   The information is there; only the feedback latency is bad.
+1. **The step-4 loop is `npx vitest run --project db`, run locally before every push.** Not advice —
+   the stated loop. 00a §11.5 recorded that *"`docker` and `podman` are both absent"* for both roles,
+   and the step-1 draft inherited it as an open assumption. **A-4 is now closed: Docker works in all
+   three roles' shells, measured on 2026-09-04, and the `db` project completes in about 3.4 s.** So
+   the implementer sees a malformed migration in seconds, with the runner's own error in front of it,
+   and the CI round-trip stops being the inner loop. What this falsifies in 00a — and what it does
+   **not** — is recorded in arc42 §7.2 (§10.1).
+2. **If the loop is skipped and CI aborts in `globalSetup`, the fallback is `npm run db:migrate`
+   against the compose stack — not the CI log.** The step-1 draft said the fallback was to read the
+   runner's error, *"which names the failing file and prints the failing statement with a caret"*.
+   **That is false, and it is I-8.** `tests/setup/postgres.ts:68` passes `log: () => {}`, which
+   swallows the `logger.error` carrying both. What actually reaches the CI log is the raw
+   `DatabaseError` — a SQLSTATE, a `position`, and `file: 'scan.l'`, which is PostgreSQL's *own*
+   lexer source and not a migration — under a headline of `No test files found`. **No migration
+   filename appears anywhere.** The architect read the caret-printing code in `db.js` and did not read
+   the call site, having quoted that call site earlier in the same session.
+
+   `npm run db:migrate` invokes the **CLI**, whose logger is not silenced, so it is expected to print
+   what `globalSetup` swallows. That expectation is **assumed, not measured** (§11.2 A-6): the CLI's
+   failure output was observed today, but not checked for the migration filename specifically. **Step
+   4 measures it in one command before relying on it.** Stating it as fact would be the fourth
+   instance of the shape §0.1 records.
 3. **`globalSetup` must not catch the migration error.** Wrapping the runner in a `try`/`catch` that
    provides an error message to the tests would convert a loud, correct failure into a run where
    every case fails for a laundered reason, and it would put a branch into a test-engineer-owned file
    whose purpose is to have none. 00a rejected substituting an evidence chain for an observation;
-   this is the same move. **Rejected.**
+   this is the same move. **Rejected — and the implementer, who raised I-8, agrees with the
+   rejection.** It asked only that this section say what the failure actually yields.
+
+**Why `log: () => {}` is not changed here**, since I-9 has just demolished the seam-promise argument
+for a different file. `tests/setup/postgres.ts` is genuinely test-engineer-owned, editing it genuinely
+spends 00a's seam promise on the slice whose failure-attribution depends on nothing else moving, and
+with A-4 closed the fallback is now rarely reached at all. That reasoning holds where I-9's did not.
+It is recorded as a deferred improvement in §11.3.
 
 ### 8.3 What must not be changed
 
@@ -707,26 +938,55 @@ way that observation is credible, and it is the mirror image of *"no counting UN
 
 ### 10.1 Edits at step 7, inside the slice's declared scope
 
-The slice's `arc42:` field is **§8.1 · §8.2**, and R-11 is an open finding against exactly the
-failure of editing outside a declared scope. So:
+**The human widened the slice's `arc42:` field to §8.1 · §8.2 · §7.2 · §11 on 2026-09-04**, on the
+reasoning that arc42 currently contradicts an immutable ADR with nothing recording it (I-9), and that
+leaving the source of truth knowingly wrong across a human gate is worse than a widened scope. R-11 is
+an open finding against editing *outside* a declared scope; all four sections below are inside it.
 
 | Section | Correction |
 |---|---|
 | **§8.1** | An as-built note recording that the schema applies verbatim on `postgres:16` (dated, with what was run); **§6.2's transitive-reference table**, so the three columns without a singleton FK read as complete rather than missing; **§6.3 — three of the four composite keys are unreachable from the API surface**, which is why they can only be tested here; `appointment.id` having no default and `btree_gist` therefore remaining the only extension; `updated_at` maintained by the writer with no trigger, and the obligation that puts on ADR-0003's `UPDATE` |
 | **§8.2** | The **measured constraint-evaluation order** — CHECK, then index-based, then FK triggers — and its consequence for any test asserting a specific SQLSTATE; the normalised `pg_get_constraintdef` text a catalogue assertion must match; consequences 5 and 6 confirmed with the measured `btree_gist` version and the two partial GiST index definitions; **and a refinement of consequence 1**: adjacency discriminates `[)` from `[]` and provably cannot discriminate `[)` from `(]`, so the half-open claim is stated at the strength the evidence supports |
 
-### 10.2 Two edits this design wants and may not make
+### 10.2 §7.2 and §11 — I-9, and a defect in the architect's own 00a reconciliation
 
-Both are outside `§8.1 · §8.2`. They are named here so the orchestrator can widen the slice's
-`arc42:` field at step 2 if the human agrees, and the design proceeds unchanged if it does not:
+The step-1 draft asked for *"one sentence recording the measured `singleTransaction` divergence"* and
+framed it as two entry points with different natural defaults whose remedy would cost an edit to a
+test-engineer-owned file. **Both halves of that were wrong, and the correction is larger than the
+finding as raised.**
 
-- **§7.2** — one sentence recording the measured `singleTransaction` divergence between
-  `npm run db:migrate` (CLI, all-or-nothing) and `globalSetup` (programmatic, per-migration). §7.2
-  already narrows its claim to *"the same package, the same directory and the same `pgmigrations`
-  table"* and warns that a CLI-only flag would diverge silently. This is that warning coming true,
-  measured, one slice later — it belongs beside the warning.
-- **§11** — two debt items: the divergence above, whose remedy is one option flag; and `updated_at`
-  having no trigger and therefore an obligation on every future `UPDATE`.
+**ADR-0007's Decision says the runner is invoked programmatically *"both by `npm run db:migrate`
+against the local compose stack and by the Testcontainers fixture"*. `package.json:18` is the CLI
+binary.** That is not a divergence between two legitimate entry points; it is **conformance drift from
+an accepted, immutable ADR**. The remedy therefore sits entirely on the non-test-owned side —
+`package.json` and wherever a programmatic runner would live — so the seam-promise argument for
+deferring it never applied.
+
+**And the part the finding did not reach.** arc42 §7.2 *already records the drift*, at 00a step 7, and
+frames it as arc42 having overstated its own phase-2 wording. But ADR-0007 makes the same claim, and
+ADRs are immutable. So **the architect's own as-built pass narrowed, in arc42, a claim an accepted ADR
+still asserts** — leaving the *"single source of truth for architecture"* (`CLAUDE.md` §4) quietly
+contradicting an immutable decision, with nothing recording that it had. That is a defect in the
+reconciliation, not a documentation nit, and it is the reason the human widened the scope rather than
+letting it wait for slice 01.
+
+| Section | Correction |
+|---|---|
+| **§7.2** | **Name ADR-0007.** The existing as-built paragraph states the fact and calls it arc42 overstating; it must say that the CLI entry point *contradicts ADR-0007's Decision*, that the ADR is immutable, and that arc42 narrowing it unilaterally was the wrong repair. Plus the measured partial-failure consequence (CLI all-or-nothing, programmatic per-migration). **And A-4's closure**: Docker works in all three shells, falsifying 00a §11.5's *"no container runtime on either role's machine"*. The two-project split stays correct on its own merits — a database-less subset is worth having regardless — but **its stated justification does not**, and the operative meaning of *"every implementer commit is green"* recovers its plain sense for this slice |
+| **§11** | Two coupled debt items under one heading, since the coupling is the point: **(1)** the ADR-0007 conformance drift, named as such, with the recommendation below; **(2)** `tsc` emits only `.ts`, so `dist/persistence/` holds no migrations and the built artifact cannot migrate itself. Inert today — both migration paths read `src/persistence/migrations/` from disk and `dist/main.js` never migrates — and it becomes real the day a Dockerfile exists. **A conforming programmatic `db:migrate` must resolve a directory the build actually populates, or the fix for (1) ships broken in the built artifact.** Also `updated_at` having no trigger and therefore an obligation on every future `UPDATE` |
+
+**The deferral is held, on the corrected ground, and the eventual close is stated so it is not
+re-argued.** There is no cheap fully-conforming fix: passing `singleTransaction: true` in
+`globalSetup` makes the *behaviour* agree while leaving the ADR's wording violated and edits a
+test-owned file; making `db:migrate` programmatic means a runner module, a location decision and an
+ownership question — real work in a slice whose job is the invariant. Meanwhile the drift is invisible
+on every successful migration and loud on every failed one (M-4, M-5), so nothing is at risk while it
+stands.
+
+**Recommendation: conform `db:migrate`. Do not supersede ADR-0007.** Superseding an accepted decision
+to legitimise a drift that was never argued for is the worse precedent, and the ADR's underlying
+requirement 3 — in-process, no shelling out to a binary that may not be on the path — is the right
+requirement.
 
 ### 10.3 ADR-0012 — seed fixtures, `status: proposed`
 
@@ -781,16 +1041,19 @@ on the person who wrote the rule.
 | # | Assumption | Why it is not measured, and what depends on it |
 |---|---|---|
 | **A-1** | How Vitest's JSON reporter represents a `beforeAll` failure — whether it produces a `testResults[]` entry `red-proof` can classify | Not measured, and **the design does not depend on it**: §4 forbids schema work in `beforeAll` precisely so the question never arises. If it arises anyway, measure it before reasoning about it |
-| **A-2** | Which exclusion constraint is reported when both are violable | Observed once as `no_bay_overlap` (M-2). That is index order and PostgreSQL does not document a guarantee, so §4.2 requires each case to make exactly one constraint violable rather than relying on the observation |
-| **A-3** | That two parallel seeds with a literal VIN would collide on `vehicle.vin`'s `UNIQUE` | Deduced from the schema, not observed. §3.4's derived VIN makes it moot |
-| **A-4** | Whether the implementer's and the test-engineer's shells can reach a Docker daemon | The architect's can (§8.2). The other two are a different sandbox and were reported absent at 00a. **One `docker info` each at step 2 settles it** |
+| **A-2** | Which exclusion constraint is reported when both are violable | Observed once as `no_bay_overlap` (M-2). That is index order and PostgreSQL does not document a guarantee, so §4.2 requires each case to make exactly one constraint violable rather than relying on the observation. **T-4 turned this from a caveat into a load-bearing fact**: it is why AC-2 could not be relied on to catch a wrongly-keyed constraint, and therefore why case 0 asserts by equality |
+| **A-3** | That two seeds with a literal VIN would collide on `vehicle.vin`'s `UNIQUE` | Deduced from the schema, not observed. §3.4's derived VIN makes it moot |
+| **A-4** | ~~Whether the implementer's and the test-engineer's shells can reach a Docker daemon~~ | **CLOSED at step 2, 2026-09-04.** Docker works in all three roles' shells; the `db` project runs in about 3.4 s. This falsifies 00a §11.5's *"no container runtime on either role's machine"*. §8.2's mitigation 1 is promoted to the stated step-4 loop and arc42 §7.2 records what it does and does not falsify in 00a. Struck rather than deleted: a closed assumption that vanishes leaves no evidence it was ever open |
 | **A-5** | That the planner *chooses* the partial GiST indexes for the availability query (§8.2 consequence 6) | Index definitions are measured; plan selection is not, and belongs to QS-14, not here |
+| **A-6** | That `npm run db:migrate` — the CLI, whose logger is not silenced — names the failing **migration file** on a malformed statement | The CLI's failure output was observed today; it was not checked for the filename specifically. §8.2's mitigation 2 rests on it, so **step 4 measures it in one command before relying on it.** Asserting it would be the fourth instance of the shape §0.1 records, in the section written to correct the third |
 
 ### 11.3 Deferred, with the reason
 
 | Item | Why not now |
 |---|---|
-| **Passing `singleTransaction: true` in `globalSetup`**, so both entry points agree on partial failure | It is one line and it is right, but it edits `tests/setup/postgres.ts` and breaks 00a's seam promise (§8.3) on the slice where that promise is load-bearing for attributing a failure. The divergence only bites on a broken migration, and both paths fail loudly. §10.2 proposes it as a §11 debt item |
+| **Conforming `npm run db:migrate` to ADR-0007** — the runner invoked programmatically on both paths | **This is the correct framing, and the step-1 draft's was wrong (I-9).** It is not a `singleTransaction` flag on a test-owned file; it is conformance drift from an immutable ADR whose remedy is entirely on the non-test-owned side. Deferred because there is no cheap fully-conforming fix and the drift is invisible on success and loud on failure — not because of the seam promise, which never applied. Recorded in arc42 §11 naming ADR-0007, with the recommendation to conform rather than supersede (§10.2) |
+| **Replacing `log: () => {}` in `tests/setup/postgres.ts`**, so a malformed migration names its file | Here the seam-promise argument *does* hold: the file is genuinely test-engineer-owned and this is the slice whose failure-attribution depends on nothing else moving. With A-4 closed the fallback is rarely reached, and `npm run db:migrate` covers it (§8.2 mitigation 2). The implementer raised I-8 and did not ask for this fix |
+| **`dist/persistence/` holds no migrations**, because `tsc` emits only `.ts` | Inert today — both migration paths read `src/persistence/migrations/` from disk and `dist/main.js` never migrates. Recorded in arc42 §11 **coupled to the ADR-0007 item**, because a conforming programmatic `db:migrate` must resolve a directory the build actually populates or it ships broken |
 | **A test that exercises the down migrations** | ADR-0007 puts down migrations outside any recovery story; the DoD says migrations run **forward** from empty; no AC mentions them. M-7 records that they work today. A test would pin behaviour nothing depends on |
 | **The demo seed and `npm run db:seed`** | ADR-0012's second half, and not in this slice's *In scope*. It has a different consumer (the cURL harness, TC-5) and inventing it now would fix the demo narrative six slices early |
 | **An `updated_at` trigger** | §6.4. The obligation moves to the writer; a trigger is behaviour in the database beyond the invariant |
@@ -806,7 +1069,8 @@ recommendation the design proceeds on unless step 2 says otherwise.
    is not evidence for A-9. If the human intended something broader, this is the cheap moment.
 2. **AC-9's "deterministically" is undefined.** §3.4 reads it as *the fixture's shape and its
    name-to-id resolution are a pure function of the case*, not *the ids are fixed literals* — the
-   latter is incompatible with the parallel, isolate-by-data suite arc42 §7.2 requires.
+   latter is incompatible with the isolate-by-data suite arc42 §7.2 requires, and with the
+   attributability §3.2 depends on.
 3. **AC-9's "every reference table"** is read as all eight non-`appointment` relations, including
    `opening_hours`, which §8.1 describes as existing "because of a Gate A ruling" rather than as
    plain reference data. Seeding it costs nothing and ADR-0001 needs it from slice 01.

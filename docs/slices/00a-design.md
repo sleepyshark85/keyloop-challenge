@@ -748,6 +748,40 @@ measurement recorded with its date and its subject**, or an explicit **"assumed,
 third is honest and costs nothing — §11.5's step-3 refusal to claim which symptom an out-of-range
 compiler produces is exactly what it looks like, and step 4 then went and measured it (§11.5).
 
+#### The generalisation, added 2026-09-04 from slice 00 step 2
+
+> **Amendment.** This subsection is appended after 00a merged, from slice 00's step-2 round, because
+> the rule above turned out to be necessary and not sufficient. Slice 00's design quoted it at the top
+> of its own §0 and then produced **three more false causal sentences** — T-6, I-8, and a claim that
+> Vitest parallelises at case granularity. Recorded here rather than in slice 00's design because it
+> is a property of the rule, and the next slice should inherit the sharper form.
+
+The four instances — 00a's **F1** and slice 00's three — share a shape that the rule above does not
+name:
+
+> **Each explains why something works by naming a mechanism's *capability* instead of its
+> *configuration* or its *discriminating case*.**
+>
+> `depcruise` **can** fail to open a directory — unchecked against the `mkdirSync` that creates it.
+> `node-pg-migrate`'s `db.query` **does** print a caret — unchecked against the `log: () => {}` at the
+> call site that swallows it. A range type **has** two bounds — unchecked against a mutant that
+> separates them. Vitest **is** parallel — unchecked at what granularity.
+
+The operational form is two clauses and it is cheaper than measuring everything:
+
+> **For a discrimination claim, name the mutant. For a mechanism claim, name the call site.**
+
+*"This step is not redundant"*, *"this test would catch that"*, *"this rule fires"* are all claims
+about a **mutant**, and a claim about a mutant that does not name one is a guess. *"This prints the
+filename"*, *"this rejects the import"*, *"this runs before that"* are claims about a **call site**,
+and reading the library is not reading the call site.
+
+**Why this is written as an attention problem rather than a knowledge gap.** Slice 00's design already
+contained the technique, correctly applied: its §2 proves that `[)` and `(]` are indistinguishable by
+naming the discriminating case and showing there is none. The method was present, used on the
+constraint under test, and not turned on the document's own test steps. That is harder to fix with a
+rule than ignorance would be, which is why it is recorded plainly instead of being declared solved.
+
 ### The same failure mode in production: `lint:arch`
 
 O1's third consequence is the one that reaches past this slice, and it is why the remedy is not

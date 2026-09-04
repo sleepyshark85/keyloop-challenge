@@ -30,9 +30,10 @@ moment the first one has to exist.
 Four forces are in play, and no option satisfies all four:
 
 1. **`CLAUDE.md` §2.2 and arc42 §7.2 isolate by data, never by truncation.** Each test seeds its own
-   dealership and works only inside it, so the suite parallelises and every test is implicitly
-   asserting A-9's scoping. Truncating between tests would serialise the suite and make the slice-07
-   concurrency tests race the cleanup rather than each other.
+   dealership and works only inside it, so test *files* parallelise, every row is attributable to the
+   case that wrote it, and every test is implicitly asserting A-9's scoping. Truncating between tests
+   would serialise the suite and make the slice-07 concurrency tests race the cleanup rather than each
+   other.
 2. **`CLAUDE.md` §5 makes independence a *read* restriction.** `.claude/hooks/guard-paths.mjs` denies
    the test-engineer every read under `src/`, and `outside-in-tests-do-not-import-src` denies
    `tests/support/` the import edge. The role that writes the assertions cannot see the
@@ -71,8 +72,19 @@ Specifically:
   discovers a fixture by query; a fixture found by `select … limit 1` is a fixture shared by
   accident.
 - **Ids are derived, not random and not literal.** `uuidFor(namespace, name)` hashes the pair, so
-  ids are disjoint across cases *and* stable across runs — a failure message names the same UUID
-  every time. `vehicle.vin` carries a global `UNIQUE`, so the VIN is derived the same way.
+  ids are disjoint across cases *and* a pure function of the case's own name. `vehicle.vin` carries a
+  global `UNIQUE`, so the VIN is derived the same way.
+
+  **The reason is diagnostic, not cosmetic, and it is the test-engineer's rather than the
+  architect's.** The architect proposed derived ids on legibility grounds and pre-conceded
+  `randomUUID()` as an acceptable fallback. At slice 00 step 2 the test-engineer **declined the
+  concession**, on a ground the proposal had not stated: *in a suite that isolates by data with no
+  cleanup, the UUID is the only handle on which subtree a failing row belongs to.* Rows from every
+  case sit in one table for the life of the run; when an assertion over a bay or an interval fails,
+  the ids in the message are the only thing identifying which rows were that case's own — and under
+  `randomUUID()` they identify nothing, are not recomputable outside the run, and differ every time.
+  **The fallback is withdrawn.** Recorded because the refusal improved the decision, which is what
+  `CLAUDE.md` §6 point 3 exists to make possible.
 - **No `ON CONFLICT DO NOTHING`.** Two cases sharing a namespace must fail loudly on the primary key
   rather than silently sharing a subtree.
 - **The demo dataset is not built.** When it lands it is the implementer's, under
@@ -95,21 +107,25 @@ divergence on the eight tables it writes. It detects nothing about constraints, 
 
 **Good**
 
-- The suite parallelises, because every case owns a disjoint subtree; arc42 §7.2's isolate-by-data
-  rule stops being stated-and-unexercised and starts being exercised.
+- Every case owns a disjoint subtree, so every row in the table is attributable to the case that
+  wrote it, and arc42 §7.2's isolate-by-data rule stops being stated-and-unexercised. The
+  granularity matters and the first draft of slice 00's design overstated it: **Vitest parallelises
+  files, not cases**, so across files this buys disjointness and within a file it buys
+  attributability — which is what the count assertions actually rest on.
 - The fixtures that define *done* are authored by the role that defines *done*, from the
   specification rather than from the implementation — which is `CLAUDE.md` §5's whole argument,
   applied to data rather than to assertions.
 - A second, independent statement of the reference schema exists, and it fails loudly on divergence.
-- Every id in a failure message is reproducible, so a failing case is re-runnable rather than a
-  screenshot.
+- Every id in a failure message is a pure function of the case's name, so a failing row can be traced
+  to its case in a table holding every other case's rows — which, with no cleanup, is the only way to
+  trace it at all.
 - No extension is needed for id generation: ids come from the application side, so `btree_gist`
   remains the only extension the deployment requires.
 
 **Bad, or deferred**
 
 - **Isolation is genuinely partial.** `service_type`, `customer` and `vehicle` carry no
-  `dealership_id`, so parallel cases share those three tables. Safe today — the only collidable
+  `dealership_id`, so every case's rows land in those three tables side by side. Safe today — the only collidable
   constraint is `vehicle.vin`, handled by deriving it — but it is a limit on the rule, not an
   application of it.
 - **Rows accumulate for the life of a run** and are never cleaned up. Acceptable at one container per

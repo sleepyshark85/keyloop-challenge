@@ -114,9 +114,9 @@ type edit produces code that compiles and is wrong.
 | R-7a | ADR-0009's ordering seed must actually vary per request; if it does not, ordering silently degrades to sorted order and the retry work becomes quadratic under burst. No test fails — the symptom is latency, not incorrectness | Cheap to get right, and QS-14's budget would eventually show it |
 | R-7b | `src/http` may import `src/domain`, and the rule is not "types only". An implementer could put policy in a route handler and `dependency-cruiser` would not notice | QS-12 catches the three ambiguities that matter; the rest is review |
 | R-7c | `src/platform` is importable-by-all and imports nothing, which is exactly the shape of a junk drawer | The leaf rule stops it acquiring behaviour, not contents. Reviewer's job |
-| R-7d | Down migrations are written and never run (ADR-0007), so they are unverified by construction | The deployment is a fresh container; rollback in anger is not a story this system has |
+| R-7d | Down migrations are written and are exercised by no test (ADR-0007), so they are unverified by CI. *"Never run"* was true until 2026-09-04, when the architect reversed the whole corpus once by hand while designing slice 00 — a dated measurement, not a guarantee | The deployment is a fresh container; rollback in anger is not a story this system has |
 | R-7e | The retry loop must not be wrapped in a transaction (§6). Nothing structural enforces it | QS-3 fails immediately if it is — `25P02` on the second attempt |
-| R-7f | Docker is required for everything but the `nodb` project — `tests/unit/` and `tests/architecture/` (TC-9, §7.2) | A consequence of §2.2 being right about where the invariant lives. At 00a neither implementer nor test-engineer had a container runtime, which is what forced the two-project split |
+| R-7f | Docker is required for everything but the `nodb` project — `tests/unit/` and `tests/architecture/` (TC-9, §7.2) | A consequence of §2.2 being right about where the invariant lives. At 00a neither implementer nor test-engineer had a container runtime, which is what forced the two-project split; **measured again at slice 00, all three roles have Docker**, so the split now stands on its merits rather than on that constraint (§7.2) |
 
 ### R-8 · Four things CI is *said* to enforce — one closed at slice 00a, three open
 
@@ -138,6 +138,51 @@ ground truth is subagent transcripts under `~/.claude/projects/`, which exist on
 machine; on a fresh checkout it reports every honest agent run as `UNSUPPORTED` and exits 1. That is
 correct behaviour, and it is why §9 calls it a gate-time command. CI substitutes two structural
 checks it *can* make — the log is append-only, and every record validates against the schema.
+
+### R-9 · `npm run db:migrate` does not conform to ADR-0007, and the built artifact cannot migrate
+
+Two items, recorded together because **the second is a trap laid for whoever pays the first**.
+
+**R-9a — the conformance drift.** [ADR-0007](../adr/0007-node-pg-migrate-with-sql-files.md)'s Decision
+states that the runner is invoked *"programmatically … both by `npm run db:migrate` … and by the
+Testcontainers fixture"*. `package.json:18` is the CLI binary. The observable consequence is the
+`--single-transaction` default (§7.2): a malformed migration rolls everything back under `db:migrate`
+and leaves earlier files committed under the test harness. It bites only on a broken migration and
+both paths fail loudly, which is why slice 00 recorded it instead of conforming mid-slice.
+
+This is debt of an unusual kind and it is worth naming as such: **not code falling short of a
+document, but an accepted immutable decision that the code silently stopped implementing, with arc42
+having quietly narrowed its own copy of the claim rather than reporting the mismatch.** §7.2 carries
+that correction; this row carries the obligation.
+
+> **Recommendation, stated so it is not re-argued: conform `db:migrate`. Do not supersede ADR-0007.**
+> Superseding an accepted decision to legitimise a drift nobody argued for is the worse precedent, and
+> the ADR's underlying requirement — in-process, no shelling out to a binary that may not be on the
+> path — is the right requirement. The cost is a small runner module and a location decision, which is
+> why it did not belong in the slice that had to land the invariant.
+
+**R-9b — `dist/persistence/` holds no migrations.** `tsc` emits only what it compiles, so
+`npm run build` copies no `.sql` and the built artifact cannot migrate itself. Inert today: both
+migration paths read `src/persistence/migrations/` from the working tree, and `dist/main.js` never
+migrates. It becomes real the first time the service is packaged — which §11.3 and the human's §7.1
+ruling both defer.
+
+**The coupling is the point.** A programmatic `db:migrate` written to close R-9a must resolve the
+migrations directory from a location the build actually populates, or **the conforming fix ships
+broken in the built artifact** — passing in development, failing in the first container. Whoever takes
+R-9a takes R-9b with it.
+
+### R-10 · `updated_at` is maintained by the writer, and nothing enforces it
+
+`appointment.updated_at` has `DEFAULT now()` and no trigger. ADR-0003's atomic move is an `UPDATE`,
+so unless every such statement sets `updated_at = now()` explicitly the column will be wrong from
+slice 05 onward, silently and unrecoverably.
+
+No trigger is added, deliberately: `CLAUDE.md` §2.1's discipline is that the **database holds the
+invariant** while the application holds the convenience, and a mutable-column trigger is convenience.
+The obligation therefore sits on `src/persistence/appointmentRepository.ts`, and no test currently
+asserts it. Recorded here because a column that lies is discovered long after the commit that made it
+lie.
 
 ## 11.3 What production would additionally require
 
