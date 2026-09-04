@@ -15,18 +15,17 @@
 
 | | |
 |---|---|
-| Last commit | `5eb3e14 fix(log): the audit pairs by agent id, and its git half stops being inert (O-3, R-10)` |
+| Last commit | `fb3ff83 docs(01): §6.2 asserted a build the landed tool does not do` |
 | Gates decided | A, B, C, E, E, E, D |
-| Agent runs recorded | 46 |
+| Agent runs recorded | 52 |
 | ADRs accepted | 10 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Next: slice [`01`](slices/01-domain-policy-core.md) — The domain policy core — duration, occupancy interval, and opening hours**
-- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
-- It claims QS-9, QS-12.
+- **Slice [`01`](slices/01-domain-policy-core.md) is in flight** — The domain policy core — duration, occupancy interval, and opening hours.
+- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
 - 8 slice(s) remain of 10 defined; Gate D folded 3 (03, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
@@ -76,6 +75,7 @@
 | [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | accepted | — |
 | [0011](adr/0011-health-is-an-operational-probe.md) | Treat /health as an operational probe outside the API contract, not as a sixth operation | proposed | — |
 | [0012](adr/0012-seed-fixtures-are-a-test-owned-loader.md) | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | proposed | — |
+| [0013](adr/0013-outside-in-tests-exercise-the-built-artifact.md) | Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost | proposed | — |
 
 ## Agent runs
 
@@ -127,7 +127,13 @@
 | 2026-09-04 11:00 | test-engineer | 163m49 | 284 / 24,116 / 23,909,782 | `derived` |
 | 2026-09-04 11:07 | test-engineer | 171m00 | 322 / 27,344 / 29,300,388 | `derived` |
 | 2026-09-04 11:23 | architect | 211m53 | 572 / 40,007 / 62,900,812 | `derived` |
-| | **total** | **3469m25** | **13,316 / 1,009,664 / 1,083,681,763** | |
+| 2026-09-04 16:55 | architect | 17m35 | 118 / 6,959 / 5,227,025 | `derived` |
+| 2026-09-04 16:59 | architect | 21m41 | 146 / 7,284 / 7,475,577 | `derived` |
+| 2026-09-04 17:04 | implementer | 4m06 | 54 / 16,372 / 1,618,862 | `derived` |
+| 2026-09-04 17:06 | test-engineer | 6m06 | 34 / 29,517 / 771,446 | `derived` |
+| 2026-09-04 17:12 | architect | 34m49 | 150 / 7,288 / 7,475,577 | `derived` |
+| 2026-09-04 18:54 | architect | 136m30 | 230 / 10,951 / 15,711,998 | `derived` |
+| | **total** | **3690m11** | **14,048 / 1,088,035 / 1,121,962,248** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

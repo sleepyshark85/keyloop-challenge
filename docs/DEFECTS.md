@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **59** |
-| Severity | 9 blocking · 35 major · 15 minor |
-| Verdicts | 4 narrowed · 30 accepted · 1 escalated · 3 deferred |
-| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · orchestrator 7 · architect 6 · human 1 |
-| Awaiting a ruling | **21** |
-| Mean escape distance | 1.61 step(s) |
+| Findings recorded | **64** |
+| Severity | 10 blocking · 37 major · 17 minor |
+| Verdicts | 5 narrowed · 32 accepted · 1 escalated · 4 deferred |
+| Raised by | test-engineer 18 · reviewer 17 · implementer 13 · architect 8 · orchestrator 7 · human 1 |
+| Awaiting a ruling | **22** |
+| Mean escape distance | 1.58 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -448,6 +448,11 @@ rather than narrated.*
 | ref | sev | step | raised by | claim | verdict |
 |---|---|---|---|---|---|
 | **O-13** | MAJOR | 1 *(+1)* | orchestrator | AC-2's worked example is unsatisfiable: it describes Europe/London at UTC minus 1, an offset the zone never has | accepted |
+| **F-01-1** | MINOR | 1 *(+1)* | architect | arc42 section 10 QS-9 still carries the UTC/local transposition the human corrected in AC-2 under O-13 | **open** |
+| **F-01-2** | MINOR | 1 *(+1)* | architect | AC-5's time_zone containment clause will collide with referenceRepository at a later slice | deferred |
+| **I-01-1** | MAJOR | 2 *(+2)* | implementer | A literal reading of AC-6 is mechanically unsatisfiable alongside AC-5, and the call site can be named | narrowed |
+| **T-01-1** | MAJOR | 2 *(+1)* | test-engineer | The design's 'AC-5 and AC-6 are jointly unsatisfiable' is overstated — a third path exists, so the reading is the human's and not a foregone conclusion | accepted |
+| **T-01-2** | BLOCKING | 2 *(+1)* | test-engineer | Design section 8.3's reason 2 is false as measured: a db-project container failure destroys the nodb project's results in the same npm test invocation, so this slice's red can still arrive as a crash | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -456,6 +461,35 @@ rather than narrated.*
 - *scenario:* AC-2 reads 'the instant that is 08:30 local but 09:30 UTC is rejected and its counterpart accepted'. Europe/London is GMT (UTC+0) or BST (UTC+1), so local is never behind UTC and no instant is both 08:30 local and 09:30 UTC. Measured: 2026-03-28T08:30Z renders 08:30 local and is rejected against 09:00-17:00, while 2026-03-29T08:30Z renders 09:30 local and is accepted — which is the DST pair the criterion is plainly reaching for, with UTC and local transposed. Raised at step 1 rather than discovered at step 3, where the test-engineer would have had to either assert something impossible or silently reinterpret an acceptance criterion. Acceptance criteria are the human's under section 6, so this is not the architect's to fix.
 - *file:* `docs/slices/01-domain-policy-core.md`
 - *accepted* by human — Ruled a wording defect, not a design defect: AC-2's substance stands and only its illustrative pair was corrected, to 2026-03-28T08:30Z rejected at 08:30 local GMT and 2026-03-29T08:30Z accepted at 09:30 local BST. Decided by the human because section 6 reserves acceptance criteria to the human and the architect may not change them. Two things worth keeping about how it was found. It was caught at step 1 by checking the criterion against real Intl offsets before anyone was dispatched, not by reading it — the same operational rule the phase-4 retro produced, that a claim about a mechanism needs the mechanism run. And it is the second acceptance criterion in two slices to need a human ruling mid-slice, after AC-10 at slice 00; both were defects in what the criteria said rather than in what anyone built, which is an argument about where this process's remaining risk actually sits.
+
+**F-01-1** — arc42 section 10 QS-9 still carries the UTC/local transposition the human corrected in AC-2 under O-13
+
+- *scenario:* QS-9 reads 'the instant that is 08:30 local but 09:30 UTC is rejected, and its counterpart accepted'. That is the identical unsatisfiable pair O-13 corrected in the slice file, surviving in the architect's own document. Raised by the architect against itself. It is the retro's tier-2 shape — a document contradicting a ruling, needing only something read — and the escalation is that QS-9, not AC-2, is what the test-engineer reads at step 3 to write tests/property/opening-hours-dst.test.ts. Left until step 7 it is a contradiction sitting in the document the next role works from.
+- *file:* `docs/arc42/10-quality-requirements.md`
+
+**F-01-2** — AC-5's time_zone containment clause will collide with referenceRepository at a later slice
+
+- *scenario:* AC-5 confines any use of a dealership's time_zone to src/domain/openingHours.ts. A later slice must read that column through the persistence layer to pass it in, at which point the literal reading of AC-5 is violated by code that is plainly correct. The architect built no exception now, on the grounds that an allowlist over an empty set is a mechanism nobody ran. AC-5 is an acceptance criterion and therefore the human's, so the reading goes to the human at the slice where it actually bites rather than being resolved here by inference.
+- *file:* `docs/slices/01-domain-policy-core.md`
+- *deferred* by orchestrator — Deferred deliberately, and the architect's reasoning for not fixing it now is the right one: an allowlist written over an empty set is a mechanism nobody ran, which is the exact shape the phase-4 retro catalogued eight times. Nothing in slice 01 reads time_zone through persistence, so there is no case to discriminate yet. Carried to the slice that introduces referenceRepository, where AC-5's reading becomes a live question and goes to the human under section 6.
+
+**I-01-1** — A literal reading of AC-6 is mechanically unsatisfiable alongside AC-5, and the call site can be named
+
+- *scenario:* appointmentInterval in interval.ts must convert minutes to milliseconds. AC-5 confines duration arithmetic, including the 60_000 multiplication, to duration.ts exclusively. So interval.ts either calls durationMillis — a value import, forbidden by a literal AC-6 — or re-derives the multiplication itself, violating AC-5. The implementer reports it read AC-6 the literal way on first pass and would have hit this while writing interval.ts. Named the call site rather than describing the capability, per the retro's operational rule. Recommends a clarification DCR to the human.
+- *file:* `docs/slices/01-domain-policy-core.md`
+- *narrowed* by architect — The escalation was right and the reasoning was wrong. The implementer named a real call site — appointmentInterval needing minutes to milliseconds — but enumerated only two responses to it: value-import durationMillis, or re-derive 60_000. It missed the third, which is to change the signature so the conversion happens before the call and no import is needed. The architect: the argument is not wrong about its call site, it is incomplete about the option space, and an exhaustiveness claim that has not enumerated exhaustively is the same error the architect made one level up. Where the two reviewers contradict, the test-engineer is right. The recommendation to escalate AC-6 to the human stands and was acted on.
+
+**T-01-1** — The design's 'AC-5 and AC-6 are jointly unsatisfiable' is overstated — a third path exists, so the reading is the human's and not a foregone conclusion
+
+- *scenario:* Directly contradicts I-01-1's 'there is no third path'. A literal AC-6 is satisfiable by pushing composition up to the caller: appointmentInterval takes a raw millisecond count rather than a DurationMinutes, and the caller — outside src/domain, so outside the rule — calls durationMillis then appointmentInterval. No intra-domain import, no duplicated arithmetic, AC-5 intact. Worse design, because it loses the brand safety A-1 argues for, but a trade-off rather than an impossibility. The distinction matters because it changes who decides. Compounding it: arc42 section 5.2 line 40 states today, in the architecture source of truth, that the pure core 'imports nothing at all — no other module, no npm package, no node: builtin'. That is the literal reading, written by the architect before this slice, and the design proposes to correct it at step 7 on the strength of an argument the test-engineer shows is not airtight.
+- *file:* `docs/slices/01-design.md`
+- *accepted* by human — AC-6 reads LITERALLY: src/domain imports nothing at all, including intra-domain imports. arc42 section 5.2 line 40 therefore stands unamended, which is the honest outcome under this reading and the one the test-engineer argued for when it objected to the amendment being queued as routine. Consequences accepted knowingly, as the architect set them out: appointmentInterval takes startsAtMillis and durationMillis, withinOpeningHours takes startsAtMillis, endsAtMillis, ianaZone and weekly hours, and the Instant and DurationMinutes brands stop crossing module boundaries and either go or shrink to per-module input validation. The cost — composition order moves into src/application, the domain stops expressing 'an interval is derived from a duration' as a type relationship, and unit confusion across domain boundaries becomes review-caught rather than compiler-caught — is recorded in section 11 as debt under this reading rather than argued away.
+
+**T-01-2** — Design section 8.3's reason 2 is false as measured: a db-project container failure destroys the nodb project's results in the same npm test invocation, so this slice's red can still arrive as a crash
+
+- *scenario:* Raised by the test-engineer as an unmeasured mechanism claim and confirmed by the orchestrator by running it. With DOCKER_HOST pointed at nothing: npx vitest run over both projects aborts in TestProject._initializeGlobalSetup and writes a results file containing 0 test files and 0 tests, so the nodb project never runs and nothing lands. red-proof reads exactly that combined test-results.json. Therefore moving the DST property test into the nodb project does not, by itself, protect the red from arriving as an empty results file rather than an AssertionError. Remedy measured alongside it: npx vitest run --project nodb with the same broken Docker records 7 files and 94 passing tests, so splitting the invocation isolates it. This is the retro's tier-1 shape — a mechanism claim explained by capability rather than by its discriminating case — and it bears on section 2.4, the observed red, which is NON-NEGOTIABLE.
+- *file:* `docs/slices/01-design.md`
+- *accepted* by architect — Ruled (c) design defect, naming CLAUDE.md section 2.4 — every slice begins with a failing test observed red in CI — which is NON-NEGOTIABLE. The architect's own words: section 8.3 reason 2 is not imprecise, it is false. It named the project the test sits in rather than the invocation CI issues, which is the retro's tier-1 shape committed by the author of the rule against it. Under the design as written, red-proof reads a results file with zero test files, takes the failedFiles empty branch, and returns 'the commit is marked red but no test-engineer-owned suite failed' — red for the wrong reason, the exact exposure slice 00's design spent a section eliminating. Not (a): the wording is not ambiguous, it is wrong. Not (b): (b) requires the work to be correct with something better available, and a design asserting a protection it does not provide is not correct. The remedy is ACCEPTED BUT EXTENDED: splitting the invocation is necessary and insufficient, because two JSON files merged for red-proof's single --results would let a db run that never happened merge as zero failures, indistinguishable from one where everything passed. Third part required: a project that did not run must be a loud, distinct failure and never an empty contribution. Fail-soft globalSetup rejected on the record as a green over nothing. This is the case the 2026-09-04 section 6 amendment was written for, and this time the architect is the author.
 
 </details>
 
