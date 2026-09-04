@@ -49,7 +49,7 @@ plan that reads as though it never was. §11 and §13 discuss the material delta
 | **4** | [Solution strategy](arc42/04-solution-strategy.md) | Five decisions. Everything in §5 to §8 follows from them, and each links to the record that argues it. |
 | **5** | [Building block view](arc42/05-building-blocks.md) | The decomposition and the reasons for it are ADR-0008. |
 | **6** | [Runtime view](arc42/06-runtime-view.md) | Five scenarios. The first is the one the whole design exists to make safe, so it is documented before the happy path. |
-| **7** | [Deployment view](arc42/07-deployment-view.md) | Versions are pinned here because TC-10 deliberately left them open at Gate A: **Node ≥ 22.11 < 25** and **npm ≥ 10.9** in `package.json` `engines`, **Postgre… |
+| **7** | [Deployment view](arc42/07-deployment-view.md) | npm start                                  # the scheduler, on the HOST └── scheduler      Node 22 LTS · the compiled dist/main.js · :3000 ``` |
 | **8** | [Cross-cutting concepts](arc42/08-crosscutting-concepts.md) | Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API writes, and `opening_hours` is the only one that exists becaus… |
 | **9** | [Architecture decisions](arc42/09-architecture-decisions.md) | Decisions live as individual MADR files under `docs/adr/`. |
 | **10** | [Quality requirements](arc42/10-quality-requirements.md) | The §1.2 ranking, refined into the scenarios below it. |
