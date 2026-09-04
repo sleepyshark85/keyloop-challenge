@@ -83,3 +83,80 @@ describe('loadConfig', () => {
     expect((thrown as ConfigError).message).toMatch(/LOG_LEVEL/);
   });
 });
+
+/**
+ * The diagnosis is the behaviour here, not a detail of it.
+ *
+ * `loadConfig` runs once, at startup, before there is a logger — so the thrown error IS the
+ * whole of what a person gets when a deployment is misconfigured at 03:00. A test that only
+ * asserts "it threw" leaves every word of that message free to rot, and mutation testing
+ * says so: blanking the heading, the bullet prefix or the list separator changed nothing
+ * any test could see.
+ */
+describe('ConfigError', () => {
+  const thrownBy = (env: NodeJS.ProcessEnv): ConfigError => {
+    try {
+      loadConfig(env);
+    } catch (error) {
+      return error as ConfigError;
+    }
+    throw new Error('loadConfig did not throw');
+  };
+
+  it('is identifiable by name, so a caller can tell it from any other Error', () => {
+    expect(thrownBy({}).name).toBe('ConfigError');
+  });
+
+  it('reads as a heading and one bullet per problem', () => {
+    const error = thrownBy({});
+    const [heading, ...bullets] = error.message.split('\n');
+
+    expect(heading).toBe('invalid configuration:');
+    expect(bullets).toEqual(error.problems.map((problem) => `  - ${problem}`));
+    expect(bullets).toHaveLength(2);
+  });
+
+  it('lists the legal log levels separated, not run together', () => {
+    // `LOG_LEVELS.join(', ')` with a blank separator produces "fatalerrorwarn…", which is
+    // still a message and still useless to the person reading it.
+    expect(thrownBy({ ...VALID, LOG_LEVEL: 'verbose' }).message).toContain('fatal, error, warn');
+  });
+});
+
+/**
+ * Values arrive from a shell, a compose file or a CI secret, and every one of those can
+ * deliver a value with whitespace around it. Trimming is what makes `PORT=" 3000 "` a port
+ * rather than an error naming a string the operator cannot see the problem with.
+ */
+describe('surrounding whitespace', () => {
+  it('accepts a padded PORT as the port it obviously is', () => {
+    expect(loadConfig({ ...VALID, PORT: ' 3000 ' }).port).toBe(3000);
+  });
+
+  it('accepts a padded LOG_LEVEL', () => {
+    expect(loadConfig({ ...VALID, LOG_LEVEL: '  warn\n' }).logLevel).toBe('warn');
+  });
+
+  it('accepts a padded DATABASE_URL and hands on the trimmed value', () => {
+    expect(loadConfig({ ...VALID, DATABASE_URL: `  ${VALID.DATABASE_URL}\t` }).databaseUrl).toBe(
+      VALID.DATABASE_URL,
+    );
+  });
+});
+
+/**
+ * The ends of the range are the interesting part: 1 and 65535 are legal ports, and an
+ * off-by-one here rejects a configuration that would have worked. Asserted from both
+ * sides so that neither comparison can be loosened or tightened unobserved.
+ */
+describe('the PORT range', () => {
+  it.each(['1', '80', '65535'])('accepts %s', (rawPort) => {
+    expect(loadConfig({ ...VALID, PORT: rawPort }).port).toBe(Number(rawPort));
+  });
+
+  it.each(['0', '65536'])('rejects %s', (rawPort) => {
+    expect(() => loadConfig({ ...VALID, PORT: rawPort })).toThrowError(
+      `PORT must be between 1 and 65535, got ${rawPort}`,
+    );
+  });
+});
