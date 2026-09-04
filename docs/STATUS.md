@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `fb3ff83 docs(01): §6.2 asserted a build the landed tool does not do` |
+| Last commit | `0550d09 test(01): opening-hours DST property (QS-9) and ambiguity-containment scan (AC-5, QS-12) (red)` |
 | Gates decided | A, B, C, E, E, E, D |
-| Agent runs recorded | 52 |
+| Agent runs recorded | 53 |
 | ADRs accepted | 10 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -133,7 +133,8 @@
 | 2026-09-04 17:06 | test-engineer | 6m06 | 34 / 29,517 / 771,446 | `derived` |
 | 2026-09-04 17:12 | architect | 34m49 | 150 / 7,288 / 7,475,577 | `derived` |
 | 2026-09-04 18:54 | architect | 136m30 | 230 / 10,951 / 15,711,998 | `derived` |
-| | **total** | **3690m11** | **14,048 / 1,088,035 / 1,121,962,248** | |
+| 2026-09-04 19:30 | test-engineer | 24m55 | 244 / 62,546 / 21,214,281 | `derived` |
+| | **total** | **3715m07** | **14,292 / 1,150,581 / 1,143,176,529** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

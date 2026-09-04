@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **64** |
-| Severity | 10 blocking · 37 major · 17 minor |
-| Verdicts | 5 narrowed · 32 accepted · 1 escalated · 4 deferred |
-| Raised by | test-engineer 18 · reviewer 17 · implementer 13 · architect 8 · orchestrator 7 · human 1 |
+| Findings recorded | **65** |
+| Severity | 10 blocking · 37 major · 18 minor |
+| Verdicts | 5 narrowed · 32 accepted · 1 escalated · 5 deferred |
+| Raised by | test-engineer 19 · reviewer 17 · implementer 13 · architect 8 · orchestrator 7 · human 1 |
 | Awaiting a ruling | **22** |
-| Mean escape distance | 1.58 step(s) |
+| Mean escape distance | 1.55 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -453,6 +453,7 @@ rather than narrated.*
 | **I-01-1** | MAJOR | 2 *(+2)* | implementer | A literal reading of AC-6 is mechanically unsatisfiable alongside AC-5, and the call site can be named | narrowed |
 | **T-01-1** | MAJOR | 2 *(+1)* | test-engineer | The design's 'AC-5 and AC-6 are jointly unsatisfiable' is overstated — a third path exists, so the reading is the human's and not a foregone conclusion | accepted |
 | **T-01-2** | BLOCKING | 2 *(+1)* | test-engineer | Design section 8.3's reason 2 is false as measured: a db-project container failure destroys the nodb project's results in the same npm test invocation, so this slice's red can still arrive as a crash | accepted |
+| **T-01-3** | MINOR | 3 *(+0)* | test-engineer | ADR-0013's src-reference scan excludes tests/architecture/, so the directory it lives in is the one directory it cannot check | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -490,6 +491,12 @@ rather than narrated.*
 - *scenario:* Raised by the test-engineer as an unmeasured mechanism claim and confirmed by the orchestrator by running it. With DOCKER_HOST pointed at nothing: npx vitest run over both projects aborts in TestProject._initializeGlobalSetup and writes a results file containing 0 test files and 0 tests, so the nodb project never runs and nothing lands. red-proof reads exactly that combined test-results.json. Therefore moving the DST property test into the nodb project does not, by itself, protect the red from arriving as an empty results file rather than an AssertionError. Remedy measured alongside it: npx vitest run --project nodb with the same broken Docker records 7 files and 94 passing tests, so splitting the invocation isolates it. This is the retro's tier-1 shape — a mechanism claim explained by capability rather than by its discriminating case — and it bears on section 2.4, the observed red, which is NON-NEGOTIABLE.
 - *file:* `docs/slices/01-design.md`
 - *accepted* by architect — Ruled (c) design defect, naming CLAUDE.md section 2.4 — every slice begins with a failing test observed red in CI — which is NON-NEGOTIABLE. The architect's own words: section 8.3 reason 2 is not imprecise, it is false. It named the project the test sits in rather than the invocation CI issues, which is the retro's tier-1 shape committed by the author of the rule against it. Under the design as written, red-proof reads a results file with zero test files, takes the failedFiles empty branch, and returns 'the commit is marked red but no test-engineer-owned suite failed' — red for the wrong reason, the exact exposure slice 00's design spent a section eliminating. Not (a): the wording is not ambiguous, it is wrong. Not (b): (b) requires the work to be correct with something better available, and a design asserting a protection it does not provide is not correct. The remedy is ACCEPTED BUT EXTENDED: splitting the invocation is necessary and insufficient, because two JSON files merged for red-proof's single --results would let a db run that never happened merge as zero failures, indistinguishable from one where everything passed. Third part required: a project that did not run must be a loud, distinct failure and never an empty contribution. Fail-soft globalSetup rejected on the record as a green over nothing. This is the case the 2026-09-04 section 6 amendment was written for, and this time the architect is the author.
+
+**T-01-3** — ADR-0013's src-reference scan excludes tests/architecture/, so the directory it lives in is the one directory it cannot check
+
+- *scenario:* The scan looks for a computed dynamic-import specifier whose string parts resolve under src/ rather than dist/. Implemented as a raw-text scan it cannot distinguish a violation from this file's own fixture-content strings, or layering.test.ts's, which legitimately mention src/ paths as data. Scanning tests/architecture/ produced two false positives against pre-existing correct code, so the test-engineer narrowed the scope to the other seven outside-in directories and documented the measurement in the file. Flagged rather than buried, in its own words. The residual hole is narrow but real: a future tests/architecture/ file could computed-import src/ and this scan would not see it, and ADR-0013's consequences were narrowed on the strength of this scan existing.
+- *file:* `tests/architecture/ambiguity-containment.test.ts`
+- *deferred* by orchestrator — Deferred to step 5 for the reviewer, not resolved here. The judgement is sound and it is a mechanism the design explicitly left to the test-engineer, so it is within its authority; the two false positives are measured rather than asserted. But ADR-0013's consequences were narrowed from 'review alone closes this hole' to 'a source scan closes it' on the strength of a scan that turns out not to cover the directory it lives in, and the person who should weigh whether the narrowing still holds is the one who did not write either artifact. Carried to step 5 with the ADR, which is still status proposed and reaches the human at Gate E.
 
 </details>
 
