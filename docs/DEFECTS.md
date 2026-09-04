@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **39** |
-| Severity | 9 blocking · 20 major · 10 minor |
+| Findings recorded | **44** |
+| Severity | 9 blocking · 24 major · 11 minor |
 | Verdicts | 4 narrowed · 20 accepted · 1 escalated · 3 deferred |
-| Raised by | reviewer 12 · test-engineer 10 · implementer 9 · orchestrator 5 · architect 3 |
-| Awaiting a ruling | **11** |
-| Mean escape distance | 1.51 step(s) |
+| Raised by | test-engineer 13 · reviewer 12 · implementer 11 · orchestrator 5 · architect 3 |
+| Awaiting a ruling | **16** |
+| Mean escape distance | 1.45 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -308,6 +308,45 @@ rather than narrated.*
 - *scenario:* generate.mjs infers position as the phase after the last gate.decided, matching PHASES[p][1].startsWith(gate). PHASES[5][1] is the string E (per slice), so any gate E matches and reports current phase 6, Consolidation. Gate E fires on EVERY slice by design, so the first slice gate of phase 5 would report consolidation with twelve slices unbuilt. Observed live at slice 00a gate E: STATUS.md regenerated to phase 6 while the scope marker said 4 and the pilot had not run. STATUS.md is the file a resuming session reads first and its own header tells the reader to trust it over narration.
 - *file:* `tools/status/generate.mjs`
 - *accepted* by orchestrator — Fixed rather than deferred, unlike O-3, O-6 and O-7. Those mis-report a gate the human is standing in front of; this one mis-reports where the project is to a session that has no other context, and it would have fired on the first real slice regardless of how slice 00a gate was recorded. Per-slice gates now close nothing: PER_SLICE_GATES holds E and the inference skips it. STATUS.md is back to phase 4. Note the shape it shares with the deferred three — the generator agreed with itself right up until a gate was actually decided, so nothing was wrong until the first time it mattered.
+
+</details>
+
+## Slice 00
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **T-4** | MAJOR | 2 *(+1)* | test-engineer | Case 0 never asserts the column the exclusion constraints are keyed on, so a wrongly-keyed constraint ships green | **open** |
+| **T-5** | MAJOR | 2 *(+1)* | test-engineer | The one-violable-constraint discipline is enforced non-uniformly by undocumented FK trigger order, so drift is silent in exactly the likeliest case | **open** |
+| **T-6** | MINOR | 2 *(+1)* | test-engineer | AC-3 step 5 is redundant with step 4 and its stated reason is false | **open** |
+| **I-8** | MAJOR | 2 *(+1)* | implementer | The design mitigation for a malformed migration is false: globalSetup silences the very diagnostic it relies on | **open** |
+| **I-9** | MAJOR | 2 *(+1)* | implementer | The singleTransaction divergence is db:migrate having drifted from ADR-0007, so the remedy is not where the design says it is | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**T-4** — Case 0 never asserts the column the exclusion constraints are keyed on, so a wrongly-keyed constraint ships green
+
+- *scenario:* A constraint keyed on dealership_id instead of bay_id — which would serialise an entire dealership to one appointment at a time — passes the whole of AC-3 and AC-1. Measured and independently reproduced by the orchestrator: overlapping same-bay REJECTED, adjacency same-bay ACCEPTED, both identical to the correct schema. Only AC-2 distinguishes it, and only because PostgreSQL reported one of two simultaneously violable constraints, which the design own A-2 says is not guaranteed. If index order goes the other way on a future minor version, AC-2 passes too and nothing catches it until slice 07.
+- *file:* `docs/slices/00-design.md`
+
+**T-5** — The one-violable-constraint discipline is enforced non-uniformly by undocumented FK trigger order, so drift is silent in exactly the likeliest case
+
+- *scenario:* Measured: an AC-5 fixture drifted so the technician also belongs to another dealership still reports appointment_technician_qualified and PASSES SILENTLY, while the equivalent AC-6 drift reports a different constraint and fails loudly. Which you get is decided by FK trigger firing order — the same non-guarantee as A-2. So asserting the constraint name catches drift only when drift changes the reported name, and the case where it does not is the case where the fixture is broken in the same dimension as the constraint under test, which is the likeliest drift there is.
+- *file:* `docs/slices/00-design.md`
+
+**T-6** — AC-3 step 5 is redundant with step 4 and its stated reason is false
+
+- *scenario:* The reason given — a range type is defined by two bounds and testing one is half the claim — conflates the range type two bounds with the test two rows. There is one range expression evaluated on both operands and && is symmetric, so no EXCLUDE-expressible mutant accepts one adjacency and rejects the other. Measured against the closed-range mutant the design itself names: both steps reject it. Second instance after 00a F1 of a confident causal sentence that does not hold, in a design whose own rule 2 requires measured or labelled unmeasured.
+- *file:* `docs/slices/00-design.md`
+
+**I-8** — The design mitigation for a malformed migration is false: globalSetup silences the very diagnostic it relies on
+
+- *scenario:* Design 8.2 mitigation 2 says a malformed migration prints the failing statement with a caret. Measured against the real harness with a malformed 0003: CI prints "No test files found, exiting with code 1" plus an unhandled 42601 naming file scan.l — PostgreSQL own lexer source — and NO migration filename anywhere. node-pg-migrate does build the caret dump but emits it through logger.error, and tests/setup/postgres.ts line 68 passes log: () => {}, which getLogger maps onto debug, info, warn and error alike. The harness silences exactly the diagnostic the fallback depends on. The remedy is to stop silencing error, which adds observation rather than substituting an evidence chain, but it edits a test-owned file so it is not asked for in this slice.
+- *file:* `tests/setup/postgres.ts`
+
+**I-9** — The singleTransaction divergence is db:migrate having drifted from ADR-0007, so the remedy is not where the design says it is
+
+- *scenario:* ADR-0007 line 72 states the runner is invoked programmatically by node-pg-migrate Node API both by npm run db:migrate and by the Testcontainers fixture. package.json line 18 is the CLI binary node-pg-migrate -m src/persistence/migrations -t pgmigrations up, whose singleTransaction defaults true while the programmatic runner defaults false. Verified independently. So the divergence is a conformance drift from the governing ADR and its cause, not a pair of entry points with different natural defaults — and the remedy sits on the non-test-owned side of the seam, never needing to touch tests/setup/postgres.ts. The deferral stays right for this slice, but the recorded debt must name package.json and ADR-0007 conformance or it gets paid in the wrong file.
+- *file:* `package.json`
 
 </details>
 
