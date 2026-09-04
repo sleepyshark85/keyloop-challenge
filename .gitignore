@@ -2,6 +2,10 @@ node_modules/
 dist/
 coverage/
 reports/
+
+# Written into the repository root by `npm test -- --reporter=json --outputFile=…` in CI
+test-results.json
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
