@@ -97,9 +97,10 @@ const RELATIONS = [
  * version bump beats silent on a wrong column.
  *
  * THE LIMIT, STATED SO NOBODY MISTAKES THIS FOR A WHOLE-SCHEMA GUARANTEE. This proves the
- * seven NAMED constraints are exactly right. It proves nothing about what else is in the
- * schema — an extra constraint, a missing NOT NULL, a wrong column type — and nothing about
- * whether any of them FIRE. Cases 1 to 9 prove firing.
+ * seven NAMED constraints are exactly right, and — with the set-equality assertion in case 0
+ * (d) — that `appointment` carries no eighth. It proves nothing about a missing NOT NULL, a
+ * wrong column type, or the constraints on the other eight tables, and nothing about whether
+ * any of them FIRE. Cases 1 to 9 prove firing.
  */
 const EXPECTED_CONSTRAINT_DEFS: Readonly<Record<string, string>> = {
   no_bay_overlap:
@@ -268,7 +269,29 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
   });
 
   it('case 0 — the schema under test IS arc42 §8.1 and §8.2 (a precondition for every case below)', async () => {
-    // (a) The extension. `bay_id WITH =` is an equality operator on a uuid and plain GiST
+    // (a) The schema arrived VIA THE MIGRATION CORPUS, and via nothing else.
+    //
+    // This is the only assertion in the suite that says WHERE the schema came from. Without
+    // it, a schema created by a stray `CREATE TABLE` in a fixture, or by a container image
+    // baked with it, satisfies every other case in this file — and ADR-0007's whole argument
+    // is that the schema is reproducible from a corpus of ordered, immutable `.sql` files.
+    //
+    // It lives here rather than in `postgres-harness.test.ts` because it is a per-slice fact,
+    // not a harness property. That file used to assert `count === '0'` and would have gone
+    // red at this slice's GREEN commit, in a file the implementer must not edit; the note in
+    // its docblock records the retirement. Here the polarity is right: red now, green after.
+    //
+    // `pgmigrations` exists at the red commit — globalSetup creates it and applies zero
+    // migrations — so this reads an empty table rather than raising.
+    const { rows: migrations } = await client.query<{ name: string }>(
+      'select name from pgmigrations order by name',
+    );
+    expect(
+      migrations.map((row) => row.name),
+      'pgmigrations must record exactly the three migrations of arc42 §8.1 and §8.2, in filename order — node-pg-migrate sorts the directory listing, and btree_gist MUST precede the exclusion constraints',
+    ).toEqual(['0001_extensions', '0002_reference_data', '0003_appointment']);
+
+    // (b) The extension. `bay_id WITH =` is an equality operator on a uuid and plain GiST
     // cannot index it; `btree_gist` supplies `gist_uuid_ops`. TC-3, §8.2 consequence 5.
     const { rows: extensions } = await client.query<{ extname: string }>(
       "select extname from pg_extension where extname = 'btree_gist'",
@@ -278,7 +301,7 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
       'btree_gist is absent, so no exclusion constraint on (uuid, tstzrange) can exist at all',
     ).toEqual(['btree_gist']);
 
-    // (b) The nine relations. `to_regclass` returns null rather than raising for a missing
+    // (c) The nine relations. `to_regclass` returns null rather than raising for a missing
     // relation, so this is an ASSERTION about the schema and not an error escaping the case.
     const { rows: relations } = await client.query<{ relation: string; oid: string | null }>(
       `select r.relation, to_regclass('public.' || r.relation)::text as oid
@@ -290,7 +313,8 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
       'relations of arc42 §8.1 that do not exist',
     ).toEqual([]);
 
-    // (c) The seven named constraints, by FULL NORMALISED DEFINITION.
+    // (d) The constraints on `appointment`, by NAME SET and then by FULL NORMALISED
+    // DEFINITION.
     //
     // Joined through pg_class by name rather than cast through `'appointment'::regclass`, so
     // a missing table yields zero rows and an assertion failure rather than a thrown 42P01.
@@ -301,6 +325,33 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
          join pg_namespace n on n.oid = t.relnamespace
         where n.nspname = 'public' and t.relname = 'appointment' and c.contype <> 'p'`,
     );
+
+    // EXACTLY these seven and no others — coverage before result, and the assertion that
+    // makes §6.2 enforceable rather than documentary.
+    //
+    // §6.2 says `dealership_id`, `service_type_id` and `customer_id` carry no standalone
+    // reference ON PURPOSE, because each is covered transitively by a composite, and adding
+    // the singleton foreign keys as well *"would make the reported constraint
+    // non-deterministic in exactly the cases §4.2 depends on being deterministic."* Nothing
+    // else in this file would notice: adding `appointment_customer_id_fkey` for tidiness
+    // breaks no case here. The damage lands at slice 03, where §8.6 maps
+    // `422 /problems/unknown-reference` BY CONSTRAINT NAME — and a second `23503` reaching
+    // the same insert makes which name arrives a matter of declaration order.
+    //
+    // Measured on postgres:16 — `pg_constraint` for this table returns these seven plus
+    // `appointment_pkey`, so `contype <> 'p'` is a clean filter today. ASSUMED, NOT MEASURED:
+    // whether a later major version surfaces `NOT NULL` as `pg_constraint` rows. If one does,
+    // this fails loudly in the same commit as the bump, alongside the definition assertions
+    // below, which is the same bounded fragility already accepted for those.
+    //
+    // Deliberately NOT extended to the other eight tables: no case in this file discriminates
+    // on their constraints, and doing so is the first step back toward the whole-`\d` snapshot
+    // the design rejected as brittle.
+    expect(
+      constraints.map((row) => row.conname).sort(),
+      'the non-primary-key constraints on appointment must be EXACTLY arc42 §8.1 and §8.2\'s seven — an extra one falsifies §6.2 and makes the reported constraint ambiguous at slice 03',
+    ).toEqual(Object.keys(EXPECTED_CONSTRAINT_DEFS).sort());
+
     const actual = new Map(constraints.map((row) => [row.conname, row.def]));
 
     for (const [name, expected] of Object.entries(EXPECTED_CONSTRAINT_DEFS)) {
