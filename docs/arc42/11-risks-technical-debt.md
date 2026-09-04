@@ -11,6 +11,7 @@ construction, a debt item traceable to the decision that created it.
 | Item | Origin | Why deferred |
 |---|---|---|
 | Treat /health as an operational probe outside the API contract, not as a sixth operation | [ADR-0011](../adr/0011-health-is-an-operational-probe.md) | deferred improvement |
+| Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | [ADR-0012](../adr/0012-seed-fixtures-are-a-test-owned-loader.md) | deferred improvement |
 <!-- /generated:debt-register -->
 
 The register held nothing until slice 00a, and that was the correct reading rather than an omission.
