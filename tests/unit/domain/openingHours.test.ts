@@ -82,11 +82,11 @@ describe('withinOpeningHours — step 2, unknown-zone', () => {
 describe('withinOpeningHours — step 4, spans-local-days', () => {
   const weekly = weekOpen('00:00:00', '24:00:00');
 
-  it('an interval crossing local midnight is spans-local-days', () => {
+  it('an interval crossing local midnight is spans-local-days, naming the exact local dates (kills the year/month/day getter-swap mutants)', () => {
     const start = Date.parse('2026-06-15T22:30:00Z'); // BST: 23:30 local, 2026-06-15
     const end = start + 60 * 60_000; // one hour later: 00:30 local, 2026-06-16 — crosses midnight
     const verdict = withinOpeningHours(start, end, ZONE, weekly);
-    expect(verdict.kind).toBe('spans-local-days');
+    expect(verdict).toEqual({ kind: 'spans-local-days', startsOn: '2026-06-15', endsOn: '2026-06-16' });
   });
 
   it('the equivalent interval one hour earlier (same local day) is not spans-local-days', () => {
@@ -251,5 +251,83 @@ describe('withinOpeningHours — the weekday lookup (kills a lookup-table mutant
     const start = Date.parse(`${date}T10:00:00Z`);
     const verdict = withinOpeningHours(start, start + 60_000, ZONE, CLOSED_WEEK);
     expect(verdict).toEqual({ kind: 'closed-day', dayOfWeek: expected });
+  });
+});
+
+// ─────────────────────────── the time parser's exact boundaries (mutation, §10) ──
+
+/**
+ * `parseTimeToSeconds` is not exported (only `withinOpeningHours` is, per §2.3's signature
+ * block), so every case here goes through the public function, using `outside-window` /
+ * `within` as the observable difference between "rejected as malformed" and "parsed, then
+ * compared". The design's own §10 table names the comparison-operator boundary mutants;
+ * these additionally aim at the parser's own overflow checks and its seconds-of-day
+ * arithmetic, which are new in this slice and not named there.
+ */
+describe('withinOpeningHours — the time parser: field-overflow rejection is per-field, not conflated (LogicalOperator mutants)', () => {
+  it('an hours-only overflow (25:00:00) is malformed-hours even though minutes and seconds are in range', () => {
+    // If the hours check were dropped (or replaced with a constant false), the numeric value
+    // 25:00:00 -> 90000s would slip through as a valid closesAt and 10:00 local would read as
+    // "within" a 05:00-25:00 window instead of malformed-hours.
+    const weekly = weekOpen('05:00:00', '25:00:00');
+    const start = Date.parse('2026-06-15T09:00:00Z'); // 10:00 BST
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly)).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 1,
+    });
+  });
+
+  it('a minutes-only overflow (09:60:00) is malformed-hours even though hours and seconds are in range', () => {
+    const weekly = weekOpen('05:00:00', '09:60:00');
+    const start = Date.parse('2026-06-15T08:30:00Z'); // 09:30 BST
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly)).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 1,
+    });
+  });
+
+  it('a seconds-only overflow (09:00:60) is malformed-hours even though hours and minutes are in range', () => {
+    const weekly = weekOpen('05:00:00', '09:00:60');
+    const start = Date.parse('2026-06-15T07:30:00Z'); // 08:30 BST
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly)).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 1,
+    });
+  });
+
+  it('hours=23, minutes=59 and seconds=59 are each individually the LAST valid value, not already overflow', () => {
+    // Kills the >=23 / >=59 / >=59 boundary mutants: each of these, taken alone, must still
+    // parse as a valid, in-range time.
+    const weekly = weekOpen('23:00:00', '23:59:59');
+    const start = Date.parse('2026-06-15T22:30:00Z'); // 23:30 BST — inside 23:00-23:59:59
+    expect(withinOpeningHours(start, start + 60_000, ZONE, weekly).kind).toBe('within');
+
+    const weeklyMinuteBoundary = weekOpen('09:59:00', '10:30:00');
+    const startMinute = Date.parse('2026-06-15T09:00:00Z'); // 10:00 BST
+    expect(withinOpeningHours(startMinute, startMinute + 60_000, ZONE, weeklyMinuteBoundary).kind).toBe(
+      'within',
+    );
+
+    const weeklySecondBoundary = weekOpen('09:00:59', '10:00:00');
+    const startSecond = Date.parse('2026-06-15T08:01:00Z'); // 09:01 BST — after opensAt, before closesAt
+    expect(withinOpeningHours(startSecond, startSecond + 60_000, ZONE, weeklySecondBoundary).kind).toBe(
+      'within',
+    );
+  });
+});
+
+describe('withinOpeningHours — the seconds-of-day arithmetic is hours*3600 + minutes*60 + seconds, exactly', () => {
+  it('a window with non-zero minutes and seconds components draws its boundary at the exact second (kills ArithmeticOperator and getter-swap mutants)', () => {
+    const weekly = weekOpen('09:15:30', '09:45:10');
+
+    // Exactly at opensAt (09:15:30 BST = 08:15:30Z): within. One second earlier: outside.
+    const atOpen = Date.parse('2026-06-15T08:15:30Z');
+    expect(withinOpeningHours(atOpen, atOpen + 1000, ZONE, weekly).kind).toBe('within');
+    expect(withinOpeningHours(atOpen - 1000, atOpen, ZONE, weekly).kind).toBe('outside-window');
+
+    // Exactly at closesAt (09:45:10 BST = 08:45:10Z): within. One second later: outside.
+    const atClose = Date.parse('2026-06-15T08:45:10Z');
+    expect(withinOpeningHours(atClose - 1000, atClose, ZONE, weekly).kind).toBe('within');
+    expect(withinOpeningHours(atClose, atClose + 1000, ZONE, weekly).kind).toBe('outside-window');
   });
 });
