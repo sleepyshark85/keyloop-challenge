@@ -60,8 +60,9 @@ One round of discussion, then rule:
 | **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede the ADR; prior work is **revised, never deleted** |
 | **(d) Escalate** | Genuine trade-off or scope question | Stop; the human decides |
 
-**To rule (c) you MUST name the specific acceptance criterion or `QS-*` that would fail.** If you
-cannot name one, the correct ruling is (b). A better idea is not a blocker.
+**To rule (c) you MUST name the specific acceptance criterion, `QS-*`, or `CLAUDE.md` §2 standing
+invariant that would fail.** If you cannot name one, the correct ruling is (b). A better idea is not
+a blocker — but a §2 breach always is, even when the end state would be green either way.
 
 This slice's loopback count is in your prompt. **At 2, you may not rule (c) again** — escalate
 instead: a slice needing three design changes is a slicing problem, and the right fix is to split it.

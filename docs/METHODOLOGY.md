@@ -226,8 +226,18 @@ architect convenes **one** round, then rules:
 | **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede the ADR; **revise** prior work, never delete |
 | **(d) Escalate** | Genuine trade-off or scope question | Human decides |
 
-**To rule (c) the architect must name the acceptance criterion or `QS-*` that would fail.** If it
-cannot, the ruling is (b) — a forcing function against dramatising preference into blockage. (b)
+**To rule (c) the architect must name the acceptance criterion, `QS-*`, or `CLAUDE.md` §2 standing
+invariant that would fail.** If it cannot, the ruling is (b) — a forcing function against dramatising
+preference into blockage.
+
+*§2 joined that list on 2026-09-04.* Slice 00a's design worked around §2.4 — the red observed in CI
+— and offered four evidence items in its place. No acceptance criterion failed and no `QS-*` failed,
+because the end state was green under either wiring; the defect was that the board could never
+truthfully leave `red` (§9 above requires step 3 to log *the CI run that observed it failing*). So
+the rule's narrow test made the most serious available defect — breaching a NON-NEGOTIABLE — the one
+class it could not name, and the architect had to rule (c) on §2's authority while flagging the
+wording. The forcing function is unharmed: a §2 breach is citable and NON-NEGOTIABLE, which is the
+opposite of the preference this test was written to exclude. (b)
 exists because blocking correct work destroys throughput; it also makes §11 self-generating. But it
 can become a dumping ground: three deferred items read as judgement, fifteen as avoidance, so the
 count is on the board and triaged at every gate.

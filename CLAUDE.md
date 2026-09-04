@@ -140,8 +140,16 @@ convenes **one** round of discussion, then rules:
 | **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede the ADR; revise (never delete) prior work |
 | **(d) Escalate** | Genuine trade-off or scope question | Human decides |
 
-To rule **(c)** the architect **must name the acceptance criterion or §10 quality scenario that
-would fail**. If it cannot name one, the outcome is (b). Preference is not a blocker.
+To rule **(c)** the architect **must name the acceptance criterion, §10 quality scenario, or §2
+standing invariant that would fail**. If it cannot name one, the outcome is (b). Preference is not
+a blocker.
+
+§2 was added to that list on 2026-09-04, after slice 00a. A design had worked around §2.4 — the red
+observed in CI — and substituted an evidence chain for it. No acceptance criterion and no quality
+scenario failed, because the end state was green either way, so by the letter of this rule the most
+serious class of defect available was the one class it could not name. The narrow test exists to stop
+(c) being reached for on preference, and it still does: a §2 breach is nameable, citable and
+NON-NEGOTIABLE, which is the opposite of a preference.
 
 **Max 2 loopbacks per slice.** A third auto-escalates: a slice needing three design changes is a
 slicing problem, not a design problem.
