@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { ChildProcessByStdio } from 'node:child_process';
+import type { Readable } from 'node:stream';
 import { createServer } from 'node:net';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -101,7 +102,11 @@ export async function startService(options: {
     `  entrypoint   ${entrypoint} (${existsSync(entrypoint) ? 'exists' : 'DOES NOT EXIST'})`,
   ].join('\n');
 
-  let child: ChildProcessWithoutNullStreams;
+  // The type is the one the `stdio: ['ignore', 'pipe', 'pipe']` overload of `spawn`
+  // actually returns: stdin is ignored, so it is `null`, and only stdout and stderr are
+  // streams. It is written out rather than asserted so that changing the tuple below is a
+  // compile error here instead of a lie the compiler was told to believe.
+  let child: ChildProcessByStdio<null, Readable, Readable>;
   try {
     child = spawn(argv[0] as string, argv.slice(1), {
       cwd,
@@ -113,7 +118,7 @@ export async function startService(options: {
         NODE_ENV: 'test',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
-    }) as ChildProcessWithoutNullStreams;
+    });
   } catch (error) {
     return {
       failure:
