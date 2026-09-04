@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **37** |
-| Severity | 9 blocking · 19 major · 9 minor |
-| Verdicts | 4 narrowed · 19 accepted · 1 escalated · 2 deferred |
-| Raised by | reviewer 12 · test-engineer 10 · implementer 9 · architect 3 · orchestrator 3 |
+| Findings recorded | **38** |
+| Severity | 9 blocking · 19 major · 10 minor |
+| Verdicts | 4 narrowed · 19 accepted · 1 escalated · 3 deferred |
+| Raised by | reviewer 12 · test-engineer 10 · implementer 9 · orchestrator 4 · architect 3 |
 | Awaiting a ruling | **11** |
-| Mean escape distance | 1.27 step(s) |
+| Mean escape distance | 1.39 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -72,6 +72,7 @@ rather than narrated.*
 | **R-11** | MINOR | 5 *(+1)* | reviewer | Authored prose moved in an arc42 section the slice did not declare | **open** |
 | **R-12** | MINOR | 5 *(+1)* | reviewer | contract and property are RED_ZONE members with no committed case | **open** |
 | **O-6** | MAJOR | 6 *(+6)* | orchestrator | tests green and red before green accept any check.run record, including one that carries no test result at all | deferred |
+| **O-7** | MINOR | 6 *(+6)* | orchestrator | The human-approved gate check requires an undocumented literal string and fails closed on any other, including a more descriptive one | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -285,6 +286,12 @@ rather than narrated.*
 - *scenario:* check.mjs line 112 reads runs.at(-1) and tests /FAIL/ over its checks; line 99 finds the first record matching /FAIL/ and line 100 accepts any later record without FAIL as the green. Both treat every check.run alike. Appending a mutation-score record — which carries mutation_score, killed and survived and no test outcome whatsoever — made tests green report PASS by reading it, and satisfied red before green as the green half. Observed live while backfilling slice 00a: the gate reported PASS on a record that says nothing about whether any test ran. Any future record kind sharing the check.run event will do the same, and the Definition of Done is what reads it.
 - *file:* `tools/slice/check.mjs`
 - *deferred* by orchestrator — Real, observed live rather than reasoned, and mine. Deferred for the same reason O-2 deeper fix was declined by the architect: changing the gate tool in the slice that first feeds it is how you get a gate that agrees with its own bug. The remedy is a kind discriminator on check.run — the record already distinguishes itself by carrying run_id and jobs versus mutation_score — so the predicate can require a record that actually reports a test outcome. Sequencing for this slice avoids it: the final CI run is appended last, so runs.at(-1) is a real run. Carried to the phase-4 retro under C7 alongside O-3 and R-10, all three of which are the same class — a gate reading a record that does not mean what the gate assumes.
+
+**O-7** — The human-approved gate check requires an undocumented literal string and fails closed on any other, including a more descriptive one
+
+- *scenario:* check.mjs line 137 tests gate.decision === approved exactly. schema.mjs requires gate, decision and rationale but validates none of their values, so a gate recorded as approved-and-merged is schema-valid, semantically correct, and reported FAIL by the Definition of Done. Observed live: slice 00a human gate was recorded accurately, the check reported no approval, and the fix was appending a superseding record whose only difference is the literal. The three collect-ci constraints of the same class are documented in design section 6 because the architect found them; this one is documented nowhere and was found by tripping it.
+- *file:* `tools/slice/check.mjs`
+- *deferred* by orchestrator — Real and cheap, and deferred to the retro with O-3, O-6, R-10 and the rest of the gate-tooling cluster. The remedy is either an enum in schema.mjs so an invalid decision is rejected at write time rather than silently ignored at read time, or the check accepting any decision whose value is not a rejection. Note the shape: every one of O-3, O-6 and O-7 is the Definition of Done reading a record that does not mean what it assumes, and all three were found by running the gate rather than by reading it.
 
 </details>
 

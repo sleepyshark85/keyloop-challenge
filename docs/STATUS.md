@@ -11,21 +11,21 @@
 
 ## Where we are
 
-**Phase 4 — Pilot + retro**, which closes at Gate D.
+**Phase 6 — Consolidation**, which closes at Gate F.
 
 | | |
 |---|---|
-| Last commit | `be195dc test(00a): the ruleset's alternation, asserted from both sides (R-1)` |
-| Gates decided | A, B, C |
-| Agent runs recorded | 28 |
+| Last commit | `b14c5df Merge pull request #4 from sleepyshark85/slice/00a-walking-skeleton` |
+| Gates decided | A, B, C, E, E |
+| Agent runs recorded | 29 |
 | ADRs accepted | 10 |
 | Slices defined | 13 |
 | Open DCRs | none |
 
 ## What happens next
 
-- Run slice 00 end-to-end, then hold the retro against `team-log/process-criteria.md`.
-- **Gate D**: tune the machine, or proceed.
+- As-built arc42 pass, presentation diagrams refreshed, README and §13 written.
+- **Gate F**: final read.
 
 ## Gate decisions
 
@@ -40,6 +40,14 @@
 **Gate C** · 2026-09-03 · backlog-approved-13-slices
 
 > Scope and ordering approved as proposed. Thirteen slices, every arc42 section 10 quality scenario QS-1 to QS-14 claimed by the slice that makes it executable. Ordering driven by what must exist before the invariant can be tested rather than by feature value. The three contested seams stand: 00a/00 separating scaffold from invariant per the Gate B ruling, 02/04 so the retry loop arrives with a test that fails without it rather than as untested optimism, and 06/07 so the atomic move is separated from the two concurrency scenarios that catch a cancel-then-insert. Slice 07 is accepted as potentially proof-only, with the reviewer required to state explicitly if no production code changed.
+
+**Gate E** · 2026-09-04 · approved-and-merged
+
+> Slice 00a approved and merged as b14c5df, a merge commit preserving the red and green commit trail. Definition of Done met on records rather than narration: test-first proven with the red at 03:01 and a green after, tests green from run 33844632820, mutation score 0.9577 against a threshold of 0.75, layering clean, arc42 reconciled at step 7, zero loopbacks. Two items ruled at the gate. R-11: the architect ruling that prose surrounding a generated block is authored and in scope is ADOPTED as a general rule for future slices, recorded in METHODOLOGY; slice 00a arc42 field is left as merged, since the edit and the ruling are both in the record and retroactively editing a merged slice file after its own gate is the same class of quiet change the rule exists to prevent. Eleven open reviewer findings are carried to the phase-4 retro for triage rather than fixed now, on the grounds that several of them — R-3 cancelled CI runs, R-5 the unpinned token accumulator, R-10 the inert audit git-linkage — bear directly on criteria C6 and C7 and are better triaged where those criteria are being read.
+
+**Gate E** · 2026-09-04 · approved
+
+> Supersedes s-00a-human-gate, which carried the same ruling under decision approved-and-merged. tools/slice/check.mjs line 137 requires the literal string approved and nothing documents or validates that; the earlier record was correct in substance and failed the gate on a string contract. Ruling unchanged: slice 00a approved and merged as b14c5df. Definition of Done met on records — red at 03:01 with a green after, tests green from run 33844632820, mutation 0.9577 against 0.75, layering clean, arc42 reconciled at step 7, zero loopbacks. R-11 adopted as a general rule for future slices rather than applied retroactively to a merged slice file. Eleven open reviewer findings carried to the phase-4 retro for triage, since R-3, R-5 and R-10 bear directly on C6 and C7.
 
 ## Decisions on record
 
@@ -89,7 +97,8 @@
 | 2026-09-04 05:42 | implementer | 151m35 | 890 / 45,843 / 109,111,076 | `derived` |
 | 2026-09-04 06:21 | reviewer | 15m20 | 238 / 15,620 / 16,253,209 | `derived` |
 | 2026-09-04 06:29 | test-engineer | 146m08 | 416 / 20,886 / 30,481,090 | `derived` |
-| | **total** | **1460m35** | **7,436 / 493,389 / 589,984,617** | |
+| 2026-09-04 06:48 | architect | 164m19 | 298 / 3,088 / 19,690,446 | `derived` |
+| | **total** | **1624m54** | **7,734 / 496,477 / 609,675,063** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
