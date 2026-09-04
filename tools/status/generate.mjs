@@ -119,7 +119,7 @@ const doc = `# Status
 
 ## What happens next
 
-${nextActions(current)}
+${nextActions(current, events)}
 
 ## Gate decisions
 
@@ -155,7 +155,45 @@ billing record.
 Verify this file's figures against ground truth: \`npm run log:audit\`.*
 `;
 
-function nextActions(phase) {
+/**
+ * The next action is a function of the phase AND of what has happened inside it.
+ *
+ * A static string per phase told a resuming session to "run slice 00 end-to-end,
+ * then hold the retro" after both had been done and merged — the same class of
+ * defect as O-8, in the same file: the resume point confidently naming work that
+ * is finished. STATUS.md's own header tells the reader to trust it over
+ * narration, so it has to be right about the inside of a phase, not only about
+ * which phase it is.
+ *
+ * Only phase 4 branches today, because it is the only phase with a decidable
+ * mid-point in the log. The others become derived the first time one of them is
+ * wrong about itself.
+ */
+function nextActions(phase, events = []) {
+  const done = (id) => events.some((e) => e.event === 'slice.done' && String(e.slice) === id);
+  const retroHeld = events.some(
+    (e) => e.event === 'handoff' && String(e.artifact ?? '').includes('phase-4-retro'),
+  );
+
+  if (phase === '4') {
+    if (!done('00a')) {
+      return '- Run slice 00a (the walking skeleton) end-to-end.\n- Then slice 00, then the retro.\n- **Gate D**: tune the machine, or proceed.';
+    }
+    if (!done('00')) {
+      return '- Slice 00a is done. Run slice 00 (the pilot) end-to-end.\n- Then hold the retro against `team-log/process-criteria.md`.\n- **Gate D**: tune the machine, or proceed.';
+    }
+    if (!retroHeld) {
+      return '- Slices 00a and 00 are done. Hold the retro against `team-log/process-criteria.md`.\n- **Gate D**: tune the machine, or proceed.';
+    }
+    return [
+      '- **Both pilot slices are done and the retro is written** — see [`team-log/phase-4-retro.md`](team-log/phase-4-retro.md).',
+      '- Verdict: C1 PASS · C2 PASS on git, weakened on hooks · C3 PASS · C4 PASS · **C5 FAIL** · **C6 FAIL** · C7 PASS with three open defects · C8 the human\'s.',
+      '- Two non-fatal criteria fail and neither is C1 nor C2, so the pre-registered decision rule reads: **tune the mechanisms and proceed to slice 01, no second pilot.**',
+      '- **Gate D is open and undecided.** C6 is the one needing a ruling — its own wording says the response to a breach is to cut slices or reduce agent count, not to proceed and hope.',
+      '- Open findings are in [`DEFECTS.md`](DEFECTS.md); the C2 and C7 clusters are what the retro says to tune first.',
+    ].join('\n');
+  }
+
   const map = {
     '0': '- Finish phase 0 instrumentation, then start phase 1.',
     '1': '- The architect writes arc42 §1–§3 and surfaces assumptions and open questions.\n- **Gate A**: the human resolves the open questions; answers become ADRs.',
@@ -166,7 +204,6 @@ function nextActions(phase) {
       '- **Gate B**: plan-mode approval; the stack is confirmed here.',
     ].join('\n'),
     '3': '- Slice the backlog into ~14 files (rescheduling added one at Gate A).\n- **Gate C**: approve scope and ordering.',
-    '4': '- Run slice 00 end-to-end, then hold the retro against `team-log/process-criteria.md`.\n- **Gate D**: tune the machine, or proceed.',
     '5': '- Work slices one at a time, WIP 1. **Gate E** on each.',
     '6': '- As-built arc42 pass, presentation diagrams refreshed, README and §13 written.\n- **Gate F**: final read.',
     '7': '- Record the video from `docs/video-shotlist.md`.',
