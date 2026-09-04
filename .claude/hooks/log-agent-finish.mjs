@@ -90,6 +90,13 @@ try {
       thinking += u.output_tokens_details?.thinking_tokens ?? 0;
     }
     if (i || o || cr || cw) tokens = { in: i, out: o, cache_read: cr, cache_write: cw, thinking };
+    // R-5. C6 — "the budget is real" — is measured from this accumulator and
+    // nothing else. If the harness renames its usage fields, every term above
+    // sums to zero; emitting `tokens: {in: 0, ...}` would then be indistinguishable
+    // from an agent that was genuinely cheap, and a 13-slice cost extrapolated
+    // from zeros reads as success. Absent-and-noted is recoverable. Silent zeros
+    // are not — so a transcript with turns but no readable usage says so.
+    if (tokens === null && lines.length) note(`no token usage read from ${subPath} (${lines.length} turns) — usage shape may have changed`);
   } else {
     note(`no transcript at ${subPath} for ${role}/${agentId}`);
   }
