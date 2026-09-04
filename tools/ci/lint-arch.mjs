@@ -95,6 +95,23 @@ export function judgeCruiseResult(cruiseResult, roots = []) {
   }
 
   // Per ROOT (F2), and only over roots the caller actually asked for.
+  //
+  // A caller that asks for coverage but hands over a payload with no `modules[]` gets its
+  // OWN verdict, not "examined no module under src/". The two are different failures and
+  // point at different places: the first is a bug in the call, the second a fact about the
+  // tree. Reporting the second for the first sends someone to look at a source directory
+  // that is fine.
+  if (roots.length > 0 && !Array.isArray(cruiseResult?.modules)) {
+    return {
+      ok: false,
+      reason:
+        'coverage could not be checked: the cruise result carried no `modules[]`, so which ' +
+        `files were examined is unknown. Roots asked about: ${roots.join(', ')}. A summary ` +
+        'alone is a complete input for the environment and violation rules, but not for ' +
+        'this one',
+    };
+  }
+
   for (const root of roots) {
     const prefix = root.endsWith('/') ? root : `${root}/`;
     const covered = modules.some(
@@ -141,12 +158,30 @@ function main(argv) {
   }
 
   // The same CLI with the same arguments the bare script used, plus the JSON reporter — so
-  // the artifact under test is still the file CI runs. The local bin rather than `npx`: npx
-  // will happily fetch a DIFFERENT dependency-cruiser from the network, and a guard against
-  // the wrong analyser running must not be able to run the wrong analyser.
+  // the artifact under test is still the file CI runs.
+  //
+  // THE LOCAL BINARY, AND ONLY THE LOCAL BINARY. Not `npx`, which will fetch a different
+  // dependency-cruiser from the network; and not a PATH fallback either, which was the
+  // first version of this and was the same mistake with the network removed: a globally
+  // installed depcruise brings its own node_modules and therefore its own `typescript`
+  // resolution — dependency-cruiser resolves the compiler with
+  // `createRequire(import.meta.url)`, from ITS OWN location, never from the cwd — so it
+  // could cruise this repository under a compiler nobody here pinned, or under none, which
+  // is the exact silence this whole file exists to break. A guard against the wrong
+  // analyser running must not be able to run the wrong analyser.
   const local = resolve('node_modules/.bin/depcruise');
+  if (!existsSync(local)) {
+    console.error(
+      `lint-arch: ${local} is missing. Run \`npm ci\`.\n` +
+        '  Refusing to fall back to a depcruise on PATH: a different installation resolves ' +
+        'a different TypeScript compiler, and a cruise under an unknown analyser cannot ' +
+        'stand in for this one.',
+    );
+    return 2;
+  }
+
   const cruise = spawnSync(
-    existsSync(local) ? local : 'depcruise',
+    local,
     [...roots, '--config', CONFIG, '--output-type', 'json'],
     { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 },
   );
