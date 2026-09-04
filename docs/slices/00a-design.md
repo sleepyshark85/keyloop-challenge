@@ -7,20 +7,23 @@
 > **§5.2 · §5.3 · §7.1 · §7.2 · §7.4 · §8.5 · §11.2** · quality scenarios: **QS-10** · ADRs in
 > force: 0005, 0006, 0007, 0008, 0010.
 >
-> **Amended at step 2 on 2026-09-04**, after both reviewers objected. Every ruling below is applied
-> in the body — this is one current document, not a design plus a thread of corrections.
+> **Amended at step 2 on 2026-09-04**, after both reviewers objected, and again before step 3 when a
+> self-raised finding (**S-1**) showed the design had worked around a NON-NEGOTIABLE. Every ruling is
+> applied in the body — this is one current document, not a design plus a thread of corrections.
 
 This design settles *shape*. It does not restate the acceptance criteria and it may not change them
 (`CLAUDE.md` §6): AC-1 to AC-6 are the human's.
 
-Read §0 first: it is the step-2 audit trail. Then §11, which is what still needs watching.
+Read §0 first: it is the audit trail, and S-1 in it is the most consequential entry. Then §11, which
+is what still needs watching.
 
 ---
 
 ## 0. Step 2 rulings
 
 Both the test-engineer and the implementer returned **OBJECT**. One round of discussion was convened
-per `CLAUDE.md` §6; these are the rulings. Four of the five carried **measurement or file-level
+per `CLAUDE.md` §6; these are the rulings. **S-1 is the architect's own, raised after step 2** when a
+fact discovered while preparing step 3 exposed a defect neither reviewer had found. Four of the five carried **measurement or file-level
 evidence rather than argument** — a role built the thing this design specified, ran it, and reported
 what happened. That is the standard the rest of this slice should be held to.
 
@@ -31,6 +34,40 @@ what happened. That is the standard the rest of this slice should be held to.
 | **O3** | test-engineer — the step-1 draft's reason for implementer-authored tool tests is factually wrong: `test:tools` is a literal `&&` chain, not a glob | **(a) clarification** | Conceded outright. The stated reason was false, so the ownership conclusion it supported does not survive it; all three tool tests become test-engineer-authored |
 | **O-1** | implementer — `red-proof`'s red zone makes slices 07 and 11 structurally unable to pass | **(d) escalated → ruled by the human** | Finding correct and the defect is this design's, not AC-6's. The reading of AC-6 was escalated because under the literal reading the fix requires changing an acceptance criterion. **The human ruled BROAD on 2026-09-04** |
 | **O-2** | implementer — §6's three `collect-ci.mjs` constraints are right but not sufficient; two more are load-bearing | **(a) clarification** | Both verified. (c) is deliberately **not** available: AC-5 says nothing about ordering or timestamps and C1 is a process criterion, not a §10 scenario — the rule says (a) however severe the consequence |
+| **S-1** | **architect, self-raised** after step 2 — this design worked around `CLAUDE.md` §2.4, a NON-NEGOTIABLE, and called the result a paradox | **(c) design defect** | 00a's red would never have been observed in CI. The suite is wired into the red commit's own CI job instead (§7); the evidence list collapses from five substitutes to four items with the observation first |
+
+### S-1 — the finding about the process, not only about the design
+
+It belongs here rather than in an amendment note. `CLAUDE.md` §2.4 requires every slice's failing
+acceptance test to be *"observed red in CI"*, and §2's preamble says a NON-NEGOTIABLE *"may not be
+relaxed by any agent for any reason; if one appears to block progress, raise a DCR instead of working
+around it."* The step-1 design offered four substitute evidence items and labelled the gap a
+bootstrap paradox. **That is a workaround presented as an evidence chain, and it should have been
+raised as a DCR at step 1.** Neither reviewer caught it either, which is worth recording: step 2
+found five real defects and missed the one that breached a standing invariant.
+
+What exposed it was a fact discovered while preparing step 3 — **no container runtime on either
+role's machine** — which removed evidence item 5, the last item compensating for the missing
+observation. The trigger was environmental; the defect was not.
+
+Two things make it unarguable rather than a matter of degree. `METHODOLOGY.md:272`: *"the board
+cannot leave `red` until CI has recorded the acceptance test failing."* And `:335`, which defines the
+step-3 log entry as *"the red commit SHA **and the CI run that observed it failing, with the failing
+assertion quoted**"*. Under the step-1 design that entry could not be written truthfully, so slice
+00a would either stall at `red` forever or advance on narration — which is the failure C7 exists to
+catch. It was not a weaker evidence chain; it was an unloggable state.
+
+**No exemption is needed, because §7 now satisfies the invariant** rather than asking to relax it.
+Two consequences beyond the fix are recorded in §7 and §4: `red-proof` gains a replay against the red
+run's own artifact, and **C1 stops being unmeasurable for 00a** — the correction of a ruling this
+design made in its own step-1 draft.
+
+**A gap in `CLAUDE.md` §6 that this exposes, and that is the human's to close.** To rule **(c)** the
+architect *"must name the acceptance criterion or §10 quality scenario that would fail"*. Here
+nothing in AC-1…AC-6 or QS-10 fails — the end state is green either way — yet a §2 invariant was
+breached, and §2 outranks both. S-1 is therefore ruled (c) on §2's authority rather than by §6's
+test. The suggested wording — *"acceptance criterion, §10 quality scenario, **or `CLAUDE.md` §2
+invariant**"* — is not the architect's to apply and is being put to the human separately.
 
 **What the human ruled**, at the same sitting:
 
@@ -61,10 +98,12 @@ conceding a finding is not the same as conceding a remedy:
   the defect it was complaining about. §5 now names the mechanism, and asserts something stronger
   than `totalCruised > 0`.
 
-**Three findings of the architect's own**, surfaced while ruling and applied below: the migration
-seam would have crashed 00a's red run in `globalSetup` (§4); AC-4 is green on arrival and that is
-honest rather than a test-first violation (§7); and the `.dependency-cruiser.js` widening now
-includes `tests/setup/`, which **neither reviewer reviewed** (§11.2).
+**Findings of the architect's own**, surfaced while ruling and applied below: the migration seam
+would have crashed 00a's red run in `globalSetup` (§4); AC-4 is green on arrival and that is honest
+rather than a test-first violation (§7); the `.dependency-cruiser.js` widening now includes
+`tests/setup/`, which **neither reviewer reviewed** (§11.2); and **S-1**, below, which reverses two
+of this design's own earlier decisions — the single Vitest project (§4) and C1 being unmeasurable by
+construction (§7).
 
 **Loopbacks.** `CLAUDE.md` §6 contrasts cheap step-2 objections with the same finding at step 5,
 which *"costs a full cycle plus a loopback"*. At step 2 there is no prior work to revise and no
@@ -356,7 +395,9 @@ own ownership rules. At the red commit `src/persistence/migrations/` cannot exis
 denies the test-engineer every write under `src/`, and the implementer's commits all come later.
 `node-pg-migrate` would throw `ENOENT`, `globalSetup` would abort, and **no test would run at all** —
 turning the red commit's evidence from a set of assertion failures into a setup crash, which is "red
-for the wrong reason" in the most literal sense and guts evidence item 5 in §7.
+for the wrong reason" in the most literal sense. That now matters more than it did when the defect
+was found: since the `test` job runs on the red commit (§7), a `globalSetup` crash would be the
+*observation itself*, and `CLAUDE.md` §2.4 would be satisfied in form while proving nothing.
 
 Two alternatives were considered and rejected. Moving migrations to a root `migrations/` directory is
 cleaner — it is `node-pg-migrate`'s own default and sidesteps the ownership collision entirely — but
@@ -388,11 +429,37 @@ step-3/step-4 split.
 `npm test`, redden 00a's red commit for a third reason, and pollute the failure set `red-proof`
 classifies (§7).
 
-**One Vitest project in 00a, not two.** §7.2 mentions `npm run test:domain` as the Docker-less
-subset. It cannot exist yet: there is no `src/domain` and therefore no `tests/unit`. Rather than ship
-a second project configured with `passWithNoTests` — a flag that would silently stay green forever —
-00a ships a single project with the global setup, and the project split lands in slice 01 alongside
-the first domain module. Recorded as an as-built delta in §7.2 at step 7.
+**Two Vitest projects, split by whether a test needs the database.** This reverses the step-1 draft,
+which shipped one project and deferred the split to slice 01. The reason given there was that
+`test:domain` would need a `tests/unit/` that does not exist yet and a `passWithNoTests` flag that
+stays green forever. That reason never covered the real case, and a fact discovered before step 3
+made the real case decisive: **there is no container runtime on either role's machine** (§11.5).
+Under a single project, a failing container start aborts the entire run — so neither role can execute
+*any* Vitest test locally. Not the AC-4 fixture, which is the test-engineer's most delicate
+deliverable and the one O1 proved is easy to get silently wrong; and not any `tests/unit/` file,
+which means the implementer cannot run the inner TDD loop `CLAUDE.md` §6 step 4 requires. Red-green
+through CI round-trips is not slow TDD, it is not TDD.
+
+| Project | Contains | `globalSetup` |
+|---|---|---|
+| `nodb` | `tests/unit/**`, `tests/architecture/**` | none |
+| `db` | `tests/acceptance/**`, `tests/integration/**`, `tests/contract/**`, `tests/property/**`, `tests/concurrency/**`, `tests/performance/**` | `tests/setup/postgres.ts` |
+
+`npm test` runs **both**, so AC-1 is unchanged and one invocation still produces **one**
+`test-results.json` — which matters, because `red-proof.mjs` takes a single `--results` path (§7).
+`npm run test:nodb` is the Docker-less subset. Neither project is ever empty: `tests/architecture/`
+exists from the red commit and `tests/unit/` joins at green commit 1, so the `passWithNoTests`
+objection that justified one project does not apply to this split. arc42 §7.2's `test:domain` becomes
+`test:nodb` and lands in 00a rather than slice 01 — an as-built note at step 7, inside the declared
+§7.2 scope.
+
+> **The one mechanical unknown in this slice, and an instruction rather than a hope.** Per-project
+> `globalSetup` must be **verified to work in the pinned Vitest version** at step 3, before the red
+> commit. If it is not honoured, the guaranteed fallback is a second config file
+> (`vitest.nodb.config.ts`, with `test:nodb` running `vitest run -c`) — but that makes `npm test`
+> produce **two** result files, which `red-proof.mjs`'s single `--results` input cannot consume, and
+> that is a design question. **Raise it rather than improvise.** Stating the mechanism instead of the
+> outcome is the lesson of O1, applied to the architect's own amendment.
 
 ---
 
@@ -687,21 +754,19 @@ which is slice 00. Therefore:
 
 ---
 
-## 7. The CI phase-4 block
+## 7. The CI wiring, and how 00a's red is observed
 
-### What switches on
+### The split, and the criterion that decides it
 
-The commented block at the foot of `.github/workflows/verify.yml` is replaced by:
+`.github/workflows/verify.yml` says in its own header what governs this: *"It contains only what
+passes with no `src/` in the repository, on purpose… Everything that needs `src/` is at the foot of
+this file as a clearly marked PHASE 4 block."* **The criterion is "does it need `src/`", not "which
+phase does it belong to."** `npm test` does not need `src/` — it needs a Docker daemon, which
+`ubuntu-latest` has. The step-1 draft bundled the suite into the phase-4 block with `typecheck`,
+`lint:arch` and `red-proof`, which grouped by phase and put the suite three commits later than the
+criterion allows. Corrected here; see §0's sixth row for why that mattered more than tidiness.
 
-**Existing job `verify`** gains two steps, after install and before the docs checks:
-
-```yaml
-- name: typecheck            run: npm run typecheck      # tsc --noEmit -p tsconfig.json
-- name: layering (QS-10)     run: npm run lint:arch      # node tools/ci/lint-arch.mjs — §5
-```
-
-**New job `test`** — separate, because the red-proof discrimination has to read *which* thing failed,
-and a single job's conclusion cannot say:
+**The red commit** (test-engineer) adds **one new job**, in its final form:
 
 ```yaml
 test:
@@ -709,12 +774,50 @@ test:
   runs-on: ubuntu-latest      # ships a Docker daemon — TC-9, ADR-0010
   steps: checkout · setup-node 22.x · npm ci --engine-strict
        · npm test -- --reporter=json --outputFile=test-results.json
-       · upload-artifact: test-results.json + run-summary.json   (if: always(), retention 90)
+       · upload-artifact: test-results.json   (if: always(), retention 90)
 ```
 
-No `services:` block: Testcontainers starts its own `postgres:16` (§7.2, §7.4).
+No `needs:`, no `continue-on-error`, and no `services:` block — Testcontainers starts its own
+`postgres:16` (§7.2, §7.4). It is the same job the phase-4 design already called for; it lands
+earlier, so nothing new is invented and the job is never restructured mid-slice.
 
-**New job `red-proof`** — `needs: [verify, test]`, `if: always()`.
+**Why it is the test-engineer's, and why it is in the red commit.** `verify.yml` is on neither role's
+deny list. AC-1's evidence is that the container starts and the suite connects, which is the same
+argument that gives them `tests/setup/`; and `CLAUDE.md` §2.4 makes the red commit responsible for
+being **observed**. A commit that creates a red nobody can see has not discharged its obligation.
+
+**Green commit 9** (implementer) then adds only what genuinely needs `src/`:
+
+```yaml
+# on the existing `verify` job, after install:
+- name: typecheck            run: npm run typecheck      # tsc --noEmit -p tsconfig.json
+- name: layering (QS-10)     run: npm run lint:arch      # node tools/ci/lint-arch.mjs — §5
+
+# and one new job:
+red-proof:                   needs: [verify, test]   if: always()
+```
+
+### What CI must report on the red SHA
+
+Stated as a prediction so step 5 checks one rather than forms an impression. `verify.yml` triggers on
+`pull_request`, and PR #4 is open on this branch, so the run happens on the push — nothing has to be
+enabled for it to occur.
+
+| Job | Expected | Why |
+|---|---|---|
+| `verify` | **PASS** | install, `docs:check`, `test:tools`, the diagram check and the log-integrity checks. The three new `tools/test/*.test.mjs` are deliberately unwired (§11.4), so `test:tools` stays green — which is now load-bearing for a second reason: a wired-in tool test would fail earlier in this job and abort the observation below |
+| `test` | **FAIL** | `tests/acceptance/health.test.ts` — both AC-2 cases, no service to spawn — and `tests/architecture/layering.test.ts`'s AC-3 case, `depcruise` cannot open `src`. **Passing in the same run:** `tests/integration/postgres-harness.test.ts` (§4's `mkdirSync` keeps `globalSetup` working) and `layering.test.ts`'s AC-4 fixture cases |
+
+**That pair is the discrimination itself.** `verify` green proves the branch is sound; `test` red
+proves the acceptance suite failed. It is exactly what `red-proof` automates from slice 00 onward,
+performed here by two job conclusions a human can read — which is why the suite needed its own job at
+the red commit and not a step inside `verify`.
+
+**One requirement on the test author, because C1 distinguishes an assertion from a missing import.**
+The acceptance test must fail **inside its test body**, not at collection time: the spawn helper
+waits with a bound and then fails with a message naming what it tried, so the Vitest JSON shows a
+failed assertion in a collected file rather than a load error. That distinction is what C1's *"a real
+assertion failure rather than a missing import"* is about, and it is visible in the artifact.
 
 ### The `red-proof` job's mechanics
 
@@ -796,50 +899,37 @@ Six details, each of which is a way to get this wrong:
 The job's conclusion is therefore **success when the required failure was observed**, and the check's
 name makes that inversion visible rather than hiding it in `continue-on-error`.
 
-### The bootstrap paradox, stated rather than papered over
+### How 00a's red is evidenced
 
-**`process-criteria.md` C1 is unmeasurable for slice 00a by construction, and the phase-4 retro must
-record it as `UNMEASURABLE`, not as a pass.** C1 requires *"a failing acceptance run recorded in
-`check.run` before a passing one"*. `check.run` is emitted by `collect-ci.mjs`, which this slice
-builds. At the moment 00a's red commit is authored, the collector does not exist, so there is nothing
-to record the red run with. This is not a criterion being softened after the fact — it is a
-sequencing consequence that was already visible in ADR-0010 (*"until the collector is written
-`check.run` remains unemitted and C1 remains unpassable"*) and in arc42 §11 R-8, which names it as
-the largest of four unenforced claims.
+Four items. The first is the **observation `CLAUDE.md` §2.4 requires**; the rest support it. The
+step-1 draft had five, of which four were substitutes for an observation it had assumed impossible —
+see §0's sixth row.
 
-A second, narrower instance of the same paradox: **AC-6's `red-proof` job cannot judge 00a's own red
-commit.** At that commit there is no `src/`, so `lint:arch` fails with *"Can't open 'src' for
-reading"* and `typecheck` has nothing to check — the job's own precondition ("install, typecheck,
-lint and unit all passed") cannot hold. The phase-4 CI block therefore lands with the implementer at
-step 4, and the workflow that runs against the red commit is today's phase-3 `verify` job, which
-passes.
-
-**How 00a's red state is evidenced instead**, in decreasing durability:
-
-1. **The red commit itself**, in git, permanent — `test(00a): … (red)`, authored by the
+1. **The CI run on the red SHA.** `verify` green, `test` red, the failing files and the assertion
+   text in the job log and in the uploaded `test-results.json`. This is the observation itself, and
+   it is what `METHODOLOGY.md:335` obliges the orchestrator to log at step 3 — *"the red commit SHA
+   and the CI run that observed it failing, with the failing assertion quoted"*. The old items 1 and
+   2 (the commit; a green `verify`) are absorbed into it: the SHA is what the run is *on*, and the
+   green `verify` is the discriminating half of the same run.
+2. **The red commit itself**, in git, permanent — `test(00a): … (red)`, authored by the
    test-engineer, one commit, per `CLAUDE.md` §7.
-2. **The `verify` run on that SHA**, green, proving the branch was not merely broken. Combined with
-   (1) this is the same discrimination `red-proof` automates, performed by a human at step 5/6
-   instead of by a job.
-3. **`tools/test/red-proof.test.mjs`**, which proves the discriminator itself is correct in all six
-   cases — so what AC-6 promises for every later slice is verified here as logic, even though it
-   cannot be verified here as a live run. **Under O3 this file is now the test-engineer's** (§11.4),
-   which is what the substitution needed: a substitute for an independent check that is itself not
-   independent is worth much less.
+3. **`tools/ci/red-proof.mjs`, replayed offline against that run's own artifact.** Its contract takes
+   `--results <path>` and reads nothing from the environment, so once it exists at green commit 8 it
+   can be run against the red commit's downloaded `test-results.json` with `--verify success` and the
+   red SHA's subject: expected exit 0. **This narrows AC-6's bootstrap paradox rather than papering
+   over it** — `red-proof` still cannot *judge* the commit that introduced it as a live job, but it
+   can judge it as a replay against real data instead of only as logic over hand-made cases. It is
+   supported by `tools/test/red-proof.test.mjs`, which proves the discriminator correct in all six
+   cases and which under O3 is now the **test-engineer's** (§11.4) — a substitute for an independent
+   check has to be independent itself.
 4. **The reviewer's and the human's observation** at steps 5 and 6, recorded on the PR.
-5. **The verbatim `npm test` failure output at the red commit**, run locally by the test-engineer and
-   returned in its step-3 report — assertion text and failing paths. Accepted at step 2 because it is
-   the only item that speaks to *why* it was red, which is C1's own standard (*"a real assertion
-   failure rather than a missing import"*); items 1 and 2 can only show *that* it was. It is
-   **narration-tier** evidence and is labelled as such — but the report is captured verbatim by
-   `.claude/hooks/log-agent-finish.mjs` rather than retyped, so it cannot drift, and anyone can
-   reproduce it from the red SHA.
 
-**What the red commit is expected to redden, so the reviewer checks a prediction rather than forms an
-impression.** Red: `tests/acceptance/health.test.ts` (both AC-2 cases — no service to spawn) and
-`tests/architecture/layering.test.ts`'s AC-3 case (`depcruise` cannot open `src`). **Green:**
-`tests/integration/postgres-harness.test.ts`, because §4's `mkdirSync` keeps `globalSetup` working,
-and `layering.test.ts`'s AC-4 fixture cases.
+**Item 5 of the step-1 draft is withdrawn.** It asked the test-engineer to run `npm test` locally at
+the red commit and return the verbatim assertion output. There is **no container runtime on either
+role's machine** (§11.5), so `globalSetup` cannot start PostgreSQL and a local run produces a
+Testcontainers crash rather than assertion failures — the same "red for the wrong reason" this design
+rejects elsewhere. It is also no longer wanted: item 1 carries the assertion text with better
+provenance, being third-party, durable and machine-readable rather than narration.
 
 **AC-4 is green on arrival, and that is honest rather than a test-first violation.** Its fixture
 exercises `.dependency-cruiser.js`, which was authored at Gate B and already exists, so the test
@@ -848,18 +938,50 @@ criterion to have its own red; 00a's red comes from AC-1, AC-2 and AC-3. Stated 
 raised at step 5 as a finding — and it is a second reason the test-engineer's AC-3 addition (§5)
 earns its keep.
 
-**C1 becomes measurable from slice 00 onward**, where all four preconditions hold at the red commit:
-`src/` exists and conforms, the workflow carries typecheck/lint/test/red-proof, `collect-ci.mjs`
-exists, and the orchestrator can run it at the gate. Slice 00 is the pilot proper, which is the slice
-C1 was pre-registered to judge — so the criterion measures what it was written to measure, one slice
-later than the numbering suggests.
+### C1 is measurable for 00a, by backfill — correcting this design
 
-**The decision rule has no row for `UNMEASURABLE`, and the retro must say so out loud.** C1 *failing*
-is fatal; C1 *unmeasured* is neither pass nor fail. `docs/team-log/retro-slice-00a.md` must therefore
-state that the phase-4 decision rule is **not applied** to 00a's C1 at all, and that C1's first real
-measurement is slice 00 — otherwise "UNMEASURABLE" quietly reads as "not fatal, therefore fine",
-which is the same defeat as counting UNVERIFIED as PASS. Raised by the test-engineer at step 2 and
-accepted.
+The step-1 draft asserted that **C1 is unmeasurable for slice 00a by construction**, reasoning that
+`check.run` is emitted by `collect-ci.mjs`, which this slice builds, so at the moment the red commit
+is authored there is nothing to record the red run with. **That reasoning was wrong, and the error is
+worth naming: it conflates the moment of *authoring* with the moment of *recording*.** A CI run is a
+durable artifact in GitHub's API; the collector derives from it whenever it is run, not only as it
+happens. Nothing in ADR-0010 or in C1 requires the two to be simultaneous — only that the record be
+*derived* rather than narrated, which is what `allowDerived` earns.
+
+Three properties already in this design make the backfill work, and two of them were adopted for
+other reasons:
+
+- `collect-ci.mjs` accepts **`--run <id>`** and is **idempotent** on `checks.run_id` (§6), which is
+  what backfill and gate-time re-collection need;
+- **O-2 constraint 5** stamps `ts` from the run's `updatedAt`, not from collection time. Adopted to
+  stop C1 reporting FAIL on a correct slice; here it is the enabling condition, because the red run's
+  `updatedAt` is genuinely earlier than the green run's however late both are collected;
+- **O-2 constraint 4** appends oldest-run-first, so the two records land in the order `check.mjs`
+  reads.
+
+**The orchestrator's obligation, which is not optional.** If this reads as a possibility it will not
+happen, and the criterion returns to unmeasured:
+
+1. At step 3, record the **run id** of the CI run on the red SHA in the step-3 log entry, alongside
+   the SHA and the quoted assertion (`METHODOLOGY.md:335`).
+2. At the gate, after `collect-ci.mjs` exists (green commit 7), run it for **both** that red run and
+   the green run at the branch tip, in one invocation or in ascending `updatedAt` order.
+3. For the red run, **`suites` is omitted, not invented.** `gh run view --json jobs` yields job and
+   step conclusions only; per-suite results come from the Vitest JSON, which no collector parses.
+   §6's rule stands — the collector writes nothing it did not compute — and an omitted field is
+   honest where a guessed one would corrupt the very record C1 reads. `checks.jobs` carries
+   `{"verify": "PASS", "test": "FAIL"}`, which satisfies the `FAIL`-iff-failed invariant on its own.
+
+With those three done, `check.mjs` sees a failing `check.run` whose `ts` precedes a passing one and
+**C1 is measured on 00a** — the pilot's fatal criterion exercised on the pilot's own precursor rather
+than deferred.
+
+**The fallback, if the backfill does not happen.** Then and only then is C1 recorded as
+`UNMEASURABLE`, never as a pass — and the retro must state that the phase-4 decision rule is **not
+applied** to it at all, because the rule has no row for `UNMEASURABLE`: C1 *failing* is fatal, C1
+*unmeasured* is neither pass nor fail, and left unsaid it quietly reads as "not fatal, therefore
+fine" — the same defeat as counting UNVERIFIED as PASS. Raised by the test-engineer at step 2, and
+kept here as the fallback it now is rather than the expected outcome it was.
 
 Nothing in `process-criteria.md` is edited by this design. C1 stands as written; it is
 pre-registered, and a criterion edited after seeing a result is not a criterion.
@@ -919,8 +1041,8 @@ document also has a section of that number.)
 | **§5.2** | The as-built file list of §1; the `Db` alias and why nothing above persistence names `Kysely`; **`ServerDeps` as the http seam, in the narrowed form of §2(c) — `src/http` cannot *name* the handle's type — with the generic-parameter counterexample recorded beside it**; `/health` described as an operational probe outside §8.6's table; `src/domain` recorded as deliberately empty until slice 01, with the reason |
 | **§5.3** | The first render of the module dependency graph. It shows **four** modules, not five: `src/domain` is deliberately empty, so nothing to cruise. Eyeball it rather than trust it — §5 explains why an empty graph and a clean graph look identical |
 | **§7.1** | **The compose delta, as the human ruled:** `docker-compose.yml` starts `postgres` and `otel-lgtm` only, and the service runs on the host via `npm start`. §7.1 currently draws a third `scheduler` container. Containerising the app needs a Dockerfile, a build stage and an image-caching story maintained through twelve slices for no demo benefit |
-| **§7.2** | The harness as built: global setup, one container per run, **no reuse** and why; `provide`/`inject` rather than ambient env; the migration call that applies zero migrations, why it is unconditional, and why `globalSetup` also ensures the directory exists; `test:domain` and the second Vitest project deferred to slice 01; the `build` → `pretest` → spawn `dist/main.js` path the acceptance tests take |
-| **§7.4** | Replace the PHASE 4 comment block's description with what shipped: the two new `verify` steps, the `test` job, the `red-proof` job with its own checkout and its tested script, the run-summary artifact; **`lint:arch` as `tools/ci/lint-arch.mjs` and what it guards**; and the note that `red-proof` could not judge the commit that introduced it |
+| **§7.2** | The harness as built: global setup, one container per run, **no reuse** and why; `provide`/`inject` rather than ambient env; the migration call that applies zero migrations, why it is unconditional, and why `globalSetup` also ensures the directory exists; **the two Vitest projects, `db` and `nodb`, split by whether a test needs the database — `test:domain` becomes `test:nodb` and lands here rather than in slice 01, with the Docker-less reason (§4)**; the `build` → `pretest` → spawn `dist/main.js` path the acceptance tests take |
+| **§7.4** | Replace the PHASE 4 comment block's description with what shipped, **and with the split criterion that governs it — *needs `src/`*, not *belongs to phase 4***: the `test` job landing in the **red commit** so the red is observed in CI (`CLAUDE.md` §2.4), and only the two `verify` steps and the `red-proof` job deferred to green commit 9. Also: `red-proof`'s own checkout and tested script, the `test-results.json` artifact, **`lint:arch` as `tools/ci/lint-arch.mjs` and what it guards**, and the note that `red-proof` could not judge the commit that introduced it as a live job — only as a replay against that run's artifact |
 | **§8.5** | The `tests/setup/`, `tests/support/` and `vitest.config.ts` ownership ruling; the shape of `tests/architecture/layering.test.ts` including the negative control and the environment guard; `tools/test/` as the home of the three tool-level tests, now test-engineer-authored (§11.4); **and the `tests/integration/` boundary rule below** |
 | **arc42 §11.2** | Close R-8's first row: `collect-ci.mjs` exists after this slice, so the claim *"`check.run` remains unemitted"* is no longer true. The rest of R-8 stands until slice 00 makes C1 measurable |
 
@@ -1024,7 +1146,8 @@ proved it emits.
 
 | Script | Value | Author |
 |---|---|---|
-| `test` | `vitest run` | test-engineer, red commit |
+| `test` | `vitest run` — runs **both** projects, one `test-results.json` (§4) | test-engineer, red commit |
+| `test:nodb` | `vitest run --project nodb` — the Docker-less subset (§4) | test-engineer, red commit |
 | `build` | `tsc -p tsconfig.build.json` | implementer, green |
 | `pretest` | `npm run build` | implementer, green |
 | `start` | `node dist/main.js` | implementer, green |
@@ -1045,12 +1168,13 @@ acceptance criterion needs one, and slice 10's cURL harness can use `start`.
 |---|---|---|
 | `tsconfig.json` | `include: ["src","tests"]`, `noEmit`, NodeNext + `strict` + `verbatimModuleSyntax` | test-engineer, red commit — Vitest, `depcruise`'s `tsConfig.fileName` and the AC-4 fixture's mirrored `compilerOptions` all need it before any `src/` exists |
 | `tsconfig.build.json` | extends it; `include: ["src"]`, emit on, `outDir: "dist"` | implementer, green |
-| `vitest.config.ts` | single project, `globalSetup`, **`include` scoped to `tests/**`** (§4) | test-engineer, red commit |
+| `vitest.config.ts` | **two projects, `db` and `nodb`** (§4); `globalSetup` on `db` only; **`include` scoped to `tests/**`** | test-engineer, red commit |
 | `.gitignore` | `dist/` | implementer, green |
 
 **The commit split.** The red commit carries the test toolchain: `tsconfig.json`, `vitest.config.ts`,
 `tests/**` (including `tests/setup/` and `tests/support/`), the three `tools/test/*.test.mjs` files
-per §11.4, and these dependencies —
+per §11.4, **the `test` job in `.github/workflows/verify.yml`** (§7 — without it the red is never
+observed and the board cannot leave `red`), and these dependencies —
 
 - **devDependencies:** `vitest`, `@testcontainers/postgresql` (+ `testcontainers`), `node-pg-migrate`,
   **`typescript`** (O1: without it the fixture cruises nothing and `typecheck` cannot run),
@@ -1061,7 +1185,23 @@ per §11.4, and these dependencies —
 
 The implementer's commits then add `src/**`, the remaining runtime dependencies (`fastify`,
 `@sinclair/typebox`, `kysely`, `pino`), `docker-compose.yml`, `tools/**`, the scripts and configs
-above, and the CI block. Both roles edit `package.json`, sequentially and in different stanzas.
+above, and — at commit 9 — the part of the CI wiring that needs `src/`: the `typecheck` and
+`lint:arch` steps on `verify`, and the `red-proof` job. Both roles edit `package.json` and
+`verify.yml`, sequentially and in different stanzas and jobs; the implementer does **not** modify the
+`test` job the red commit landed.
+
+**What *"every implementer commit is green"* (`CLAUDE.md` §7) means in this slice, since there is no
+local database.** It is the operative definition the reviewer checks against:
+
+| Check | Before each commit |
+|---|---|
+| `npm run typecheck` · `npm run lint:arch` · `npm run test:tools` · `npm run build` | locally green |
+| `npm run test:nodb` — unit tests, the AC-4 fixture, AC-3 | locally green |
+| `npm test` — everything touching PostgreSQL, and both AC-2 cases | **CI only** |
+
+Recommended, though scheduling is the orchestrator's: the implementer **pushes after each of the nine
+commits** rather than in batches. They are small, the runs are cheap, and it turns "green" from an
+assertion into nine recorded runs — which also feeds C4.
 
 The implementer may still object that scaffolding is landing in a `test(…)` commit; the answer is
 AC-1 — *"`npm ci && npm test` starts a container and the suite connects"* is the acceptance
@@ -1081,8 +1221,11 @@ was false.** `test:tools` is a literal `&&` chain of four named files, so a new
 `tools/test/*.test.mjs` does not run in CI until someone wires it in. Therefore:
 
 - the **test-engineer** authors `tools/test/collect-ci.test.mjs`, `tools/test/red-proof.test.mjs` and
-  `tools/test/lint-arch.test.mjs` in the red commit. They are red, and **invisible to `verify`**,
-  which stays green — evidence item 2 in §7 is preserved exactly;
+  `tools/test/lint-arch.test.mjs` in the red commit. They are red, and **invisible to CI** — not
+  named in `test:tools`, and not collected by Vitest, whose `include` is scoped to `tests/**` (§4).
+  So `verify` stays green on the red commit, which §7 now depends on twice over: it is the
+  discriminating half of the observation, and a failure here would abort `verify` before the run that
+  observes the red is complete;
 - the **implementer** wires all three into the `test:tools` chain in the green commits that make them
   pass.
 
@@ -1109,14 +1252,23 @@ Each is a real improvement that is deliberately not made in this slice, with the
 | **`test:tools` should discover `tools/test/*.test.mjs` rather than name them** | §11.4's arrangement depends on the literal chain. Once all three tools are wired, a globbing runner is safe — orchestrator's, and after this slice |
 | **`graph:modules` has `lint:arch`'s pre-O1 failure mode**: an empty graph and a clean graph render identically | Cosmetic; it gates nothing. §5.3's first render is eyeballed instead |
 | **`docker-compose.yml` does not start the service** (human-ruled, §11.1) | A Dockerfile, a build stage and an image-caching story maintained through twelve slices for no demo benefit. Recorded in §7.1 |
-| **One Vitest project, not two** (§4) | `test:domain` needs a `tests/unit/` that does not exist yet; a second project with `passWithNoTests` would stay green forever |
+| **The step-1 evidence item 5** — a local `npm test` at the red commit, returned verbatim | **Withdrawn as unavailable**, not deferred: no container runtime means a local run crashes in `globalSetup` rather than producing assertion failures. It is also no longer wanted — the CI run on the red SHA carries the assertion text with better provenance (§7) |
 
-**Environmental note from the implementer, which changes nothing in the design but bears on step 4:**
-there is no container runtime in its environment — no `docker`, no `podman`, no socket. AC-1 and every
-Testcontainers-backed run are therefore **not locally verifiable by the implementer**. It can prove
-`typecheck`, `lint:arch` and the tool suites green before each commit; *"every commit is green"* for
-the Testcontainers path depends on CI or on the human's machine. The reviewer should read the commit
-sequence with that in mind rather than treating it as carelessness.
+**No container runtime on either role's machine — a stated constraint, not an aside.** `docker` and
+`podman` are both absent and `/var/run/docker.sock` does not exist, for the implementer and the
+test-engineer alike; `ubuntu-latest` runners have Docker, so CI is unaffected. Reported by the
+implementer at step 2 and confirmed before step 3, and it is load-bearing in three places rather than
+being background:
+
+- it forced the **two-project split** (§4), because one project makes *every* local test run
+  impossible for both roles, including the implementer's inner TDD loop;
+- it **withdrew evidence item 5** (§7), which removed the last item compensating for a red that was
+  never going to be observed in CI — and so exposed **S-1** (§0);
+- it sets the operative meaning of *"every implementer commit is green"* (§11.3): locally green on
+  everything that does not need a database, CI-green on everything that does.
+
+The reviewer should read the commit sequence with that in mind rather than treating it as
+carelessness.
 
 **A second note for the reviewer.** `guard-paths.mjs`'s Bash branch is a substring test: any
 write-ish shell command containing the literal `src/` is denied wherever the path points, so ordinary
