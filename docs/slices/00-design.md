@@ -43,6 +43,27 @@ not.
 | **I-8** | §8.2's mitigation 2 is false — the harness silences the logger the fallback depends on | **(a)** accepted; mitigation **replaced**, not merely corrected | `tests/setup/postgres.ts:68` passes `log: () => {}`. The architect read the mechanism in `db.js` and not the call site, having quoted that call site earlier in the same session |
 | **I-9** | The `singleTransaction` divergence is **conformance drift from ADR-0007**, not two entry points with different defaults — so the stated reason for deferring it was wrong | **(a)** accepted; deferral **held on corrected grounds**; debt relocated | ADR-0007's Decision says the runner is invoked programmatically on both paths; `package.json:18` is the CLI binary. The remedy is entirely on the non-test-owned side, so the seam-promise argument never applied |
 
+**Step 3 findings, ruled 2026-09-04** after the red commit was observed in CI.
+
+| # | Objection | Outcome | Reasoning, in one line |
+|---|---|---|---|
+| **T-7** | `postgres-harness.test.ts:50` asserts `pgmigrations` is empty, so **the slice cannot reach all-green as specified**, and §8.3 assigns the fix to nobody | **(a)** accepted; ruled to the **structural** form, not the literal one | §4.1 cites that file four lines above the failing assertion. §8.3 enumerated files by ownership risk and never asked which existing *assertions* this slice falsifies |
+| **T-8** | Case 0's stated limit leaves an added singleton foreign key undetected, falsifying §6.2 while all ten cases pass | **(a)** accepted; the architect's **own limit narrowed** rather than defended | Extra constraints on the table every case writes to are not like the column types and unrelated objects the limit had bundled them with. Same query, same mechanism, no added fragility |
+
+T-7's remedy was ruled **(a) over (b)** — a second test-engineer commit rather than an implementer
+obligation at step 4 — on a ground stronger than attribution: `tests/integration/` is not in
+`guard-paths.mjs`'s `TEST_OWNED`, so (b) would have had the implementer editing a test-engineer-owned
+assertion to green its own commit, with the hook allowing it. That is **O-9**, recorded in §8.3 where
+the reader who needs it will find it.
+
+**The test-engineer took the structural form and improved on the ruling.** It placed the
+migration-names assertion ahead of the extension because *"it names the cause where the extension names
+a symptom"*, and identified a property the ruling had implied without stating — **it is the only
+assertion in the suite that says where the schema came from.** It also narrowed case 0's limit in the
+file's own docblock rather than waiting for this document, and verified the commit's polarity by
+running `red-proof`'s `judge()` offline rather than asserting it. Landed as `dc3b459`, unmarked;
+`98ace77` remains the slice's single red commit.
+
 **No loopback was consumed.** All five are **(a) Clarification** under `CLAUDE.md` §6 — the design's
 substance held, its specification was incomplete or its stated reasons were false — so the slice stays
 at `loopbacks: 0`. That is what §6's *"objections here are cheap; the same ambiguity found at step 5
@@ -120,6 +141,25 @@ the technique, correctly applied**: §2's proof that `[)` and `(]` are indisting
 discriminating case and shows there is none. The method was present, used on the constraint, and not
 turned on the document's own test steps. **An attention asymmetry, not a knowledge gap** — which is a
 harder thing to fix with a rule and the reason it is written down rather than resolved.
+
+**A second tier, named at step 3 because it has now happened twice.** §8.1's prediction of which
+assertion fails first was wrong at step 2 (it named `to_regclass`; case 0 asserted the extension
+first) and wrong again at step 3 (it named `btree_gist`; case 0 now asserts `pgmigrations` first).
+Neither needed a measurement to catch, and neither was wrong on its own page — both were wrong because
+they **restated a fact that §4.1 already stated**, four sections away, where two copies drift without
+either looking incorrect locally.
+
+> **Tier 2 — a document contradicting itself.** Cheaper than the capability/configuration tier: no
+> mutant, no call site, no container. Catchable by reading the document against itself.
+>
+> The remedy is not a better prediction. It is **not restating the fact**: a claim about which
+> assertion fails first belongs beside the assertion order, or it names the *rule* rather than the
+> assertion. §8.1 now says *"case 0's first assertion, whichever §4.1 lists first"*, which is true
+> under every reordering because there is one statement of the order rather than two.
+
+The two tiers differ in what they cost to catch, and that is why they are separated: tier 1 needs
+something run, tier 2 needs something read. **Tier 2 came first in this document both times and was
+found last both times**, which is the opposite of the order effort should be spent in.
 
 ---
 
@@ -433,13 +473,36 @@ import, which is the point of the slice.
 
 The first case asserts the schema under test **is** §8.1's schema, from the catalogue:
 
-- `pg_extension` contains `btree_gist`;
-- `to_regclass` resolves all nine relations of §8.1;
-- and for **each of the seven** named constraints on `appointment`, the full normalised
-  `pg_get_constraintdef(oid)` is compared **by equality** against an expected string:
-  `no_bay_overlap`, `no_technician_overlap`, `appointment_interval_ordered`,
-  `appointment_technician_qualified`, `appointment_bay_in_dealership`,
-  `appointment_technician_in_dealership`, `appointment_vehicle_owned_by_customer`.
+**(a)** `pgmigrations` records exactly `0001_extensions`, `0002_reference_data`,
+`0003_appointment`, in filename order;
+**(b)** `pg_extension` contains `btree_gist`;
+**(c)** `to_regclass` resolves all nine relations of §8.1;
+**(d)** the set of non-primary-key constraint names on `appointment` is **exactly** the seven, and
+then for **each** of them the full normalised `pg_get_constraintdef(oid)` is compared **by equality**
+against an expected string: `no_bay_overlap`, `no_technician_overlap`,
+`appointment_interval_ordered`, `appointment_technician_qualified`, `appointment_bay_in_dealership`,
+`appointment_technician_in_dealership`, `appointment_vehicle_owned_by_customer`.
+
+**(a) is first because it is the most upstream fact, and it carries a property nothing else in the
+suite has.** As built, the test-engineer placed it ahead of the extension on the reasoning that *it
+names the cause where the extension names a symptom* — and observed something this design's ruling
+implied without stating: **it is the only assertion in the suite that says where the schema came
+from.** A schema created by a stray `CREATE TABLE` in a fixture, or baked into a container image,
+satisfies every other case in the file. ADR-0007's entire argument is that the schema is reproducible
+from a corpus of ordered, immutable `.sql` files, and (a) is what holds it to that. It also sits here
+rather than in `postgres-harness.test.ts` because it is a per-slice fact — see §8.3 and T-7.
+
+**(d)'s set equality is what makes §6.2 enforceable rather than documentary — this is T-8.** §6.2
+forbids the singleton foreign keys on `dealership_id`, `service_type_id` and `customer_id` because
+they *"would make the reported constraint non-deterministic in exactly the cases §4.2 depends on being
+deterministic"*, and until step 3 nothing asserted it. Adding `appointment_customer_id_fkey` for
+tidiness breaks no case in the file: AC-6 seeds its customer, so the singleton is satisfied and only
+the composite fires. The damage lands at slice 03, where §8.6 maps `422 /problems/unknown-reference`
+**by constraint name** and a second `23503` reaching the same insert makes which name arrives a matter
+of declaration order. Two boundaries hold the remedy narrow: the filter is `contype <> 'p'`, measured
+clean on `postgres:16` where `pg_constraint` returns the seven plus `appointment_pkey`; and it is
+**not** extended to the other eight tables, because no case discriminates on their constraints and
+doing so is the first step back toward the whole-`\d` snapshot rejected below.
 
 **Equality, not substrings, and not `conname` plus `contype` — this is T-4.** The step-1 draft
 asserted names and constraint types and called that coverage. It is not: a `no_bay_overlap` keyed on
@@ -486,11 +549,23 @@ and it proves nothing about whether they **fire** — arc42 §8.2's own conseque
 ruleset that has never rejected anything is not evidence"* pointed at the database. Cases 1 to 8 prove
 firing.
 
-It also proves nothing about **what else is in the schema**: an extra constraint, a missing `NOT
-NULL`, a wrong column type. Closing that would mean snapshotting the whole `\d` output, which is
-rejected — it is brittle against every unrelated change and would be edited into uselessness within
-three slices. The limit is stated so the next reader does not mistake case 0 for a whole-schema
-guarantee.
+**The limit, narrowed at step 3 rather than defended (T-8).** The step-2 form read *"nothing about
+what else is in the schema — an extra constraint, a missing `NOT NULL`, a wrong column type"*, and
+that bundled three unlike things. An extra constraint **on `appointment`** is not like the other two:
+`appointment` is the table every case writes to, and constraint identity is precisely what every
+negative assertion discriminates on, so an extra constraint there is the one addition that can change
+what a passing test means. Set equality on names is the same query and the same mechanism, and unlike
+the definition comparison it carries no text fragility. It is closed.
+
+What remains open, stated accurately rather than merely shorter: a missing `NOT NULL` on
+`appointment`, a wrong column type, the constraints on the other eight tables, and unrelated schema
+objects. Closing *those* would mean snapshotting the whole `\d` output, which is rejected — brittle
+against every unrelated change, and edited into uselessness within three slices.
+
+**The test-engineer narrowed the same limit in the file's own docblock rather than waiting for this
+section**, on the reasoning that *"leaving prose standing that the code has outgrown is the thing I
+have been objecting to twice."* That is the correct instinct and it is the same one §4.2's maintenance
+obligation encodes: the prose and the assertion change together or the prose becomes decoration.
 
 ### 4.2 The isolation rule, which is where this file is most likely to go wrong
 
@@ -838,9 +913,25 @@ The red is assertion-shaped **by ownership**, not by luck, and the property is c
 migration file existed at the red commit it would mean either a `guard-paths` denial that did not
 fire or an implementer commit ordered before the test commit, and both are visible in git.
 
-**What the failure will say.** Case 0 fails first with `to_regclass('appointment')` null. Every AC
-case fails on `42P01 relation "dealership" does not exist` from its own `seedDealership` call. That
-is a legible red: one message that names the missing schema, and eight that name the missing seed.
+**What the failure says.** Case 0 fails on **its first assertion, whichever §4.1 lists first** — as
+built, `pgmigrations` empty. Every AC case fails on `42P01 relation "dealership" does not exist` from
+its own `seedDealership` call, inside its own `it()` body. Observed on the red commit: ten failing
+cases in one file, zero hook or collection errors, `typecheck` and `lint:arch` clean.
+
+**This sentence has been wrong twice, and the correction is structural rather than another
+restatement.** The step-1 draft predicted `to_regclass('appointment')` null; case 0 asserted the
+extension first, so the red came from `btree_gist`. Step 3 then moved the migration-names assertion to
+the front, and the red came from `pgmigrations`. Neither prediction was wrong on its own page — each
+was wrong because it restated §4.1's ordering four sections away, where the two drift without either
+looking incorrect locally. The test-engineer's form of it is the right one:
+
+> **A prediction about which assertion fails first is a claim about assertion ordering, and it belongs
+> beside the ordering.**
+
+So this section no longer names the assertion. It names the rule — *case 0's first assertion, whatever
+§4.1 lists first* — which is true under every future reordering and cannot drift, because there is now
+one statement of the order rather than two. §0.1 records why this class is worth separating from the
+others.
 
 **`red-proof` classifies it as `tests/integration/`-only**, which is exactly the case O-1's ruling
 added to the red zone on 2026-09-04 and which has never run live (§9).
@@ -888,14 +979,54 @@ spends 00a's seam promise on the slice whose failure-attribution depends on noth
 with A-4 closed the fallback is now rarely reached at all. That reasoning holds where I-9's did not.
 It is recorded as a deferred improvement in §11.3.
 
-### 8.3 What must not be changed
+### 8.3 What the slice touches, and what it must not
 
-**Slice 00 adds `0001`, `0002`, `0003` under `src/persistence/migrations/`, plus
-`tests/integration/exclusion-constraints.test.ts`, `tests/support/seed.ts` and `tests/support/ids.ts`
-— and modifies no existing file.** In particular `tests/setup/postgres.ts`, `vitest.config.ts`,
-`package.json` and `.github/workflows/verify.yml` are untouched. That is 00a's seam promise, and it
-has evidential value beyond tidiness: if this slice's CI run fails, the failure is attributable to
-the migrations and the new tests, because nothing else moved.
+**Adds:** `0001_extensions.sql`, `0002_reference_data.sql`, `0003_appointment.sql` under
+`src/persistence/migrations/`; `tests/integration/exclusion-constraints.test.ts`;
+`tests/support/seed.ts`; `tests/support/ids.ts`.
+
+**Modifies exactly one existing file:** `tests/integration/postgres-harness.test.ts`.
+
+**Untouched, and this is the seam promise:** `tests/setup/postgres.ts`, `vitest.config.ts`,
+`package.json`, `.github/workflows/verify.yml`. If this slice's CI run fails, the failure is
+attributable to the migrations and the tests, because the harness, the runner and the pipeline did
+not move.
+
+**The step-1 and step-2 drafts of this section said the slice modifies *no* existing file, and that
+was wrong — T-7.** `postgres-harness.test.ts:50` asserted `count === '0'` on `pgmigrations` under the
+name *"zero migrations applied"*. At the green commit it holds three, so **the slice could not have
+reached "all tests green" as specified.** §4.1 cites that file's `server_version` case four lines
+above the failing assertion, as the evidence for the bounded-fragility argument, and the architect
+read past it.
+
+The miss has a shape worth stating, because no step of the loop currently asks the question:
+
+> **This section enumerated files by *ownership risk*. It never asked which existing *assertions* this
+> slice's work falsifies.**
+>
+> "Do not modify X" protects attribution. "What asserts the fact I am about to change" protects the
+> suite from going stale. They are different questions and this section answered only the first.
+
+The remedy is in §4.1: the harness test now asserts the seam **ran** — `pgmigrations` exists and is
+reachable, a property true at every commit of every slice — and what the seam **carried** moved into
+case 0 (a), where it is a per-slice fact with the right polarity, red before the migrations land and
+green after. Landed as `dc3b459`, **unmarked**, so `98ace77` remains this slice's single red commit
+under `CLAUDE.md` §7; `red-proof`'s `judge()` was run offline against that subject and returned *not
+applicable*, so the polarity was verified rather than asserted.
+
+**Why the alternative was dangerous rather than merely untidy — O-9.** The rejected option was to
+leave the stale assertion for the implementer to fix at step 4. `tests/integration/` is **not** in
+`guard-paths.mjs`'s `TEST_OWNED` list, and an implementer `Write` there is **ALLOWed** — verified by
+the orchestrator. So the hook would not have stopped the implementer editing a test-engineer-owned
+assertion in order to green its own commit, which is the precise shape `CLAUDE.md` §5 forbids. **That
+is a gap in the hook, not permission.**
+
+It is deferred rather than closed, and the reason is that the obvious fix is wrong: a blanket deny on
+`tests/integration/` contradicts §5, which makes the directory *shared*. The enforceable form is 00a
+step 7's structural rule — deny an implementer write to an **existing** `tests/integration/` file that
+does not import `src/` — and that needs the hook to read file contents, which it does not do today.
+Recorded here rather than only in the register because a reader of this section is the one who needs
+to know that the boundary protecting it is documentary.
 
 ---
 
@@ -920,9 +1051,23 @@ authored — that is 00a's AC-6 bootstrap paradox, narrowed but not closed. Here
 branch has six unit cases behind it and has never executed against a real run. Slice 00 is its first.
 
 **The failure is unambiguous in a way 00a's could not be.** 00a's red came from three directories and
-from a `depcruise` invocation whose predicted cause turned out to be wrong (F1). Slice 00's red comes
-from one file, asserting against a schema that provably does not exist, with a first case whose
-message names the missing relation. There is no second explanation available.
+from a `depcruise` invocation whose predicted cause turned out to be wrong (F1). Slice 00's red has
+**one cause**: the migrations do not exist. Every failing assertion is that absence restated — case 0
+as an empty `pgmigrations`, the nine AC cases as `42P01` on their own `seedDealership` line. **There is
+no second explanation available.**
+
+**The step-1 and step-2 wording was *"the red comes from one file"*, and that conflated the incidental
+with the evidential.** As it happens the count is **still one** — `dc3b459` took the structural form,
+so `postgres-harness.test.ts` asserts only that the seam ran and is green at the red commit and after.
+But it would have been **two** under the literal remedy the test-engineer first offered, and the
+evidential claim would have been untouched, because two files naming one absence is *one explanation
+stated twice*. That the file count survived is luck about which remedy was chosen, not evidence.
+
+This is why T-7 cost less than it was priced at. The test-engineer offered to spend this claim and
+called it the architect's to spend; it was not spent, because the claim that matters was never about
+files. **A claim that stays true for a reason other than the one that made it true is worth exactly as
+much attention as one that goes false** — and it is only visible here because a remedy nearly falsified
+it.
 
 **And one criterion will pass vacuously, which is said now rather than in the retro.** **C4** —
 *"architecture held unprompted", measured from `depcruise` in `check.run`* — will report PASS,
@@ -1036,6 +1181,19 @@ M-4 is the one that nearly became a wrong sentence: the architect's first probe 
 bug in the probe's own fixture-splitting `sed`. Recorded because it is the mechanism of rule 2 working
 on the person who wrote the rule.
 
+### 11.1a Observed at step 3, correcting this design
+
+| # | This design said | What was observed |
+|---|---|---|
+| **O-a** | Case 0 fails first on `to_regclass('appointment')` null (step-1 draft) | It failed first on **`btree_gist` absent**, because §4.1 asserted the extension before the relations. Contradicted §4.1 on its own page |
+| **O-b** | Case 0 fails first on `btree_gist` absent (step-2 draft) | It fails first on **`pgmigrations` empty**, because step 3 moved the migration-names assertion to the front. Same drift, one step later |
+| **O-c** | *"The red comes from one file"* | Still one file, but for a different reason than when written — `dc3b459` chose the structural remedy; the literal one would have made it two without touching the evidential claim (§9) |
+| **O-d** | *"Slice 00 modifies no existing file"* | It modifies `tests/integration/postgres-harness.test.ts`. T-7, and §8.3 carries the corrected list and the reason the enumeration was the wrong one |
+
+O-a and O-b are one defect, not two, and §0.1 records it as tier 2 rather than as two rows here. The
+observation that matters for the retro is that **both were catchable by reading this document against
+itself**, and neither was caught that way.
+
 ### 11.2 Assumed, not measured
 
 | # | Assumption | Why it is not measured, and what depends on it |
@@ -1046,6 +1204,7 @@ on the person who wrote the rule.
 | **A-4** | ~~Whether the implementer's and the test-engineer's shells can reach a Docker daemon~~ | **CLOSED at step 2, 2026-09-04.** Docker works in all three roles' shells; the `db` project runs in about 3.4 s. This falsifies 00a §11.5's *"no container runtime on either role's machine"*. §8.2's mitigation 1 is promoted to the stated step-4 loop and arc42 §7.2 records what it does and does not falsify in 00a. Struck rather than deleted: a closed assumption that vanishes leaves no evidence it was ever open |
 | **A-5** | That the planner *chooses* the partial GiST indexes for the availability query (§8.2 consequence 6) | Index definitions are measured; plan selection is not, and belongs to QS-14, not here |
 | **A-6** | That `npm run db:migrate` — the CLI, whose logger is not silenced — names the failing **migration file** on a malformed statement | The CLI's failure output was observed today; it was not checked for the filename specifically. §8.2's mitigation 2 rests on it, so **step 4 measures it in one command before relying on it.** Asserting it would be the fourth instance of the shape §0.1 records, in the section written to correct the third |
+| **A-7** | That a later PostgreSQL major version does **not** surface `NOT NULL` as `pg_constraint` rows, which would break case 0 (d)'s `contype <> 'p'` filter | Measured clean on `postgres:16` — `pg_constraint` for `appointment` returns the seven plus `appointment_pkey` and nothing else. Not measured on any later major, and deliberately not guessed at. If one does, case 0 fails loudly in the same commit as the bump, alongside the definition assertions, which is the same bounded fragility §4.1 already accepts |
 
 ### 11.3 Deferred, with the reason
 
@@ -1054,6 +1213,23 @@ on the person who wrote the rule.
 | **Conforming `npm run db:migrate` to ADR-0007** — the runner invoked programmatically on both paths | **This is the correct framing, and the step-1 draft's was wrong (I-9).** It is not a `singleTransaction` flag on a test-owned file; it is conformance drift from an immutable ADR whose remedy is entirely on the non-test-owned side. Deferred because there is no cheap fully-conforming fix and the drift is invisible on success and loud on failure — not because of the seam promise, which never applied. Recorded in arc42 §11 naming ADR-0007, with the recommendation to conform rather than supersede (§10.2) |
 | **Replacing `log: () => {}` in `tests/setup/postgres.ts`**, so a malformed migration names its file | Here the seam-promise argument *does* hold: the file is genuinely test-engineer-owned and this is the slice whose failure-attribution depends on nothing else moving. With A-4 closed the fallback is rarely reached, and `npm run db:migrate` covers it (§8.2 mitigation 2). The implementer raised I-8 and did not ask for this fix |
 | **`dist/persistence/` holds no migrations**, because `tsc` emits only `.ts` | Inert today — both migration paths read `src/persistence/migrations/` from disk and `dist/main.js` never migrates. Recorded in arc42 §11 **coupled to the ADR-0007 item**, because a conforming programmatic `db:migrate` must resolve a directory the build actually populates or it ships broken |
+| **`guard-paths.mjs` does not enforce §5's shared-`tests/integration/` boundary** (O-9) | An implementer `Write` under `tests/integration/` is ALLOWed, verified. Not closed here because the obvious fix is wrong: a blanket deny contradicts §5, which makes the directory shared. The enforceable form is 00a step 7's structural rule — deny a write to an **existing** `tests/integration/` file that does not import `src/` — which needs the hook to read file contents. §8.3 carries it where a reader will meet it |
+
+### A standing check this slice should have had
+
+**A slice that changes a fact must find the tests that assert the old one.** T-7 existed because §8.3
+enumerated files by ownership risk and stopped there. The two questions are different and only one of
+them was asked:
+
+| Question | Protects | Asked at step 1? |
+|---|---|---|
+| *Which files must this slice not modify?* | attribution of a failure | yes |
+| *Which existing assertions does this slice's work falsify?* | the suite not going stale | **no** |
+
+The second costs one `grep` for the fact being changed — here, for `pgmigrations` — and it would have
+found `postgres-harness.test.ts:50` at step 1 rather than at step 3, before the red was pushed and
+before a second commit was needed. It belongs in every future slice's design, and it is cheap enough
+that there is no argument for leaving it out.
 | **A test that exercises the down migrations** | ADR-0007 puts down migrations outside any recovery story; the DoD says migrations run **forward** from empty; no AC mentions them. M-7 records that they work today. A test would pin behaviour nothing depends on |
 | **The demo seed and `npm run db:seed`** | ADR-0012's second half, and not in this slice's *In scope*. It has a different consumer (the cURL harness, TC-5) and inventing it now would fix the demo narrative six slices early |
 | **An `updated_at` trigger** | §6.4. The obligation moves to the writer; a trigger is behaviour in the database beyond the invariant |
