@@ -141,6 +141,15 @@ try {
       const prefix = `${tag}-${role}-`;
       // Pair with the highest-numbered prompt for this role and scope: the hook
       // that wrote it ran at the spawn this stop corresponds to.
+      //
+      // An agent RESUMED via SendMessage stops again without a new prompt file,
+      // so a single `<scope>-<role>-<n>.report.md` would be overwritten by every
+      // resume and only the last would survive.  During slice 00a the architect
+      // was resumed six times and five reports were silently lost — the same
+      // failure shape this slice kept finding elsewhere: a mechanism that looks
+      // like it works because losing data is silent.  Resumes therefore get
+      // `.report.2.md`, `.report.3.md`, … beside the first, so the reasoning
+      // chain of a long adjudication survives in order.
       const n = readdirSync(dir)
         .filter((f) => f.startsWith(prefix) && /-(\d+)\.md$/.test(f))
         .reduce((max, f) => Math.max(max, Number(f.match(/-(\d+)\.md$/)[1])), 0);
@@ -148,7 +157,16 @@ try {
       const text = (last?.message?.content ?? [])
         .filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
       if (n && text) {
-        writeFileSync(join(dir, `${prefix}${n}.report.md`), [
+        // First stop writes .report.md; each later stop of the same invocation
+        // appends a numbered sibling rather than replacing it.
+        const base = `${prefix}${n}.report`;
+        let reportName = `${base}.md`;
+        if (existsSync(join(dir, reportName))) {
+          let turn = 2;
+          while (existsSync(join(dir, `${base}.${turn}.md`))) turn++;
+          reportName = `${base}.${turn}.md`;
+        }
+        writeFileSync(join(dir, reportName), [
           `# Report · ${scope.slice ? `slice ${scope.slice}` : `phase ${scope.phase ?? '0'}`} · ${role} · invocation ${n}`,
           '',
           'Extracted from the agent transcript by `.claude/hooks/log-agent-finish.mjs`.',

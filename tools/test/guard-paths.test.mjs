@@ -48,6 +48,23 @@ const CASES = [
     { tool_name: 'Bash', agent_type: 'test-engineer', command: 'cp x.ts src/domain/bad.ts' }],
   ['...and so is an explicitly relative one', DENY,
     { tool_name: 'Bash', agent_type: 'test-engineer', command: 'cp x.ts ./src/domain/bad.ts' }],
+  // Five false positives in five consecutive agent runs during slice 00a, every one a
+  // legitimate action. A guard that stops more real work than violations inverts its
+  // purpose, and an agent working around it by concatenating 's' + 'rc' teaches exactly
+  // the habit the reviewer then has to see through.
+  ['a heredoc body naming a guarded path is prose, not a write', ALLOW,
+    { tool_name: 'Bash', agent_type: 'implementer',
+      command: "git commit -q -F - <<'EOF'\nfeat: raise a DCR rather than edit tests/acceptance/x.ts\nEOF" }],
+  ['git restore --staged is not a write, even of a guarded path', ALLOW,
+    { tool_name: 'Bash', agent_type: 'architect',
+      command: 'git restore --staged docs/team-log/events.jsonl' }],
+  ['git diff over a guarded path is not a write', ALLOW,
+    { tool_name: 'Bash', agent_type: 'implementer', command: 'git diff tests/acceptance/' }],
+  ['...but a real redirect into a guarded path is still denied', DENY,
+    { tool_name: 'Bash', agent_type: 'implementer', command: 'echo x > tests/acceptance/03.spec.ts' }],
+  ['...and a heredoc redirected INTO a guarded path is still denied', DENY,
+    { tool_name: 'Bash', agent_type: 'implementer',
+      command: "cat > tests/acceptance/03.spec.ts <<'EOF'\nit('x', () => {});\nEOF" }],
   // Ruled to the test-engineer at Gate B (CLAUDE.md §5). QS-10 asserts the layering the
   // implementer must not be able to relax, so it is guarded like the other outside-in dirs.
   ['implementer may not write an architecture test (QS-10)', DENY,

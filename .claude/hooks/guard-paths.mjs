@@ -135,7 +135,30 @@ if (tool === 'Bash') {
   const cmd = String(input.command ?? '');
   const guarded = [...policy.write, ...UNIVERSAL_WRITE_DENY];
   const writeish = /(^|[\s;&|])(>{1,2}|tee\b|sed\s+-i|truncate\b|dd\b|cp\b|mv\b|rm\b|install\b)/;
-  if (writeish.test(cmd)) {
+
+  // Commands that cannot write a working-tree file, however they mention one.
+  // Slice 00a produced FIVE false positives in five consecutive agent runs, and
+  // every one was a legitimate action: building a fixture under a temp dir,
+  // `git commit -F` with a heredoc naming a guarded path in its MESSAGE, and —
+  // worst — `git restore --staged docs/team-log/…`, which was denied *because it
+  // names the path it was un-staging*, blocking the correction to a boundary
+  // violation rather than the violation.  A guard that stops more legitimate work
+  // than violations inverts its purpose, and its normal workaround becoming
+  // obfuscation (an agent concatenated 's' + 'rc' to get past it) teaches exactly
+  // the habit the reviewer then has to see through.
+  //
+  // A heredoc body is prose, not a path.  Git plumbing that unstages or inspects
+  // writes nothing a hook needs to stop.  The Write/Edit branch above is the real
+  // enforcement and is unaffected — this branch was always a speed bump.
+  const heredocBody = /<<-?\s*'?[A-Za-z_]+'?\n[\s\S]*?\n[A-Za-z_]+\s*$/m;
+  const readOnlyGit = /^\s*git\s+(restore\s+--staged|reset|diff|status|log|show|stash\s+list|add\s+-p)\b/;
+  const stripped = cmd.replace(heredocBody, ' <heredoc> ');
+
+  if (readOnlyGit.test(cmd)) {
+    process.exit(0);
+  }
+
+  if (writeish.test(stripped)) {
     for (const prefix of guarded) {
       // Anchor the match to a path that would actually resolve inside the repo.
       // A bare substring test denied any command merely CONTAINING `src/` —
@@ -151,7 +174,7 @@ if (tool === 'Bash') {
       // An ABSOLUTE path elsewhere (/tmp/probe-1/src/...) is someone else's tree.
       // `./src/` is not: the leading `/` is required, so a relative path still bites.
       const underAbsolute = new RegExp(`(^|[\\s;&|='"\`])/[\\w.-]+(/[\\w.-]+)*/${escaped}`);
-      if (inRepo.test(cmd) && !underAbsolute.test(cmd)) {
+      if (inRepo.test(stripped) && !underAbsolute.test(stripped)) {
         deny(`${role} may not modify ${prefix}* — the command appears to write there via the shell. ${policy.note}`);
       }
     }

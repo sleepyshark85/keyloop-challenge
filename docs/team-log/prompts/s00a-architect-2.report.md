@@ -4,34 +4,33 @@ Extracted from the agent transcript by `.claude/hooks/log-agent-finish.mjs`.
 This is the report **as returned** — it is derived, not retyped, so it cannot drift.
 
 - Task: Adjudicate step 2 objections
-- Returned: 2026-09-04T02:00:07.866Z
-- Duration: 7314s
+- Returned: 2026-09-04T03:18:25.600Z
+- Duration: 12011s
 
 ---
 
-Committed as `0622b67`, one file. `docs:check` and `test:tools` pass (10/10). Nothing pushed, no PR comment.
+Committed as `804c91e`, one file, +197/−29. `docs:check` and `test:tools` pass (10/10). Nothing pushed, no PR comment, no writes to the log; the implementer's concurrent `package.json` work and the hook's files are untouched.
 
 ## What I amended
 
-All in `/home/agentadmin/sources/keyloop-challenge/docs/slices/00a-design.md` (+249/−97):
+All in `/home/agentadmin/sources/keyloop-challenge/docs/slices/00a-design.md`:
 
-- **§0** — sixth row **S-1** (self-raised, **(c)**), plus a subsection making it a finding about the process: the design worked around a NON-NEGOTIABLE and labelled it a paradox; `METHODOLOGY:272`/`:335` make that an unloggable board state rather than weaker evidence; neither reviewer caught it; the trigger was environmental, the defect was not. It also records the §6 (c)-criterion gap as the human's, and names the two rulings of my own that S-1 reverses.
-- **§4** — the two-project split (`db` / `nodb`) replacing the single-project decision, with the reason the old one never covered the real case, and the **mechanical unknown written as an instruction**: verify per-project `globalSetup` in the pinned Vitest version, and if it is not honoured **raise it rather than improvise**, because the two-config fallback changes `red-proof.mjs`'s single `--results` input. The `mkdirSync` paragraph now says why a `globalSetup` crash matters *more* under §7 — it would be the observation itself.
-- **§7**, retitled *The CI wiring, and how 00a's red is observed* — the split criterion in `verify.yml`'s own words (*needs `src/`*, not *belongs to phase 4*); the `test` job landing complete in the red commit with its authorship argument; green commit 9 reduced to two `verify` steps plus `red-proof`; the **expected-outcome table** for the red SHA (`verify` PASS with why, `test` FAIL with which files and why); the requirement that the acceptance test fail inside its body rather than at collection; the **four-item evidence list** with the CI run first and item 5 withdrawn; the **AC-6 replay** against the red run's own artifact; and **§7's C1 section rewritten** — the authoring/recording conflation named, the three enabling properties, the orchestrator's three-step obligation (record the run id at step 3, collect both runs in ascending order at the gate, **omit `suites` rather than invent it**), and `UNMEASURABLE` demoted to a fallback.
-- **§10** — the §7.2 row gains the project split and `test:nodb`; the §7.4 row gains the split criterion and the red-commit `test` job.
-- **§11.3** — `test:nodb` in the scripts table, `vitest.config.ts` described as two projects, `verify.yml`'s `test` job added to the red commit's contents, the implementer told not to modify it, and the **operative definition of "every implementer commit is green"** as a table plus the push-per-commit recommendation.
-- **§11.4** — corrected to say the tool tests are invisible to *CI* (not just `test:tools`) and why `verify` staying green is now load-bearing twice.
-- **§11.5** — the Docker-less constraint promoted from an aside to a stated constraint that is load-bearing in three named places; item 5 recorded as withdrawn-unavailable rather than deferred.
+- **§5 — the general rule, given its own subsection before the wrapper spec.** *"A cruise that exits 0 says nothing about what it examined. Every assertion about violations must be preceded by an assertion about coverage — which files were cruised, not how many."* With the three-instance table (O1 measured, F1, F2) and the two non-`dependency-cruiser` instances that share the shape — the unwired file in `test:tools`, and a green `verify` that never ran the suite — so the fourth is caught by reading.
+- **§5 — the wrapper spec.** Per-**root** non-emptiness naming the root, `judgeCruiseResult(summary, roots)`, and the two constraints on how it is built: roots from argv (a hardcoded pair is the same bug a fourth time, inside the guard against it) and one cruise (a per-root cruise disables `outside-in-tests-do-not-import-src`, which only fires when both roots share a graph). The rejected stronger form — matching a filesystem walk — is recorded with its reason. The unit test now feeds four summaries, not three.
+- **§5 — AC-3 as built.** Exit 0 *and* coverage, with the argument that this checks AC-3's own *given* clause rather than adding a requirement, plus why the redundancy with the commit-9 wrapper is deliberate layering: the wrapper enforces, the test checks the tool, and different roles own each.
+- **§4 — the `mkdirSync` side effects**, two of them: the source root exists empty from the first test run, which is why the step-2 mechanism was false; and `lint:arch` therefore behaves differently before and after a test run — the same hazard this section rejects `withReuse()` for, stated rather than engineered away, with its one-slice lifetime and the note that F2's guard makes it harmless from commit 9.
+- **§7 — the prediction table's reason corrected**, with the superseded explanation quoted and marked as corrected so a reader cannot inherit it.
+- **§6 — two pure exports** with the division table (per-run mapping and `ts` from `updatedAt`; list ordering; and I/O plus idempotence in the CLI), and the explicit warning that idempotence must not migrate into the pure function.
+- **§11.3 — described for the implementer to apply, not applied:** the `engines` intersection with the verified engine strings and both errors; `@types/node`; `.gitignore` gaining `test-results.json`; and the exact `typescript` pin marked load-bearing with the `meta.cjs` citation and the fact that it is not a peer dependency, so nothing warns.
+- **§11.5 — the standing maintenance obligation** to re-check the supported-transpiler range on any bump of either package, plus the guard-heuristic count.
+- **§10 — the §7.1 row** gains the Node range correction, flagged as a visible change to a published number.
+- **§0 — a step-3 findings section**: the CI observation, the four-row ruling table, F4 written as two independent guards rather than a symptom, F5/F8/F9, and the line confirming nothing touches the module tree.
 
-`process-criteria.md` and `CLAUDE.md` untouched.
+## Confirmations
 
-## Self-consistency
+**No sentence says the guard counts modules overall** — that bullet is replaced by the per-root form; the phrase does not occur. **No sentence says AC-3 reddens because `depcruise` cannot open the source root** — the two remaining occurrences are §4 and §7 explicitly identifying that as the step-2 draft's false explanation. **No sentence says `collect-ci` exports a single mapper** — the one occurrence quotes the step-2 draft in the sentence that supersedes it. On F4 the design claims only that the two guards are independent, and states in as many words that only an absent compiler has been measured.
 
-Swept for the three you named. **No sentence says C1 is unmeasurable** — the five remaining hits are the corrected-draft narration in §0/§7, the `UNMEASURABLE` fallback clause, and the retro rider that depends on it. **No sentence says the suite runs in one project** — remaining "one project" hits are §4's account of what it reversed and why. **No sentence puts `npm test` in the phase-4 block** — "PHASE 4" now appears only in the quoted workflow header and in §10's instruction to rewrite that comment. Also fixed two stale cross-references the changes created: §4's appeal to "evidence item 5" and §11.4's appeal to "evidence item 2", both of which pointed at list positions that no longer exist.
-
-## One process error of mine, reported rather than buried
-
-My first commit used `git add -A` and swept in `docs/team-log/events.jsonl` and `s00a-architect-2.report.md`, which the orchestrator's hook wrote mid-run. That is the orchestrator's file and its commit. I rewrote the commit to contain only the design file and left both modified in the working tree; the guard hook correctly blocked my first attempt at the fix because the command named `docs/team-log/`, which is how I noticed the boundary rather than only the mistake. Final commit `0622b67` touches one file.
+Two process notes. The guard heuristic denied my Bash edit a fourth time, this run because my *text* contained `meta.cjs`'s path and a glob — the design records the running count for the orchestrator. And I committed by explicit path rather than `git add -A` this time; the implementer's concurrent `package.json` and `package-lock.json` changes are untouched, which matters because F7 and F4 are described in the design for the implementer to apply rather than applied by me.
 
 ```json
 {
@@ -41,13 +40,10 @@ My first commit used `git add -A` and swept in `docs/team-log/events.jsonl` and 
   "adrs": [],
   "quality_scenarios": ["QS-10"],
   "assumptions": [
-    "Per-project globalSetup works in the pinned Vitest version — to be verified at step 3, raised if not.",
-    "The red run and its test-results.json artifact remain retrievable at the gate, so collect-ci.mjs can backfill."
+    "The symptom of an out-of-range TypeScript compiler is unmeasured; only an absent one is (O1). The design claims two independent guards rather than a named symptom."
   ],
-  "open_questions": [
-    "CLAUDE.md §6's (c) criterion names only acceptance criteria and §10 scenarios, so a breach of a §2 NON-NEGOTIABLE cannot be ruled (c) by its letter. Recorded in §0; the wording is the human's and the coordinator is putting it to them separately."
-  ],
-  "dcr_ruling": "S-1 (c), self-raised: the suite's CI job moves into the red commit so §2.4 is satisfied rather than substituted for.",
-  "message": "Applied every amendment in one pass; the design now carries the S-1 finding in §0 as a process finding, the test job in the red commit with a predicted CI outcome table, a four-item evidence list led by the observation itself, the C1 backfill as an orchestrator obligation with suites omitted rather than invented, and the two-project split with its mechanical unknown written as an instruction to raise rather than improvise. My first commit wrongly swept in two orchestrator-owned log files; it was rewritten to touch only the design."
+  "open_questions": [],
+  "dcr_ruling": "F2 AGREE (remedy refined: roots from argv, single cruise) · F1 AGREE (test-engineer's coverage assertion stands; §4 and §7 corrected) · F6 AGREE (toCheckRunRecords, with the ordering/idempotence division) · F7 AGREE (engines wrong twice; described for the implementer to apply)",
+  "message": "Applied all four step-3 rulings plus F4, F5 and F8. The most durable output is §5's new general rule — a cruise that exits 0 says nothing about what it examined — written once with its three instances rather than patched a third time, since the shape also covers the unwired tool test and a verify job that never ran the suite. F2's remedy is refined rather than adopted: roots from argv, and one cruise, because per-root cruising would have disabled a cross-root rule while appearing to strengthen the guard. package.json changes are described for the implementer rather than made, since it is editing that file concurrently."
 }
 ```

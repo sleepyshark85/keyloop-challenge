@@ -80,6 +80,30 @@ const files = (dir) => readdirSync(join(dir, 'docs/team-log/prompts')).sort();
     !files(s.dir).includes('s00a-architect-1.report.md'));
 }
 
+// --- a RESUMED agent does not overwrite its own earlier report ---------------
+// An agent resumed via SendMessage stops again with no new prompt file. A single
+// report filename meant every resume replaced the last; during slice 00a the
+// architect was resumed six times and five reports were silently lost.
+{
+  const s = sandbox({
+    scope: { slice: '00a' }, promptFiles: ['s00a-architect-1.md'],
+    turns: [turn('FIRST RULING', '2026-01-01T00:00:00Z')],
+  });
+  run(s);
+  // second stop of the same invocation, as a resume produces
+  writeFileSync(join(s.dir, 'session', 'subagents', 'agent-abc.jsonl'),
+    [turn('SECOND RULING, AFTER RESUME', '2026-01-01T01:00:00Z')].map((t) => JSON.stringify(t)).join('\n'), 'utf8');
+  run(s);
+  const reports = files(s.dir).filter((f) => f.includes('.report'));
+  ok('a resume writes a sibling report rather than overwriting',
+    reports.length === 2, reports.join(','));
+  ok('the first ruling survives the resume',
+    readFileSync(join(s.dir, 'docs/team-log/prompts/s00a-architect-1.report.md'), 'utf8')
+      .includes('FIRST RULING'));
+  ok('the resume is numbered .report.2.md',
+    reports.includes('s00a-architect-1.report.2.md'), reports.join(','));
+}
+
 // --- a report with no prompt is not invented ---------------------------------
 {
   const s = sandbox({ scope: { slice: '00a' }, promptFiles: [], turns: [turn('R', '2026-01-01T00:00:00Z')] });
