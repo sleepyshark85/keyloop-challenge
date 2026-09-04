@@ -499,10 +499,30 @@ deterministic"*, and until step 3 nothing asserted it. Adding `appointment_custo
 tidiness breaks no case in the file: AC-6 seeds its customer, so the singleton is satisfied and only
 the composite fires. The damage lands at slice 03, where §8.6 maps `422 /problems/unknown-reference`
 **by constraint name** and a second `23503` reaching the same insert makes which name arrives a matter
-of declaration order. Two boundaries hold the remedy narrow: the filter is `contype <> 'p'`, measured
-clean on `postgres:16` where `pg_constraint` returns the seven plus `appointment_pkey`; and it is
-**not** extended to the other eight tables, because no case discriminates on their constraints and
-doing so is the first step back toward the whole-`\d` snapshot rejected below.
+of declaration order. Two boundaries hold the remedy narrow: a filter on constraint type, and **no**
+extension to the other eight tables — no case discriminates on their constraints, and doing so is the
+first step back toward the whole-`\d` snapshot rejected below.
+
+> **The filter must be an allowlist, `contype IN ('c','f','u','x')` — not the denylist `contype <> 'p'`
+> that merged. Measured, and the assumption behind the denylist was wrong (M-11, A-7).**
+>
+> The step-3 ruling accepted `contype <> 'p'` on the reasoning that a later major surfacing `NOT NULL`
+> as `pg_constraint` rows would *"fail loudly in the same commit as the bump"*, and treated that as
+> acceptable. It was measured afterwards: clean on 16 and 17, but **PostgreSQL 18 emits six
+> `contype = 'n'` rows for `appointment` alone**, so the denylist would fail with six invented names
+> that nobody added.
+>
+> That is not a loud failure, it is a **false positive**, and the difference matters: someone bumping
+> the image would see case 0 (d) fail, conclude the assertion is too strict, and loosen the very thing
+> §6.2 depends on. The failure direction is the whole argument. An allowlist ignores a constraint type
+> the *platform* introduces while still catching every constraint a *developer* can add — check,
+> foreign key, unique, exclusion are the four, and they are exactly the types a negative case
+> discriminates on.
+>
+> **Not urgent and not step 4's:** the image is pinned to `postgres:16` and `postgres-harness.test.ts`
+> asserts `^16\.`, so nothing can fail today. It is a one-token change in a test-engineer-owned file;
+> the orchestrator should sequence it — with the reviewer's step-5 findings, or a test-engineer commit
+> before the gate — rather than interrupting the implementer mid-step-4.
 
 **Equality, not substrings, and not `conname` plus `contype` — this is T-4.** The step-1 draft
 asserted names and constraint types and called that coverage. It is not: a `no_bay_overlap` keyed on
@@ -961,11 +981,14 @@ Three things follow, in the order they should be tried:
    filename appears anywhere.** The architect read the caret-printing code in `db.js` and did not read
    the call site, having quoted that call site earlier in the same session.
 
-   `npm run db:migrate` invokes the **CLI**, whose logger is not silenced, so it is expected to print
-   what `globalSetup` swallows. That expectation is **assumed, not measured** (§11.2 A-6): the CLI's
-   failure output was observed today, but not checked for the migration filename specifically. **Step
-   4 measures it in one command before relying on it.** Stating it as fact would be the fourth
-   instance of the shape §0.1 records.
+   `npm run db:migrate` invokes the **CLI**, whose logger is not silenced, so it prints what
+   `globalSetup` swallows. **Measured (M-10), and the precision matters more than the fact:** the
+   failing migration is named by the **last `### MIGRATION <name> (UP) ###` header printed**,
+   immediately above `Error executing:`. The error line itself — `error: syntax error at or near
+   "THIS"` — names nothing, so a reader who greps for `error` finds the message and not the file.
+   **Look at the header above the error, not at the error.** The programmatic path was tested the same
+   way and carries no filename in any populated field of the thrown `DatabaseError`, which is what
+   makes the CLI the fallback rather than a preference.
 3. **`globalSetup` must not catch the migration error.** Wrapping the runner in a `try`/`catch` that
    provides an error message to the tests would convert a loud, correct failure into a run where
    every case fails for a laundered reason, and it would put a branch into a test-engineer-owned file
@@ -1175,6 +1198,8 @@ All against `postgres:16` in a throwaway container, with this repository's pinne
 | **M-7** | Down migrations | `direction: 'down', count: 3` reverses cleanly to `pgmigrations` alone, `btree_gist` dropped |
 | **M-8** | `pg`'s `DatabaseError` fields | `code`, `constraint`, `table`, `schema` populated on `23P01`, `23503` and `23514` |
 | **M-9** | Adjacency and the partial predicate | `[09,10)` then `[10,11)` and `[08,09)` in one bay all succeed; `[09:30,10:30)` is rejected `23P01`; after `status='cancelled'` the overlapping insert succeeds |
+| **M-10** | Where the failing migration's **name** appears, on both entry points (closes A-6) | **CLI:** prints `### MIGRATION 0003_appointment (UP) ###` immediately before `Error executing:`; the error line itself (`error: syntax error at or near "THIS"`) names nothing. **Programmatic with `log: () => {}`, i.e. `globalSetup`:** the thrown `DatabaseError` carries `code: 42601`, `position`, `file: 'scan.l'`, `line`, `routine` — and **no migration filename in any field**, confirmed by testing every populated key |
+| **M-11** | `pg_constraint` contents for `appointment` across majors (closes A-7, **falsifying it**) | **16.15 and 17.11:** the named constraints plus `appointment_pkey`, nothing else — `contype <> 'p'` is a clean filter. **18.6: six additional `contype = 'n'` rows** — `appointment_id_not_null`, `appointment_dealership_id_not_null`, `appointment_bay_id_not_null`, `appointment_starts_at_not_null`, `appointment_ends_at_not_null`, `appointment_status_not_null`. `pg_get_constraintdef` text is byte-identical across 16 and 17 for all three constraint types tested |
 
 M-4 is the one that nearly became a wrong sentence: the architect's first probe reported a
 `CREATE TYPE … already exists` failure that looked like a `node-pg-migrate` defect and was in fact a
@@ -1196,6 +1221,17 @@ itself**, and neither was caught that way.
 
 ### 11.2 Assumed, not measured
 
+> **An id collision this document created, disambiguated rather than renamed.** `A-1`…`A-7` below are
+> *this design's* open assumptions. arc42 §1.4 also has `A-1`…`A-10`, which are the **Gate A domain
+> assumptions** (A-4 no buffer, A-6 nothing created implicitly, A-9 resources never span dealerships),
+> and both sets appear in this document — §1.1 and §3 cite arc42's, §4 and §8 cite these. They are
+> told apart by context and by the `§11.2` prefix, which every cross-reference to this table carries.
+>
+> They are **not** renamed, and the reason is the same one that makes ADRs immutable: `docs/team-log/`
+> is append-only and already cites `§11.2 A-2` and `A-4` by number, as do two commit messages. A rename
+> would make the record wrong to make this table tidier, which is the wrong trade. A future slice
+> should pick a non-colliding prefix from the start.
+
 | # | Assumption | Why it is not measured, and what depends on it |
 |---|---|---|
 | **A-1** | How Vitest's JSON reporter represents a `beforeAll` failure — whether it produces a `testResults[]` entry `red-proof` can classify | Not measured, and **the design does not depend on it**: §4 forbids schema work in `beforeAll` precisely so the question never arises. If it arises anyway, measure it before reasoning about it |
@@ -1203,8 +1239,8 @@ itself**, and neither was caught that way.
 | **A-3** | That two seeds with a literal VIN would collide on `vehicle.vin`'s `UNIQUE` | Deduced from the schema, not observed. §3.4's derived VIN makes it moot |
 | **A-4** | ~~Whether the implementer's and the test-engineer's shells can reach a Docker daemon~~ | **CLOSED at step 2, 2026-09-04.** Docker works in all three roles' shells; the `db` project runs in about 3.4 s. This falsifies 00a §11.5's *"no container runtime on either role's machine"*. §8.2's mitigation 1 is promoted to the stated step-4 loop and arc42 §7.2 records what it does and does not falsify in 00a. Struck rather than deleted: a closed assumption that vanishes leaves no evidence it was ever open |
 | **A-5** | That the planner *chooses* the partial GiST indexes for the availability query (§8.2 consequence 6) | Index definitions are measured; plan selection is not, and belongs to QS-14, not here |
-| **A-6** | That `npm run db:migrate` — the CLI, whose logger is not silenced — names the failing **migration file** on a malformed statement | The CLI's failure output was observed today; it was not checked for the filename specifically. §8.2's mitigation 2 rests on it, so **step 4 measures it in one command before relying on it.** Asserting it would be the fourth instance of the shape §0.1 records, in the section written to correct the third |
-| **A-7** | That a later PostgreSQL major version does **not** surface `NOT NULL` as `pg_constraint` rows, which would break case 0 (d)'s `contype <> 'p'` filter | Measured clean on `postgres:16` — `pg_constraint` for `appointment` returns the seven plus `appointment_pkey` and nothing else. Not measured on any later major, and deliberately not guessed at. If one does, case 0 fails loudly in the same commit as the bump, alongside the definition assertions, which is the same bounded fragility §4.1 already accepts |
+| **A-6** | ~~That `npm run db:migrate` names the failing **migration file**~~ | **CLOSED by measurement, 2026-09-04 — see M-10.** It does, but not where a reader would look: the filename is the **last `### MIGRATION <name> (UP) ###` header printed**, immediately above `Error executing:`. The error line itself names nothing. §8.2's mitigation 2 is validated and now says where to look |
+| **A-7** | ~~That a later PostgreSQL major does not surface `NOT NULL` as `pg_constraint` rows~~ | **CLOSED by measurement, and the assumption was WRONG — see M-11.** Clean on 16 and 17; **PostgreSQL 18 surfaces six `contype = 'n'` rows on `appointment` alone**, so case 0 (d)'s `contype <> 'p'` filter would fail on a bump. §4.1 carries the remedy. Struck rather than deleted: this is the only assumption in this design that a measurement falsified rather than confirmed |
 
 ### 11.3 Deferred, with the reason
 
