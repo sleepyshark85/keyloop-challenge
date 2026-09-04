@@ -46,9 +46,14 @@
  * cruise examined nothing under src" and "the cruise examined nothing" are different
  * failures and only the first tells a maintainer where to look.
  */
-import { resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 
 const TOOL = resolve('tools/ci/lint-arch.mjs');
+const REPO_ROOT = process.cwd();
+const DEPCRUISE = resolve(REPO_ROOT, 'node_modules/.bin/depcruise');
 
 let passed = 0;
 let failed = 0;
@@ -233,6 +238,131 @@ if (tool) {
       JSON.stringify(violating));
   }
 }
+
+// ── THE WRAPPER, SPAWNED: an exit code DERIVED, never passed through (F3) ──────────────
+//
+// This is the one rule in this tool whose deletion is invisible to the entire suite.
+//
+// `depcruise --output-type json` EXITS 0 WITH ERROR-SEVERITY VIOLATIONS PRESENT — measured
+// at F3, and asserted again below rather than trusted, because the whole case rests on it.
+// Only the default `err` reporter turns violations into a status. So `main()` derives its
+// own exit code from the parsed JSON and deliberately does not pass the CLI's through.
+//
+// Tidy that into `return cruise.status` and `npm run lint:arch` exits 0 on every real
+// layering violation. Nothing in this repository fails: layering.test.ts's AC-3 case asserts
+// the wrapper exits 0 on a CLEAN tree, which is true either way, and its AC-4 cases spawn
+// `depcruise` directly rather than the wrapper. `collect-ci.mjs` then records
+// `checks.depcruise: "pass"`, criterion C4 reads a clean architecture, and QS-10 switches
+// itself off in silence — the third instance of O1's failure mode, now in the guard written
+// against the second.
+//
+// The only way to catch it is to SPAWN the wrapper against a tree that really violates the
+// ruleset and read its status. Everything above this line tests the pure rule; the exit code
+// is not in the pure rule.
+
+const fixtureRoots = [];
+
+/**
+ * A tree the wrapper can be pointed at, with `cwd` set to it.
+ *
+ * Two symlinks, and both are load-bearing rather than convenient — the standard this slice
+ * arrived at after the AC-4 fixture's symlink turned out to have a false explanation:
+ *
+ *   .dependency-cruiser.js  `main()` passes `--config .dependency-cruiser.js`, a BARE
+ *                           cwd-relative filename with no flag to override it. A symlink
+ *                           rather than a copy so the ruleset under test is the real file,
+ *                           byte for byte, and cannot drift from the one CI runs.
+ *   node_modules            `main()` resolves `node_modules/.bin/depcruise` from the cwd and
+ *                           REFUSES to fall back to PATH. Verified: without this link the
+ *                           wrapper exits 2 naming the missing binary — so a fixture that
+ *                           failed to link cannot be mistaken for a fixture that found a
+ *                           violation, since the assertions below want exit 1 specifically.
+ */
+function fixture(sources) {
+  const root = mkdtempSync(join(tmpdir(), 'keyloop-lint-arch-'));
+  fixtureRoots.push(root);
+
+  symlinkSync(resolve(REPO_ROOT, 'node_modules'), join(root, 'node_modules'), 'dir');
+  symlinkSync(resolve(REPO_ROOT, '.dependency-cruiser.js'), join(root, '.dependency-cruiser.js'));
+  writeFileSync(join(root, 'package.json'),
+    `${JSON.stringify({ name: 'lint-arch-fixture', private: true, type: 'module' }, null, 2)}\n`);
+  // `tsPreCompilationDeps` needs a TypeScript configuration resolvable from the working
+  // directory, and `tsConfig.fileName` in the ruleset is a bare filename.
+  writeFileSync(join(root, 'tsconfig.json'),
+    `${JSON.stringify({ compilerOptions: {
+      module: 'nodenext', moduleResolution: 'nodenext', target: 'es2023', strict: true,
+    } }, null, 2)}\n`);
+
+  for (const [path, contents] of Object.entries(sources)) {
+    const target = join(root, path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, contents);
+  }
+  return root;
+}
+
+const LEGAL_TREE = {
+  'src/platform/config.ts': 'export const config = { port: 3000 };\n',
+  'src/domain/policy.ts': 'export const allowed = (n: number): boolean => n > 0;\n',
+  // `tests/` is planted in both trees so the per-root coverage rule is satisfied and cannot
+  // be the reason for a non-zero exit. The assertions want the VIOLATION to be the reason.
+  'tests/acceptance/probe.test.ts':
+    "import assert from 'node:assert';\nexport const check = (): void => assert.ok(true);\n",
+};
+
+const violatingRoot = fixture({
+  ...LEGAL_TREE,
+  // domain-is-pure: the core may import nothing. One violation, one rule, and no stub
+  // packages needed — what is under test here is the exit code, not the ruleset's coverage,
+  // which tests/architecture/layering.test.ts already establishes rule by rule.
+  'src/domain/bad.ts':
+    "import { config } from '../platform/config.js';\nexport const port = config.port;\n",
+});
+const conformingRoot = fixture(LEGAL_TREE);
+
+const wrapper = (root, args = ['src', 'tests']) =>
+  spawnSync(process.execPath, [TOOL, ...args], { cwd: root, encoding: 'utf8' });
+
+// THE PREMISE, MEASURED. If dependency-cruiser ever made `--output-type json` exit non-zero
+// on violations, `return cruise.status` would stop being a bug and every assertion below
+// would stop discriminating while still passing. Asserted first, per this slice's rule.
+const rawJson = spawnSync(
+  DEPCRUISE,
+  ['src', 'tests', '--config', '.dependency-cruiser.js', '--output-type', 'json'],
+  { cwd: violatingRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+);
+check('premise — `depcruise --output-type json` exits 0 over a tree with a real violation',
+  rawJson.status === 0 && /domain-is-pure/.test(rawJson.stdout ?? ''),
+  `this is F3, and it is why the wrapper must derive its own status. got exit `
+  + `${rawJson.status}, violation reported: ${/domain-is-pure/.test(rawJson.stdout ?? '')}`);
+
+const onViolation = wrapper(violatingRoot);
+check('the wrapper EXITS NON-ZERO on a real violation, though the JSON reporter exited 0',
+  onViolation.status === 1,
+  `pass the CLI's status through — \`return cruise.status\` — and this is 0: lint:arch goes `
+  + `green on every layering violation, collect-ci records depcruise: "pass", and C4 reads a `
+  + `clean architecture for a tree the ruleset rejected. got ${onViolation.status}\n`
+  + `          stdout ${(onViolation.stdout ?? '').trim()}\n`
+  + `          stderr ${(onViolation.stderr ?? '').trim()}`);
+
+check('…and it names the rule, so the 1 is the violation and not a broken fixture',
+  /domain-is-pure/.test(onViolation.stdout ?? ''),
+  `exit 1 is also what a missing binary, an environment issue or an uncovered root produces. `
+  + `Without this the case would pass on a fixture that never cruised anything. got `
+  + JSON.stringify((onViolation.stdout ?? '').trim()));
+
+const onConforming = wrapper(conformingRoot);
+check('the wrapper exits 0 on a conforming tree, so it is not simply always non-zero',
+  onConforming.status === 0 && /no layering violations/.test(onConforming.stdout ?? ''),
+  `a wrapper hardwired to fail would satisfy the case above; this is what makes the pair `
+  + `evidence. got ${onConforming.status} ${JSON.stringify((onConforming.stdout ?? '').trim())}`);
+
+check('no roots given → exit 2, distinct from a violation',
+  wrapper(conformingRoot, []).status === 2,
+  'a usage error and a rejected architecture must not be the same status: CI would report '
+  + 'a mistyped script as a layering failure, and the reviewer would look in the wrong file');
+
+for (const root of fixtureRoots) rmSync(root, { recursive: true, force: true });
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

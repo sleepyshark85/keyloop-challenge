@@ -39,8 +39,10 @@
  * verify passed cannot exist in this repository until a red commit runs under the test job,
  * which is the commit this file lands in. The other two say DERIVED in as many words.
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { validate } from '../team-log/schema.mjs';
 
 const MODULE = '../team-log/collect-ci.mjs';
@@ -298,7 +300,217 @@ if (collector) {
       `check.mjs reads jobs.verify for "tests green" and §7 reads jobs.test; a rename that `
       + `moved either is a silent DoD failure. got ${JSON.stringify(record?.checks?.jobs)}`);
   }
+
+  // -- an UNFINISHED run is not a measurement -------------------------------------------
+  //
+  // Every fixture in this file is `status: "completed"`, so the skip and the `done`
+  // conditioning inside toCheckRunRecord are both unexercised: delete either and nothing
+  // here fails. This protects C1 directly. The implementer shipped it broken once — `gh`
+  // reports a running run as `conclusion: ""`, an empty STRING, which `??` does not fall
+  // through, so every job came back FAIL and a fabricated red run would have gone into the
+  // log and into check.mjs's red-before-green reading. A red that never happened is worse
+  // than a missing one: C1 would report test-first for a slice that was not.
+  //
+  // Derived from the green fixture rather than captured, because a payload mid-run cannot be
+  // captured after the fact — but the two fields that matter, `conclusion: ""` alongside
+  // `status: "in_progress"`, are the shape the implementer measured against a live branch.
+  if (typeof toCheckRunRecord === 'function') {
+    const unfinishedRun = {
+      ...DERIVED_GREEN.run,
+      status: 'in_progress',
+      conclusion: '',
+      jobs: (DERIVED_GREEN.run.jobs ?? []).map((job) => ({
+        ...job, status: 'in_progress', conclusion: null,
+      })),
+    };
+
+    check('fixture precondition — the run is unfinished and its conclusion is the EMPTY STRING',
+      unfinishedRun.status === 'in_progress'
+        && unfinishedRun.conclusion === ''
+        && unfinishedRun.jobs.every((job) => job.conclusion === null),
+      'null instead of "" would fall through `??` and test a different bug than the one '
+      + 'that shipped');
+
+    const running = toCheckRunRecord(unfinishedRun, { slice: '00a', collectedVia: 'gh-cli' });
+
+    check('an unfinished run classifies NO job, so nothing reads as failed',
+      JSON.stringify(running?.checks?.jobs) === '{}',
+      `a job with conclusion null has not failed, it has not finished. passFail() maps every `
+      + `non-success to FAIL, so classifying an unfinished job invents a failure. got `
+      + JSON.stringify(running?.checks?.jobs));
+
+    check('an unfinished run carries no FAIL anywhere in checks (constraint 2)',
+      !/FAIL/.test(JSON.stringify(running?.checks ?? {})),
+      `check.mjs decides red-before-green by /FAIL|\\b0\\// over this string, so a FAIL here `
+      + `is a red run that never happened. got ${JSON.stringify(running?.checks)}`);
+
+    check('an unfinished run\'s conclusion is its STATUS, not the empty string',
+      running?.checks?.conclusion === 'in_progress' && running?.outcome === 'in_progress',
+      `\`ghRun.conclusion ?? ghRun.status\` keeps "" — it is not nullish — and "" !== `
+      + `"success", so the completed-run backstop then injects a FAIL. got `
+      + JSON.stringify({ outcome: running?.outcome, conclusion: running?.checks?.conclusion }));
+  }
+
+  // -- ON A KEY COLLISION, FAIL WINS ----------------------------------------------------
+  //
+  // Two display names can slug to one key — a matrix, a rename, any two names differing only
+  // in punctuation. A plain assignment is last-write-wins, so a later PASS overwrites an
+  // earlier FAIL and the record stringifies without it: constraint 2 corrupted inside the
+  // function written to enforce it.
+  //
+  // BOTH ARRAY ORDERS, AND ONLY ONE OF THEM DOES THE WORK. Measured against
+  // `jobs[key] = verdict`: failure-first gives PASS (caught), failure-last gives FAIL
+  // (passes anyway, because last-write-wins happens to write the FAIL last). So one order
+  // is a real test and the other is a coin that landed the right way up, and there is
+  // nothing in the case itself to say which. Do not "simplify" this to a single order.
+  if (typeof toCheckRunRecord === 'function') {
+    const collidingJobs = [
+      { name: 'suite (linux)', status: 'completed', conclusion: 'failure', steps: [] },
+      { name: 'suite [linux]', status: 'completed', conclusion: 'success', steps: [] },
+    ];
+
+    const keysFor = (jobs) => Object.keys(toCheckRunRecord(
+      { ...DERIVED_GREEN.run, conclusion: 'success', jobs },
+      { slice: '00a', collectedVia: 'gh-cli' },
+    ).checks.jobs);
+
+    check('fixture precondition — the two display names really do collide on one key',
+      keysFor(collidingJobs).length === 1,
+      `if they stopped colliding there would be two keys, both assertions below would pass `
+      + `trivially, and the rule would be untested again. got `
+      + JSON.stringify(keysFor(collidingJobs)));
+
+    for (const [label, jobs] of [
+      ['failure first', collidingJobs],
+      ['failure LAST', [...collidingJobs].reverse()],
+    ]) {
+      const collided = toCheckRunRecord(
+        // conclusion `success` on purpose: it disables the completed-run backstop that would
+        // otherwise inject a FAIL under the workflow key, so a FAIL here can only have come
+        // from the collision rule itself.
+        { ...DERIVED_GREEN.run, conclusion: 'success', jobs },
+        { slice: '00a', collectedVia: 'gh-cli' },
+      );
+      check(`a job-key collision keeps the FAIL — ${label}`,
+        collided?.checks?.jobs?.['suite-linux'] === 'FAIL',
+        `last-write-wins loses the failing job and the run reads green at the gate. got `
+        + JSON.stringify(collided?.checks?.jobs));
+      check(`…and the FAIL came from the collision, not from the backstop — ${label}`,
+        JSON.stringify(Object.keys(collided?.checks?.jobs ?? {})) === '["suite-linux"]',
+        `an extra key would mean the run-level injection fired and the collision rule could `
+        + `still be broken. got ${JSON.stringify(collided?.checks?.jobs)}`);
+    }
+  }
 }
+
+// ── the CLI wrapper: main() is where the slice and the skip actually happen ────────────
+//
+// Everything above tests the two pure exports. `main()` was untested in its entirety, and it
+// holds two rules that fail SILENTLY and write to the log while doing it. Both are driven
+// here through `--dry-run`, which computes and prints every record and appends none — so
+// these cases exercise the real CLI without touching docs/team-log/.
+//
+// `loadLog()` and `resolveSlice()` both resolve their paths from the CURRENT WORKING
+// DIRECTORY, so each case runs in a scratch directory of its own. That is not a workaround:
+// it is the only way to reach `.scope` parsing without writing to the repository's own.
+
+const scratch = mkdtempSync(join(tmpdir(), 'collect-ci-'));
+
+const runsFile = (label, runs) => {
+  const path = join(scratch, `${label}.json`);
+  writeFileSync(path, JSON.stringify({ runs }, null, 2));
+  return path;
+};
+
+const cli = (args, cwd) =>
+  spawnSync(process.execPath, [resolve('tools/team-log/collect-ci.mjs'), ...args], {
+    cwd, encoding: 'utf8',
+  });
+
+const workdir = (label, scope) => {
+  const dir = join(scratch, label);
+  mkdirSync(join(dir, 'docs/team-log'), { recursive: true });
+  if (scope !== undefined) writeFileSync(join(dir, 'docs/team-log/.scope'), scope);
+  return dir;
+};
+
+const mixedRuns = runsFile('mixed', [
+  { ...DERIVED_GREEN.run, status: 'in_progress', conclusion: '', databaseId: 44400001,
+    jobs: (DERIVED_GREEN.run.jobs ?? []).map((job) => ({
+      ...job, status: 'in_progress', conclusion: null,
+    })) },
+  DERIVED_RED.run,
+]);
+
+// -- main()'s unfinished-run skip -------------------------------------------------------
+{
+  const result = cli(
+    ['--from-file', mixedRuns, '--slice', '00a', '--dry-run'],
+    workdir('skip', undefined),
+  );
+  const stdout = result.stdout ?? '';
+
+  check('CLI precondition — a --dry-run collection succeeds and prints its records',
+    result.status === 0 && stdout.includes('--dry-run'),
+    `every assertion below reads this output, so an exit 2 here would make them all vacuous. `
+    + `got ${result.status}\n          stdout ${stdout.trim()}\n          stderr `
+    + `${(result.stderr ?? '').trim()}`);
+
+  check('main() SKIPS the unfinished run, and says so rather than dropping it silently',
+    /skipped\s+44400001\s+still in_progress/.test(stdout),
+    `"collect at the gate" is something a human does while a run is still going, so the `
+    + `omission has to be visible. got ${JSON.stringify(stdout.trim())}`);
+
+  check('…and no record is emitted for it',
+    !stdout.includes('44400001,') && !stdout.includes('"run_id":44400001'),
+    `delete the filter and toCheckRunRecord's own \`done\` guard is the only thing left `
+    + `between a running build and a fabricated verdict in the log. got `
+    + JSON.stringify(stdout.trim()));
+
+  check('…while the FINISHED run in the same payload is still collected',
+    stdout.includes(`"run_id":${DERIVED_RED.run.databaseId}`),
+    `a skip that dropped everything would satisfy the case above. got `
+    + JSON.stringify(stdout.trim()));
+}
+
+// -- resolveSlice: .scope holds JSON, and SLICE_ID is the backstop ----------------------
+//
+// Reading `.scope` raw produced `slice: "{\"slice\":\"00a\"}"`, which validate() ACCEPTS —
+// the schema takes any non-empty string — so the record was written, looked fine, and every
+// slice-scoped query missed it. Two independent rules, so two cases: the parse, and the
+// guard that catches the parse being wrong again.
+{
+  const parsed = cli(
+    ['--from-file', runsFile('one', [DERIVED_RED.run]), '--dry-run'],
+    workdir('scope', '{"slice":"00a"}\n'),
+  );
+  check('main() reads docs/team-log/.scope as JSON, not as a bare id',
+    parsed.status === 0 && (parsed.stdout ?? '').includes('"slice":"00a"'),
+    `a raw read yields slice "{\\"slice\\":\\"00a\\"}", which the schema accepts and every `
+    + `query then misses. got ${parsed.status}\n          stdout `
+    + `${(parsed.stdout ?? '').trim()}\n          stderr ${(parsed.stderr ?? '').trim()}`);
+
+  const malformed = cli(
+    ['--from-file', runsFile('two', [DERIVED_RED.run]), '--slice', '{"slice":"00a"}', '--dry-run'],
+    workdir('malformed', undefined),
+  );
+  check('SLICE_ID rejects a slice the log schema would have accepted',
+    malformed.status === 2 && /not a slice id/i.test(malformed.stderr ?? ''),
+    `this is the backstop for the bug above, and it is the only thing standing between a `
+    + `malformed slice and a silently unqueryable log. got ${malformed.status}\n`
+    + `          stderr ${(malformed.stderr ?? '').trim()}`);
+
+  const noScope = cli(
+    ['--from-file', runsFile('three', [DERIVED_RED.run]), '--dry-run'],
+    workdir('none', undefined),
+  );
+  check('no --slice and no .scope → exit 2 naming both ways to supply one',
+    noScope.status === 2 && /--slice/.test(noScope.stderr ?? '') && /\.scope/.test(noScope.stderr ?? ''),
+    `guessing a slice would put the record under the wrong one. got ${noScope.status}\n`
+    + `          stderr ${(noScope.stderr ?? '').trim()}`);
+}
+
+rmSync(scratch, { recursive: true, force: true });
 
 // -- fixture provenance is part of the evidence, not decoration -------------------------
 check('the captured fixture says it was captured, and names the run it came from',

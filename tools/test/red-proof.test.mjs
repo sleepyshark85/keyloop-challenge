@@ -294,6 +294,35 @@ for (const [desc, expected, args] of cliCases) {
     `got ${result.status}\n          stdout ${result.stdout?.trim()}\n          stderr ${result.stderr?.trim()}`);
 }
 
+// -- the subject file is read A LINE AT A TIME, and that is not cosmetic ----------------
+//
+// Raised as low priority and it earns a case, though not for the reason it looked like.
+// `judge()` already trims, so dropping `.split('\n')[0]` is invisible for the trailing
+// newline `git log -1 --format=%s` produces — every existing case here passes either way.
+// It bites on a MULTI-LINE subject file: `RED_COMMIT_SUBJECT` carries no `m` flag, so `$`
+// is end-of-input, a subject with a body after it matches nothing, and red-proof reports
+// NOT APPLICABLE and exits 0.
+//
+// That is the failure direction that matters. The check does not go red, it goes quiet —
+// AC-6 stops being asserted on precisely the commit it exists for, and the only way to
+// notice is to read the job's log. One edit to the workflow step (`%B` instead of `%s`, or
+// a `--format` that appends anything) is enough. Measured: real exits 1, the mutant exits 0.
+const multiLineSubject = join(scratch, 'subject-multiline.txt');
+writeFileSync(multiLineSubject, `${RED_SUBJECT}\n\nA body paragraph, as %B would give.\n`);
+
+const multiLine = run(
+  ['--subject-file', multiLineSubject, '--verify', 'success', '--results', greenResults]);
+check('a subject file with a body still arms the check — only the FIRST LINE is the subject',
+  multiLine.status === 1,
+  `red-marked with nothing failed is exit 1. Read the file whole and the subject matches `
+  + `nothing, so the tool reports "not applicable" and exits 0 — AC-6 silently unasserted on `
+  + `the one commit it is for. got ${multiLine.status}\n          stdout `
+  + `${(multiLine.stdout ?? '').trim()}`);
+check('…and it did NOT report itself not-applicable',
+  !/not applicable/i.test(multiLine.stdout ?? ''),
+  `exit 1 could also come from a later clause; this is what pins the subject as recognised. `
+  + `got ${JSON.stringify((multiLine.stdout ?? '').trim())}`);
+
 const named = run(['--subject-file', subjectFile, '--verify', 'success', '--results', greenResults]);
 check('exit 1 names the failing condition on stdout',
   /acceptance|suite|fail/i.test(named.stdout ?? ''),
