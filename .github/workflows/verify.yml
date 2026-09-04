@@ -54,12 +54,39 @@ jobs:
         # with package.json.
         run: npm ci --engine-strict
 
+      # ── PHASE 4, wired in at slice 00a green commit 9 ────────────────────────────────
+      # These two need `src/` and could not run before it existed.  They sit here, on the
+      # existing job, rather than in a job of their own: they are cheap, they share this
+      # job's install, and `red-proof` reads ONE conclusion for "install, typecheck and
+      # lint all passed" (AC-6).  Splitting them would make that clause three conclusions
+      # and the discriminator would have to be told about each.
+      - name: typecheck
+        # tsconfig.json includes BOTH src and tests, deliberately.  tsconfig.build.json
+        # narrows to src, so `pretest`'s build can never see a type error in a test file —
+        # which is exactly how one reached the red commit unnoticed (I-1, fixed in 46f0f53).
+        # This step is what closes that gap, so it must not be narrowed to the build config.
+        run: npm run typecheck
+
+      - name: layering (QS-10)
+        # `node tools/ci/lint-arch.mjs src tests`, NOT the bare `depcruise`.  The bare CLI
+        # exits 0 having cruised nothing when it cannot resolve a compatible TypeScript
+        # compiler, and `collect-ci.mjs` would then record `depcruise: "pass"` for a tree
+        # the ruleset never looked at — criterion C4 reading a clean architecture from a
+        # check that never ran.  The wrapper asserts coverage per root before it asserts
+        # anything about violations.
+        run: npm run lint:arch
+
       - name: system-design.md is current with its section files
         # METHODOLOGY §4, generated tier: the assembly cannot drift from its sources.
         run: npm run docs:check
 
       - name: tools regression suite
         run: npm run test:tools
+
+      - name: the defect register is current with the log
+        # Ruled at slice 00a: findings live in the event log and DEFECTS.md is
+        # derived, so the register cannot drift from the record. Generated tier.
+        run: npm run defects:check
 
       - name: every diagram is exported, and every diagram link resolves
         # METHODOLOGY §4: "an evaluator reading the repository on GitHub has no plugin
@@ -129,39 +156,136 @@ jobs:
             if (bad) process.exit(1);
           '
 
+  # The criterion that decides what lives here rather than in the PHASE 4 block below is
+  # "does it need `src/`", not "which phase does it belong to".  `npm test` does not need
+  # `src/` — it needs a Docker daemon, which `ubuntu-latest` has.  It therefore lands in
+  # slice 00a's RED COMMIT, authored by the test-engineer, and not three commits later.
+  #
+  # That is not tidiness.  CLAUDE.md §2.4 requires every slice's failing acceptance test to
+  # be "observed red in CI", and METHODOLOGY.md:272 says the board cannot leave `red` until
+  # CI has recorded it failing.  A red commit that creates a failure nobody can see has not
+  # discharged its obligation, and the step-3 log entry — "the red commit SHA and the CI run
+  # that observed it failing, with the failing assertion quoted" — could not be written
+  # truthfully.  The step-1 design offered four substitute evidence items instead and called
+  # the gap a bootstrap paradox; that was a workaround for a NON-NEGOTIABLE, and it was
+  # ruled a design defect (docs/slices/00a-design.md §0, S-1).  This job is the fix.
+  #
+  # On the red commit the discrimination is two job conclusions a human can read: `verify`
+  # green proves the branch is sound, `test` red proves the acceptance suite failed.  That
+  # is exactly what the `red-proof` job automates from slice 00 onward.
+  test:
+    name: suite (Testcontainers)
+    # ubuntu-latest ships a working Docker daemon (TC-9, ADR-0010), so no `services:` block
+    # is needed and none is wanted: CLAUDE.md §2.2 forbids substituting the database, and
+    # Testcontainers starts its own postgres:16 (arc42 §7.2).  No `needs:` and no
+    # `continue-on-error` — this job's conclusion IS the observation.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: install, with the engines pin enforced (TC-10)
+        run: npm ci --engine-strict
+
+      - name: npm test
+        # Both Vitest projects, `db` and `nodb`, in one invocation — so AC-1's
+        # "npm ci && npm test" is satisfied literally and the run produces ONE
+        # test-results.json, which is what tools/ci/red-proof.mjs's single --results input
+        # can consume.
+        run: npm test -- --reporter=json --outputFile=test-results.json
+
+      - name: the failing assertions, as an artifact
+        # if: always() because the interesting run is the one that failed.  90 days, so the
+        # red run's own artifact is still there when red-proof.mjs is replayed against it at
+        # the gate (docs/slices/00a-design.md §7, evidence item 3) and when
+        # collect-ci.mjs backfills the `check.run` record that makes C1 measurable.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.json
+          retention-days: 90
+          if-no-files-found: warn
+
+  # The last of the PHASE 4 block, wired in at slice 00a green commit 9.
+  #
+  # It runs only when the head commit subject matches ^test\(.+\): .*\(red\)$ — CLAUDE.md §7,
+  # exactly one such commit per slice and authored by the test-engineer, so the marker cannot
+  # be self-awarded by the implementer.  On every other commit it is *not applicable* and
+  # exits 0 without asserting anything.
+  #
+  # It asserts the SHAPE of the failure rather than that there was one: at least one
+  # test-engineer-owned suite failed, no test under tests/unit/ failed, and `verify`
+  # concluded success.  A branch that does not compile fails `verify` and is therefore
+  # reported as a broken run rather than a red proof — the discrimination ADR-0010
+  # Decision 3 asks for.  The job SUCCEEDS when the required failure was observed, and the
+  # check's name makes that inversion visible rather than hiding it in `continue-on-error`.
+  #
+  # The rule lives in tools/ci/red-proof.mjs with tools/test/red-proof.test.mjs in
+  # `test:tools`, not in inline YAML — ADR-0010's Consequences anticipated exactly this, and
+  # a decision this consequential should be executable offline against a downloaded artifact
+  # (docs/slices/00a-design.md §7, evidence item 3).
+  red-proof:
+    name: red-proof
+    needs: [verify, test]
+    # always(): the interesting case is precisely the one where `test` FAILED, and a plain
+    # `needs:` would skip this job then.
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      # Its OWN checkout.  This is a new job on its own runner with its own workspace —
+      # jobs do not inherit one — and `fetch-depth: 0` because `git log -1 <head.sha>`
+      # fails on an object a shallow clone never fetched.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      # No `npm ci`: red-proof.mjs imports nothing but node builtins.  That is a property
+      # worth keeping — the discriminator must be runnable against an old artifact without
+      # restoring that commit's dependency tree.
+
+      - name: the head commit's subject
+        # On a pull_request event the checked-out HEAD is GitHub's MERGE commit, whose
+        # subject is "Merge <sha> into <sha>" and never matches the red pattern.  The
+        # subject has to be read from the head commit explicitly.  A file rather than an
+        # argument because a commit subject is arbitrary text and must not be re-quoted
+        # through a shell.
+        run: git log -1 --format=%s ${{ github.event.pull_request.head.sha || github.sha }} > subject.txt
+
+      - name: the suite's results, from the test job
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results
+        # If the `test` job never produced one, let red-proof.mjs report the missing input
+        # itself (exit 2, naming the file) rather than failing here with a generic
+        # artifact error.
+        continue-on-error: true
+
+      - name: red-proof
+        run: |
+          node tools/ci/red-proof.mjs \
+            --subject-file subject.txt \
+            --verify '${{ needs.verify.result }}' \
+            --results test-results.json
+
 # ---------------------------------------------------------------------------------------
-# PHASE 4 — wired in when `src/` and the test suite arrive.  Not commented out because it
-# is unfinished, but because the commands it runs do not yet have anything to run against.
-# Full reasoning in ADR-0010 Decision 4.
+# What is deliberately still not here.
 #
-#   typecheck:                tsc --noEmit
-#   lint:arch:                npm run lint:arch                 # CLAUDE.md §2.3, QS-10
-#   test:                     npm test                          # Vitest + Testcontainers
-#
-# The test job needs Docker (TC-9), which is why the platform decision was a correctness
-# decision and not a convenience: §2.2 forbids substituting the database, so a Docker-less
-# runner can only run the tests that would pass anyway.  `ubuntu-latest` ships a working
-# daemon, so no `services:` block is needed — Testcontainers starts its own PostgreSQL.
-#
-#   red-proof:  runs only when the head commit subject matches ^test\(.+\): .*\(red\)$
-#               (CLAUDE.md §7 — exactly one such commit per slice, authored by the
-#               test-engineer, so the marker cannot be self-awarded by the implementer).
-#               It asserts the *shape* of the failure, not merely that there was one:
-#                 - the acceptance suite MUST exit non-zero, and
-#                 - install, typecheck, lint:arch, docs, tools and unit MUST all pass.
-#               A branch that does not compile is a broken run, not a red proof, and the
-#               job says which.  The job therefore SUCCEEDS when the required failure was
-#               observed — so a correctly red slice is not blocked behind a spurious
-#               failure — and the check name makes that inversion visible rather than
-#               hiding it in `continue-on-error`.  On any other commit there is no
-#               inversion: a failing acceptance test is a failing build.
-#
-#   check-run summary:        write a machine-readable run summary and upload it as an
-#               artifact (retention 90 days).  tools/team-log/collect-ci.mjs reads it — or
-#               `gh run view --json` — at each gate and appends the `check.run` record with
-#               source "derived" via appendRecords(..., { allowDerived: true }).  The
-#               durable evidence is that record in git plus the red commit's SHA; the
-#               artifact is corroboration and expires.
+#   check-run summary:        tools/team-log/collect-ci.mjs reads `gh run view --json` at
+#               each gate and appends the `check.run` record with source "derived" via
+#               appendRecords(..., { allowDerived: true }).  It needs no artifact from this
+#               workflow: the API is the durable source, and the record in git plus the red
+#               commit's SHA is the evidence.  The `test` job's test-results.json is
+#               corroboration and expires at 90 days.
 #
 # Deliberately never here, with reasons in ADR-0010 Decision 4: Stryker (a reviewer's
 # findings, not a threshold), `npm run log:audit` (its ground truth is subagent transcripts

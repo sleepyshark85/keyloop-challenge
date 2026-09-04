@@ -1,0 +1,129 @@
+{
+  "_fixture": {
+    "provenance": "CAPTURED",
+    "command": "gh run view 33828584765 --json databaseId,headSha,conclusion,status,workflowName,updatedAt,url,event,jobs",
+    "run_id": 33828584765,
+    "url": "https://github.com/sleepyshark85/keyloop-challenge/actions/runs/33828584765",
+    "captured_on": "2026-09-04",
+    "note": "A real verify run on PR #4, at slice 00a step 2. It predates the test and red-proof jobs, so it is the pre-00a shape: one job, no typecheck and no lint:arch step."
+  },
+  "run": {
+    "conclusion": "success",
+    "databaseId": 33828584765,
+    "event": "pull_request",
+    "headSha": "ae26cf5d09ca7cac0321f8ef063d1f180dd30fdc",
+    "jobs": [
+      {
+        "completedAt": "2026-09-04T02:18:39Z",
+        "conclusion": "success",
+        "databaseId": 100886466899,
+        "name": "docs, tools and log integrity",
+        "startedAt": "2026-09-04T02:11:29Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-04T02:11:31Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-04T02:11:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:11:32Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-09-04T02:11:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:11:33Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 3,
+            "startedAt": "2026-09-04T02:11:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:34Z",
+            "conclusion": "success",
+            "name": "install, with the engines pin enforced (TC-10)",
+            "number": 4,
+            "startedAt": "2026-09-04T02:11:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:34Z",
+            "conclusion": "success",
+            "name": "system-design.md is current with its section files",
+            "number": 5,
+            "startedAt": "2026-09-04T02:18:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:36Z",
+            "conclusion": "success",
+            "name": "tools regression suite",
+            "number": 6,
+            "startedAt": "2026-09-04T02:18:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:36Z",
+            "conclusion": "success",
+            "name": "every diagram is exported, and every diagram link resolves",
+            "number": 7,
+            "startedAt": "2026-09-04T02:18:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:36Z",
+            "conclusion": "success",
+            "name": "the event log is append-only",
+            "number": 8,
+            "startedAt": "2026-09-04T02:18:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:36Z",
+            "conclusion": "success",
+            "name": "every event-log record validates against the schema",
+            "number": 9,
+            "startedAt": "2026-09-04T02:18:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:37Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 17,
+            "startedAt": "2026-09-04T02:18:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:37Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-09-04T02:18:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-04T02:18:37Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-09-04T02:18:37Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/sleepyshark85/keyloop-challenge/actions/runs/33828584765/job/100886466899"
+      }
+    ],
+    "status": "completed",
+    "updatedAt": "2026-09-04T02:18:39Z",
+    "url": "https://github.com/sleepyshark85/keyloop-challenge/actions/runs/33828584765",
+    "workflowName": "verify"
+  }
+}

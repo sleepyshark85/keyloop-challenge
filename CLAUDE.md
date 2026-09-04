@@ -140,11 +140,45 @@ convenes **one** round of discussion, then rules:
 | **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede the ADR; revise (never delete) prior work |
 | **(d) Escalate** | Genuine trade-off or scope question | Human decides |
 
-To rule **(c)** the architect **must name the acceptance criterion or §10 quality scenario that
-would fail**. If it cannot name one, the outcome is (b). Preference is not a blocker.
+To rule **(c)** the architect **must name the acceptance criterion, §10 quality scenario, or §2
+standing invariant that would fail**. If it cannot name one, the outcome is (b). Preference is not
+a blocker.
+
+§2 was added to that list on 2026-09-04, after slice 00a. A design had worked around §2.4 — the red
+observed in CI — and substituted an evidence chain for it. No acceptance criterion and no quality
+scenario failed, because the end state was green either way, so by the letter of this rule the most
+serious class of defect available was the one class it could not name. The narrow test exists to stop
+(c) being reached for on preference, and it still does: a §2 breach is nameable, citable and
+NON-NEGOTIABLE, which is the opposite of a preference.
 
 **Max 2 loopbacks per slice.** A third auto-escalates: a slice needing three design changes is a
 slicing problem, not a design problem.
+
+### Adjudication is reasoned before it is applied — NON-NEGOTIABLE
+
+Deliberating and conceding are separate acts and must be separate steps. An adjudicator that rules
+and edits in one pass has already half-written the amendment by the time it decides whether the
+objection was right, which makes agreement the path of least resistance.
+
+So a role receiving an objection **replies before it edits**:
+
+1. **Re-think, then reply per objection.** One verdict each — **AGREE** or **DISAGREE** — with the
+   reasoning stated. Where it agrees, it states the exact change it would make. It does not make it.
+2. **Judge the finding and the remedy separately.** A correct measurement does not make the fix
+   proposed alongside it correct. Accepting that a problem is real while rejecting the offered
+   remedy, or accepting a narrower one, is a legitimate and common outcome.
+3. **Disagreement is expected and is not failure.** No role is obliged to concede to keep a slice
+   moving. An adjudication round that has never produced a disagreement is not consensus, it is
+   deference, and the retro reads it the same way it reads a reviewer with no findings.
+4. **A disagreement opens a review loop.** The objector may answer once. If the two still disagree,
+   the architect may **call a vote**: a third role — one that owns neither side of the dispute — is
+   given both positions and returns a reasoned verdict. Votes are advisory to the architect on
+   architecture, and to the human on scope; they are recorded either way.
+5. **Only then is the design amended**, in one pass, with the rulings attached.
+
+Every reply, disagreement and vote goes on the PR under §9's attribution convention, because the
+reasoning is the graded artifact — the record of *how* a design was argued into shape is worth more
+than the amended design alone.
 
 ### Authority
 

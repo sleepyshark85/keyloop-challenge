@@ -24,6 +24,13 @@ const TEST_OWNED = [
   'tests/acceptance/', 'tests/contract/', 'tests/property/', 'tests/concurrency/',
   // Ruled to the test-engineer at Gate B; CLAUDE.md §5 carries the reasoning.
   'tests/architecture/', 'tests/performance/',
+  // The harness is part of the test.  Both reviewers flagged this gap independently
+  // at slice 00a step 2: AC-1's assertion IS that the container starts and the suite
+  // connects, so an implementer able to edit globalSetup, the shared spawn helper or
+  // the Vitest config can turn a failing acceptance test green without touching the
+  // behaviour under test.  Criterion C2 is measured from hook denials, so an
+  // unenforced boundary here makes a fatal criterion self-reported.
+  'tests/setup/', 'tests/support/', 'vitest.config.ts',
 ];
 
 /** role -> { write: [prefixes], read: [prefixes], note } */
@@ -128,9 +135,46 @@ if (tool === 'Bash') {
   const cmd = String(input.command ?? '');
   const guarded = [...policy.write, ...UNIVERSAL_WRITE_DENY];
   const writeish = /(^|[\s;&|])(>{1,2}|tee\b|sed\s+-i|truncate\b|dd\b|cp\b|mv\b|rm\b|install\b)/;
-  if (writeish.test(cmd)) {
+
+  // Commands that cannot write a working-tree file, however they mention one.
+  // Slice 00a produced FIVE false positives in five consecutive agent runs, and
+  // every one was a legitimate action: building a fixture under a temp dir,
+  // `git commit -F` with a heredoc naming a guarded path in its MESSAGE, and —
+  // worst — `git restore --staged docs/team-log/…`, which was denied *because it
+  // names the path it was un-staging*, blocking the correction to a boundary
+  // violation rather than the violation.  A guard that stops more legitimate work
+  // than violations inverts its purpose, and its normal workaround becoming
+  // obfuscation (an agent concatenated 's' + 'rc' to get past it) teaches exactly
+  // the habit the reviewer then has to see through.
+  //
+  // A heredoc body is prose, not a path.  Git plumbing that unstages or inspects
+  // writes nothing a hook needs to stop.  The Write/Edit branch above is the real
+  // enforcement and is unaffected — this branch was always a speed bump.
+  const heredocBody = /<<-?\s*'?[A-Za-z_]+'?\n[\s\S]*?\n[A-Za-z_]+\s*$/m;
+  const readOnlyGit = /^\s*git\s+(restore\s+--staged|reset|diff|status|log|show|stash\s+list|add\s+-p)\b/;
+  const stripped = cmd.replace(heredocBody, ' <heredoc> ');
+
+  if (readOnlyGit.test(cmd)) {
+    process.exit(0);
+  }
+
+  if (writeish.test(stripped)) {
     for (const prefix of guarded) {
-      if (cmd.includes(prefix)) {
+      // Anchor the match to a path that would actually resolve inside the repo.
+      // A bare substring test denied any command merely CONTAINING `src/` —
+      // including fixture work under /tmp, which slice 00a's AC-4 requires. The
+      // test-engineer hit this at step 2 and had to build its probe through a
+      // node script concatenating 's' + 'rc' to evade the heuristic. A guard
+      // whose normal workaround is obfuscation teaches the wrong habit and
+      // makes the reviewer's job harder, so the match now requires the prefix
+      // to appear at a token boundary and NOT under an absolute path outside
+      // the project.
+      const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const inRepo = new RegExp(`(^|[\\s;&|='"\`])(\\./)?${escaped}`);
+      // An ABSOLUTE path elsewhere (/tmp/probe-1/src/...) is someone else's tree.
+      // `./src/` is not: the leading `/` is required, so a relative path still bites.
+      const underAbsolute = new RegExp(`(^|[\\s;&|='"\`])/[\\w.-]+(/[\\w.-]+)*/${escaped}`);
+      if (inRepo.test(stripped) && !underAbsolute.test(stripped)) {
         deny(`${role} may not modify ${prefix}* — the command appears to write there via the shell. ${policy.note}`);
       }
     }

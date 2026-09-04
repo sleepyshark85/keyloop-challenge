@@ -8,16 +8,23 @@ Generated: every ADR with `status: proposed` and every deferred-improvement slic
 construction, a debt item traceable to the decision that created it.
 
 <!-- generated:debt-register -->
-_No deferred improvements recorded._
+| Item | Origin | Why deferred |
+|---|---|---|
+| Treat /health as an operational probe outside the API contract, not as a sixth operation | [ADR-0011](../adr/0011-health-is-an-operational-probe.md) | deferred improvement |
 <!-- /generated:debt-register -->
 
-The register is empty, and that is the correct reading rather than an omission. Between the architect
-writing this section and Gate B closing it reported ADR-0005 to ADR-0010 as debt, because it is
-generated from `status: proposed` and those were the *founding* decisions awaiting ratification, not
-deferred improvements. **The human accepted all six at Gate B on 2026-09-04**, so the register
-emptied on its own. Every entry that appears here from now on is genuinely a deferred improvement —
-a `(b)` DCR ruling under `CLAUDE.md` §6, which is what the register exists to make impossible to
-lose.
+The register held nothing until slice 00a, and that was the correct reading rather than an omission.
+Between the architect writing this section and Gate B closing it reported ADR-0005 to ADR-0010 as
+debt, because it is generated from `status: proposed` and those were the *founding* decisions
+awaiting ratification, not deferred improvements. **The human accepted all six at Gate B on
+2026-09-04**, so the register emptied on its own.
+
+The single entry above is the first genuine one: **ADR-0011** was raised by the architect at slice
+00a step 1 and is `proposed` because it is the human's to rule at that slice's gate, not the
+architect's to close inline. It is debt in the narrow sense the register means — an open decision
+with a recommendation attached — and it leaves the register the moment it is accepted or rejected.
+Every other entry that appears here is a deferred improvement from a `(b)` DCR ruling under
+`CLAUDE.md` §6, which is what the register exists to make impossible to lose.
 
 ## 11.2 Known risks
 
@@ -108,20 +115,22 @@ type edit produces code that compiles and is wrong.
 | R-7c | `src/platform` is importable-by-all and imports nothing, which is exactly the shape of a junk drawer | The leaf rule stops it acquiring behaviour, not contents. Reviewer's job |
 | R-7d | Down migrations are written and never run (ADR-0007), so they are unverified by construction | The deployment is a fresh container; rollback in anger is not a story this system has |
 | R-7e | The retry loop must not be wrapped in a transaction (§6). Nothing structural enforces it | QS-3 fails immediately if it is — `25P02` on the second attempt |
-| R-7f | Docker is required for everything but the `src/domain` suite (TC-9) | A consequence of §2.2 being right about where the invariant lives |
+| R-7f | Docker is required for everything but the `nodb` project — `tests/unit/` and `tests/architecture/` (TC-9, §7.2) | A consequence of §2.2 being right about where the invariant lives. At 00a neither implementer nor test-engineer had a container runtime, which is what forced the two-project split |
 
-### R-8 · Four things CI is *said* to enforce, and does not yet
+### R-8 · Four things CI is *said* to enforce — one closed at slice 00a, three open
 
 ADR-0010 founds the pipeline (§7.4), and writing it turned up a set of claims made in prose that no
 tool implements. They are listed here rather than quietly fixed later, because the failure mode of an
-unenforced enforcement claim is that everyone stops checking by hand.
+unenforced enforcement claim is that everyone stops checking by hand. **The first row closed at slice
+00a and is struck through rather than deleted** — a debt item that vanishes on payment leaves no
+evidence it was ever owed.
 
 | Claimed | Claimed by | State today |
 |---|---|---|
-| `check.run` is emitted by tooling, tier `derived` | METHODOLOGY §400 | **Not emitted.** ADR-0010 decides the mechanism — a collector reading the GitHub API at each gate — but `tools/team-log/collect-ci.mjs` does not exist, so phase-4 criterion **C1 remains unpassable**. This is the largest of the four |
+| ~~`check.run` is emitted by tooling, tier `derived`~~ | METHODOLOGY §400 | **Closed at slice 00a.** `tools/team-log/collect-ci.mjs` exists, derives every field from `gh` output — there is no `--conclusion` and no way to state an outcome on the command line — and has run against real runs on this branch. **C1 is measured, not merely passable**: the red run and its later green run were both collected and `slice:check 00a` reads *test-first proven (red before green)* from records rather than from narration |
 | The diagram scripts `self_check.py` and `verify-geometry.py` run in CI | METHODOLOGY §4 | **Cannot run.** They live in a `diagram-design` plugin cache outside the repository and nothing vendors them. CI checks the honest subset: every `.html` has a committed `.svg`, and every diagram link resolves |
 | Link integrity and ADR existence are enforced | METHODOLOGY §4 | No tool. CI checks diagram links only; the rest of the documentation's relative links are unchecked |
-| `QS-*` names a real test, or CI fails | METHODOLOGY §4, §10.2, §0 | No tool, and nothing to check against until `tests/` exists. It is the traceability chain's last link and should land with the first slice that has tests |
+| `QS-*` names a real test, or CI fails | METHODOLOGY §4, §10.2, §0 | Still no tool — **and as of slice 00a the excuse has expired.** This row read *"nothing to check against until `tests/` exists"*; `tests/` now exists and QS-10 has a committed test, so the traceability chain's last link is now a plain gap rather than a blocked one. It is the oldest unpaid item in this table and should land with slice 00 |
 
 A fifth is a fact about tooling rather than a gap: **`npm run log:audit` cannot run in CI.** Its
 ground truth is subagent transcripts under `~/.claude/projects/`, which exist only on the maintainer's

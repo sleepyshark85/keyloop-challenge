@@ -27,6 +27,44 @@ const CASES = [
     { tool_name: 'Write', agent_type: 'implementer', file_path: 'tests/property/p.spec.ts' }],
   ['implementer may not delete an acceptance test via the shell', DENY,
     { tool_name: 'Bash', agent_type: 'implementer', command: 'rm tests/acceptance/03.spec.ts' }],
+  // The harness is part of the test. Both reviewers flagged this gap at slice 00a
+  // step 2: an implementer able to edit globalSetup or the Vitest config can turn a
+  // failing acceptance test green without touching the behaviour under test.
+  ['implementer may not write the Testcontainers globalSetup', DENY,
+    { tool_name: 'Write', agent_type: 'implementer', file_path: 'tests/setup/postgres.ts' }],
+  ['implementer may not write the shared spawn helper', DENY,
+    { tool_name: 'Write', agent_type: 'implementer', file_path: 'tests/support/service.ts' }],
+  ['implementer may not edit the Vitest config', DENY,
+    { tool_name: 'Edit', agent_type: 'implementer', file_path: 'vitest.config.ts' }],
+  ['test-engineer owns the harness', ALLOW,
+    { tool_name: 'Write', agent_type: 'test-engineer', file_path: 'tests/setup/postgres.ts' }],
+  // A guard whose normal workaround is obfuscation teaches the wrong habit. AC-4
+  // requires building a fixture tree under a temp directory; the bare substring
+  // test denied it for merely containing the literal `src/`.
+  ['fixture work outside the repo is not denied for containing a guarded name', ALLOW,
+    { tool_name: 'Bash', agent_type: 'test-engineer',
+      command: 'cp fixture.ts /tmp/probe-123/src/domain/bad.ts' }],
+  ['...but the real path is still denied', DENY,
+    { tool_name: 'Bash', agent_type: 'test-engineer', command: 'cp x.ts src/domain/bad.ts' }],
+  ['...and so is an explicitly relative one', DENY,
+    { tool_name: 'Bash', agent_type: 'test-engineer', command: 'cp x.ts ./src/domain/bad.ts' }],
+  // Five false positives in five consecutive agent runs during slice 00a, every one a
+  // legitimate action. A guard that stops more real work than violations inverts its
+  // purpose, and an agent working around it by concatenating 's' + 'rc' teaches exactly
+  // the habit the reviewer then has to see through.
+  ['a heredoc body naming a guarded path is prose, not a write', ALLOW,
+    { tool_name: 'Bash', agent_type: 'implementer',
+      command: "git commit -q -F - <<'EOF'\nfeat: raise a DCR rather than edit tests/acceptance/x.ts\nEOF" }],
+  ['git restore --staged is not a write, even of a guarded path', ALLOW,
+    { tool_name: 'Bash', agent_type: 'architect',
+      command: 'git restore --staged docs/team-log/events.jsonl' }],
+  ['git diff over a guarded path is not a write', ALLOW,
+    { tool_name: 'Bash', agent_type: 'implementer', command: 'git diff tests/acceptance/' }],
+  ['...but a real redirect into a guarded path is still denied', DENY,
+    { tool_name: 'Bash', agent_type: 'implementer', command: 'echo x > tests/acceptance/03.spec.ts' }],
+  ['...and a heredoc redirected INTO a guarded path is still denied', DENY,
+    { tool_name: 'Bash', agent_type: 'implementer',
+      command: "cat > tests/acceptance/03.spec.ts <<'EOF'\nit('x', () => {});\nEOF" }],
   // Ruled to the test-engineer at Gate B (CLAUDE.md §5). QS-10 asserts the layering the
   // implementer must not be able to relax, so it is guarded like the other outside-in dirs.
   ['implementer may not write an architecture test (QS-10)', DENY,

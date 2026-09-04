@@ -1,0 +1,296 @@
+{
+  "_fixture": {
+    "provenance": "CAPTURED",
+    "command": "gh run download 33831214774 -n test-results",
+    "run_id": 33831214774,
+    "head_sha": "a483d091fd3359e9b93759c331c7d60d11f27376",
+    "url": "https://github.com/sleepyshark85/keyloop-challenge/actions/runs/33831214774",
+    "captured_on": "2026-09-04",
+    "note": "Slice 00a's RED run — the artifact §7 evidence item 3 replays red-proof.mjs against. testResults[].name is RUNNER-ABSOLUTE (/home/runner/work/keyloop-challenge/keyloop-challenge/…), which is what Vitest actually emits and what no hand-authored fixture in this repository contained: every earlier case resolve()d a repo-relative name against the local cwd, so failedFilesFrom's normalisation was only ever exercised on its trivial branch. Verbatim under .results — nothing edited, including the failure messages."
+  },
+  "results": {
+    "numTotalTestSuites": 8,
+    "numPassedTestSuites": 4,
+    "numFailedTestSuites": 4,
+    "numPendingTestSuites": 0,
+    "numTotalTests": 17,
+    "numPassedTests": 14,
+    "numFailedTests": 3,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "snapshot": {
+      "added": 0,
+      "failure": false,
+      "filesAdded": 0,
+      "filesRemoved": 0,
+      "filesRemovedList": [],
+      "filesUnmatched": 0,
+      "filesUpdated": 0,
+      "matched": 0,
+      "total": 0,
+      "unchecked": 0,
+      "uncheckedKeysByFile": [],
+      "unmatched": 0,
+      "updated": 0,
+      "didUpdate": false
+    },
+    "startTime": 1788490465009,
+    "success": false,
+    "testResults": [
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "AC-4 — every layering rule fires by name against an injected violation"
+            ],
+            "fullName": "AC-4 — every layering rule fires by name against an injected violation cruised the fixture: no environment issues, and every planted file was analysed",
+            "status": "passed",
+            "title": "cruised the fixture: no environment issues, and every planted file was analysed",
+            "duration": 1.9117280000000392,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-4 — every layering rule fires by name against an injected violation"
+            ],
+            "fullName": "AC-4 — every layering rule fires by name against an injected violation reports domain-is-pure by name, at error severity, on src/domain/bad.ts",
+            "status": "passed",
+            "title": "reports domain-is-pure by name, at error severity, on src/domain/bad.ts",
+            "duration": 1.5054700000000594,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-4 — every layering rule fires by name against an injected violation"
+            ],
+            "fullName": "AC-4 — every layering rule fires by name against an injected violation reports sql-only-in-persistence by name, at error severity, on src/application/bad.ts",
+            "status": "passed",
+            "title": "reports sql-only-in-persistence by name, at error severity, on src/application/bad.ts",
+            "duration": 0.4725819999998748,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-4 — every layering rule fires by name against an injected violation"
+            ],
+            "fullName": "AC-4 — every layering rule fires by name against an injected violation reports http-must-not-reach-persistence by name, at error severity, on src/http/bad.ts",
+            "status": "passed",
+            "title": "reports http-must-not-reach-persistence by name, at error severity, on src/http/bad.ts",
+            "duration": 0.37474999999994907,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-4 — every layering rule fires by name against an injected violation"
+            ],
+            "fullName": "AC-4 — every layering rule fires by name against an injected violation reports outside-in-tests-do-not-import-src by name, at error severity, on tests/acceptance/bad.test.ts",
+            "status": "passed",
+            "title": "reports outside-in-tests-do-not-import-src by name, at error severity, on tests/acceptance/bad.test.ts",
+            "duration": 0.5478219999999965,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-4 — every layering rule fires by name against an injected violation"
+            ],
+            "fullName": "AC-4 — every layering rule fires by name against an injected violation counts the four injected violations at error severity",
+            "status": "passed",
+            "title": "counts the four injected violations at error severity",
+            "duration": 0.3075440000002345,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-4 — every layering rule fires by name against an injected violation"
+            ],
+            "fullName": "AC-4 — every layering rule fires by name against an injected violation exits non-zero under the reporter lint:arch uses, so a violation fails the build",
+            "status": "passed",
+            "title": "exits non-zero under the reporter lint:arch uses, so a violation fails the build",
+            "duration": 0.29771600000003673,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-4 — the negative control: a conforming tree produces no violation"
+            ],
+            "fullName": "AC-4 — the negative control: a conforming tree produces no violation cruised the fixture: no environment issues, and every planted file was analysed",
+            "status": "passed",
+            "title": "cruised the fixture: no environment issues, and every planted file was analysed",
+            "duration": 0.5200509999999667,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-4 — the negative control: a conforming tree produces no violation"
+            ],
+            "fullName": "AC-4 — the negative control: a conforming tree produces no violation reports zero error-severity violations",
+            "status": "passed",
+            "title": "reports zero error-severity violations",
+            "duration": 1.0025110000001405,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-3 — `npm run lint:arch` exits 0 against the real module tree"
+            ],
+            "fullName": "AC-3 — `npm run lint:arch` exits 0 against the real module tree exits 0",
+            "status": "passed",
+            "title": "exits 0",
+            "duration": 800.8098750000004,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-3 — `npm run lint:arch` exits 0 against the real module tree"
+            ],
+            "fullName": "AC-3 — `npm run lint:arch` exits 0 against the real module tree cruised the real src/ tree — exit 0 over an unexamined src/ is not evidence",
+            "status": "failed",
+            "title": "cruised the real src/ tree — exit 0 over an unexamined src/ is not evidence",
+            "duration": 721.2288200000003,
+            "failureMessages": [
+              "AssertionError: depcruise src tests reported no module under src/. `lint:arch` exits 0 on that, collect-ci records depcruise: \"pass\", and criterion C4 reads a clean architecture for a tree the ruleset never looked at.: expected 0 to be greater than 0\n    at /home/runner/work/keyloop-challenge/keyloop-challenge/tests/architecture/layering.test.ts:430:7\n    at file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:1628:35\n    at file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2783:26\n    at file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3319:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3314:10)\n    at file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3299:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3257:10)\n    at file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3876:64"
+            ],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          }
+        ],
+        "startTime": 1788490476080,
+        "endTime": 1788490478974.2288,
+        "status": "failed",
+        "message": "",
+        "name": "/home/runner/work/keyloop-challenge/keyloop-challenge/tests/architecture/layering.test.ts"
+      },
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "AC-2 — GET /health reports database connectivity"
+            ],
+            "fullName": "AC-2 — GET /health reports database connectivity returns 200 and reports the database up when the database is reachable",
+            "status": "failed",
+            "title": "returns 200 and reports the database up when the database is reachable",
+            "duration": 192.556044,
+            "failureMessages": [
+              "AssertionError: the service did not start.\nthe service exited before it answered on its port.\n  command      node dist/main.js\n  cwd          /home/runner/work/keyloop-challenge/keyloop-challenge\n  PORT         45231\n  DATABASE_URL postgres://test:test@localhost:32769/test\n  entrypoint   /home/runner/work/keyloop-challenge/keyloop-challenge/dist/main.js (DOES NOT EXIST)\n  exit         code=1 signal=null\n  stdout       (empty)\n  stderr       \n               node:internal/modules/cjs/loader:1433\n                 throw err;\n                 ^\n               \n               Error: Cannot find module '/home/runner/work/keyloop-challenge/keyloop-challenge/dist/main.js'\n                   at Function._resolveFilename (node:internal/modules/cjs/loader:1430:15)\n                   at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)\n                   at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)\n                   at Function._load (node:internal/modules/cjs/loader:1216:25)\n                   at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)\n                   at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n                   at node:internal/main/run_main_module:36:49 {\n                 code: 'MODULE_NOT_FOUND',\n                 requireStack: []\n               }\n               \n               Node.js v22.23.2: expected 'the service exited before it answered…' to be 'started' // Object.is equality\n    at /home/runner/work/keyloop-challenge/keyloop-challenge/tests/acceptance/health.test.ts:28:92\n    at file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2783:20"
+            ],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-2 — GET /health reports database connectivity"
+            ],
+            "fullName": "AC-2 — GET /health reports database connectivity returns 503 and reports the database down when the database is unreachable",
+            "status": "failed",
+            "title": "returns 503 and reports the database down when the database is unreachable",
+            "duration": 113.31042499999995,
+            "failureMessages": [
+              "AssertionError: the service did not start.\nthe service exited before it answered on its port.\n  command      node dist/main.js\n  cwd          /home/runner/work/keyloop-challenge/keyloop-challenge\n  PORT         46139\n  DATABASE_URL postgresql://keyloop:keyloop@127.0.0.1:1/keyloop_unreachable\n  entrypoint   /home/runner/work/keyloop-challenge/keyloop-challenge/dist/main.js (DOES NOT EXIST)\n  exit         code=1 signal=null\n  stdout       (empty)\n  stderr       \n               node:internal/modules/cjs/loader:1433\n                 throw err;\n                 ^\n               \n               Error: Cannot find module '/home/runner/work/keyloop-challenge/keyloop-challenge/dist/main.js'\n                   at Function._resolveFilename (node:internal/modules/cjs/loader:1430:15)\n                   at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)\n                   at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)\n                   at Function._load (node:internal/modules/cjs/loader:1216:25)\n                   at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)\n                   at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n                   at node:internal/main/run_main_module:36:49 {\n                 code: 'MODULE_NOT_FOUND',\n                 requireStack: []\n               }\n               \n               Node.js v22.23.2: expected 'the service exited before it answered…' to be 'started' // Object.is equality\n    at /home/runner/work/keyloop-challenge/keyloop-challenge/tests/acceptance/health.test.ts:52:92\n    at file:///home/runner/work/keyloop-challenge/keyloop-challenge/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2783:20"
+            ],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          }
+        ],
+        "startTime": 1788490474123,
+        "endTime": 1788490474429.3105,
+        "status": "failed",
+        "message": "",
+        "name": "/home/runner/work/keyloop-challenge/keyloop-challenge/tests/acceptance/health.test.ts"
+      },
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": [
+              "AC-1 — the Testcontainers harness"
+            ],
+            "fullName": "AC-1 — the Testcontainers harness provides a PostgreSQL connection URI to the suite",
+            "status": "passed",
+            "title": "provides a PostgreSQL connection URI to the suite",
+            "duration": 1.9990640000000326,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-1 — the Testcontainers harness"
+            ],
+            "fullName": "AC-1 — the Testcontainers harness connects to the container and answers a query",
+            "status": "passed",
+            "title": "connects to the container and answers a query",
+            "duration": 2.917605999999978,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-1 — the Testcontainers harness"
+            ],
+            "fullName": "AC-1 — the Testcontainers harness runs PostgreSQL 16, the version arc42 §7.2 names",
+            "status": "passed",
+            "title": "runs PostgreSQL 16, the version arc42 §7.2 names",
+            "duration": 0.9065889999999968,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          },
+          {
+            "ancestorTitles": [
+              "AC-1 — the Testcontainers harness"
+            ],
+            "fullName": "AC-1 — the Testcontainers harness has run the migration seam: pgmigrations exists and zero migrations applied",
+            "status": "passed",
+            "title": "has run the migration seam: pgmigrations exists and zero migrations applied",
+            "duration": 1.8494150000000218,
+            "failureMessages": [],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          }
+        ],
+        "startTime": 1788490474283,
+        "endTime": 1788490474290.8494,
+        "status": "passed",
+        "message": "",
+        "name": "/home/runner/work/keyloop-challenge/keyloop-challenge/tests/integration/postgres-harness.test.ts"
+      }
+    ]
+  }
+}

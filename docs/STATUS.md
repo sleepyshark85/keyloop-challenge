@@ -11,21 +11,21 @@
 
 ## Where we are
 
-**Phase 3 — Backlog**, which closes at Gate C.
+**Phase 4 — Pilot + retro**, which closes at Gate D.
 
 | | |
 |---|---|
-| Last commit | `3bcaafc Merge pull request #2 from sleepyshark85/phase/02-architecture` |
-| Gates decided | A, B |
-| Agent runs recorded | 4 |
+| Last commit | `be195dc test(00a): the ruleset's alternation, asserted from both sides (R-1)` |
+| Gates decided | A, B, C |
+| Agent runs recorded | 28 |
 | ADRs accepted | 10 |
 | Slices defined | 13 |
 | Open DCRs | none |
 
 ## What happens next
 
-- Slice the backlog into ~14 files (rescheduling added one at Gate A).
-- **Gate C**: approve scope and ordering.
+- Run slice 00 end-to-end, then hold the retro against `team-log/process-criteria.md`.
+- **Gate D**: tune the machine, or proceed.
 
 ## Gate decisions
 
@@ -36,6 +36,10 @@
 **Gate B** · 2026-09-03 · accepted-all-adrs-and-three-rulings
 
 > ADR-0005 to ADR-0010 accepted as recommended, unmodified: Fastify+TypeBox, Kysely over pg with no ORM, node-pg-migrate running .sql files, five layered modules with no repository port, seeded-shuffle candidate ordering with a cap of 16, and GitHub Actions with check.run collected from the API rather than committed by the workflow. Three open rulings decided alongside them. (1) tests/architecture/ and tests/performance/ belong to the test-engineer, on the same reasoning as the other outside-in directories; CLAUDE.md section 5 and the path guard now carry it. (2) Slice 00 splits into 00a, a walking skeleton carrying compose, the first migration, /health and the phase-4 CI steps, before the pilot slice proper — so the pilot measures the loop rather than scaffolding friction. (3) TC-10 bites locally as well as in CI via .npmrc engine-strict=true. Separately, METHODOLOGY section 4 was corrected: it claimed the diagram-design skill scripts run in CI and they cannot, since they live outside the repository.
+
+**Gate C** · 2026-09-03 · backlog-approved-13-slices
+
+> Scope and ordering approved as proposed. Thirteen slices, every arc42 section 10 quality scenario QS-1 to QS-14 claimed by the slice that makes it executable. Ordering driven by what must exist before the invariant can be tested rather than by feature value. The three contested seams stand: 00a/00 separating scaffold from invariant per the Gate B ruling, 02/04 so the retry loop arrives with a test that fails without it rather than as untested optimism, and 06/07 so the atomic move is separated from the two concurrency scenarios that catch a cancel-then-insert. Slice 07 is accepted as potentially proof-only, with the reviewer required to state explicitly if no production code changed.
 
 ## Decisions on record
 
@@ -51,6 +55,7 @@
 | [0008](adr/0008-module-decomposition.md) | Decompose into five layered modules around a dependency-free policy core | accepted | — |
 | [0009](adr/0009-candidate-ordering-and-attempt-cap.md) | Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 | accepted | — |
 | [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | accepted | — |
+| [0011](adr/0011-health-is-an-operational-probe.md) | Treat /health as an operational probe outside the API contract, not as a sixth operation | proposed | — |
 
 ## Agent runs
 
@@ -60,7 +65,31 @@
 | 2026-09-03 15:37 | architect | 9m59 | 120 / 2,396 / 3,889,958 | `derived` |
 | 2026-09-03 17:32 | architect | 30m29 | 214 / 1,994 / 15,080,691 | `derived` |
 | 2026-09-03 17:58 | architect | 13m48 | 192 / 2,138 / 7,743,192 | `derived` |
-| | **total** | **60m38** | **574 / 9,525 / 27,804,662** | |
+| 2026-09-03 18:54 | architect | 13m17 | 86 / 1,127 / 3,238,327 | `derived` |
+| 2026-09-03 23:53 | test-engineer | 7m18 | 72 / 1,830 / 2,456,784 | `derived` |
+| 2026-09-03 23:56 | implementer | 9m54 | 132 / 8,233 / 4,668,458 | `derived` |
+| 2026-09-04 00:11 | architect | 13m41 | 46 / 18,381 / 1,376,739 | `derived` |
+| 2026-09-04 00:35 | architect | 36m51 | 170 / 30,448 / 11,519,516 | `derived` |
+| 2026-09-04 01:54 | architect | 116m02 | 182 / 30,464 / 11,921,786 | `derived` |
+| 2026-09-04 02:00 | architect | 121m54 | 266 / 30,806 / 22,191,883 | `derived` |
+| 2026-09-04 02:52 | test-engineer | 30m11 | 290 / 13,145 / 20,939,329 | `derived` |
+| 2026-09-04 03:13 | architect | 195m22 | 288 / 31,892 / 24,090,714 | `derived` |
+| 2026-09-04 03:18 | architect | 200m11 | 342 / 32,724 / 31,972,451 | `derived` |
+| 2026-09-04 03:29 | implementer | 18m59 | 276 / 23,112 / 16,049,617 | `derived` |
+| 2026-09-04 03:33 | test-engineer | 2m56 | 58 / 1,150 / 1,097,312 | `derived` |
+| 2026-09-04 04:02 | implementer | 51m36 | 582 / 37,362 / 55,341,592 | `derived` |
+| 2026-09-04 04:10 | test-engineer | 6m40 | 96 / 9,598 / 3,057,287 | `derived` |
+| 2026-09-04 04:10 | architect | 6m36 | 86 / 529 / 2,695,112 | `derived` |
+| 2026-09-04 04:15 | implementer | 65m11 | 638 / 38,531 / 63,608,063 | `derived` |
+| 2026-09-04 04:17 | architect | 13m21 | 160 / 1,913 / 7,529,918 | `derived` |
+| 2026-09-04 04:18 | test-engineer | 15m03 | 184 / 10,938 / 8,136,823 | `derived` |
+| 2026-09-04 04:33 | test-engineer | 29m25 | 316 / 19,934 / 19,652,168 | `derived` |
+| 2026-09-04 04:37 | implementer | 87m25 | 676 / 38,851 / 69,319,666 | `derived` |
+| 2026-09-04 04:48 | test-engineer | 45m03 | 372 / 20,547 / 25,471,035 | `derived` |
+| 2026-09-04 05:42 | implementer | 151m35 | 890 / 45,843 / 109,111,076 | `derived` |
+| 2026-09-04 06:21 | reviewer | 15m20 | 238 / 15,620 / 16,253,209 | `derived` |
+| 2026-09-04 06:29 | test-engineer | 146m08 | 416 / 20,886 / 30,481,090 | `derived` |
+| | **total** | **1460m35** | **7,436 / 493,389 / 589,984,617** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

@@ -133,8 +133,16 @@ export default {
         'by a role that never reads src/ (CLAUDE.md §5, METHODOLOGY P4). They reach the system ' +
         'the way a client does — over HTTP, and over SQL against the real database. An import ' +
         'from src/ is that independence quietly spent, and the path hook cannot see it because ' +
-        'the file being written is one the test-engineer legitimately owns.',
-      from: { path: '^tests/(acceptance|contract|property|concurrency)/' },
+        'the file being written is one the test-engineer legitimately owns. ' +
+        'Widened at slice 00a step 2 (docs/slices/00a-design.md §11.2) to every directory the ' +
+        'test-engineer owns: architecture and performance make the Gate B ownership ruling ' +
+        'structural rather than documentary, and setup/ and support/ close the loophole where a ' +
+        'globalSetup or a spawn helper imports src/ and hands it to a test that may not. ' +
+        'tests/unit/ and tests/integration/ stay out: both legitimately import src/.',
+      from: {
+        path:
+          '^tests/(acceptance|architecture|concurrency|contract|performance|property|setup|support)/',
+      },
       to: { path: '^src/' },
     },
 

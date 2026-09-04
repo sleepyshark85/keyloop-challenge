@@ -84,9 +84,15 @@ failure silently rendering as a `500`.
 **This layer depends on `src/persistence` concretely. There is no repository port**, and that is a
 decision rather than an omission — [ADR-0008](../adr/0008-module-decomposition.md) argues it at length. The short form: a port that can be
 implemented in memory is a port whose implementation cannot hold this system's invariant, and offering
-the socket invites the substitution `CLAUDE.md` §2.2 bans. The cost is that use cases are not
-unit-testable without Docker, which is the correct outcome — the unit-testable surface is
-`src/domain`, deliberately, and that is where the mutation budget is spent (§8.5).
+the socket invites the substitution `CLAUDE.md` §2.2 bans. The cost is that **a use case cannot be
+unit-tested against a substitute repository**, because there is no socket to plug one into.
+
+*As built at 00a, that cost is narrower than this section first claimed.* The phase-2 wording was
+*"use cases are not unit-testable without Docker — the unit-testable surface is `src/domain`"*, and
+`checkHealth` falsifies it: it is unit-tested with no container, against a Kysely instance whose
+**driver** is replaced and whose dialect is the real one. Removing the port forecloses substituting
+the *repository*; it does not foreclose substituting the *transport* underneath it. §8.5 draws the
+line that keeps §2.2 intact, and it is not this one.
 
 ### `src/persistence` — SQL, and the only place SQLSTATE is read
 
@@ -136,6 +142,35 @@ from acquiring *contents*.
 Reads config, starts telemetry, builds the pool, builds the server, listens. The only module allowed
 to see every layer, and the only place a dependency is chosen rather than received.
 
+### As built at slice 00a — the walking skeleton
+
+Five module directories exist; four of them have contents. `GET /health` was chosen precisely because
+it crosses every one of them, since a skeleton whose single route short-circuits the layering proves
+nothing about the layering.
+
+| Module | As built | Note |
+|---|---|---|
+| `src/domain` | **empty** (`.gitkeep`) | There is no domain logic in a health probe, and a placeholder would trip `no-orphans` — a permanent warning is a warning nobody reads. It fills at slice 01 |
+| `src/application` | `checkHealth.ts` | `HealthOutcome` — the first discriminated union, declared *here* and not in `src/http`, so the route's `switch` is exhaustiveness-checked and the use case stays callable without a server |
+| `src/persistence` | `db.ts` (the `Db` alias and the pool), `health.ts` (`pingDatabase`, which never rethrows a driver error), `schema.ts` (an empty `Database` interface), `migrations/` | `pingDatabase` returning a boolean rather than throwing is what lets the outcome union stay the only vocabulary above it |
+| `src/http` | `server.ts`, `routes/health.ts` | `buildServer` takes already-bound use cases, never a handle |
+| `src/platform` | `config.ts`, `logger.ts` | Telemetry is slice 09's; an empty OTel bootstrap now would be the junk drawer this section warns about |
+| `src/main.ts` | composition root, signals, listen | The only module that sees every layer |
+
+**One claim was narrowed while it was being built, and the narrowed form is the one that is true.**
+The design first said partial application was *"the only shape left"* once the ruleset forbids the
+edge. It is not. `sql-only-in-persistence` forbids naming `Kysely` outside persistence and
+`http-must-not-reach-persistence` forbids naming `Db` — under `tsPreCompilationDeps: true` that
+catches `import type` as well, which is the point of the flag. But a **generic parameter evades both
+by declining to name the handle at all**: `interface GenericDeps<TDb> { db: TDb }` compiles and cruises
+clean. So the honest claim is that **the ruleset forecloses every shape that *names* the handle**, and
+partial application is the shape *taken* rather than the shape *left*. It costs nothing to prefer: the
+generic alternative buys the edge a value it cannot type, cannot use and must not touch.
+
+The distinction matters beyond wording. "No other shape compiles" would have been a claim about the
+tooling that the tooling does not support, and the next person to need an escape hatch would have
+found one and concluded the rule was decorative.
+
 ## 5.3 Module dependency graph
 
 **Generated, never hand-drawn** — a hand-drawn dependency graph is a claim, a generated one is a
@@ -150,6 +185,25 @@ The graph is rendered here from the first implementation slice onward; until `sr
 nothing to draw, and drawing the intended graph by hand would be exactly the claim this subsection
 exists to avoid making.
 
+**The first render happened at slice 00a, and it does not look like what this subsection promised.**
+Measured: `--output-type mermaid` **ignores `reporterOptions.archi.collapsePattern`**, so the render
+is one node per *file* inside directory subgraphs, plus a subgraph for every `node_modules` package it
+reaches — seventeen subgraphs, of which twelve are dependencies. The collapsed five-box picture this
+section assumed the tool would produce is not an output it offers.
+
+So the as-built record is deliberately split, and the split is the honest one:
+
+- **the fact** is `npm run lint:arch` — **40 modules cruised across `src` and `tests`, every root
+  covered, zero violations.** That number is generated, gated in CI, and is what QS-10 rests on;
+- **the picture** is the presentation diagram, refreshed **once** in phase 6 rather than redrawn per
+  slice. `npm run graph:modules` remains the check against it — run it, eyeball it, and if it
+  disagrees with §5.2's direction block, §5.2 is wrong;
+- **§5.2's block above is a claim**, labelled as one. It is checked by the ruleset, not by the render.
+
+Four of the five modules appear, because `src/domain` ships empty (§5.2). The step-1 prediction of
+"four modules" therefore held in substance and not literally — which is a small thing, recorded
+because the alternative is a reader concluding the graph is wrong.
+
 `.dependency-cruiser.js` carries thirteen rules. Six describe the layering above; the rest are the
 ones that do the real work:
 
@@ -159,9 +213,28 @@ ones that do the real work:
 | `sql-only-in-persistence` | `pg`, `kysely` outside `src/persistence` | One SQLSTATE translation site, so `409` cannot come to mean two things and `err.constraint` cannot be dropped on one path |
 | `http-must-not-reach-persistence` | `src/http` → `src/persistence` | No route issues SQL; every database access carries a span and the retry policy |
 | `http-framework-only-in-the-edge` | `fastify`, `@fastify/*`, `@sinclair/typebox` outside `src/http` (and `main.ts`) | A use case stays callable without a server |
-| `outside-in-tests-do-not-import-src` | `tests/{acceptance,contract,property,concurrency}` → `src/` | OC-5 and METHODOLOGY P4 made structural. The path hook cannot catch this, because the file being written is one the test-engineer legitimately owns |
+| `outside-in-tests-do-not-import-src` | `tests/{acceptance,contract,property,concurrency,architecture,performance,setup,support}` → `src/` | OC-5 and METHODOLOGY P4 made structural. The path hook cannot catch this, because the file being written is one the test-engineer legitimately owns. **Widened at 00a** from four directories to eight: `architecture` and `performance` make the Gate B ownership ruling structural rather than documentary, and `setup`/`support` close the loophole where a `globalSetup` or a spawn helper imports `src/` and hands it to a test that may not. `tests/unit/` and `tests/integration/` stay out — both legitimately import `src/` |
 | `no-circular`, `platform-is-a-leaf`, `persistence-must-not-look-upward`, `application-must-not-reach-http`, `not-to-unresolvable`, `no-dev-dep-in-src` | the remaining edges and the usual hygiene | A cycle means two modules are one module with a false boundary, which makes every rule above unenforceable in principle |
 
 The ruleset was verified to *fire*, not merely to parse, before it was committed: a fixture tree
 breaking every rule reports each one by name, and a conforming tree shaped like this section reports
 zero. QS-10 keeps that true.
+
+**At 00a that verification became a committed test, and twice it caught the ruleset reporting a green
+it had not earned.** `tests/architecture/layering.test.ts` builds the fixture in a temp directory,
+plants one violation per file so every assertion names one rule, and runs a conforming negative
+control. Two guards precede every assertion about violations, and both exist because the pair was
+measured passing over nothing:
+
+- `summary.environment.issues` must be empty. Without a resolvable `typescript`, `dependency-cruiser`
+  detects a TypeScript project, silently skips every source, and exits 0 with four planted violations
+  unreported;
+- **every planted file must appear in `modules[]`** — per file in the fixture, per *root* in
+  `lint:arch`. A count over the whole cruise is satisfied by `tests/` alone while `src/` goes
+  unexamined behind a green gate, which is the same hole one level down.
+
+`npm run lint:arch` is therefore `node tools/ci/lint-arch.mjs src tests`, not the bare CLI: the guard
+has to live inside whatever produces the `pass` that criterion C4 reads. **A cruise that exits 0 says
+nothing about what it examined** — every assertion about violations must be preceded by one about
+coverage. That rule cost this slice three findings to learn and it is not specific to
+`dependency-cruiser`.

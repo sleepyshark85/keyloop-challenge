@@ -257,7 +257,7 @@ rule does not say.
 
 | Level | Owner | Runs against | What it is for |
 |---|---|---|---|
-| `tests/unit/` | implementer | nothing — `src/domain` is pure | A design tool, freely rewritable during refactor. **This is where the Stryker mutation budget is spent**, because ADR-0008 made `src/domain` the whole unit-testable surface deliberately |
+| `tests/unit/` | implementer | `src/`, with the database's **driver** stubbed where a container is not needed | A design tool, freely rewritable during refactor. **This is where the Stryker mutation budget is spent** — scoped to `src/**` less `main.ts`, and see *What a unit test may substitute* below, which is narrower than "`src/domain` is the whole unit-testable surface" |
 | `tests/property/` | test-engineer | `src/domain` and real PostgreSQL | `fast-check` over interval arithmetic, candidate ordering, opening hours across DST — and QS-8, which is the only thing holding the availability query and the exclusion constraint in agreement |
 | `tests/integration/` | shared; DB-invariant tests are the test-engineer's | Testcontainers PostgreSQL | Single-threaded persistence behaviour: self-overlapping reschedule, cancellation releasing a slot |
 | `tests/concurrency/` | test-engineer | Testcontainers PostgreSQL, several pooled connections | The invariant. Genuinely simultaneous statements; nothing here is simulatable |
@@ -266,12 +266,76 @@ rule does not say.
 
 Two structural supports rather than conventions:
 
-- **`outside-in-tests-do-not-import-src`** (§5.3) forbids `tests/{acceptance,contract,property,concurrency}`
-  from importing `src/`. The path hook cannot catch this, because the file being written is one the
-  test-engineer legitimately owns; `dependency-cruiser` can. It is OC-5 and METHODOLOGY P4 made
-  structural: tests that define *done* reach the system the way a client does.
+- **`outside-in-tests-do-not-import-src`** (§5.3) forbids every test directory the test-engineer owns
+  — as built, `acceptance`, `contract`, `property`, `concurrency`, `architecture`, `performance`,
+  `setup` and `support` — from importing `src/`. The path hook cannot catch this, because the file
+  being written is one the test-engineer legitimately owns; `dependency-cruiser` can. It is OC-5 and
+  METHODOLOGY P4 made structural: tests that define *done* reach the system the way a client does.
+  `setup/` and `support/` were added at 00a to close the indirect route — a `globalSetup` or a spawn
+  helper that imports `src/` and hands it to a test that may not.
 - **Isolation is by data, not by truncation** (§7.2). Each test seeds its own dealership, so the
   suite parallelises and every test is implicitly asserting A-9's scoping.
+
+### What a unit test may substitute, and where the line actually falls
+
+§5.2 said at Gate B that removing the repository port left `src/domain` as the whole unit-testable
+surface. Slice 00a falsified that: `checkHealth` is a use case in `src/application`, takes a `Db`, and
+is unit-tested with no container at all. The line `CLAUDE.md` §2.2 draws is not the one this section
+first assumed, so it is restated here in the form that is true.
+
+**A unit test may replace the driver beneath Kysely. It may not replace what the database decides.**
+The stub keeps the production dialect — compiler, adapter, introspector — and swaps only the
+transport, so the SQL a test observes is the SQL PostgreSQL would receive, and a `catch` block that a
+reachable database would never enter becomes reachable. That is how `pingDatabase` is proved not to
+rethrow a driver error, and how a released connection is proved released.
+
+The boundary is the assertion, not the seam:
+
+| The assertion is about | Legitimate substitute | Why |
+|---|---|---|
+| the code *around* the database — an outcome mapping, a `catch`, a released handle, the SQL emitted | driver stub, `tests/unit/` | The database's answer is not the evidence; the code's response to a given answer is |
+| what the database **decides** — a constraint firing, a SQLSTATE, an ordering, an interleaving | **none.** Real PostgreSQL, `tests/integration/` or `tests/concurrency/` | This is `CLAUDE.md` §2.2 verbatim, and §4.1's reason: the invariant lives in the database, so a test that substitutes it tests the substitute's imitation — and the imitation would necessarily be check-then-act |
+
+Stated this way the rule keeps its teeth while being true. "Nothing outside `domain` is unit-testable"
+was easy to state and false, and a rule that is visibly false is a rule the next person routes around
+on their own judgement.
+
+### The response-schema seam is a serialiser, not an assertion
+
+**A TypeBox `response` schema does not validate what a handler produced. It reshapes it on the way
+out**, through `fast-json-stringify`, and it has four distinct behaviours that the design, the route
+docblock and the unit test all described as one. Measured on this repository's pinned Fastify, at
+step 5 by the reviewer and re-run independently at step 7:
+
+| The handler sends | On the wire | Behaviour |
+|---|---|---|
+| an undeclared property | dropped | **stripped** |
+| a required property missing | `500 Internal Server Error` | **enforced** — the only case that fails loudly |
+| a wrongly-typed value (`"42"` for a number) | `42` | **coerced**, silently |
+| a wrong value for a `Type.Literal` | **the schema's constant** | **substituted**, silently |
+
+The fourth is the dangerous one and it is a property of every route this system will have, which is
+why it is here rather than in a commit message. **A handler emitting `{status:'', checks:{database:''}}`
+produces a byte-identical `200 {"status":"ok","checks":{"database":"up"}}`** — which is why four
+mutants of the health route survived a suite that looked thorough. The committed test proving *"the
+schema is enforcement rather than decoration"* proves **stripping**, on a throwaway route with a plain
+string schema. **Nothing proves substitution, and nothing can, from the wire.**
+
+Two consequences bind every later slice:
+
+1. **Where a value is computed, the schema must not pin it.** §8.6's taxonomy gives each status code a
+   `type` URI; expressed as a `Type.Literal` per code, a handler's computed URI is silently rewritten
+   to the constant. A contract test asserting on the response body then reads the constant back and
+   passes — **QS-11's own test unable to fail for the reason it names.** Either the schema does not
+   pin the value, or the test does not assert it from the body.
+2. **A test through this seam proves the schema, not the handler.** To hold a handler to a computed
+   value, assert on what the handler passed to `send`, not on what arrived. Everything an assertion on
+   the wire body can tell you about a pinned field, it would tell you about an empty handler too.
+
+The general form, and it is the same sentence this slice kept rediscovering elsewhere: **a green
+signal is evidence only for the work it actually did.** Serialisation is not validation, and a
+response body is a claim about the schema until something independent proves it is also a claim about
+the code.
 
 Two directories in §10 were **not** in `CLAUDE.md` §5's ownership table: `tests/architecture/`
 (QS-10, QS-12) and `tests/performance/` (QS-14). Both assert properties of the design rather than of

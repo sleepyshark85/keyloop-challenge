@@ -1,0 +1,24 @@
+{
+  // The build — implementer's, slice 00a (docs/slices/00a-design.md §11.3).
+  //
+  // There is no TypeScript loader in this project. `tsx` is named in neither CLAUDE.md §3
+  // nor any ADR, and Node's --experimental-strip-types does not remap `./x.js` specifiers
+  // onto `x.ts`, which is how every import here is written under NodeNext. So the service
+  // COMPILES, `npm start` is `node dist/main.js`, and the acceptance test spawns the
+  // artifact a deployment would actually run.
+  //
+  // It extends tsconfig.json rather than restating it, so `npm run typecheck` and
+  // `npm run build` can never disagree about the language. Two things are overridden:
+  // `include` drops tests/, and emit is turned on.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": true,
+    // The acceptance harness reads the child's stderr when it fails to start, so a stack
+    // trace that names src/ line numbers is the difference between a diagnosis and a guess.
+    "declaration": false
+  },
+  "include": ["src"]
+}
