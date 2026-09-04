@@ -44,6 +44,24 @@ the whole submission rests on.
   `appointment_interval_ordered`.
 - **AC-9** — Given the seed fixtures, when they are loaded into an empty database, then every
   reference table is populated and the suite can book against them deterministically.
+- **AC-10** — Given confirmed appointments A and B on the same bay, when A is
+  `UPDATE`d onto an interval overlapping **its own** prior interval, then it succeeds; when A is
+  `UPDATE`d onto an interval overlapping **B**, then it is rejected with `23P01` on `no_bay_overlap`
+  and B is unchanged. *Added by the human at slice 00's gate, 2026-09-04.* arc42 §8.2 consequence 4
+  — an `UPDATE` is checked against other rows, not against the version it replaces — is the single
+  property ADR-0003's atomic move rests on, and it was asserted nowhere. §8.5 names it in the same
+  sentence as cancellation-frees-the-slot, which landed as AC-4; its sibling clause did not, and
+  §8.2 defers it to QS-6, which has no slice. It belongs here rather than at slice 06 because by
+  then the property is reached through `PATCH`, a use case, Kysely and ADR-0004's retry loop, and a
+  failure there is ambiguous between PostgreSQL's `UPDATE` semantics and the application's move
+  logic. **This is the only slice in which it is an unambiguous claim about the database** — the
+  same reasoning that keeps AC-5 and AC-7 here. *Clarified the same day (T-9): the original wording
+  said "the same bay **and technician**", which would make `no_technician_overlap` violable too and
+  put the named assertion back on §11.2 A-2's non-guarantee about which of two simultaneously
+  violable constraints PostgreSQL reports. The test-engineer authored that wording, measured that
+  the literal fixture passes on 16.15 by index order alone, wrote the case with B on the other
+  technician, and raised the contradiction rather than following it — so `no_bay_overlap` is the
+  only violable constraint and the assertion is evidence rather than a coin flip.*
 
 ## In scope
 

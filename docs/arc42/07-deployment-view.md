@@ -77,21 +77,60 @@ vitest globalSetup
 
 Three properties this arrangement buys, each of which cost a design choice:
 
-- **The schema under test is the schema that runs — and the reason is narrower than this section
-  first gave.** The phase-2 wording was *"byte-identical … applied by the same programmatic call
-  `npm run db:migrate` makes"*, and that overstates it: as built, `db:migrate` invokes the
-  `node-pg-migrate` **CLI** while `globalSetup` calls its **`runner()`** API. Two entry points, not
-  one call. What actually holds the two together is that they share **the same package, the same
-  migrations directory and the same `pgmigrations` table** — three inputs, none of them a shared
-  module. The property is real and worth having; the mechanism is a convention checked by nothing, so
-  a CLI-only flag added on one path would diverge silently. Recorded here rather than left as a
-  stronger claim than the code supports.
+- **The schema under test is the schema that runs — and as built, `db:migrate` does not conform to
+  ADR-0007.** As built, `db:migrate` invokes the `node-pg-migrate` **CLI** (`package.json:18`) while
+  `globalSetup` calls its **`runner()`** API. Two entry points, not one call. What actually holds them
+  together is that they share **the same package, the same migrations directory and the same
+  `pgmigrations` table** — three inputs, none of them a shared module.
+
+  **As built at slice 00, one assertion holds that together, and it is a property of the seam rather
+  than of the schema.** `tests/integration/exclusion-constraints.test.ts` case 0 asserts that
+  `pgmigrations` records exactly `0001_extensions`, `0002_reference_data`, `0003_appointment`, in
+  filename order — and it is **the only thing in the suite that establishes where the schema came
+  from.** Every other assertion in the repository inspects the schema and would be satisfied by one
+  created by a stray `CREATE TABLE` in a fixture, or baked into a container image, or applied by hand.
+  ADR-0007's entire argument is that the schema is reproducible from a corpus of ordered, immutable
+  `.sql` files; this is what holds it to that, and it belongs to the seam described here rather than to
+  the domain model of §8.1.
+
+  It lives in the per-slice file rather than in `postgres-harness.test.ts` deliberately. That file
+  asserted `pgmigrations` was *empty* at 00a — a property of the **corpus**, in a file whose job is
+  properties of the **harness** — which would have gone red inside the implementer's commit at this
+  slice and again at every migrating slice after, in a file the implementer must not edit. It now
+  asserts only that the seam **ran**; what the seam **carried** is a per-slice fact and moved to where
+  it changes with the slice.
+
+  **This section previously called that a narrowing of arc42's own phase-2 overstatement. That was
+  wrong, and correcting it is the point of this paragraph.** [ADR-0007](../adr/0007-node-pg-migrate-with-sql-files.md)'s
+  Decision states that the runner is invoked *"programmatically … **both** by `npm run db:migrate`
+  against the local compose stack **and** by the Testcontainers fixture"*. So the CLI entry point does
+  not merely fall short of a claim arc42 made; **it contradicts an accepted, immutable ADR.** Narrowing
+  the claim here, unilaterally, left the *"single source of truth for architecture"* (`CLAUDE.md` §4)
+  disagreeing with an ADR that still asserts the original, with nothing recording that it did. The
+  right repair for a decision that no longer matches the code is a superseding ADR or a conforming
+  change — never a quieter sentence in arc42. Raised at slice 00 step 2 as **I-9**; the reconciliation
+  defect is the architect's own, from slice 00a step 7.
+
+  **The measured consequence**, since "a CLI-only flag would diverge silently" has now come true:
+  `--single-transaction` defaults to `true` on the CLI and is unset on the programmatic call, so a
+  malformed migration rolls **all** files back under `db:migrate` and leaves earlier files
+  **committed and recorded** under `globalSetup`. Measured on `postgres:16` with
+  `node-pg-migrate@9.0.0`, 2026-09-04. It bites only on a broken migration and both paths fail
+  loudly, which is why slice 00 deferred it rather than conforming mid-slice. Carried as debt in
+  §11.2 R-9, with the recommendation to **conform `db:migrate`, not to supersede ADR-0007**.
 - **Tests isolate by data, not by truncation.** Each test seeds its own dealership, bays,
   technicians and service types, and works only within it. Truncating between tests would serialise
   the suite and — worse — would make the concurrency tests race the cleanup rather than each other.
   Isolating by dealership lets the suite run in parallel *and* keeps A-9's multi-dealership scoping
   under permanent test, since every test is implicitly asserting that another dealership's data does
   not leak into its own.
+
+  **The granularity is worth stating, because slice 00's design first read it too broadly. Vitest
+  parallelises *files*, not cases.** Across files, per-case seeding buys disjointness. *Within* a file
+  it buys something the tests lean on more heavily: with one container per run and no cleanup, every
+  row in the table is **attributable** to the case that wrote it, which is what makes an assertion
+  that counts rows over a bay and an interval a claim about that case rather than about the run.
+  Isolation by data is therefore load-bearing whether or not anything runs concurrently.
 - **Concurrency tests get real connections.** QS-1 to QS-5 open several pooled connections and fire
   genuinely simultaneous statements. Nothing about that is simulatable; it is the whole point.
 
@@ -106,16 +145,24 @@ nodb   tests/unit/** · tests/architecture/**        no globalSetup
 db     everything that talks to PostgreSQL          globalSetup: tests/setup/postgres.ts
 ```
 
-`npm run test:nodb` is the Docker-less command. The two-project split was forced by a constraint the
-phase-2 text did not anticipate: **neither the implementer nor the test-engineer had a container
-runtime**, so a single project would have made *every* local test run impossible for both — including
-the implementer's inner TDD loop, which is the loop `CLAUDE.md` §7's "every implementer commit is
-green" depends on. Per-project `globalSetup` was the one mechanical unknown flagged for verification
-before the red commit, and it was verified on the pinned `vitest@5.0.0` rather than assumed.
+`npm run test:nodb` is the Docker-less command. Per-project `globalSetup` was the one mechanical
+unknown flagged for verification before 00a's red commit, and it was verified on the pinned
+`vitest@5.0.0` rather than assumed.
 
-The operative meaning of a green commit is therefore: **locally green on everything that does not need
-a database, CI-green on everything that does.** Read the commit sequence with that in mind rather than
-as carelessness.
+**The split's justification at 00a no longer holds; the split does.** It was forced by a constraint
+the phase-2 text did not anticipate — *"neither the implementer nor the test-engineer had a container
+runtime"* — which would have made every local test run impossible for both. **Measured again at slice
+00 step 2 on 2026-09-04: Docker works in all three roles' shells, and the `db` project completes in
+about 3.4 s.** So that premise is false as of slice 00, and 00a §11.5 should be read as a report of
+what was true then rather than as a standing constraint.
+
+The two projects stay, on merits that never depended on it: a database-less subset is worth having for
+its speed, for a contributor without a daemon, and because a container failure should not be able to
+abort `tests/unit/` and `tests/architecture/`. What changes is the operative meaning of a green
+commit. At 00a it was **locally green on everything that does not need a database, CI-green on
+everything that does** — read 00a's commit sequence with that in mind rather than as carelessness.
+**From slice 00 it recovers its plain sense: green means green, locally, before the push**, and
+`npx vitest run --project db` is the stated inner loop for any slice whose work is in the database.
 
 ## 7.3 Configuration
 

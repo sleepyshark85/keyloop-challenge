@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **37** |
-| Severity | 9 blocking · 19 major · 9 minor |
-| Verdicts | 4 narrowed · 19 accepted · 1 escalated · 2 deferred |
-| Raised by | reviewer 12 · test-engineer 10 · implementer 9 · architect 3 · orchestrator 3 |
-| Awaiting a ruling | **11** |
-| Mean escape distance | 1.27 step(s) |
+| Findings recorded | **56** |
+| Severity | 9 blocking · 32 major · 15 minor |
+| Verdicts | 4 narrowed · 24 accepted · 1 escalated · 4 deferred |
+| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · architect 6 · orchestrator 5 |
+| Awaiting a ruling | **23** |
+| Mean escape distance | 1.46 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -71,7 +71,8 @@ rather than narrated.*
 | **R-10** | MINOR | 5 *(+1)* | reviewer | The audit git-linkage check is inert by construction and C7 reads its output | **open** |
 | **R-11** | MINOR | 5 *(+1)* | reviewer | Authored prose moved in an arc42 section the slice did not declare | **open** |
 | **R-12** | MINOR | 5 *(+1)* | reviewer | contract and property are RED_ZONE members with no committed case | **open** |
-| **O-6** | MAJOR | 6 *(+6)* | orchestrator | tests green and red before green accept any check.run record, including one that carries no test result at all | deferred |
+| **O-6** | MAJOR | 6 *(+6)* | orchestrator | tests green and red before green accept any check.run record, including one that carries no test result at all | accepted |
+| **O-7** | MINOR | 6 *(+6)* | orchestrator | The human-approved gate check requires an undocumented literal string and fails closed on any other, including a more descriptive one | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -284,7 +285,145 @@ rather than narrated.*
 
 - *scenario:* check.mjs line 112 reads runs.at(-1) and tests /FAIL/ over its checks; line 99 finds the first record matching /FAIL/ and line 100 accepts any later record without FAIL as the green. Both treat every check.run alike. Appending a mutation-score record — which carries mutation_score, killed and survived and no test outcome whatsoever — made tests green report PASS by reading it, and satisfied red before green as the green half. Observed live while backfilling slice 00a: the gate reported PASS on a record that says nothing about whether any test ran. Any future record kind sharing the check.run event will do the same, and the Definition of Done is what reads it.
 - *file:* `tools/slice/check.mjs`
-- *deferred* by orchestrator — Real, observed live rather than reasoned, and mine. Deferred for the same reason O-2 deeper fix was declined by the architect: changing the gate tool in the slice that first feeds it is how you get a gate that agrees with its own bug. The remedy is a kind discriminator on check.run — the record already distinguishes itself by carrying run_id and jobs versus mutation_score — so the predicate can require a record that actually reports a test outcome. Sequencing for this slice avoids it: the final CI run is appended last, so runs.at(-1) is a real run. Carried to the phase-4 retro under C7 alongside O-3 and R-10, all three of which are the same class — a gate reading a record that does not mean what the gate assumes.
+- *accepted* by orchestrator — SUPERSEDES the slice 00a deferral. O-6 recurred at slice 00 the first time I forgot the workaround, which was append the CI run last — a mitigation depending on my memory every time. Observed live again: after appending the mutation score, tests green PASSed by reading a record carrying mutation_score, killed and survived and no test outcome at all. Fixed rather than deferred a second time. check.run carries two record kinds and only a CI run has run_id, so the predicates now filter on it, and tests green takes the newest CI run by timestamp rather than by log position — which also removes the dependency on section 7 append-ordering obligation, since asking two mechanisms to agree is how they drift apart. Seven cases in tools/test/slice-check.test.mjs pin both directions. Slice 00a re-checked: still all checks pass. The architect argument for the original deferral — do not change the gate tool in the slice that first feeds it — does not apply to the second slice that feeds it, and a deferred finding that recurs immediately is evidence the deferral was wrong.
+
+**O-7** — The human-approved gate check requires an undocumented literal string and fails closed on any other, including a more descriptive one
+
+- *scenario:* check.mjs line 137 tests gate.decision === approved exactly. schema.mjs requires gate, decision and rationale but validates none of their values, so a gate recorded as approved-and-merged is schema-valid, semantically correct, and reported FAIL by the Definition of Done. Observed live: slice 00a human gate was recorded accurately, the check reported no approval, and the fix was appending a superseding record whose only difference is the literal. The three collect-ci constraints of the same class are documented in design section 6 because the architect found them; this one is documented nowhere and was found by tripping it.
+- *file:* `tools/slice/check.mjs`
+- *deferred* by orchestrator — Real and cheap, and deferred to the retro with O-3, O-6, R-10 and the rest of the gate-tooling cluster. The remedy is either an enum in schema.mjs so an invalid decision is rejected at write time rather than silently ignored at read time, or the check accepting any decision whose value is not a rejection. Note the shape: every one of O-3, O-6 and O-7 is the Definition of Done reading a record that does not mean what it assumes, and all three were found by running the gate rather than by reading it.
+
+</details>
+
+## Phase 4
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **O-8** | MAJOR | 6 *(+6)* | orchestrator | The committed resume point advances the phase on a per-slice gate, so the first slice of the slice loop reports the project as finished building | accepted |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**O-8** — The committed resume point advances the phase on a per-slice gate, so the first slice of the slice loop reports the project as finished building
+
+- *scenario:* generate.mjs infers position as the phase after the last gate.decided, matching PHASES[p][1].startsWith(gate). PHASES[5][1] is the string E (per slice), so any gate E matches and reports current phase 6, Consolidation. Gate E fires on EVERY slice by design, so the first slice gate of phase 5 would report consolidation with twelve slices unbuilt. Observed live at slice 00a gate E: STATUS.md regenerated to phase 6 while the scope marker said 4 and the pilot had not run. STATUS.md is the file a resuming session reads first and its own header tells the reader to trust it over narration.
+- *file:* `tools/status/generate.mjs`
+- *accepted* by orchestrator — Fixed rather than deferred, unlike O-3, O-6 and O-7. Those mis-report a gate the human is standing in front of; this one mis-reports where the project is to a session that has no other context, and it would have fired on the first real slice regardless of how slice 00a gate was recorded. Per-slice gates now close nothing: PER_SLICE_GATES holds E and the inference skips it. STATUS.md is back to phase 4. Note the shape it shares with the deferred three — the generator agreed with itself right up until a gate was actually decided, so nothing was wrong until the first time it mattered.
+
+</details>
+
+## Slice 00
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **T-4** | MAJOR | 2 *(+1)* | test-engineer | Case 0 never asserts the column the exclusion constraints are keyed on, so a wrongly-keyed constraint ships green | **open** |
+| **T-5** | MAJOR | 2 *(+1)* | test-engineer | The one-violable-constraint discipline is enforced non-uniformly by undocumented FK trigger order, so drift is silent in exactly the likeliest case | **open** |
+| **T-6** | MINOR | 2 *(+1)* | test-engineer | AC-3 step 5 is redundant with step 4 and its stated reason is false | **open** |
+| **I-8** | MAJOR | 2 *(+1)* | implementer | The design mitigation for a malformed migration is false: globalSetup silences the very diagnostic it relies on | **open** |
+| **I-9** | MAJOR | 2 *(+1)* | implementer | The singleTransaction divergence is db:migrate having drifted from ADR-0007, so the remedy is not where the design says it is | **open** |
+| **T-7** | MAJOR | 3 *(+2)* | test-engineer | A pre-existing harness assertion blocks the green commit, and the design do-not-modify list does not mention the file | **open** |
+| **T-8** | MINOR | 3 *(+2)* | test-engineer | Section 6.2 forbids singleton foreign keys for a stated reason, and nothing asserts that they are absent | **open** |
+| **O-9** | MAJOR | 3 *(+3)* | architect | tests/integration/ is unguarded, so the implementer can edit a test-engineer-owned assertion to green its own commit and nothing denies it | deferred |
+| **O-10** | MAJOR | 4 *(+4)* | architect | Concurrent agents on one worktree make a bare git commit unsafe, and it nearly recorded an authority violation in git | accepted |
+| **I-11** | MINOR | 4 *(+1)* | implementer | Every db run emits a pg deprecation warning that becomes an error at pg 9 | deferred |
+| **A-7f** | MAJOR | 4 *(+1)* | architect | Case 0 constraint-set filter breaks on PostgreSQL 18, and it breaks in the direction that gets the assertion loosened | accepted |
+| **R00-1** | MAJOR | 5 *(+1)* | reviewer | Every slice file is status: ready, so the pilot Definition of Ready has been failing throughout and nobody read it | **open** |
+| **R00-2** | MAJOR | 5 *(+1)* | reviewer | The mutation gate passes on a measurement that could not have failed | **open** |
+| **R00-3** | MAJOR | 5 *(+1)* | reviewer | appointment_technician_in_dealership is never asserted to fire — six of seven constraints are proven, the seventh only exists | **open** |
+| **R00-4** | MAJOR | 5 *(+1)* | reviewer | AC-1 and AC-2 have no positive control and the design stated reason for exempting them is false | **open** |
+| **R00-5** | MINOR | 5 *(+1)* | reviewer | Four reference-table constraints that arc42 specifies are asserted by nothing | **open** |
+| **T-9** | MINOR | 5 *(+0)* | test-engineer | AC-10 fixture clause contradicts its assertion clause, and the test-engineer authored both | accepted |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**T-4** — Case 0 never asserts the column the exclusion constraints are keyed on, so a wrongly-keyed constraint ships green
+
+- *scenario:* A constraint keyed on dealership_id instead of bay_id — which would serialise an entire dealership to one appointment at a time — passes the whole of AC-3 and AC-1. Measured and independently reproduced by the orchestrator: overlapping same-bay REJECTED, adjacency same-bay ACCEPTED, both identical to the correct schema. Only AC-2 distinguishes it, and only because PostgreSQL reported one of two simultaneously violable constraints, which the design own A-2 says is not guaranteed. If index order goes the other way on a future minor version, AC-2 passes too and nothing catches it until slice 07.
+- *file:* `docs/slices/00-design.md`
+
+**T-5** — The one-violable-constraint discipline is enforced non-uniformly by undocumented FK trigger order, so drift is silent in exactly the likeliest case
+
+- *scenario:* Measured: an AC-5 fixture drifted so the technician also belongs to another dealership still reports appointment_technician_qualified and PASSES SILENTLY, while the equivalent AC-6 drift reports a different constraint and fails loudly. Which you get is decided by FK trigger firing order — the same non-guarantee as A-2. So asserting the constraint name catches drift only when drift changes the reported name, and the case where it does not is the case where the fixture is broken in the same dimension as the constraint under test, which is the likeliest drift there is.
+- *file:* `docs/slices/00-design.md`
+
+**T-6** — AC-3 step 5 is redundant with step 4 and its stated reason is false
+
+- *scenario:* The reason given — a range type is defined by two bounds and testing one is half the claim — conflates the range type two bounds with the test two rows. There is one range expression evaluated on both operands and && is symmetric, so no EXCLUDE-expressible mutant accepts one adjacency and rejects the other. Measured against the closed-range mutant the design itself names: both steps reject it. Second instance after 00a F1 of a confident causal sentence that does not hold, in a design whose own rule 2 requires measured or labelled unmeasured.
+- *file:* `docs/slices/00-design.md`
+
+**I-8** — The design mitigation for a malformed migration is false: globalSetup silences the very diagnostic it relies on
+
+- *scenario:* Design 8.2 mitigation 2 says a malformed migration prints the failing statement with a caret. Measured against the real harness with a malformed 0003: CI prints "No test files found, exiting with code 1" plus an unhandled 42601 naming file scan.l — PostgreSQL own lexer source — and NO migration filename anywhere. node-pg-migrate does build the caret dump but emits it through logger.error, and tests/setup/postgres.ts line 68 passes log: () => {}, which getLogger maps onto debug, info, warn and error alike. The harness silences exactly the diagnostic the fallback depends on. The remedy is to stop silencing error, which adds observation rather than substituting an evidence chain, but it edits a test-owned file so it is not asked for in this slice.
+- *file:* `tests/setup/postgres.ts`
+
+**I-9** — The singleTransaction divergence is db:migrate having drifted from ADR-0007, so the remedy is not where the design says it is
+
+- *scenario:* ADR-0007 line 72 states the runner is invoked programmatically by node-pg-migrate Node API both by npm run db:migrate and by the Testcontainers fixture. package.json line 18 is the CLI binary node-pg-migrate -m src/persistence/migrations -t pgmigrations up, whose singleTransaction defaults true while the programmatic runner defaults false. Verified independently. So the divergence is a conformance drift from the governing ADR and its cause, not a pair of entry points with different natural defaults — and the remedy sits on the non-test-owned side of the seam, never needing to touch tests/setup/postgres.ts. The deferral stays right for this slice, but the recorded debt must name package.json and ADR-0007 conformance or it gets paid in the wrong file.
+- *file:* `package.json`
+
+**T-7** — A pre-existing harness assertion blocks the green commit, and the design do-not-modify list does not mention the file
+
+- *scenario:* postgres-harness.test.ts line 50 asserts pgmigrations holds zero rows with the message slice 00a applies no migrations. At slice 00 green commit it holds three, so all tests green is unreachable as specified and no step or role owns the update. Design section 4.1 cites this same file four lines above the failing assertion — the server_version matches caret 16 case is the evidence for T-4 bounded-fragility argument — so the file was read and the adjacent assertion was read past. Not fixed unilaterally because doing so falsifies section 9 claim that slice 00 red comes from one file with no second explanation available, which is part of the pilot C1 evidence.
+- *file:* `tests/integration/postgres-harness.test.ts`
+
+**T-8** — Section 6.2 forbids singleton foreign keys for a stated reason, and nothing asserts that they are absent
+
+- *scenario:* Section 6.2 says adding the singleton foreign keys would make the reported constraint non-deterministic in exactly the cases section 4.2 depends on being deterministic. Case 0 stated limit — it proves nothing about what else is in the schema — leaves that addition undetected, so an implementer adding appointment_customer_id_fkey for tidiness passes all ten cases while falsifying section 6.2 and reintroducing the ambiguity T-5 controls were added to remove. Remedy needs no new mechanism and not the whole-schema snapshot the design rejected: assert the SET of non-primary-key constraint names on appointment is exactly the seven.
+- *file:* `docs/slices/00-design.md`
+
+**O-9** — tests/integration/ is unguarded, so the implementer can edit a test-engineer-owned assertion to green its own commit and nothing denies it
+
+- *scenario:* TEST_OWNED lists nine paths and not tests/integration/. Verified: an implementer Write to tests/integration/postgres-harness.test.ts exits 0, ALLOW. T-7 option (b) was exactly this — the implementer updating a harness assertion that blocks its own green commit — and CLAUDE.md section 5 forbids it (if the implementer believes a test is wrong it raises a DCR, it does not edit the test), while the hook would not have stopped it. A blanket deny is wrong because section 5 makes the directory shared; the boundary is the structural rule settled at 00a step 7, that a tests/integration/ file reaching the database only through a connection string is the test-engineer own. C2 is a fatal criterion measured from git history AND hook denials, so an unenforced shared directory makes it partly self-reported. Same family as R-4 absolute-path bypass, and worse in kind: this one permits a crossing rather than mis-reporting one.
+- *file:* `.claude/hooks/guard-paths.mjs`
+- *deferred* by orchestrator — Real, mine, and not a one-line fix — which is why it is deferred rather than patched mid-slice. A blanket deny contradicts section 5 shared ruling. The enforceable form is the 00a step-7 structural rule: deny the implementer a write to an existing tests/integration/ file that does not import src/, since that is the test-engineer own by that rule, and allow one that does. That needs the hook to read file content, which is a new capability for the Write branch and wants its own cases in both directions. Carried to the phase-4 retro with R-4 under C2, where both belong: C2 is measured from hook denials and both findings say the denials are weaker than the criterion assumes.
+
+**O-10** — Concurrent agents on one worktree make a bare git commit unsafe, and it nearly recorded an authority violation in git
+
+- *scenario:* The orchestrator ran the architect and the implementer in parallel on the same worktree on the grounds that they touch disjoint files. They do — but the git INDEX is shared. The architect ran git add on its own path and the implementer staged three migration files in the window before the architect git commit, so the bare commit took the index as it found it and swept src/ into a docs commit. The git record would have shown the architect committing src/, which is an authority violation on its face and would have corrupted C2, a fatal criterion measured from git history. Caught on the post-commit stat, soft-reset, recommitted with git commit --only pathspec, and nothing was lost. The near miss is the finding: parallelism was chosen for file disjointness and the index is not a file.
+- *file:* `docs/METHODOLOGY.md`
+- *accepted* by orchestrator — Mine — I chose the parallelism and reasoned about file disjointness without reasoning about the shared index. The architect remedy is adopted: git commit --only pathspec becomes the required form for every role, not a recovery step, and it is immune to the race rather than merely unlikely to hit it. Accepted rather than deferred because unlike the gate-tooling cluster this one writes a false fact into git history, which is the artifact every other record reconciles against, and because the fix is a prompt-level change with no tooling to build. To land in METHODOLOGY and in each agent definition commit instructions.
+
+**I-11** — Every db run emits a pg deprecation warning that becomes an error at pg 9
+
+- *scenario:* DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Emitted on every npx vitest run --project db, from the shared Client in exclusion-constraints.test.ts or tests/support/seed.ts. Harmless today, an error at pg 9, and test-engineer-owned so the implementer flagged rather than touched it.
+- *file:* `tests/integration/exclusion-constraints.test.ts`
+- *deferred* by orchestrator — Correct to flag rather than touch — tests/integration/ and tests/support/ are the test-engineer own, and the implementer raising instead of editing is exactly the section 5 discipline O-9 shows the hook would not have enforced. Deferred to the test-engineer at the slice that next touches those files, or to the pg 9 bump, whichever comes first. Recorded now because a warning that becomes an error on a routine dependency bump is the kind of thing nobody attributes when it finally fires.
+
+**A-7f** — Case 0 constraint-set filter breaks on PostgreSQL 18, and it breaks in the direction that gets the assertion loosened
+
+- *scenario:* At step 3 the architect accepted contype not-equal-p on the reasoning that a later PostgreSQL surfacing NOT NULL as pg_constraint rows would fail loudly in the same commit as the bump. Measured across three majors and independently reproduced by the orchestrator: 16.15 and 17.11 return the named constraints only; 18 returns six extra contype-n rows, appointment_id_not_null and five siblings. That is not a loud failure, it is a FALSE POSITIVE naming six constraints nobody wrote — so whoever bumps the image sees case 0 fail, concludes the assertion is too strict, and loosens the one thing section 6.2 depends on. The failure direction is the finding. Remedy is an allowlist, contype IN (c,f,u,x), which ignores a constraint type the PLATFORM introduces while still catching every constraint a DEVELOPER can add; verified on 18 to return only the real constraint.
+- *file:* `tests/integration/exclusion-constraints.test.ts`
+- *accepted* by orchestrator — Accepted and verified. Not urgent — the image is pinned to postgres:16 and postgres-harness.test.ts asserts caret-16, so nothing can fail today — but accepted rather than deferred because the remedy is one token and the deferred version of this finding is a trap that fires on a routine bump and teaches the wrong lesson when it does. Sequenced after step 5 rather than now, on the architect own advice, so the reviewer is not reviewing a file that moves under it. The architect measuring an assumption it had created and assigned to someone else, rather than carrying it, is the behaviour section 0.1 was written to produce.
+
+**R00-1** — Every slice file is status: ready, so the pilot Definition of Ready has been failing throughout and nobody read it
+
+- *scenario:* Slice 00a was approved and merged at its human gate but no commit ever set status: done in its frontmatter. git log -S"status: done" on that file is EMPTY. check.mjs line 75 tests dep.status !== done, so slice:check 00 reports FAIL dependencies merged, not done: 00a — and the whole loop ran anyway. All thirteen slice files are status: ready and each depends_on its predecessor, so the failure propagates to every remaining slice. CLAUDE.md section 10 says a slice does not reach done because an agent says so, and section 8 WIP limit says no slice starts until the previous one has passed its human gate. The machine that adjudicates both has been answering FAIL on the pilot since it began.
+- *file:* `docs/slices/00a-walking-skeleton.md`
+
+**R00-2** — The mutation gate passes on a measurement that could not have failed
+
+- *scenario:* slice:check 00 reports PASS mutation score 0.9577 for a slice whose diff contains no mutable TypeScript. CLAUDE.md section 10 Definition of Done is mutation score above threshold ON CHANGED FILES; the gate checks a number, not the clause. Stryker instruments the identical 142 mutants as slice 00a — same eight files, same 136 killed, same six survivors — because mutate is scoped to src TypeScript and this slice adds only .sql plus tests. The logged record is honest, its note field says UNCHANGED and vacuously so, but check.mjs reads only checks.mutation_score, so the honesty sits in a field the gate never opens. This is O-6 shape one turn on: c7a716d taught two predicates that a mutation record is not a CI run and left the third reading by log position with no discriminator for whether the score measures anything this slice wrote.
+- *file:* `tools/slice/check.mjs`
+
+**R00-3** — appointment_technician_in_dealership is never asserted to fire — six of seven constraints are proven, the seventh only exists
+
+- *scenario:* Every expectRejection call in the file covers no_bay_overlap three times, no_technician_overlap, appointment_interval_ordered, appointment_technician_qualified, appointment_vehicle_owned_by_customer and appointment_bay_in_dealership. appointment_technician_in_dealership appears nowhere. AC-7 is worded a bay at dealership X and the test asserts the bay constraint, so the technician half of assumption A-9 rides on case 0 alone. Measured on the live schema: booking D1 technician under D2 IS correctly rejected 23503 on that constraint, so it works — but drop it from the migration and case 0 set-equality is the only assertion that fails; key it on the wrong column pair and case 0 def-equality is again the only one. Remedy is four lines against the two-dealership fixture AC-7 already seeds.
+- *file:* `tests/integration/exclusion-constraints.test.ts`
+
+**R00-4** — AC-1 and AC-2 have no positive control and the design stated reason for exempting them is false
+
+- *scenario:* T-5 remedy was applied to AC-5 through AC-8. Section 4.6 exempts AC-1 and AC-2 because section 4.3 already reads the first row back — but the read-back validates a DIFFERENT row than the one whose rejection is asserted. AC-1 reads back techA/standard then asserts rejection on techB/quick; AC-2 reads back bayA and asserts on bayB, and bays.bayB appears exactly once in the whole file, in the rejected row. Because exclusion constraints fire before FK triggers — the design own measurement M-2, and the premise of AC-8 argument that it needs its control most — a techB outside the dealership, or a missing techB-quick qualification, leaves AC-1 reporting no_bay_overlap and passing green. That is T-5 exact failure mode, unremedied in the two cases carrying the slice headline invariant.
+- *file:* `docs/slices/00-design.md`
+
+**R00-5** — Four reference-table constraints that arc42 specifies are asserted by nothing
+
+- *scenario:* Case 0 inspects constraints on appointment only and no case attempts a row violating any constraint on the other eight tables. Measured live, all four exist and fire: opening_hours closes_at less-than-opens_at gives 23514, day_of_week 9 gives 23514, service_type duration_minutes 0 gives 23514, duplicate vehicle vin gives 23505. Every other reference-table constraint is structurally self-enforcing because the UNIQUE pairs and the qualification PK are FK targets, so dropping one fails migration 0003. These four are not. Drop any and all 110 tests pass. Slice 01 policy code will assume duration_minutes greater than zero and closes_at greater than opens_at hold.
+- *file:* `src/persistence/migrations/0002_reference_data.sql`
+
+**T-9** — AC-10 fixture clause contradicts its assertion clause, and the test-engineer authored both
+
+- *scenario:* AC-10 said A and B are on the same bay AND technician and asserted rejection at 23P01 on no_bay_overlap. Sharing the technician makes no_technician_overlap violable too, and section 11.2 A-2 says which of two simultaneously violable exclusion constraints PostgreSQL reports is index order and not a guarantee. Measured: the literal fixture passes on 16.15 for exactly that reason. The wording came from the test-engineer own step-5 recommendation and the human ruled on it in good faith. In its words, a defect I introduced at the moment I was arguing hardest that nobody should rest an assertion on A-2.
+- *file:* `docs/slices/00-schema-and-exclusion-constraints.md`
+- *accepted* by human — Ruled (a) clarification by the human: delete and technician from AC-10. Everything the criterion asserts is preserved — consequence 4, the rejection at no_bay_overlap, B unchanged — and no_bay_overlap becomes the only violable constraint, so the assertion is evidence rather than a coin flip. The committed test already matches the clarified wording, because the test-engineer wrote the case correctly and raised the contradiction instead of following the criterion into a fixture it knew was wrong. Two alternatives rejected: widening the assertion to accept either constraint name, which would stop discriminating a constraint keyed on the wrong column and reopen T-4; and making the test match the AC literally, which would have it pass by index order.
 
 </details>
 

@@ -76,6 +76,7 @@ without taking anyone's word for it.
 - [**ADR-0009**](adr/0009-candidate-ordering-and-attempt-cap.md) — Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 *(accepted)*
 - [**ADR-0010**](adr/0010-github-actions-and-check-run-collection.md) — Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow *(accepted)*
 - [**ADR-0011**](adr/0011-health-is-an-operational-probe.md) — Treat /health as an operational probe outside the API contract, not as a sixth operation *(proposed)*
+- [**ADR-0012**](adr/0012-seed-fixtures-are-a-test-owned-loader.md) — Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset *(proposed)*
 
 ---
 

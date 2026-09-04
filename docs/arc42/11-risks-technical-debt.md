@@ -11,6 +11,7 @@ construction, a debt item traceable to the decision that created it.
 | Item | Origin | Why deferred |
 |---|---|---|
 | Treat /health as an operational probe outside the API contract, not as a sixth operation | [ADR-0011](../adr/0011-health-is-an-operational-probe.md) | deferred improvement |
+| Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | [ADR-0012](../adr/0012-seed-fixtures-are-a-test-owned-loader.md) | deferred improvement |
 <!-- /generated:debt-register -->
 
 The register held nothing until slice 00a, and that was the correct reading rather than an omission.
@@ -113,9 +114,10 @@ type edit produces code that compiles and is wrong.
 | R-7a | ADR-0009's ordering seed must actually vary per request; if it does not, ordering silently degrades to sorted order and the retry work becomes quadratic under burst. No test fails — the symptom is latency, not incorrectness | Cheap to get right, and QS-14's budget would eventually show it |
 | R-7b | `src/http` may import `src/domain`, and the rule is not "types only". An implementer could put policy in a route handler and `dependency-cruiser` would not notice | QS-12 catches the three ambiguities that matter; the rest is review |
 | R-7c | `src/platform` is importable-by-all and imports nothing, which is exactly the shape of a junk drawer | The leaf rule stops it acquiring behaviour, not contents. Reviewer's job |
-| R-7d | Down migrations are written and never run (ADR-0007), so they are unverified by construction | The deployment is a fresh container; rollback in anger is not a story this system has |
+| R-7d | Down migrations are written and are exercised by no test (ADR-0007), so they are unverified by CI. *"Never run"* was true until 2026-09-04, when the architect reversed the whole corpus once by hand while designing slice 00 — a dated measurement, not a guarantee | The deployment is a fresh container; rollback in anger is not a story this system has |
 | R-7e | The retry loop must not be wrapped in a transaction (§6). Nothing structural enforces it | QS-3 fails immediately if it is — `25P02` on the second attempt |
-| R-7f | Docker is required for everything but the `nodb` project — `tests/unit/` and `tests/architecture/` (TC-9, §7.2) | A consequence of §2.2 being right about where the invariant lives. At 00a neither implementer nor test-engineer had a container runtime, which is what forced the two-project split |
+| R-7g | Case 0's constraint-set assertion filters `contype <> 'p'`. Measured across three majors: clean on 16.15 and 17.11, but **PostgreSQL 18 surfaces `NOT NULL` as `contype = 'n'` rows** — twelve of them on `appointment`, one per column. The fix is an allowlist, `contype IN ('c','f','u','x')` | Cannot fail today: the image is pinned and `postgres-harness.test.ts` asserts `^16\.`. **The direction of the failure is the finding, not the failure.** A denylist breaks with a dozen invented names that nobody added, so the bump reads as *"the assertion is too strict"* and invites loosening the one thing that makes §8.1's seven-and-only-seven enforceable — and the noise **scales with the `NOT NULL` count, so it gets louder the more correct the schema becomes.** An allowlist ignores what the *platform* adds while still catching everything a *developer* can add |
+| R-7f | Docker is required for everything but the `nodb` project — `tests/unit/` and `tests/architecture/` (TC-9, §7.2) | A consequence of §2.2 being right about where the invariant lives. At 00a neither implementer nor test-engineer had a container runtime, which is what forced the two-project split; **measured again at slice 00, all three roles have Docker**, so the split now stands on its merits rather than on that constraint (§7.2) |
 
 ### R-8 · Four things CI is *said* to enforce — one closed at slice 00a, three open
 
@@ -137,6 +139,80 @@ ground truth is subagent transcripts under `~/.claude/projects/`, which exist on
 machine; on a fresh checkout it reports every honest agent run as `UNSUPPORTED` and exits 1. That is
 correct behaviour, and it is why §9 calls it a gate-time command. CI substitutes two structural
 checks it *can* make — the log is append-only, and every record validates against the schema.
+
+### R-9 · `npm run db:migrate` does not conform to ADR-0007, and the built artifact cannot migrate
+
+Two items, recorded together because **the second is a trap laid for whoever pays the first**.
+
+**R-9a — the conformance drift.** [ADR-0007](../adr/0007-node-pg-migrate-with-sql-files.md)'s Decision
+states that the runner is invoked *"programmatically … both by `npm run db:migrate` … and by the
+Testcontainers fixture"*. `package.json:18` is the CLI binary. The observable consequence is the
+`--single-transaction` default (§7.2): a malformed migration rolls everything back under `db:migrate`
+and leaves earlier files committed under the test harness. It bites only on a broken migration and
+both paths fail loudly, which is why slice 00 recorded it instead of conforming mid-slice.
+
+This is debt of an unusual kind and it is worth naming as such: **not code falling short of a
+document, but an accepted immutable decision that the code silently stopped implementing, with arc42
+having quietly narrowed its own copy of the claim rather than reporting the mismatch.** §7.2 carries
+that correction; this row carries the obligation.
+
+> **Recommendation, stated so it is not re-argued: conform `db:migrate`. Do not supersede ADR-0007.**
+> Superseding an accepted decision to legitimise a drift nobody argued for is the worse precedent, and
+> the ADR's underlying requirement — in-process, no shelling out to a binary that may not be on the
+> path — is the right requirement. The cost is a small runner module and a location decision, which is
+> why it did not belong in the slice that had to land the invariant.
+
+**R-9b — `dist/persistence/` holds no migrations.** `tsc` emits only what it compiles, so
+`npm run build` copies no `.sql` and the built artifact cannot migrate itself. Inert today: both
+migration paths read `src/persistence/migrations/` from the working tree, and `dist/main.js` never
+migrates. It becomes real the first time the service is packaged — which §11.3 and the human's §7.1
+ruling both defer.
+
+**The coupling is the point.** A programmatic `db:migrate` written to close R-9a must resolve the
+migrations directory from a location the build actually populates, or **the conforming fix ships
+broken in the built artifact** — passing in development, failing in the first container. Whoever takes
+R-9a takes R-9b with it.
+
+### R-11 · Assertions that would survive their own subject being deleted
+
+Two items from slice 00, kept together because they share a shape: **a specification exists, the thing
+it specifies works, and nothing would notice if it stopped.**
+
+**R-11a — four reference-table constraints (R00-5).** `opening_hours.day_of_week BETWEEN 0 AND 6`,
+`opening_hours.closes_at > opens_at`, `service_type.duration_minutes > 0`, and `vehicle.vin UNIQUE`
+are specified in §8.1 and asserted by nothing. Measured live: all four exist and all four fire
+(`23514`, `23514`, `23514`, `23505`). Drop any one and the whole suite stays green. Every other
+reference-table constraint is structurally self-enforcing — the `UNIQUE (id, dealership_id)` pairs and
+`technician_qualification`'s primary key are foreign-key targets, so dropping one fails migration
+`0003` — which is why these four and only these four are exposed.
+
+**It is not symmetric with the `appointment` constraints and should not be paid the same way.** Slice
+00's case 0 asserts `appointment`'s seven by name-set and by definition because that is the table every
+case writes to. The remedy here is smaller: two of the four are about to acquire a *consumer*, since
+slice 01's opening-hours and duration code will assume `closes_at > opens_at` and
+`duration_minutes > 0` hold. **Assert them where the code that relies on them lands**, not by extending
+case 0 across nine tables — that is the first step back toward a whole-schema snapshot, which slice 00
+rejected as brittle.
+
+**R-11b — `appointment_technician_in_dealership` is proven to exist and not to fire (R00-3).** Six of
+the seven constraints have a case that provokes them; the seventh has only case 0. Measured: booking a
+D1 technician under D2 *is* correctly rejected `23503` on that constraint, so it works. But drop it
+from the migration and case 0's set-equality is the only assertion that fails; key it on the wrong
+column pair and case 0's definition-equality is the only one. **The technician half of A-9 rides on a
+catalogue assertion alone**, where the bay half has a behavioural one. Four lines against the
+two-dealership fixture AC-7 already seeds would close it.
+
+### R-10 · `updated_at` is maintained by the writer, and nothing enforces it
+
+`appointment.updated_at` has `DEFAULT now()` and no trigger. ADR-0003's atomic move is an `UPDATE`,
+so unless every such statement sets `updated_at = now()` explicitly the column will be wrong from
+slice 05 onward, silently and unrecoverably.
+
+No trigger is added, deliberately: `CLAUDE.md` §2.1's discipline is that the **database holds the
+invariant** while the application holds the convenience, and a mutable-column trigger is convenience.
+The obligation therefore sits on `src/persistence/appointmentRepository.ts`, and no test currently
+asserts it. Recorded here because a column that lies is discovered long after the commit that made it
+lie.
 
 ## 11.3 What production would additionally require
 

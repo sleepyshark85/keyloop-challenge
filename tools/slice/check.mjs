@@ -59,6 +59,21 @@ const events = existsSync(LOG)
 const results = [];
 const check = (phase, name, verdict, detail) => results.push({ phase, name, verdict, detail });
 const PASS = 'PASS', FAIL = 'FAIL', UNVERIFIED = 'UNVERIFIED';
+/**
+ * "We cannot know" and "there is nothing to know" are different facts, and
+ * collapsing them cost this gate its meaning in both directions at once.
+ *
+ * Reading a vacuous mutation score as PASS let a slice clear §10's "on changed
+ * files" clause on a number measuring the slice before it. Reading it as
+ * UNVERIFIED — the reviewer's remedy, and right as far as it went — blocked a
+ * slice that changes only SQL from ever reaching done, because no mutation score
+ * about it can exist. NOT-APPLICABLE is the third fact: the criterion does not
+ * apply to this slice's diff, which is a conclusion rather than an absence.
+ *
+ * It does NOT block Done. UNVERIFIED still does — a slice that changed mutable
+ * files and has no score is missing evidence, not exempt from it.
+ */
+const NA = 'N/A';
 
 // --- Definition of Ready ---
 if (!onlyDone) {
@@ -95,7 +110,18 @@ if (!onlyDone) {
 // --- Definition of Done ---
 if (!onlyReady) {
   // The red-commit trail: a failing acceptance run must precede any passing one.
-  const runs = events.filter((e) => e.event === 'check.run');
+  //
+  // `check.run` carries more than one kind of record — a CI run, and a mutation
+  // score. Only a CI run reports whether tests ran, and it is the one that carries
+  // `run_id`. Reading them alike made a mutation record — which contains no test
+  // outcome at all — satisfy both "tests green" and the green half of red-before-
+  // green. Recorded as O-6 at slice 00a and deferred with a sequencing workaround;
+  // it recurred immediately at slice 00 because the workaround was "append the CI
+  // run last", which depends on the orchestrator remembering it every time. A
+  // guard whose only enforcement is discipline is the failure this project has now
+  // catalogued eight times, so the discriminator is in the predicate instead.
+  const allRuns = events.filter((e) => e.event === 'check.run');
+  const runs = allRuns.filter((e) => e.checks?.run_id !== undefined);
   const failing = runs.find((e) => /FAIL|\b0\//.test(JSON.stringify(e.checks ?? {})));
   const passingAfter = failing && runs.find((e) =>
     Date.parse(e.ts) > Date.parse(failing.ts) && !/FAIL|\b0\//.test(JSON.stringify(e.checks ?? {})));
@@ -109,17 +135,39 @@ if (!onlyReady) {
     try { return Boolean(JSON.parse(readFileSync(resolve('package.json'), 'utf8')).scripts?.test); }
     catch { return false; }
   })();
-  const lastRun = runs.at(-1);
+  // Newest CI run by completion time, not by log position: a backfill may append
+  // an older run after a newer one (§7's ordering obligation exists for the same
+  // reason, and asking two mechanisms to agree is how they drift apart).
+  const lastRun = [...runs].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)).at(-1);
   check('done', 'tests green',
     !hasTestScript ? UNVERIFIED : !lastRun ? UNVERIFIED
       : /FAIL/.test(JSON.stringify(lastRun.checks)) ? FAIL : PASS,
     !hasTestScript ? 'no `npm test` script yet — nothing to run'
-      : !lastRun ? 'no check.run recorded' : JSON.stringify(lastRun.checks));
+      : !lastRun ? 'no CI run recorded' : JSON.stringify(lastRun.checks));
 
+  // CLAUDE.md §10's clause is "mutation score above threshold ON CHANGED FILES".
+  // Reading only the number answered a different question: slice 00 changed three
+  // .sql files and no TypeScript, so Stryker instrumented the identical 142 mutants
+  // as the slice before it and this gate reported PASS on a measurement that could
+  // not have failed. The record itself was honest — its `note` said "vacuously so" —
+  // but the honesty sat in a field the gate never opened.
+  //
+  // Reviewer, slice 00, finding 2. It is O-6's shape one turn on: `c7a716d` taught
+  // the two predicates above that a mutation record is not a CI run, and left this
+  // one reading a number with no way to say the number is about nothing.
+  //
+  // A slice that changed no mutable file gets UNVERIFIED, not PASS. That is the
+  // same answer `slice:check` already gives for every other absent evidence: the
+  // gate says what it does not know rather than passing on what it cannot see.
   const mut = [...events].reverse().find((e) => e.checks?.mutation_score !== undefined);
+  const vacuous = mut?.checks?.mutation_measures_changed_files === false;
   check('done', `mutation score ≥ ${MUTATION_THRESHOLD}`,
-    !mut ? UNVERIFIED : mut.checks.mutation_score >= MUTATION_THRESHOLD ? PASS : FAIL,
-    !mut ? 'Stryker has not run for this slice' : `${mut.checks.mutation_score}`);
+    !mut ? UNVERIFIED
+      : vacuous ? NA
+      : mut.checks.mutation_score >= MUTATION_THRESHOLD ? PASS : FAIL,
+    !mut ? 'Stryker has not run for this slice'
+      : vacuous ? `this slice changed no mutable file — ${mut.checks.mutation_score} measures the slice before it`
+      : `${mut.checks.mutation_score}`);
 
   const depcruiseConfigured = ['.dependency-cruiser.js', '.dependency-cruiser.cjs', '.dependency-cruiser.json']
     .some((f) => existsSync(resolve(f)));
@@ -143,7 +191,7 @@ if (!onlyReady) {
 }
 
 // ------------------------------------------------------------------ report --
-const C = { PASS: '\x1b[32m', FAIL: '\x1b[31m', UNVERIFIED: '\x1b[33m' };
+const C = { PASS: '\x1b[32m', FAIL: '\x1b[31m', UNVERIFIED: '\x1b[33m', 'N/A': '\x1b[2m' };
 const R = '\x1b[0m';
 const dim = (s) => `\x1b[2m${s}${R}`;
 
@@ -156,11 +204,15 @@ for (const r of results) {
 
 const failed = results.filter((r) => r.verdict === FAIL);
 const unverified = results.filter((r) => r.verdict === UNVERIFIED);
+const notApplicable = results.filter((r) => r.verdict === NA);
 
 console.log();
 if (failed.length) console.log(`  ${C.FAIL}${failed.length} failing${R}`);
 if (unverified.length) {
   console.log(`  ${C.UNVERIFIED}${unverified.length} unverified${R} ${dim('— no evidence exists; this blocks Done by design')}`);
+}
+if (notApplicable.length) {
+  console.log(`  ${dim(`${notApplicable.length} not applicable — the criterion does not reach this slice's diff`)}`);
 }
 if (!failed.length && !unverified.length) console.log(`  ${C.PASS}all checks pass${R}`);
 
