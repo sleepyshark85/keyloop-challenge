@@ -606,11 +606,25 @@ consequence is a side effect of the fix, not its purpose.
   message naming the export. At red that assertion *is* the failure, which is the better trade: a
   compile error says "no such file" to CI, a shape assertion says "`withinOpeningHours` is not
   exported from `dist/domain/openingHours.js`" to a person.
-- It depends on the build being current, and **the step-1 draft's answer to that has been superseded
-  by something better.** The draft asked for a `pretest:nodb` npm hook to cover the Docker-free path,
-  which would have left two lifecycle hooks to keep in agreement. Under §6.4, `tools/ci/run-tests.mjs`
-  owns the build before *both* invocations, so there is one place that guarantees a current `dist`
-  rather than one per entry point. The requirement is unchanged; its home is better.
+- It depends on the build being current, and **`pretest:nodb` is still required.** This bullet said
+  otherwise for the length of one commit, and the correction is worth keeping visible rather than
+  tidying away. The amendment claimed `tools/ci/run-tests.mjs` *"owns the build before both
+  invocations"*, superseding the step-1 requirement. Checked against the tool as it actually landed in
+  `c328d84`, that is false: `run-tests.mjs` spawns `vitest` twice and never builds. The build is still
+  `"pretest": "npm run build"`, which fires for `npm test` and for nothing else, while
+  `"test:nodb": "vitest run --project nodb"` remains a bare invocation. So the Docker-free path — the
+  one §6.3 exists to make usable — can still run against a stale or absent `dist/`, which for a suite
+  that loads `dist/domain/*.js` means a false red or a false green depending on what is lying there.
+
+  **The requirement stands as first written:** `"pretest:nodb": "npm run build"`. It is one line, npm
+  runs `pre<name>` for any script name, and `package.json` is the orchestrator's this round — so this
+  is a flag, not an edit.
+
+  Recording the shape, because it is the third instance in this slice and the second by me: I wrote
+  that a mechanism owned a responsibility, on the strength of what the tool was *for* rather than what
+  it *does*, in the paragraph of a design that had just been amended for exactly that error. Naming a
+  mechanism's capability instead of its configuration does not stop being tempting once you have
+  written the rule against it.
 - The one mechanical unknown this design carried is now **measured**, before the red commit rather
   than after it, the way 00a measured per-project `globalSetup`. Run by the orchestrator:
   `pathToFileURL(resolve('dist/domain/_spike.js')).href` fed to `await import(...)` typechecks clean
@@ -707,8 +721,15 @@ it would be a worse defect than the one it fixes — conditional on Docker befor
 slice after. It gets `tools/test/run-tests.test.mjs` and is checked against mutants rather than
 asserted to discriminate.
 
-**This design is written against that description.** If what lands differs, this section is wrong and
-the orchestrator has undertaken to come back rather than let the two drift.
+**This design is written against that description, and it was checked against the tool rather than
+against the description.** `c328d84` implements all three parts, and its `merge()` closes a case this
+design did not anticipate: the measured Docker failure makes Vitest write a report containing an
+**empty** `testResults` array rather than no file at all, so a naive "the file is missing" check would
+have reproduced the defect it was built to close. The tool treats `null` and `[]` alike as *did not
+run*, which is the correct reading and a better one than part 3 as I specified it.
+
+One thing the check did find: the build is **not** owned by `run-tests.mjs` (§6.2), so `pretest:nodb`
+is still outstanding. That is the value of reading the tool instead of the plan.
 
 ---
 
@@ -813,10 +834,10 @@ One commit, `test(01): ... (red)`, test-engineer, touching only:
 No file under `src/`, so C2's ownership-zone check is untouched.
 
 **`tools/ci/run-tests.mjs` and the `package.json` wiring are NOT in this commit.** They are the
-orchestrator's tooling prep under the human's ruling (§6.4), land before step 3, and touch no `src/`.
-The `pretest:nodb` hook §6.2 asked for is subsumed by it: `run-tests.mjs` owns building before either
-invocation, which is a better home for it than a second npm lifecycle hook that only one of the two
-paths fires.
+orchestrator's tooling prep under the human's ruling (§6.4), landed in `c328d84`, and touch no `src/`.
+The `pretest:nodb` hook §6.2 asks for is **still outstanding** — `run-tests.mjs` does not build, and
+`test:nodb` is a bare `vitest run`. It is one line of `package.json`, which is not this commit's to
+write.
 
 ### 8.2 What passes, and why that is the interesting half
 
