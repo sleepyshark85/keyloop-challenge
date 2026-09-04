@@ -49,6 +49,29 @@ export type OpeningHoursVerdict =
   // type used to (§2.3).
   | { readonly kind: 'malformed-interval' };
 
+// ─────────────────────────────────────────────────────────────── §3.2: parsing `time` ──
+
+/**
+ * `HH:MM` or `HH:MM:SS`, `00:00:00`-`23:59:59` plus the single exact value `24:00:00`
+ * (normalised to 86400 seconds-of-day). Narrower than "hours 00-24": measured against a real
+ * `postgres:16-alpine`, `'24:00:00'::time` round-trips but `24:00:01` and `24:30:00` are
+ * rejected by PostgreSQL itself, so nothing else in this range can ever reach this parser.
+ * `null` on anything else. Fail closed: a booking gate that cannot read its own configuration
+ * must refuse rather than guess.
+ */
+function parseTimeToSeconds(raw: string): number | null {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(raw);
+  if (match === null) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = match[3] === undefined ? 0 : Number(match[3]);
+
+  if (hours === 24 && minutes === 0 && seconds === 0) return 86_400;
+  if (hours > 23 || minutes > 59 || seconds > 59) return null;
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
 // ───────────────────────────────────────────────────────────── §4.1: the local rendering ──
 
 const WEEKDAY_INDEX: { readonly [abbrev: string]: DayOfWeek } = {
@@ -116,9 +139,6 @@ function renderLocal(epochMillis: number, formatter: Intl.DateTimeFormat): Local
  *
  * The order below is part of the design (§4.2): a mutant that reorders these checks is only
  * killable if the order is asserted, and it is — see tests/unit/domain/openingHours.test.ts.
- *
- * Steps 5-7 (closed-day / malformed-hours / within-window) land in the next commit; this one
- * carries steps 1-4, which is everything that does not yet consult `weekly` at all.
  */
 export function withinOpeningHours(
   startsAtMillis: number,
@@ -156,6 +176,28 @@ export function withinOpeningHours(
     return { kind: 'spans-local-days', startsOn: start.localDate, endsOn: end.localDate };
   }
 
-  void weekly;
-  return { kind: 'within' };
+  // 5. A day with no row is a closed day, not an unbounded one (AC-4).
+  const hours = weekly[start.dayOfWeek];
+  if (hours === null) {
+    return { kind: 'closed-day', dayOfWeek: start.dayOfWeek };
+  }
+
+  // 6. Parse opensAt/closesAt; a gate that cannot read its own configuration must refuse.
+  const opensSeconds = parseTimeToSeconds(hours.opensAt);
+  const closesSeconds = parseTimeToSeconds(hours.closesAt);
+  if (opensSeconds === null || closesSeconds === null || !(opensSeconds < closesSeconds)) {
+    return { kind: 'malformed-hours', dayOfWeek: start.dayOfWeek };
+  }
+
+  // 7. Inclusive on closesAt: a job ending exactly at closing time is within opening hours.
+  if (opensSeconds <= start.secondsOfDay && end.secondsOfDay <= closesSeconds) {
+    return { kind: 'within' };
+  }
+
+  return {
+    kind: 'outside-window',
+    dayOfWeek: start.dayOfWeek,
+    opensAt: hours.opensAt,
+    closesAt: hours.closesAt,
+  };
 }
