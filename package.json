@@ -12,6 +12,8 @@
     "log": "node tools/team-log/query.mjs",
     "log:append": "node tools/team-log/append.mjs",
     "board": "node tools/board/generate.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:nodb": "vitest run --project nodb",
     "test:tools": "node tools/test/guard-paths.test.mjs && node tools/test/docs-build.test.mjs && node tools/test/capture-prompt.test.mjs && node tools/test/report-capture.test.mjs",
@@ -36,6 +38,7 @@
     "vitest": "5.0.0"
   },
   "dependencies": {
-    "pg": "8.23.0"
+    "pg": "8.23.0",
+    "pino": "10.3.1"
   }
 }
