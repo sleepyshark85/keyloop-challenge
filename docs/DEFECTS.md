@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **23** |
-| Severity | 8 blocking · 11 major · 4 minor |
-| Verdicts | 4 narrowed · 17 accepted · 1 escalated · 1 deferred |
-| Raised by | test-engineer 10 · implementer 8 · architect 3 · orchestrator 2 |
+| Findings recorded | **24** |
+| Severity | 9 blocking · 11 major · 4 minor |
+| Verdicts | 4 narrowed · 18 accepted · 1 escalated · 1 deferred |
+| Raised by | test-engineer 10 · implementer 9 · architect 3 · orchestrator 2 |
 | Awaiting a ruling | none |
-| Mean escape distance | 1.26 step(s) |
+| Mean escape distance | 1.21 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -58,6 +58,7 @@ rather than narrated.*
 | **T-3** | MINOR | 4 *(+0)* | test-engineer | The compiler diagnosis reports no compiler when one is installed | accepted |
 | **O-3** | MAJOR | 4 *(+4)* | orchestrator | log:audit reports 12 false discrepancies because it assumes one agent.finish per transcript | deferred |
 | **O-4** | BLOCKING | 4 *(+0)* | orchestrator | The unit tests are far weaker than a green suite suggests: mutation score 0.0634 against a Definition-of-Done threshold of 0.75 | accepted |
+| **O-5** | BLOCKING | 4 *(+0)* | implementer | The 0.0634 mutation score ruled BLOCKING was a harness artifact, not a measurement of the tests | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -198,6 +199,12 @@ rather than narrated.*
 - *scenario:* Stryker, installed at step 5 having been required by CLAUDE.md section 3 and section 10 since the constitution was written, reports 9 killed and 130 survived of 142 mutants over 43 unit tests. Four of seven source files kill nothing at all, including checkHealth.ts and persistence/db.ts which have dedicated unit test files. 24 BlockStatement mutants survive, meaning 24 places where an entire block can be replaced with an empty one and no test notices; 19 ConditionalExpression mutants survive, meaning branch conditions can be forced either way unobserved. Verified real rather than a configuration artifact by inspecting a survivor directly.
 - *file:* `tests/unit/`
 - *accepted* by human — Ruled by the human at step 4: strengthen the unit tests rather than relax the threshold or defer it as debt. The alternatives considered and rejected were ruling the 0.75 threshold not-applicable to a walking skeleton, which would be a Definition-of-Done change, and accepting the score as a recorded debt with a follow-up slice. The survivors are genuine weaknesses and finding them is why mutation testing is in the stack, so the work is the implementer own in tests/unit/.
+
+**O-5** — The 0.0634 mutation score ruled BLOCKING was a harness artifact, not a measurement of the tests
+
+- *scenario:* stryker-mutator/vitest-runner 10.0.0 does not activate mutants under vitest 5.0.0. Its peer range is vitest >=2.0.0, so npm warns about nothing. 118 of the 130 reported survivors carried testsCompleted 0 — Stryker ran no test against them and recorded them as survived. Only 21 of 142 mutants were tested at all. Decisive check: checkHealth.ts scored 0 of 6 against a file with six dedicated tests, and activating one of those mutants by hand in Stryker own unmodified sandbox with STRYKER_ACTIVE_MUTANT set killed it via 5 existing failing tests. The true baseline was 76.06, not 6.34. Same shape as dependency-cruiser typescript range: a tool reporting a number over work it never did, with nothing warning.
+- *file:* `stryker.config.mjs`
+- *accepted* by orchestrator — Correct, verified independently, and it is a finding against the orchestrator. I provisioned Stryker, watched it instrument 142 mutants and emit a score, and treated that score as a measurement without checking that any mutant had been activated — while writing a commit message about not working around missing tools. The sixth instance of this slice own rule and the first one I committed myself: a cruise that exits 0 says nothing about what it examined, and a mutation score says nothing about tests that were never run. The switch to the command runner is accepted; the implementer flagged the edit to a file it does not own rather than slipping it in. The underlying finding stands regardless of the bad number: the work was ruled on a false 6.34, but the true 76.06 was still below the 0.75 gate only marginally, and four of the individual weaknesses it found were real.
 
 </details>
 
