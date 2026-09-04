@@ -11,11 +11,11 @@
 
 ## Where we are
 
-**Phase 6 — Consolidation**, which closes at Gate F.
+**Phase 4 — Pilot + retro**, which closes at Gate D.
 
 | | |
 |---|---|
-| Last commit | `b14c5df Merge pull request #4 from sleepyshark85/slice/00a-walking-skeleton` |
+| Last commit | `77f2412 chore(gate-e): slice 00a done — all checks pass` |
 | Gates decided | A, B, C, E, E |
 | Agent runs recorded | 29 |
 | ADRs accepted | 10 |
@@ -24,8 +24,8 @@
 
 ## What happens next
 
-- As-built arc42 pass, presentation diagrams refreshed, README and §13 written.
-- **Gate F**: final read.
+- Run slice 00 end-to-end, then hold the retro against `team-log/process-criteria.md`.
+- **Gate D**: tune the machine, or proceed.
 
 ## Gate decisions
 

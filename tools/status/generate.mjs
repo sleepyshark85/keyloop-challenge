@@ -32,6 +32,16 @@ const PHASES = {
   '7': ['Video', null, null],
 };
 
+/**
+ * Gate E fires on EVERY slice, so it closes nothing. Treating it as
+ * phase-closing made the first slice gate of phase 5 report "phase 6,
+ * consolidation" — with twelve slices still to build, in the one file that
+ * exists to tell a resuming session where it is. Found at slice 00a's gate
+ * (finding O-8); recorded rather than only fixed, because the generator agreed
+ * with itself right up until a gate was actually decided.
+ */
+const PER_SLICE_GATES = new Set(['E']);
+
 const events = loadLog().sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
 
 const gates = events.filter((e) => e.event === 'gate.decided');
@@ -40,7 +50,7 @@ const dcrsOpen = events.filter((e) => e.event === 'dcr.raised').length
   - events.filter((e) => e.event === 'dcr.resolved').length;
 
 // Position: the phase after the last gate decided, else the last phase touched.
-const lastGate = gates.at(-1);
+const lastGate = [...gates].reverse().find((e) => !PER_SLICE_GATES.has(e.gate));
 const lastPhaseTouched = [...events].reverse().find((e) => e.phase)?.phase;
 const completedPhase = lastGate
   ? Object.keys(PHASES).find((p) => PHASES[p][1]?.startsWith(lastGate.gate))

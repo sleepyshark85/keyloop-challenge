@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **38** |
-| Severity | 9 blocking · 19 major · 10 minor |
-| Verdicts | 4 narrowed · 19 accepted · 1 escalated · 3 deferred |
-| Raised by | reviewer 12 · test-engineer 10 · implementer 9 · orchestrator 4 · architect 3 |
+| Findings recorded | **39** |
+| Severity | 9 blocking · 20 major · 10 minor |
+| Verdicts | 4 narrowed · 20 accepted · 1 escalated · 3 deferred |
+| Raised by | reviewer 12 · test-engineer 10 · implementer 9 · orchestrator 5 · architect 3 |
 | Awaiting a ruling | **11** |
-| Mean escape distance | 1.39 step(s) |
+| Mean escape distance | 1.51 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -292,6 +292,22 @@ rather than narrated.*
 - *scenario:* check.mjs line 137 tests gate.decision === approved exactly. schema.mjs requires gate, decision and rationale but validates none of their values, so a gate recorded as approved-and-merged is schema-valid, semantically correct, and reported FAIL by the Definition of Done. Observed live: slice 00a human gate was recorded accurately, the check reported no approval, and the fix was appending a superseding record whose only difference is the literal. The three collect-ci constraints of the same class are documented in design section 6 because the architect found them; this one is documented nowhere and was found by tripping it.
 - *file:* `tools/slice/check.mjs`
 - *deferred* by orchestrator — Real and cheap, and deferred to the retro with O-3, O-6, R-10 and the rest of the gate-tooling cluster. The remedy is either an enum in schema.mjs so an invalid decision is rejected at write time rather than silently ignored at read time, or the check accepting any decision whose value is not a rejection. Note the shape: every one of O-3, O-6 and O-7 is the Definition of Done reading a record that does not mean what it assumes, and all three were found by running the gate rather than by reading it.
+
+</details>
+
+## Phase 4
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **O-8** | MAJOR | 6 *(+6)* | orchestrator | The committed resume point advances the phase on a per-slice gate, so the first slice of the slice loop reports the project as finished building | accepted |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**O-8** — The committed resume point advances the phase on a per-slice gate, so the first slice of the slice loop reports the project as finished building
+
+- *scenario:* generate.mjs infers position as the phase after the last gate.decided, matching PHASES[p][1].startsWith(gate). PHASES[5][1] is the string E (per slice), so any gate E matches and reports current phase 6, Consolidation. Gate E fires on EVERY slice by design, so the first slice gate of phase 5 would report consolidation with twelve slices unbuilt. Observed live at slice 00a gate E: STATUS.md regenerated to phase 6 while the scope marker said 4 and the pilot had not run. STATUS.md is the file a resuming session reads first and its own header tells the reader to trust it over narration.
+- *file:* `tools/status/generate.mjs`
+- *accepted* by orchestrator — Fixed rather than deferred, unlike O-3, O-6 and O-7. Those mis-report a gate the human is standing in front of; this one mis-reports where the project is to a session that has no other context, and it would have fired on the first real slice regardless of how slice 00a gate was recorded. Per-slice gates now close nothing: PER_SLICE_GATES holds E and the inference skips it. STATUS.md is back to phase 4. Note the shape it shares with the deferred three — the generator agreed with itself right up until a gate was actually decided, so nothing was wrong until the first time it mattered.
 
 </details>
 
