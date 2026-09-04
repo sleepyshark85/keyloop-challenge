@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { FastifyInstance } from 'fastify';
+import Fastify from 'fastify';
+import type { FastifyInstance, RouteOptions } from 'fastify';
+import { registerHealthRoute } from '../../../src/http/routes/health.js';
 import { buildServer } from '../../../src/http/server.js';
 import { createLogger } from '../../../src/platform/logger.js';
 import type { HealthOutcome } from '../../../src/application/checkHealth.js';
@@ -121,5 +123,107 @@ describe('buildServer', () => {
     expect(log.isLevelEnabled('info'), 'the server is not logging through the injected logger').toBe(
       false,
     );
+  });
+});
+
+/**
+ * The branch the types say is unreachable.
+ *
+ * `switch (outcome.kind)` is exhaustive over two members and the `default` holds a `never`
+ * assignment, so the compiler will not let a third member be added without pointing here.
+ * That is a compile-time guarantee about THIS code, not a runtime one about its callers:
+ * `checkHealth` arrives as an injected function, and slice 02 onward will add use cases to
+ * `ServerDeps` written by someone else. The question that matters is what an operator sees
+ * if one of them ever returns something this route does not know.
+ *
+ * The answer must not be "200, healthy". A health endpoint that reports a state it cannot
+ * interpret as `ok` is worse than one that errors, because everything downstream — a load
+ * balancer, a readiness probe, a pager — believes it.
+ */
+describe('an outcome the route does not know', () => {
+  it('is never reported as healthy', async () => {
+    const app = serverReporting({ kind: 'sideways' } as unknown as HealthOutcome);
+
+    const response = await app.inject({ method: 'GET', url: '/health' });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.statusCode).not.toBe(200);
+    expect(response.body).not.toContain('"status":"ok"');
+  });
+
+  it('says what it could not interpret, so the cause is in the log', async () => {
+    const app = serverReporting({ kind: 'sideways' } as unknown as HealthOutcome);
+
+    const response = await app.inject({ method: 'GET', url: '/health' });
+
+    expect(response.json().message).toMatch(/unhandled health outcome.*sideways/);
+  });
+});
+
+/**
+ * The response schemas are the endpoint's contract, and they are enforcement rather than
+ * documentation: Fastify serialises THROUGH them, so a field the schema does not declare
+ * never reaches the client. That is what stops a future handler leaking an internal —
+ * a reason string, a driver error, a connection URL — by adding it to the object it sends.
+ *
+ * Asserted against the schema the route ACTUALLY declares, captured from the `onRoute`
+ * hook, rather than against a copy. A copy would keep passing after the route stopped
+ * declaring a schema at all, which is exactly the mutant this is here to catch: with
+ * `{ schema: … }` emptied the endpoint still answers 200 and 503 with the right bodies, and
+ * every other test in this file passes.
+ */
+describe('the declared response schemas', () => {
+  function declaredSchemas(): Record<string, unknown> {
+    const app = Fastify();
+    const routes: RouteOptions[] = [];
+    app.addHook('onRoute', (route) => {
+      routes.push(route);
+    });
+
+    registerHealthRoute(app, { checkHealth: async () => ({ kind: 'ok' }) });
+
+    const health = routes.find((route) => route.url === '/health');
+    expect(health, 'no /health route was registered').toBeDefined();
+    const response = (health?.schema as { response?: Record<string, unknown> } | undefined)
+      ?.response;
+    expect(response, 'the route declares no response schema, so nothing is enforced').toBeDefined();
+    return response as Record<string, unknown>;
+  }
+
+  it('declares one for the healthy code and one for the degraded code', () => {
+    expect(Object.keys(declaredSchemas()).sort()).toEqual(['200', '503']);
+  });
+
+  it('explains what each code means, because slice 10 emits these as the OpenAPI document', () => {
+    // The weakest assertion in this file, and deliberately not on the wording: it pins that
+    // both outcomes are documented at all. ADR-0005 chose TypeBox response schemas partly so
+    // the published contract is generated from the thing that enforces it, and a blank
+    // description ships an endpoint whose two states the reader has to guess between.
+    for (const [code, schema] of Object.entries(declaredSchemas())) {
+      const { description } = schema as { description?: string };
+      expect(description, `the ${code} response schema documents nothing`).toBeTruthy();
+      expect(description?.length ?? 0).toBeGreaterThan(20);
+    }
+  });
+
+  it.each([
+    ['200', { status: 'ok', checks: { database: 'up' } }],
+    ['503', { status: 'degraded', checks: { database: 'down' } }],
+  ])('strips fields it does not declare, on %s', async (code, body) => {
+    const schema = declaredSchemas()[code];
+    const app = Fastify();
+    apps.push(app);
+    app.get('/probe', { schema: { response: { 200: schema } } }, async (_request, reply) =>
+      reply.code(200).send({
+        ...body,
+        leaked: 'a connection string, say',
+        checks: { ...(body as { checks: object }).checks, leaked: 'a driver error, say' },
+      }),
+    );
+
+    const response = await app.inject({ method: 'GET', url: '/probe' });
+
+    expect(response.json()).toEqual(body);
+    expect(response.body).not.toContain('leaked');
   });
 });
