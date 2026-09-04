@@ -3,7 +3,7 @@ id: "00a"
 title: Walking skeleton — toolchain, real PostgreSQL under test, and the layering ruleset in CI
 status: ready
 depends_on: []
-arc42: ["§5.2", "§7.2", "§7.4", "§8.5"]
+arc42: ["§5.2", "§5.3", "§7.1", "§7.2", "§7.4", "§8.5", "§11.2"]
 adr: [5, 6, 7, 8, 10]
 quality_scenarios: [QS-10]
 loopbacks: 0

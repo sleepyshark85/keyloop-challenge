@@ -4,14 +4,75 @@
 > implementer, who may object; built against at steps 3 and 4.
 >
 > Slice: [`00a-walking-skeleton.md`](00a-walking-skeleton.md) · arc42 scope declared by the slice:
-> **§5.2 · §7.2 · §7.4 · §8.5** · quality scenarios: **QS-10** · ADRs in force: 0005, 0006, 0007,
-> 0008, 0010.
+> **§5.2 · §5.3 · §7.1 · §7.2 · §7.4 · §8.5 · §11.2** · quality scenarios: **QS-10** · ADRs in
+> force: 0005, 0006, 0007, 0008, 0010.
+>
+> **Amended at step 2 on 2026-09-04**, after both reviewers objected. Every ruling below is applied
+> in the body — this is one current document, not a design plus a thread of corrections.
 
 This design settles *shape*. It does not restate the acceptance criteria and it may not change them
 (`CLAUDE.md` §6): AC-1 to AC-6 are the human's.
 
-Read §11 first if you are short of time — it lists the three things most likely to be objected to at
-step 2, and the four that need a human ruling.
+Read §0 first: it is the step-2 audit trail. Then §11, which is what still needs watching.
+
+---
+
+## 0. Step 2 rulings
+
+Both the test-engineer and the implementer returned **OBJECT**. One round of discussion was convened
+per `CLAUDE.md` §6; these are the rulings. Four of the five carried **measurement or file-level
+evidence rather than argument** — a role built the thing this design specified, ran it, and reported
+what happened. That is the standard the rest of this slice should be held to.
+
+| # | Objection | Outcome | Reasoning, in one line |
+|---|---|---|---|
+| **O1** | test-engineer — the AC-4 fixture, built exactly to §5, cruises 0 modules and reports 0 violations at exit 0 | **(c) design defect** | Named failure: **AC-4** (*"each violation is reported by name"* — measured at zero) and **QS-10** items 3–4; the same mode would let `lint:arch` report a clean layering having checked nothing, and C4 reads that record |
+| **O2** | test-engineer — no acceptance test can start the service: no entrypoint, no loader, `tests/support/` unowned, `scripts` unassigned | **(a) clarification** | The design was silent rather than wrong; nothing is retracted, a decision is added. AC-1 and AC-2 were unbuildable without it |
+| **O3** | test-engineer — the step-1 draft's reason for implementer-authored tool tests is factually wrong: `test:tools` is a literal `&&` chain, not a glob | **(a) clarification** | Conceded outright. The stated reason was false, so the ownership conclusion it supported does not survive it; all three tool tests become test-engineer-authored |
+| **O-1** | implementer — `red-proof`'s red zone makes slices 07 and 11 structurally unable to pass | **(d) escalated → ruled by the human** | Finding correct and the defect is this design's, not AC-6's. The reading of AC-6 was escalated because under the literal reading the fix requires changing an acceptance criterion. **The human ruled BROAD on 2026-09-04** |
+| **O-2** | implementer — §6's three `collect-ci.mjs` constraints are right but not sufficient; two more are load-bearing | **(a) clarification** | Both verified. (c) is deliberately **not** available: AC-5 says nothing about ordering or timestamps and C1 is a process criterion, not a §10 scenario — the rule says (a) however severe the consequence |
+
+**What the human ruled**, at the same sitting:
+
+1. **AC-6 reads broad.** *"The acceptance suite failed"* means any test-engineer-owned suite, not
+   literally `tests/acceptance/`. No acceptance criterion changes. §7's rule is now AC-6's clauses
+   mapped one for one.
+2. **The slice's `arc42:` scope gains §7.1, arc42 §11.2, §5.3 and §7.4** (§7.4 for O1's `lint:arch`
+   wrapper). The step-1 draft's open questions 1 and 2 are closed by this.
+3. **`docker-compose.yml` starts `postgres` and `otel-lgtm` only; the service runs on the host.**
+   The delta and its reasoning are recorded in §7.1/§7.2 at step 7. Open question 3 is closed.
+
+**Where the objectors were right about the finding and wrong about the fix** — recorded because
+conceding a finding is not the same as conceding a remedy:
+
+- **O2** asked me to *"name the entrypoint command and loader"*. There is no loader. `tsx` is named
+  in no ADR and Node 22.11's `--experimental-strip-types` does not remap `./x.js` onto `x.ts`, which
+  is how this codebase writes imports. The answer is to **compile** (§11.3): no new dependency, and
+  the acceptance test spawns the artifact a deployment would run.
+- **O-1** proposed *"no failing test file under `tests/unit/` **or `tests/integration/`**"* as the
+  negative condition. That would break the **next** slice: `docs/slices/00-schema-and-exclusion-constraints.md`
+  names exactly one test file, `tests/integration/exclusion-constraints.test.ts`, and `CLAUDE.md` §5
+  assigns database-invariant integration tests to the test-engineer precisely so they can be red
+  first. `tests/integration/` is in the red zone, not outside it.
+- **O-2**'s deeper fix — teaching `tools/slice/check.mjs` to order by timestamp instead of position
+  — is **not** done here. Changing the gate tool in the slice that first feeds it is how a gate ends
+  up agreeing with its own bug (§11.5).
+- **O1**'s *"the fixture resolves the real compiler"* stated an outcome and no mechanism, which is
+  the defect it was complaining about. §5 now names the mechanism, and asserts something stronger
+  than `totalCruised > 0`.
+
+**Three findings of the architect's own**, surfaced while ruling and applied below: the migration
+seam would have crashed 00a's red run in `globalSetup` (§4); AC-4 is green on arrival and that is
+honest rather than a test-first violation (§7); and the `.dependency-cruiser.js` widening now
+includes `tests/setup/`, which **neither reviewer reviewed** (§11.2).
+
+**Loopbacks.** `CLAUDE.md` §6 contrasts cheap step-2 objections with the same finding at step 5,
+which *"costs a full cycle plus a loopback"*. At step 2 there is no prior work to revise and no
+accepted ADR to supersede, so (c)'s effect — *loop back to step 1* — **is** this amendment. The
+architect's reading is that `loopbacks:` stays at **0**; the counter is the orchestrator's field.
+
+`docs/team-log/process-criteria.md` is untouched. It is pre-registered, and a criterion edited after
+seeing a result is not a criterion.
 
 ---
 
@@ -33,7 +94,7 @@ src/
     db.ts                       pg Pool + Kysely instance; exports the `Db` type alias
     schema.ts                   the `Database` interface — empty in 00a, the typing seam for slice 00
     health.ts                   pingDatabase(db): SELECT 1, driver errors caught and never rethrown
-    migrations/.gitkeep         the seam slice 00 drops 0001_*.sql into; zero migrations today
+    migrations/.gitkeep         the seam slice 00 drops 0001_*.sql into; zero migrations today (§4)
   platform/
     config.ts                   loadConfig(env) → Config; validated once, at startup
     logger.ts                   the pino instance
@@ -70,7 +131,7 @@ would be reported on every run, and a warning nobody can clear is a warning ever
 | `platform/config.ts` | `loadConfig(env: NodeJS.ProcessEnv): Config` with `Config = { databaseUrl, port, logLevel }`. Throws on a missing or malformed value, at startup, per §7.3 | **Hand-rolled validation.** `@sinclair/typebox` is confined to `src/http` and `main.ts` by `http-framework-only-in-the-edge`, so the obvious move — a TypeBox schema for the environment — is a CI failure. ~20 lines |
 | `platform/logger.ts` | The `pino` instance built from `config.logLevel` | `pino` is unrestricted by the ruleset; `fastify` is not, and must not appear here |
 | `persistence/schema.ts` | `export interface Database {}` — empty | This is the slice's only concession to a future need, and it is load-bearing: `Kysely<Database>` needs the parameter. Slice 00 populates it from the migrations (ADR-0006) |
-| `persistence/db.ts` | `createDb(config): Db`, `closeDb(db)`, and **`export type Db = Kysely<Database>`** | The pool must **not** connect eagerly — see §3 |
+| `persistence/db.ts` | `createDb(config): Db`, `closeDb(db)`, **`export type Db = Kysely<Database>`**, and a registered `pool.on('error', …)` handler | The pool must **not** connect eagerly — see §3. **`pool.on('error')` is mandatory, not hygiene:** `pg.Pool` emits `'error'` on *idle* clients, and an unhandled `EventEmitter` error terminates the process. AC-2 deliberately runs this service against a dead database, so this is on the AC-2 path. The handler swallows the error and must not rethrow; if it reports, it does so through `src/platform/logger.ts` (a permitted `persistence → platform` edge) rather than by acquiring a new dependency. Connectivity is reported by `/health`, never by a crash |
 | `persistence/health.ts` | `pingDatabase(db: Db): Promise<boolean>` — `sql\`select 1\`` in a `try/catch` | **Catches everything and returns a boolean.** A `pg` error object escaping upward would be a `pg` value inside a layer that may not import `pg`. `dependency-cruiser` cannot see that (it is a value, not an import); it is precisely the leak `sql-only-in-persistence` exists to prevent, so it is stated here and is a review item |
 | `application/checkHealth.ts` | `checkHealth(db: Db): Promise<HealthOutcome>` and the `HealthOutcome` union | Establishes §5.2's *outcomes, not exceptions* convention from the first endpoint, so slice 02 extends a pattern rather than introducing one |
 | `http/server.ts` | `buildServer(deps: ServerDeps): FastifyInstance` | Takes **bound use cases**, never a database handle — see §2 |
@@ -128,17 +189,46 @@ likely to be evaded. AC-4's fixture proves that half of the rule with a *type-on
 
 ```ts
 // src/http/server.ts
+import type { FastifyBaseLogger } from 'fastify';
+
 export interface ServerDeps {
-  logger: Logger;
+  logger: FastifyBaseLogger;
   checkHealth: () => Promise<HealthOutcome>;
 }
 ```
 
-This is not a stylistic preference either. `http-must-not-reach-persistence` forbids
-`src/http → src/persistence`, and under `tsPreCompilationDeps` that includes
-`import type { Db }`. So the edge layer *cannot* be handed a database handle in a way that
-type-checks and passes CI. Partial application in `main.ts` is the only shape left, and it
-generalises: from slice 02 onward `ServerDeps` is a record of bound use cases and nothing else.
+**`FastifyBaseLogger`, not pino's `Logger`** — corrected at step 2, where the implementer compiled it.
+Fastify 5 specialises `FastifyInstance` on the logger type passed as `loggerInstance`, so a pino
+`Logger` makes the declared `FastifyInstance` return type unassignable
+(*"Property 'msgPrefix' is missing in type 'FastifyBaseLogger' but required in type 'BaseLogger'"*).
+The type is imported from `fastify`, which `src/http` may name; `main.ts` still passes the pino
+instance, which structurally satisfies it.
+
+**What the ruleset actually forces, stated narrowly enough to be true.**
+`http-must-not-reach-persistence` forbids `src/http → src/persistence`, and under
+`tsPreCompilationDeps` that includes `import type { Db }`; `sql-only-in-persistence` forbids
+`import type { Kysely }` anywhere outside persistence. So:
+
+> **`src/http` cannot *name* the database handle's type.** Not `Kysely`, not `Db`.
+
+The earlier draft of this section claimed partial application was *"the only shape left"*. **That was
+overstated, and the implementer disproved it by running the ruleset** — this compiles and cruises
+with zero violations:
+
+```ts
+// src/http/probeE.ts — never names Db, never imports src/persistence
+export interface GenericDeps<TDb> { db: TDb; checkHealth: (db: TDb) => Promise<HealthOutcome>; }
+```
+
+A generic parameter carries the handle through the edge layer by *refusing to name it*, which buys
+nothing: the edge still holds a value it cannot use, cannot type and must not touch. The honest
+statement, and the one that goes into arc42 §5.2 at step 7, is therefore: **the ruleset forecloses
+every shape that names the handle; a generic parameter evades that only by declining to name it; and
+partial application is the shape we take.** The counterexample is recorded beside it deliberately —
+a claim that has survived an attack is worth more in §5.2 than one that was never tested.
+
+It generalises either way: from slice 02 onward `ServerDeps` is a record of bound use cases and
+nothing else.
 
 **Shutdown.** `main.ts` registers `SIGTERM`/`SIGINT` → `app.close()` then `closeDb(db)` then exit 0.
 Not ceremony: the acceptance harness spawns and kills this process repeatedly (§4), and a process
@@ -201,7 +291,8 @@ vitest.config.ts
   globalSetup: tests/setup/postgres.ts
         │
         ├─ new PostgreSqlContainer('postgres:16').start()        one container per RUN
-        ├─ node-pg-migrate, programmatic, dir 'src/persistence/migrations'
+        ├─ mkdir -p 'src/persistence/migrations'                 see "the seam", below
+        ├─ node-pg-migrate runner(), programmatic, that same dir
         │       └─ 00a: applies ZERO migrations, creates `pgmigrations`.  This is the seam.
         ├─ provide('databaseUrl', container.getConnectionUri())
         └─ teardown: container.stop()
@@ -235,28 +326,67 @@ Isolation is by data: each test seeds its own dealership and works only inside i
 no data at all**, so the rule is stated and unexercised; the seeding helpers arrive with slice 00's
 schema. This is the honest position, not an omission: there is nothing to isolate yet.
 
-**The seam slice 00 must find waiting for it.** Two things, and both must be present in 00a even
-though they do nothing:
+**The seam slice 00 must find waiting for it.** Three things, and all three must be present in 00a
+even though they do nothing:
 
-1. `src/persistence/migrations/` exists (a `.gitkeep`), and
-2. `globalSetup` calls the migration runner **unconditionally**, against that directory, with the
-   same programmatic API `npm run db:migrate` uses (ADR-0007). Zero files apply; `pgmigrations` is
-   created; the call succeeds.
+1. `src/persistence/migrations/` is a tracked directory (a `.gitkeep`), created by the implementer
+   at step 4;
+2. `globalSetup` **ensures that directory exists** (`mkdirSync(dir, { recursive: true })`) before
+   calling the runner; and
+3. `globalSetup` calls the migration runner **unconditionally**, against that directory, with the
+   same package `npm run db:migrate` uses (ADR-0007). Zero files apply; `pgmigrations` is created;
+   the call succeeds.
 
-Slice 00 then adds `0001_schema.sql` and changes **no other file**. If instead 00a skipped the call
+Slice 00 then adds `0001_*.sql` and changes **no other file**. If instead 00a skipped the call
 "because there is nothing to migrate", slice 00 would have to add the call, the config and the schema
 at once, and any failure among them would be ambiguous.
 
-> **The one mechanical unknown in this slice.** `node-pg-migrate` against a directory containing only
-> `.gitkeep` is expected to be a no-op, but it is not verified here. If it errors, do **not** guard
-> the call with an "is the directory empty" condition — that would make the seam conditional, which
-> is the thing being avoided. Raise it and the architect will rule; the likely fix is a `0000` no-op
-> migration, which is a data-model delta and therefore a scope question for the human.
+**The no-op is verified, not assumed.** This section previously carried a warning that
+`node-pg-migrate` against a directory holding only `.gitkeep` was expected to be a no-op but was
+unverified, and floated a `0000` no-op migration as the likely fix — which would have been a
+data-model delta and a scope question for the human. The implementer closed it from the source at
+step 2: `dist/migration.js:82` defaults `ignorePattern` to `^\..*`, so `.gitkeep` is filtered out and
+the migration list is empty; `dist/runner.js:236–248` calls `ensureMigrationsTable` **before** the
+empty-list check. The call succeeds, creates `pgmigrations`, applies zero migrations. **The warning
+is struck, no `0000` migration exists, and no scope question arises.**
 
-**Directory ownership.** `tests/setup/` and `vitest.config.ts` are the **test-engineer's**, written
-in the red commit at step 3 — because AC-1's evidence *is* that the container starts and the suite
-connects, and a red run that could not start a container would be red for the wrong reason. See §7
-for the full step-3/step-4 split, and §11 for the guard-hook gap this exposes.
+**Why step 2 above exists, since it looks like defensive coding.** It is the fix for a defect the
+architect found while ruling on O2, and without it 00a's red run does not survive contact with its
+own ownership rules. At the red commit `src/persistence/migrations/` cannot exist: `guard-paths.mjs`
+denies the test-engineer every write under `src/`, and the implementer's commits all come later.
+`node-pg-migrate` would throw `ENOENT`, `globalSetup` would abort, and **no test would run at all** —
+turning the red commit's evidence from a set of assertion failures into a setup crash, which is "red
+for the wrong reason" in the most literal sense and guts evidence item 5 in §7.
+
+Two alternatives were considered and rejected. Moving migrations to a root `migrations/` directory is
+cleaner — it is `node-pg-migrate`'s own default and sidesteps the ownership collision entirely — but
+**ADR-0007 is accepted and immutable** and names `src/persistence/migrations/` in its Decision, so it
+would cost a superseding ADR for a directory rename. Accepting the setup crash for one slice costs
+the legibility of the red at the human's gate. One `mkdirSync` is the cheaper of the three, and it
+keeps the property that matters: **the runner is always called**. The seam is unconditional; only the
+directory's existence is guaranteed rather than assumed. If someone later deletes the directory, the
+harness recreates it empty, zero migrations apply, and every database-invariant test fails loudly on
+the missing schema — a loud failure one commit later, not a silent pass.
+
+**The `db:migrate` / `globalSetup` relationship, since the implementer asked for one line.**
+`npm run db:migrate` wraps the `node-pg-migrate` **CLI** (implementer's script, §11.3) and
+`globalSetup` calls `runner()` from the **same package** (test-engineer's file). They are not the
+same call site, and §7.2's *"byte-identical"* property therefore rests on the shared **directory and
+package**, not on a shared module. That is enough: the SQL applied is the same SQL, applied by the
+same runner version, in the same filename order. No shared module is created, and `src/` gains no
+tenth file.
+
+**Directory ownership.** `tests/setup/`, `tests/support/` and `vitest.config.ts` are the
+**test-engineer's**, written in the red commit at step 3 — because AC-1's evidence *is* that the
+container starts and the suite connects, and a red run that could not start a container would be red
+for the wrong reason. `tests/support/` had no stated owner before step 2 (O2); it holds the spawn
+helper the acceptance test drives the service with, so it is part of the test. See §11.3 for the full
+step-3/step-4 split.
+
+**Vitest's `include` is scoped to `tests/**`.** Not housekeeping: `tools/test/*.test.mjs` are plain
+`node` scripts run by `npm run test:tools`, and if Vitest collected them they would run inside
+`npm test`, redden 00a's red commit for a third reason, and pollute the failure set `red-proof`
+classifies (§7).
 
 **One Vitest project in 00a, not two.** §7.2 mentions `npm run test:domain` as the Docker-less
 subset. It cannot exist yet: there is no `src/domain` and therefore no `tests/unit`. Rather than ship
@@ -277,22 +407,56 @@ path (`--config <repo>/.dependency-cruiser.js`) with the working directory set t
 and the CLI is invoked exactly as `lint:arch` invokes it, with `--output-type json` so the
 assertions read `summary.violations[].rule.name` rather than scraping text.
 
-**The fixture tree is hermetic.** Built in a fresh temporary directory per run and removed in
-teardown. It must contain, at the fixture root:
+**Hermeticity has a direction, and getting it backwards is O1.** The fixture isolates the rule
+*targets* and resolves the *analyser*. Isolating both produces a tree that is not hermetic but inert:
+`dependency-cruiser` detects a TypeScript environment, finds no compatible `typescript` resolvable
+from the working directory, and **silently skips every TypeScript source**. Measured by the
+test-engineer against a fixture built exactly to the previous draft of this section, and reproduced
+independently by the orchestrator:
+
+```
+exit 0 · violations 0 · totalCruised 0 · modules 0 · stderr empty
+summary.environment.issues[0].name = "missing-typescript-transpiler"
+```
+
+Four planted violations, none reported, exit 0. Under `--output-type json` there is no other signal.
+
+**The fixture tree.** Built in a fresh temporary directory per run and removed in teardown. It must
+contain, at the fixture root:
 
 - `tsconfig.json`, mirroring the repository's `compilerOptions` — `.dependency-cruiser.js` resolves
   `tsConfig.fileName` relative to the working directory, and `tsPreCompilationDeps` needs a real
   TypeScript configuration to be meaningful;
-- **stub packages** at `node_modules/kysely/` and `node_modules/pg/` (a `package.json` and an empty
-  index each). This is the detail most likely to be got wrong: the rule matches
-  `^node_modules/(pg|…|kysely)`, and if the fixture instead resolves to the repository's real
-  `node_modules` by directory walking, the reported path is `../node_modules/kysely`, the anchor does
-  not match, and **`sql-only-in-persistence` silently does not fire** — the test would pass by
-  reporting one fewer violation than it expected only if it checks exact rule names, and would give a
-  false green if it checked "some violation was reported". Stubs remove the ambiguity and the
-  dependency on a prior `npm ci`.
+- **the real compiler, by symlink**: `node_modules/typescript` → the repository's own
+  `node_modules/typescript`, created by the fixture builder with `fs.symlinkSync`. The mechanism has
+  to be named, not the outcome: the fixture root is a temp directory, so Node's upward resolution
+  walks `/tmp/<fixture>/node_modules`, `/tmp/node_modules`, `/node_modules` and never reaches the
+  repository. "The fixture resolves the real compiler" is not a design line; a symlink is;
+- **stub packages** at `node_modules/kysely/` and `node_modules/pg/` — a `package.json`, an index and
+  a `.d.ts` that actually **declares `Kysely`**, so the type-only case resolves. This is the detail
+  most likely to be got wrong: the rule matches `^node_modules/(pg|…|kysely)`, and if the fixture
+  instead resolves to the repository's real `node_modules` by directory walking, the reported path is
+  `../node_modules/kysely`, the anchor does not match, and **`sql-only-in-persistence` silently does
+  not fire**.
+
+  The asymmetry between the two bullets above is deliberate and is the whole of O1: **stub what the
+  rules point at, resolve what does the analysis.** A stubbed compiler is not an isolated fixture, it
+  is no fixture at all;
 - import specifiers written the way `src/` writes them (explicit `.js`), so resolution behaves
   identically and `not-to-unresolvable` does not fire in place of the rule under test.
+
+**The guard, which runs before any assertion about violations.** In both the positive fixture and the
+negative control, the test asserts first that the cruise actually happened:
+
+1. `summary.environment.issues` is **empty** — a non-empty array is a hard failure naming the issues,
+   never a warning;
+2. **every planted source file appears in the result's `modules[]`.**
+
+(2) is deliberately stronger than *"`totalCruised > 0`"*, which the objection proposed: the fixture's
+file list is fixed and known, so naming the files costs nothing and closes a hole `> 0` leaves open
+— a run that cruised one stub package and skipped every source would satisfy `> 0`. The guard matters
+most for the **negative control**, where zero violations is the *expected* answer and a tree that was
+never cruised is indistinguishable from a tree that conforms.
 
 **Four positive cases, one violation per file**, so that every assertion names one rule
 unambiguously:
@@ -321,8 +485,67 @@ makes the pair evidence rather than a demonstration.
 
 **It must not import `src/`.** `tests/architecture/` belongs to the test-engineer (Gate B,
 2026-09-04), and the test-engineer may not read `src/`. The file reads `.dependency-cruiser.js` as a
-path argument to a subprocess and never imports it, and it must not depend on the repository's real
-`src/` contents in any way — it would then fail or pass for reasons belonging to another slice.
+path argument to a subprocess and never imports it. **The fixture assertions** must not depend on the
+repository's real `src/` contents in any way — they would then fail or pass for reasons belonging to
+another slice. That prohibition is narrowed at step 2 to the fixture assertions alone, because of
+what follows.
+
+### AC-3 lives in this file too
+
+The test-engineer proposed asserting AC-3 here — shell out to `npm run lint:arch` against the real
+repository, assert exit 0 — rather than leaving its evidence to a CI step. **Confirmed.** It gives
+AC-3 a genuine red at step 3 (`depcruise` cannot open `src`) and a genuine green at step 4, it needs
+no `src/` read because it observes a subprocess exit code, and it is the same argument this section
+already makes for passing `.dependency-cruiser.js` by path. AC-3 is by definition a claim about the
+real tree, which is why the prohibition above is scoped to the fixture cases.
+
+Two consequences, confirmed here rather than discovered at step 3:
+
+- **00a's red commit reddens two directories**, `tests/acceptance/` and `tests/architecture/`. Under
+  the human's broad reading of AC-6 both sit inside `red-proof`'s red zone (§7), so nothing trips.
+  Under the literal reading this alone would have failed the job on the slice that introduces it —
+  one of the two arguments that carried the escalation.
+- **AC-4 is green on arrival** (§7).
+
+### The same failure mode in production: `lint:arch`
+
+O1's third consequence is the one that reaches past this slice, and it is why the remedy is not
+confined to the test. `npm run lint:arch` is `depcruise src tests --config .dependency-cruiser.js`.
+If `typescript` is absent in CI, or lands outside `>=2.0.0 <7.0.0`, that command **exits 0 having
+cruised nothing**, `collect-ci.mjs` records `checks.depcruise: "pass"`, and criterion **C4**
+(*"architecture held unprompted", measured from `depcruise` in `check.run`*) reports a clean
+architecture for twelve slices in which the ruleset never ran. QS-10 would switch itself off in
+silence.
+
+The guard therefore has to live inside whatever produces that `pass`, which is the `lint:arch` step
+itself. **`lint:arch` becomes `node tools/ci/lint-arch.mjs`**, which:
+
+- spawns the same CLI with the same arguments — `depcruise src tests --config .dependency-cruiser.js`
+  — adding `--output-type json`, so the artifact under test is still the file CI runs;
+- exits non-zero, naming the cause, if `summary.environment.issues` is non-empty;
+- exits non-zero if no modules were cruised;
+- exits non-zero if any error-severity violation exists, re-rendering them readably (rule name,
+  `from` → `to`) so the developer-facing output is no worse than today's;
+- exits 0 otherwise;
+- exports a pure **`judgeCruiseResult(summary)` → `{ ok, reason }`**, so the rule is unit-testable
+  without running a cruise.
+
+Three cheaper options were considered and rejected. A `required` rule inside
+`.dependency-cruiser.js` cannot fire when the graph is empty — no modules, no violations. A second CI
+step running the JSON cruise duplicates the work and is skippable locally, so `lint:arch` would mean
+different things on a laptop and in CI. Asserting it only inside `layering.test.ts` leaves the
+`verify` job's `depcruise: "pass"` unguarded, and that record is exactly what C4 reads.
+
+**Ownership and sequencing.** `tools/ci/lint-arch.mjs` and the `lint:arch` script change are the
+**implementer's**, landing in a **green** commit. They must *not* land in the red commit: at that
+commit `lint:arch` has to stay today's raw CLI so AC-3's red is *"`src` does not exist"* rather than
+*"the wrapper does not exist"*. `tools/test/lint-arch.test.mjs` is the test-engineer's, authored at
+step 3 under the O3 arrangement (§11.4) and feeding `judgeCruiseResult` three summaries: an
+environment issue, zero modules, and a real violation.
+
+**`graph:modules` has the identical failure mode** and would render an empty graph in silence. It is
+cosmetic and is deliberately **not** gated — but §5.3's first render is to be eyeballed rather than
+trusted, and the implementer has already predicted it shows four modules rather than five (§11.5).
 
 ---
 
@@ -388,8 +611,10 @@ Schema-valid per `tools/team-log/schema.mjs`: `ts`, `event`, `source` universal;
 `check.run` requires `checks`. Nothing else is mandatory, and `normalize()` fills `trace_id` and
 `span_id`.
 
-**Three constraints imposed by the consumer, `tools/slice/check.mjs`.** They are not obvious from the
-schema and getting them wrong makes the Definition of Done silently wrong:
+**Five constraints imposed by the consumer, `tools/slice/check.mjs`.** They are not obvious from the
+schema and getting them wrong makes the Definition of Done silently wrong. The first three were in
+the step-1 draft and all three were verified correct by the implementer at step 2; **4 and 5 are
+O-2**, and have exactly the property that justified listing the first three:
 
 1. `checks.depcruise` must be the **lowercase** string `"pass"`. `check.mjs` compares it by equality
    for the *layering clean* check.
@@ -401,25 +626,64 @@ schema and getting them wrong makes the Definition of Done silently wrong:
 3. **No ratio strings.** `"12/12"`-style values are forbidden anywhere in `checks`, because
    `\b0\/` in a value like `"0/0 skipped"` would classify a green run as red. Counts, if wanted, go
    in separate numeric fields.
+4. **Records are appended oldest-run-first.** `check.mjs:113` is `const lastRun = runs.at(-1)` —
+   positional in log order, **not** by timestamp. `gh run list` returns newest-first, so a collector
+   that appends in `gh` order judges *tests green* on a stale run. The collector therefore sorts by
+   `updatedAt` **ascending** before appending. Invisible in a single-run collection; it appears the
+   first time anyone collects a backlog at a gate, which is exactly when it is trusted.
+5. **`ts` is the run's `updatedAt`, never the collection time.** `check.mjs:100` compares
+   `Date.parse(e.ts) > Date.parse(failing.ts)` **strictly**, and `schema.mjs:137` does
+   `out.ts ??= new Date().toISOString()` — so a collector that omits `ts` silently gets *now*.
+   Collect a red run and its later green run in one invocation, both records get near-identical
+   timestamps, the strict `>` fails, and **C1 reports FAIL on a correctly test-first slice** — the
+   criterion this whole slice exists to make passable. This also binds `--from-file`: a replay must
+   carry the run's original `updatedAt`, or offline collection reintroduces the bug through the back
+   door.
 
 A green run's `checks` therefore contains no `FAIL` anywhere — including in a job named for a failure
 concept. `red_proof` uses `"success" | "failure" | "not-applicable"`, which is why it is lowercase
 and why the third value is not `"NOT-FAILED"`.
 
+**What is deliberately not fixed here.** The deeper problem behind constraint 4 is that
+`tools/slice/check.mjs` orders by position rather than by timestamp, and the collector should not have
+to compensate for its consumer. That change is **out of this slice's scope** and is recorded in
+§11.5: the log is append-only and chronological by construction, so ordered appends are a property it
+should have anyway — and changing the gate tool in the slice that first feeds it is how a gate ends
+up agreeing with its own bug.
+
 ### How it is tested
 
 The module exports a pure `toCheckRunRecord(ghPayload, { slice, collectedVia })`; the `gh` invocation
-lives in the CLI wrapper. `tools/test/collect-ci.test.mjs` feeds captured `gh` payloads (one green
-run, one red-proof run) and asserts:
+lives in the CLI wrapper. `tools/test/collect-ci.test.mjs` — **the test-engineer's**, per O3 (§11.4)
+— feeds `gh` payloads and asserts:
 
 - the record validates against `schema.mjs`;
 - the `FAIL` invariant holds in **both** directions;
 - `depcruise` is lowercase `pass` on the green fixture;
 - `slice:check`'s *red before green* logic classifies the pair correctly — i.e. the two records are
-  fed to the same predicate the DoD uses.
+  fed to the same predicate the DoD uses;
+- **(O-2)** given a payload holding two runs in `gh`'s newest-first order, the appended records are
+  ascending by `ts`, and each record's `ts` equals its run's `updatedAt` — not the collection time.
 
-That last assertion is the one worth having. It is easy to write a collector whose output looks right
-and which the gate tool reads as green.
+The fourth assertion is the one worth having: it is easy to write a collector whose output looks
+right and which the gate tool reads as green. The fifth is the one that would otherwise be found by
+C1 failing on a slice that did nothing wrong.
+
+**Fixture provenance, and the one thing that cannot be captured.** The test-engineer asked for real
+`gh` payloads rather than hand-authored ones, and is right — a fixture captured from the tool beats a
+fixture that encodes someone's belief about the tool. With one correction it could not have known:
+**only the green payload is capturable today.** A payload in which the acceptance suite failed while
+`verify` passed cannot exist in this repository until a red commit runs under the phase-4 block,
+which is slice 00. Therefore:
+
+- the **green** payload is captured from a real `verify` run on PR #4 (`gh run view <id> --json …`)
+  and committed under `tools/test/fixtures/` with a header naming the run id, its URL and the capture
+  date;
+- the **red-proof-shaped** payload is *derived* from that captured payload by editing conclusions,
+  and its header says so in as many words. A derived fixture labelled derived is honest; two
+  hand-authored fixtures described as captured are not;
+- if the authoring role has no `gh`, the orchestrator supplies the capture. Nobody hand-authors the
+  field list from this document.
 
 ---
 
@@ -432,8 +696,8 @@ The commented block at the foot of `.github/workflows/verify.yml` is replaced by
 **Existing job `verify`** gains two steps, after install and before the docs checks:
 
 ```yaml
-- name: typecheck            run: npm run typecheck      # tsc --noEmit
-- name: layering (QS-10)     run: npm run lint:arch      # CLAUDE.md §2.3
+- name: typecheck            run: npm run typecheck      # tsc --noEmit -p tsconfig.json
+- name: layering (QS-10)     run: npm run lint:arch      # node tools/ci/lint-arch.mjs — §5
 ```
 
 **New job `test`** — separate, because the red-proof discrimination has to read *which* thing failed,
@@ -454,30 +718,78 @@ No `services:` block: Testcontainers starts its own `postgres:16` (§7.2, §7.4)
 
 ### The `red-proof` job's mechanics
 
-Four details, each of which is a way to get this wrong:
+Six details, each of which is a way to get this wrong:
 
 1. **Reading the commit subject.** On a `pull_request` event the checked-out `HEAD` is GitHub's
    *merge* commit, whose subject is `Merge <sha> into <sha>`. The subject must be read from the head
    commit explicitly:
-   `git log -1 --format=%s ${{ github.event.pull_request.head.sha || github.sha }}`, with
-   `fetch-depth: 0` (already set on the existing job).
-2. **The decision is a tested script, not inline YAML.** `tools/ci/red-proof.mjs`, with
+   `git log -1 --format=%s ${{ github.event.pull_request.head.sha || github.sha }}`.
+2. **`red-proof` needs its own checkout.** It is a **new job** on its own runner with its own
+   workspace, so it carries its own `actions/checkout@v4` with `fetch-depth: 0`; without the full
+   history `git log -1 <head.sha>` fails on an unfetched object. The step-1 draft said `fetch-depth`
+   was *"already set on the existing job"*, which is true and irrelevant — jobs do not inherit
+   workspaces. Corrected at step 2.
+3. **The decision is a tested script, not inline YAML.** `tools/ci/red-proof.mjs`, with
    `tools/test/red-proof.test.mjs` wired into `npm run test:tools`. ADR-0010's Consequences already
    anticipate this — *"two checks live as inline shell and `node -e` in YAML … if they grow, they
    become `tools/` scripts with tests in `tools/test/`"* — and this one grows past ten lines the
    moment it has to classify per-suite results.
-3. **Inputs and rule.** `red-proof.mjs` takes the commit subject, the `verify` job's conclusion, and
-   the Vitest JSON results (downloaded from the `test` job's artifact). It exits 0 when:
+4. **The invocation contract** (O3: four exit-code cases cannot be written against an unspecified
+   call). Three required argv flags, nothing read from the environment, nothing from the network:
+
+   ```
+   node tools/ci/red-proof.mjs --subject-file <path> --verify <conclusion> --results <vitest.json>
+   ```
+
+   | Flag | Value |
+   |---|---|
+   | `--subject-file` | a file holding the head commit's subject, written by the workflow as `git log -1 --format=%s <sha> > subject.txt`. A file rather than `--subject <string>` because a commit subject is arbitrary text and must not be re-quoted through a shell |
+   | `--verify` | the `verify` job's GitHub conclusion — `success`, `failure`, `cancelled`, `skipped` |
+   | `--results` | path to the Vitest JSON reporter output, downloaded from the `test` job's artifact |
+
+   Exit codes: **0** rule satisfied, or not applicable · **1** rule violated, with the failing
+   condition named on stdout · **2** usage or I/O error. The module exports a pure
+   **`judge({ subject, verifyConclusion, failedFiles })` → `{ ok, reason }`**, mirroring §6's
+   `toCheckRunRecord` split, so every case is unit-testable without spawning a process. Failing files
+   are the distinct `testResults[]` entries with `status === "failed"`, made repo-relative and
+   POSIX-normalised.
+
+5. **The rule.** It exits 0 when:
    - the subject does **not** match `^test\(.+\): .*\(red\)$` — *not applicable*, nothing asserted; or
-   - the subject matches **and** at least one failing test file lies under `tests/acceptance/`
-     **and** no failing test file lies outside it **and** the `verify` job succeeded.
+   - the subject matches **and** all three of AC-6's clauses hold:
+
+   | AC-6's words | The condition |
+   |---|---|
+   | *"install, typecheck, lint … all passed"* | the `verify` job concluded `success` |
+   | *"… and unit all passed"* | **no** failing test file under `tests/unit/` — that directory alone, because it is the only one AC-6 names |
+   | *"the acceptance suite failed"* | **at least one** failing test file under `tests/(acceptance\|contract\|property\|concurrency\|integration\|architecture\|performance)/` |
 
    It exits 1 otherwise, naming which condition failed. A branch that does not compile fails
    `verify`, so it is reported as a **broken run, not a red proof** — which is the entire
    discrimination ADR-0010 Decision 3 asks for.
-4. **Four cases in the unit test**, and they are what actually satisfies AC-6:
+
+   **This is O-1, and the human ruled it.** The step-1 draft required the failure to lie under
+   `tests/acceptance/` and forbade any failure outside it. The implementer showed that makes slices
+   07 and 11 structurally unable to pass — `docs/slices/07-reschedule-under-contention.md` names only
+   `tests/concurrency/`, `docs/slices/11-performance-budget.md` only `tests/performance/` — and that
+   the negative half was stricter than AC-6, which constrains what must *pass*. The human ruled on
+   2026-09-04 that **AC-6's "the acceptance suite failed" reads broad**: any test-engineer-owned
+   suite. No acceptance criterion changed.
+
+   The implementer's proposed negative condition — *no failure under `tests/unit/` **or
+   `tests/integration/`*** — is **not** adopted, and this is the one place the remedy is narrower
+   than the objection asked. It would break the very next slice:
+   `docs/slices/00-schema-and-exclusion-constraints.md` names exactly one test file,
+   `tests/integration/exclusion-constraints.test.ts`, and `CLAUDE.md` §5 assigns database-invariant
+   integration tests to the test-engineer *precisely so that they can be red first*. Slice 00's red
+   commit reddens `tests/integration/` and nothing else. So `tests/integration/` is in the red zone,
+   and the must-pass set is `tests/unit/` alone — which is also, exactly, what AC-6 says.
+
+6. **Six cases in the unit test**, and they are what actually satisfies AC-6:
    red-marked + acceptance-only failure + verify green → exit 0;
-   red-marked + a failure outside `tests/acceptance/` → exit 1;
+   red-marked + **concurrency**-only failure + verify green → exit 0 *(slice 07)*;
+   red-marked + **integration**-only failure + verify green → exit 0 *(slice 00)*;
+   red-marked + a failure under `tests/unit/` → exit 1;
    red-marked + everything green → exit 1 (a red proof that was not red);
    unmarked subject → exit 0, "not applicable".
 
@@ -509,10 +821,32 @@ passes.
 2. **The `verify` run on that SHA**, green, proving the branch was not merely broken. Combined with
    (1) this is the same discrimination `red-proof` automates, performed by a human at step 5/6
    instead of by a job.
-3. **`tools/test/red-proof.test.mjs`**, which proves the discriminator itself is correct in all four
+3. **`tools/test/red-proof.test.mjs`**, which proves the discriminator itself is correct in all six
    cases — so what AC-6 promises for every later slice is verified here as logic, even though it
-   cannot be verified here as a live run.
+   cannot be verified here as a live run. **Under O3 this file is now the test-engineer's** (§11.4),
+   which is what the substitution needed: a substitute for an independent check that is itself not
+   independent is worth much less.
 4. **The reviewer's and the human's observation** at steps 5 and 6, recorded on the PR.
+5. **The verbatim `npm test` failure output at the red commit**, run locally by the test-engineer and
+   returned in its step-3 report — assertion text and failing paths. Accepted at step 2 because it is
+   the only item that speaks to *why* it was red, which is C1's own standard (*"a real assertion
+   failure rather than a missing import"*); items 1 and 2 can only show *that* it was. It is
+   **narration-tier** evidence and is labelled as such — but the report is captured verbatim by
+   `.claude/hooks/log-agent-finish.mjs` rather than retyped, so it cannot drift, and anyone can
+   reproduce it from the red SHA.
+
+**What the red commit is expected to redden, so the reviewer checks a prediction rather than forms an
+impression.** Red: `tests/acceptance/health.test.ts` (both AC-2 cases — no service to spawn) and
+`tests/architecture/layering.test.ts`'s AC-3 case (`depcruise` cannot open `src`). **Green:**
+`tests/integration/postgres-harness.test.ts`, because §4's `mkdirSync` keeps `globalSetup` working,
+and `layering.test.ts`'s AC-4 fixture cases.
+
+**AC-4 is green on arrival, and that is honest rather than a test-first violation.** Its fixture
+exercises `.dependency-cruiser.js`, which was authored at Gate B and already exists, so the test
+passes the moment it is written. `CLAUDE.md` §2.4 requires the *slice* to begin red, not every
+criterion to have its own red; 00a's red comes from AC-1, AC-2 and AC-3. Stated here so it is not
+raised at step 5 as a finding — and it is a second reason the test-engineer's AC-3 addition (§5)
+earns its keep.
 
 **C1 becomes measurable from slice 00 onward**, where all four preconditions hold at the red commit:
 `src/` exists and conforms, the workflow carries typecheck/lint/test/red-proof, `collect-ci.mjs`
@@ -520,7 +854,15 @@ exists, and the orchestrator can run it at the gate. Slice 00 is the pilot prope
 C1 was pre-registered to judge — so the criterion measures what it was written to measure, one slice
 later than the numbering suggests.
 
-Nothing in `process-criteria.md` is edited by this design. C1 stands as written.
+**The decision rule has no row for `UNMEASURABLE`, and the retro must say so out loud.** C1 *failing*
+is fatal; C1 *unmeasured* is neither pass nor fail. `docs/team-log/retro-slice-00a.md` must therefore
+state that the phase-4 decision rule is **not applied** to 00a's C1 at all, and that C1's first real
+measurement is slice 00 — otherwise "UNMEASURABLE" quietly reads as "not fatal, therefore fine",
+which is the same defeat as counting UNVERIFIED as PASS. Raised by the test-engineer at step 2 and
+accepted.
+
+Nothing in `process-criteria.md` is edited by this design. C1 stands as written; it is
+pre-registered, and a criterion edited after seeing a result is not a criterion.
 
 ---
 
@@ -541,7 +883,8 @@ Stated under its own heading rather than omitted, because "the data model sectio
 ## 9. Quality scenarios
 
 **QS-10 — the layering is the ruleset, and the ruleset runs.** The only scenario in scope. This slice
-must make four things true, and all four are required — the scenario is not satisfied by any three:
+must make **five** things true, and all five are required — the scenario is not satisfied by any
+four. The fifth was added at step 2 by O1, and it is the one that keeps the other four honest:
 
 1. `depcruise src tests` with `.dependency-cruiser.js` exits **0** against the real tree of §1.
 2. `npm run lint:arch` runs **in CI** on every push and pull request, so (1) is a build gate and not
@@ -552,6 +895,11 @@ must make four things true, and all four are required — the scenario is not sa
    `tsPreCompilationDeps` could silently regress and the rule would still appear to work.
 4. A conforming fixture tree produces **zero** violations (the negative control), so (3) is evidence
    of discrimination rather than of indiscriminate rejection.
+5. **The ruleset is proved to have *run*, not merely to have exited 0.** Every cruise this slice
+   depends on — the two fixtures and `lint:arch` itself — asserts that
+   `summary.environment.issues` is empty and that modules were actually cruised, **before** reading
+   any violation. Without (5), (1) and (4) are both satisfied by a run that analysed nothing, which
+   is not a hypothesis: it is what was measured at step 2 (§5).
 
 QS-12 (`tests/architecture/ambiguity-containment.test.ts`) is **not** in scope: it scans for domain
 arithmetic that does not exist yet. It arrives with slice 01.
@@ -562,12 +910,33 @@ arithmetic that does not exist yet. It arrives with slice 01.
 
 ### Edits at step 7, inside the slice's declared scope
 
+The scope is the seven sections the human added to the slice's `arc42:` field on 2026-09-04:
+**§5.2 · §5.3 · §7.1 · §7.2 · §7.4 · §8.5 · arc42 §11.2**. (Numbers prefixed *arc42* below where this
+document also has a section of that number.)
+
 | Section | Correction |
 |---|---|
-| **§5.2** | The as-built file list of §1; the `Db` alias and why nothing above persistence names `Kysely`; `ServerDeps` as the http seam and why partial application is forced rather than chosen; `/health` described as an operational probe outside §8.6's table; `src/domain` recorded as deliberately empty until slice 01, with the reason |
-| **§7.2** | The harness as built: global setup, one container per run, **no reuse** and why; `provide`/`inject` rather than ambient env; the migration call that applies zero migrations and why it is unconditional; `test:domain` and the second Vitest project deferred to slice 01; what `docker-compose.yml` actually starts (see the open question below) |
-| **§7.4** | Replace the PHASE 4 comment block's description with what shipped: the two new `verify` steps, the `test` job, the `red-proof` job and its tested script, the run-summary artifact; and the note that `red-proof` could not judge the commit that introduced it |
-| **§8.5** | The `tests/setup/` ownership ruling; the shape of `tests/architecture/layering.test.ts` including the negative control; `tools/test/` as the home of the two tool-level tests, and the independence caveat in §11 below |
+| **§5.2** | The as-built file list of §1; the `Db` alias and why nothing above persistence names `Kysely`; **`ServerDeps` as the http seam, in the narrowed form of §2(c) — `src/http` cannot *name* the handle's type — with the generic-parameter counterexample recorded beside it**; `/health` described as an operational probe outside §8.6's table; `src/domain` recorded as deliberately empty until slice 01, with the reason |
+| **§5.3** | The first render of the module dependency graph. It shows **four** modules, not five: `src/domain` is deliberately empty, so nothing to cruise. Eyeball it rather than trust it — §5 explains why an empty graph and a clean graph look identical |
+| **§7.1** | **The compose delta, as the human ruled:** `docker-compose.yml` starts `postgres` and `otel-lgtm` only, and the service runs on the host via `npm start`. §7.1 currently draws a third `scheduler` container. Containerising the app needs a Dockerfile, a build stage and an image-caching story maintained through twelve slices for no demo benefit |
+| **§7.2** | The harness as built: global setup, one container per run, **no reuse** and why; `provide`/`inject` rather than ambient env; the migration call that applies zero migrations, why it is unconditional, and why `globalSetup` also ensures the directory exists; `test:domain` and the second Vitest project deferred to slice 01; the `build` → `pretest` → spawn `dist/main.js` path the acceptance tests take |
+| **§7.4** | Replace the PHASE 4 comment block's description with what shipped: the two new `verify` steps, the `test` job, the `red-proof` job with its own checkout and its tested script, the run-summary artifact; **`lint:arch` as `tools/ci/lint-arch.mjs` and what it guards**; and the note that `red-proof` could not judge the commit that introduced it |
+| **§8.5** | The `tests/setup/`, `tests/support/` and `vitest.config.ts` ownership ruling; the shape of `tests/architecture/layering.test.ts` including the negative control and the environment guard; `tools/test/` as the home of the three tool-level tests, now test-engineer-authored (§11.4); **and the `tests/integration/` boundary rule below** |
+| **arc42 §11.2** | Close R-8's first row: `collect-ci.mjs` exists after this slice, so the claim *"`check.run` remains unemitted"* is no longer true. The rest of R-8 stands until slice 00 makes C1 measurable |
+
+**The `tests/integration/` boundary, for §8.5.** `CLAUDE.md` §5 says integration tests *"asserting a
+database invariant"* belong to the test-engineer, and that phrase will not survive slice 05. The
+test-engineer claimed `tests/integration/postgres-harness.test.ts` under it and asked to be corrected
+if the boundary reads differently. **Confirmed, with the boundary stated structurally instead:**
+
+> A `tests/integration/` file that reaches the database **only through a connection string** is the
+> test-engineer's. One that **imports a `src/` module** and drives it against the database is the
+> implementer's.
+
+That is checkable by looking at the imports rather than by arguing about what counts as an invariant,
+and it matches how §5 already reasons. `postgres-harness.test.ts` is the test-engineer's under it: it
+asserts AC-1, it asserts the harness contract every later invariant test stands on, and the
+test-engineer owns `tests/setup/` — splitting the harness from its own assertion would be arbitrary.
 
 ### ADR
 
@@ -578,10 +947,10 @@ emitted into the OpenAPI document, or is traced as a business span. It is a real
 downstream consequences at slices 09 and 10, and it is not the architect's to close alone, so it is
 raised as a proposed ADR rather than decided inline. The recommendation is that `/health` stays
 outside all three. A `status: proposed` ADR is a technical-debt item by construction and appears in
-§11.1's generated register until the human rules at the gate.
+arc42 §11.1's generated register until the human rules at the gate.
 
-Adding the ADR mechanically regenerates two **generated-tier** blocks — the index in §9 and the debt
-register in §11.1 — via `npm run docs:build`, which CI's `docs:check` requires. Those are generated
+Adding the ADR mechanically regenerates two **generated-tier** blocks — the index in arc42 §9 and the debt
+register in arc42 §11.1 — via `npm run docs:build`, which CI's `docs:check` requires. Those are generated
 content, not authored sections, and are outside the slice's declared `arc42:` scope only in the
 trivial sense that generated blocks always are.
 
@@ -592,72 +961,178 @@ already decided.
 
 ---
 
-## 11. What needs a ruling, and what will be argued at step 2
+## 11. Rulings in force, the build split, and what is deferred
 
-### Open questions for the human (four, all cheap now)
+### 11.1 What the human ruled, and what is withdrawn
 
-1. **The slice's `arc42:` scope is one section short in two places.** Reconciling *what compose
-   actually starts* is a **§7.1** edit, and closing R-8's first row once `collect-ci.mjs` lands is a
-   **§11.2** edit; neither section is in the slice's declared scope. Recommendation: add `§7.1` and
-   `§11.2` to the slice's `arc42:` field. Leaving R-8 stating *"`collect-ci.mjs` does not exist"*
-   after the slice creates it is worse than a one-line scope addition. **Not done unilaterally —
-   scope is the human's.**
-2. **§5.3's module dependency graph** says it is rendered *"from the first implementation slice
-   onward"*. 00a is that slice, so `npm run graph:modules` produces something for the first time.
-   Same question: `§5.3` is not in the declared scope. Recommendation: add it, or defer the first
-   render to slice 00 and say so.
-3. **`docker-compose.yml` starts `postgres` and `otel-lgtm` only; the service runs on the host**
-   (`npm run dev`). §7.1 shows a third `scheduler` container. Containerising the app needs a
-   Dockerfile, a build stage and an image-caching story that buys nothing for a local demo and must
-   be maintained through twelve slices. Recommendation: accept the delta and record it in §7.1/§7.2.
-4. **`tools/test/collect-ci.test.mjs` and `tools/test/red-proof.test.mjs` are written by the
-   implementer**, in the same green commits as the code — so AC-5 and AC-6 are the only two criteria
-   in this slice whose evidence is not independently authored. The alternative was worse: if the
-   test-engineer wrote them at step 3 they would be red, `npm run test:tools` would fail, and the red
-   commit would show the existing `verify` job failing — destroying exactly the "red for the right
-   reason" signal AC-6 is about. Recommendation: accept, and note it in the retro under C2. It does
-   not recur; these two tools are built once.
+The step-1 draft raised four open questions. **Three are ruled and one is withdrawn; none is open.**
 
-### The three things most likely to be objected to at step 2
+1. **Scope — ruled.** The slice's `arc42:` field gains **§7.1, arc42 §11.2, §5.3 and §7.4**. §7.4 was
+   not in the original ask: it is needed because O1 makes `lint:arch` a script rather than a bare CLI
+   invocation, and §7.4 describes the workflow. The slice file's frontmatter is updated to match.
+2. **The first module graph — ruled** with (1). §5.3 is in scope; the render lands in this slice and
+   shows four modules (§10).
+3. **compose — ruled as recommended.** `postgres` and `otel-lgtm` only; the service runs on the host
+   via `npm start`. Recorded in §7.1/§7.2 at step 7.
+4. **Implementer-authored tool tests — WITHDRAWN, not ruled.** The question asked the human to accept
+   weaker provenance for AC-5 and AC-6 on a premise the test-engineer then falsified: `test:tools` is
+   a literal `&&` chain, not a glob. The recommendation did not survive the fact, so it is withdrawn
+   rather than re-argued. See §11.4.
 
-1. **`src/domain` ships empty** (§1). The objection will be that a walking skeleton should touch
-   every module. The answer is that a placeholder in *this* module contradicts what the module is
-   for, and that `domain-is-pure` is proved by AC-4's fixture rather than by an empty directory. If
-   the objection is sustained, the ruling is the human's, not the architect's — there is no
-   acceptance criterion requiring `src/domain` to contain a file.
-2. **`.dependency-cruiser.js` needs one amendment**, and it is the architect's file (`CLAUDE.md`
-   §2.3). `tests/support/` — where the acceptance harness's spawn helper lives — is not covered by
-   `outside-in-tests-do-not-import-src`, so a helper there could import `src/` and hand it to an
-   acceptance test, spending the independence the rule exists to protect. The `from.path` becomes:
+### 11.2 The `.dependency-cruiser.js` amendment — **applied**
 
-   ```
-   ^tests/(acceptance|architecture|concurrency|contract|performance|property|support)/
-   ```
+Applied by the architect at step 2, before the red commit; it is the architect's file (`CLAUDE.md`
+§2.3) and both roles need it. `outside-in-tests-do-not-import-src`'s `from.path` is now:
 
-   which also makes Gate B's ruling on `tests/architecture/` and `tests/performance/` structural
-   rather than only guarded by the path hook. `tests/unit/` and `tests/integration/` stay out: both
-   legitimately import `src/`. The rule keeps its name, so AC-4 is unaffected. **The architect
-   applies this edit at step 2**, before the red commit — it is needed by both roles and it is not
-   the implementer's file to change.
-3. **`tests/setup/` and `vitest.config.ts` belong to the test-engineer** (§4), which means the red
-   commit carries the test toolchain: the `vitest`, `testcontainers` and `node-pg-migrate`
-   devDependencies, `tsconfig.json`, `vitest.config.ts` and `tests/**`. The implementer's commits
-   then add `src/**`, the runtime dependencies (`fastify`, `@sinclair/typebox`, `kysely`, `pg`,
-   `pino`), `docker-compose.yml`, `.npmrc`, `tools/**` and the CI block. Both roles edit
-   `package.json`, sequentially and in different stanzas. The implementer may object that this is
-   scaffolding work landing in a `test(…)` commit; the answer is AC-1 — *"`npm ci && npm test` starts
-   a container and the suite connects"* is the acceptance criterion, so the harness that starts it is
-   the test, not the implementation.
+```
+^tests/(acceptance|architecture|concurrency|contract|performance|property|setup|support)/
+```
 
-   **A gap this exposes:** `.claude/hooks/guard-paths.mjs` lists `TEST_OWNED` as the six
-   `tests/{acceptance,contract,property,concurrency,architecture,performance}/` directories. Neither
-   `tests/setup/` nor `vitest.config.ts` is guarded, so both roles can write both. That is a hook
-   change and therefore the orchestrator's, not the architect's; recommended, and recorded here so
-   the ruling exists in writing even if the hook does not enforce it.
+`tests/support/` holds the acceptance harness's spawn helper, and a helper there could import `src/`
+and hand it to an acceptance test — the independence the rule exists to protect, spent through a file
+nobody would think to look at. Including `architecture` and `performance` also makes Gate B's
+ownership ruling structural rather than only guarded by the path hook.
 
-### Deliberately not decided here
+**`setup` is the architect's own addition and neither reviewer reviewed it.** Flagged here rather
+than slipped in. The reasoning is identical to `support`: `globalSetup` importing `src/` and handing
+it around through `provide()` is the same loophole in a different file. It has a real consequence at
+slice 00 — seeding helpers cannot be typed against `src/persistence/schema.ts` and must go through
+raw SQL — which is what the rule's own comment already requires (*"they reach the system the way a
+client does — over HTTP, and over SQL against the real database"*). `tests/unit/` and
+`tests/integration/` stay out: both legitimately import `src/`.
+
+The rule keeps its name, so **AC-4 is unaffected**, and the implementer verified at step 2 that
+`layering.test.ts` is unaffected — it reaches `.dependency-cruiser.js` as a subprocess path argument
+and imports nothing.
+
+### 11.3 The build: what exists, who authors it, and in which commit
+
+This subsection is O2. The step-1 draft listed nine source files and never said what turns them into
+a running process, so AC-1 (*"`npm ci && npm test`"*) and AC-2 (*"given the service is started"*)
+were both unbuildable.
+
+**There is no TypeScript loader. The service is compiled.** The objection asked for one; it is
+declined. `tsx` is named in neither `CLAUDE.md` §3 nor any ADR, so adopting it would be a DCR-shaped
+move for a convenience; and Node 22.11's `--experimental-strip-types` does not remap `./foo.js`
+specifiers onto `foo.ts`, which is how every import in this codebase is written under NodeNext. Since
+`typescript` is being installed anyway (O1) and `tsc` must run for `typecheck`, compiling costs no
+new dependency — and it means the acceptance test spawns **the artifact a deployment would run**,
+which is a better answer to AC-2 than any loader can give, because a loader-only project has never
+proved it emits.
+
+**Scripts, and who authors each:**
+
+| Script | Value | Author |
+|---|---|---|
+| `test` | `vitest run` | test-engineer, red commit |
+| `build` | `tsc -p tsconfig.build.json` | implementer, green |
+| `pretest` | `npm run build` | implementer, green |
+| `start` | `node dist/main.js` | implementer, green |
+| `typecheck` | `tsc --noEmit -p tsconfig.json` | implementer, green |
+| `db:migrate` | the `node-pg-migrate` CLI against `src/persistence/migrations` | implementer, green |
+| `lint:arch` | `node tools/ci/lint-arch.mjs` — replaces the bare CLI (§5) | implementer, green |
+
+**`pretest` is the load-bearing choice.** npm runs it automatically, so in the end state
+`npm ci && npm test` builds and then tests — AC-1 satisfied literally. And because it does not exist
+at the red commit, `npm test` there goes straight to `vitest run`: the red is a set of **assertion
+failures**, not a `tsc` error about a missing `src/`. It also means the test-engineer never authors,
+and never later hands over, a `test` script that mentions a build. No `dev` script is created — no
+acceptance criterion needs one, and slice 10's cURL harness can use `start`.
+
+**Configuration files:**
+
+| File | Contents | Author |
+|---|---|---|
+| `tsconfig.json` | `include: ["src","tests"]`, `noEmit`, NodeNext + `strict` + `verbatimModuleSyntax` | test-engineer, red commit — Vitest, `depcruise`'s `tsConfig.fileName` and the AC-4 fixture's mirrored `compilerOptions` all need it before any `src/` exists |
+| `tsconfig.build.json` | extends it; `include: ["src"]`, emit on, `outDir: "dist"` | implementer, green |
+| `vitest.config.ts` | single project, `globalSetup`, **`include` scoped to `tests/**`** (§4) | test-engineer, red commit |
+| `.gitignore` | `dist/` | implementer, green |
+
+**The commit split.** The red commit carries the test toolchain: `tsconfig.json`, `vitest.config.ts`,
+`tests/**` (including `tests/setup/` and `tests/support/`), the three `tools/test/*.test.mjs` files
+per §11.4, and these dependencies —
+
+- **devDependencies:** `vitest`, `@testcontainers/postgresql` (+ `testcontainers`), `node-pg-migrate`,
+  **`typescript`** (O1: without it the fixture cruises nothing and `typecheck` cannot run),
+  `@types/pg`;
+- **dependencies:** **`pg`** (O2). It is a runtime dependency of `src/persistence/db.ts`, so it must
+  not land in `devDependencies` — `no-dev-dep-in-src` would fire on the legitimate import at step 4 —
+  and the test-engineer's harness needs it from the red commit onward.
+
+The implementer's commits then add `src/**`, the remaining runtime dependencies (`fastify`,
+`@sinclair/typebox`, `kysely`, `pino`), `docker-compose.yml`, `tools/**`, the scripts and configs
+above, and the CI block. Both roles edit `package.json`, sequentially and in different stanzas.
+
+The implementer may still object that scaffolding is landing in a `test(…)` commit; the answer is
+AC-1 — *"`npm ci && npm test` starts a container and the suite connects"* is the acceptance
+criterion, so the harness that starts it is the test, not the implementation.
+
+**The guard hook.** `.claude/hooks/guard-paths.mjs` did not cover `tests/setup/`, `tests/support/` or
+`vitest.config.ts`, so both roles could write all three — and C2 is measured from hook denials, which
+makes an unenforced boundary self-reported. Both reviewers found it independently. It is a hook
+change and therefore the **orchestrator's**; it has since been made, and `TEST_OWNED` now carries all
+three. Recorded here because the ruling is the architect's even where the enforcement is not.
+
+### 11.4 The three tool tests are the test-engineer's
+
+This is O3, conceded outright. The step-1 draft argued that test-engineer-authored tool tests would
+be red at step 3, fail `npm run test:tools` and destroy the "red for the right reason" signal. **That
+was false.** `test:tools` is a literal `&&` chain of four named files, so a new
+`tools/test/*.test.mjs` does not run in CI until someone wires it in. Therefore:
+
+- the **test-engineer** authors `tools/test/collect-ci.test.mjs`, `tools/test/red-proof.test.mjs` and
+  `tools/test/lint-arch.test.mjs` in the red commit. They are red, and **invisible to `verify`**,
+  which stays green — evidence item 2 in §7 is preserved exactly;
+- the **implementer** wires all three into the `test:tools` chain in the green commits that make them
+  pass.
+
+This costs nothing and buys two things: C2 holds for AC-5 and AC-6 instead of being excepted, and
+§7's evidence item 3 — offered as the *substitute* for a check that cannot run on this commit —
+becomes independently authored, which is the whole reason it is worth offering.
+
+**The hole this opens, and how it is closed.** The mechanism that makes the arrangement possible is
+also a standing bug: a tool test nobody wires in never runs, forever. It is **not** fixed by making
+`test:tools` glob, because the arrangement above depends on it not globbing. Instead, the reviewer's
+step-5 checklist gains one line:
+
+> **Every file matching `tools/test/*.test.mjs` is named in the `test:tools` chain.**
+
+A globbing runner is recorded as a deferred improvement in §11.5.
+
+### 11.5 Deferred improvements and standing notes
+
+Each is a real improvement that is deliberately not made in this slice, with the reason.
+
+| Item | Why not now |
+|---|---|
+| **`tools/slice/check.mjs` should order `check.run` records by timestamp**, not by `runs.at(-1)` position (O-2 constraint 4) | Out of this slice's scope, and changing the gate tool in the slice that first feeds it is how a gate ends up agreeing with its own bug. The collector sorts ascending instead; the log is append-only and chronological anyway |
+| **`test:tools` should discover `tools/test/*.test.mjs` rather than name them** | §11.4's arrangement depends on the literal chain. Once all three tools are wired, a globbing runner is safe — orchestrator's, and after this slice |
+| **`graph:modules` has `lint:arch`'s pre-O1 failure mode**: an empty graph and a clean graph render identically | Cosmetic; it gates nothing. §5.3's first render is eyeballed instead |
+| **`docker-compose.yml` does not start the service** (human-ruled, §11.1) | A Dockerfile, a build stage and an image-caching story maintained through twelve slices for no demo benefit. Recorded in §7.1 |
+| **One Vitest project, not two** (§4) | `test:domain` needs a `tests/unit/` that does not exist yet; a second project with `passWithNoTests` would stay green forever |
+
+**Environmental note from the implementer, which changes nothing in the design but bears on step 4:**
+there is no container runtime in its environment — no `docker`, no `podman`, no socket. AC-1 and every
+Testcontainers-backed run are therefore **not locally verifiable by the implementer**. It can prove
+`typecheck`, `lint:arch` and the tool suites green before each commit; *"every commit is green"* for
+the Testcontainers path depends on CI or on the human's machine. The reviewer should read the commit
+sequence with that in mind rather than treating it as carelessness.
+
+**A second note for the reviewer.** `guard-paths.mjs`'s Bash branch is a substring test: any
+write-ish shell command containing the literal `src/` is denied wherever the path points, so ordinary
+shell work on a temp fixture is blocked. The test-engineer had to build its step-2 probe through a
+node script concatenating `'s' + 'rc'`. If something of that shape appears in the fixture builder,
+that is why — and it is the hook's heuristic, not an attempt to evade a boundary.
+
+### 11.6 Deliberately not decided here
 
 Observability wiring (`src/platform/telemetry.ts`) — slice 09, and creating an empty OTel bootstrap
 now would be the first item in the junk drawer §5.2 warns about. The OpenAPI emitter and
 `problem+json` error handler — slices 10 and 03; `src/http/server.ts` gets a `setErrorHandler` only
 when there is a taxonomy for it to render. Seeding helpers — slice 00, with the schema they seed.
+`@fastify/type-provider-typebox` — not named in ADR-0005, not needed (the implementer typechecked
+plain TypeBox-produced JSON Schemas on `schema.response`), and therefore not added.
+
+**`src/domain` ships empty** (§1), and the objection the step-1 draft predicted did not come: both
+reviewers accepted it, the implementer adding a second reason — `no-orphans` would fire on a
+placeholder, and a permanent warning is a warning nobody reads. It is settled, not open.
