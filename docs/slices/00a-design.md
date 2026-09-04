@@ -23,7 +23,8 @@ is what still needs watching.
 
 Both the test-engineer and the implementer returned **OBJECT**. One round of discussion was convened
 per `CLAUDE.md` §6; these are the rulings. **S-1 is the architect's own, raised after step 2** when a
-fact discovered while preparing step 3 exposed a defect neither reviewer had found. Four of the five carried **measurement or file-level
+fact discovered while preparing step 3 exposed a defect neither reviewer had found; the **step-3
+findings** below were ruled after the red commit was observed in CI. Four of the five carried **measurement or file-level
 evidence rather than argument** — a role built the thing this design specified, ran it, and reported
 what happened. That is the standard the rest of this slice should be held to.
 
@@ -35,6 +36,38 @@ what happened. That is the standard the rest of this slice should be held to.
 | **O-1** | implementer — `red-proof`'s red zone makes slices 07 and 11 structurally unable to pass | **(d) escalated → ruled by the human** | Finding correct and the defect is this design's, not AC-6's. The reading of AC-6 was escalated because under the literal reading the fix requires changing an acceptance criterion. **The human ruled BROAD on 2026-09-04** |
 | **O-2** | implementer — §6's three `collect-ci.mjs` constraints are right but not sufficient; two more are load-bearing | **(a) clarification** | Both verified. (c) is deliberately **not** available: AC-5 says nothing about ordering or timestamps and C1 is a process criterion, not a §10 scenario — the rule says (a) however severe the consequence |
 | **S-1** | **architect, self-raised** after step 2 — this design worked around `CLAUDE.md` §2.4, a NON-NEGOTIABLE, and called the result a paradox | **(c) design defect** | 00a's red would never have been observed in CI. The suite is wired into the red commit's own CI job instead (§7); the evidence list collapses from five substitutes to four items with the observation first |
+
+### Step 3 findings, ruled 2026-09-04
+
+The red commit landed and **CI observed the red**: `docs, tools and log integrity` success,
+`suite (Testcontainers)` failure, three `AssertionError`s inside collected test bodies, 14 passing —
+read from the run's own `test-results` artifact rather than from narration. §7's prediction table
+matched exactly, which is what a prediction is for. Per-project `globalSetup` is honoured, so the
+fallback §4 told the test-engineer to raise rather than improvise is not needed.
+
+The test-engineer returned nine findings. Four needed a ruling before the implementer started, and
+all four are defects in this design, found before anything was built against them.
+
+| # | Finding | Outcome | Reasoning, in one line |
+|---|---|---|---|
+| **F2** | The `lint:arch` guard counts modules **overall**, so `tests/` alone keeps the count non-zero while the source root goes unexamined | **AGREE**, remedy refined | **O1's failure mode reintroduced inside O1's own remedy.** Per-**root** non-emptiness — but roots taken from argv rather than hardcoded, and **one** cruise, because `outside-in-tests-do-not-import-src` only fires when both roots share a graph (§5) |
+| **F1** | §7's predicted *mechanism* for AC-3's red was wrong: §4's `mkdirSync` creates the source root, so `depcruise` can open it | **AGREE** | Two mechanisms in this design cancelled each other. The test-engineer's fix — assert coverage, which QS-10 item 5 already demands — stands; §4 and §7 both carried a false explanation and are corrected |
+| **F6** | §6 exported only a single-run mapper, but constraint 4 is a property of a **list** | **AGREE** | A constraint imposed in one place and enforced in another that no test reaches. `toCheckRunRecords` added, with the ordering/idempotence division written down (§6) |
+| **F7** | `engines.node` is looser than the dependency tree supports | **AGREE**, and wrong twice | 22.11–22.21 passes the declared floor then fails `npm ci --engine-strict`; and **23.x** satisfies the declared range while `vitest` and `dependency-cruiser` both exclude it. arc42 §7.1 records the numbers as the architect's Gate B choice, so the correction is the architect's (§11.3) |
+
+**F4, for information and acted on anyway.** `npm i -D typescript` now resolves to **7.0.2**, outside
+`dependency-cruiser@18.2.0`'s supported compiler range — and that range lives in the package's own
+`meta.cjs`, **not** in `peerDependencies`, so nothing warns at install time. The exact pin is the only
+preventive control (§11.3, §11.5). This design deliberately does not claim *which* symptom an
+out-of-range compiler produces, because only an *absent* one has been measured.
+
+**F5, F8, F9.** `@types/node` was missing from §11.3's list and `test-results.json` needs a
+`.gitignore` line — both amended. `guard-paths.mjs`'s Bash heuristic now denies commands whose text
+merely mentions a guarded path; that is the orchestrator's, and §11.5 records the count.
+
+**Nothing here touches the module tree.** The implementer's commits 1–6 were unaffected and proceeded
+concurrently; only `collect-ci.mjs` (commit 7), `lint-arch.mjs` (commit 9) and three
+`package.json`/`.gitignore` lines change.
 
 ### S-1 — the finding about the process, not only about the design
 
@@ -399,6 +432,23 @@ for the wrong reason" in the most literal sense. That now matters more than it d
 was found: since the `test` job runs on the red commit (§7), a `globalSetup` crash would be the
 *observation itself*, and `CLAUDE.md` §2.4 would be satisfied in form while proving nothing.
 
+**Two side effects, found at step 3 rather than designed for (F1).** Neither changes the ruling, and
+both are recorded because a reader would otherwise inherit a false explanation from §7:
+
+1. **`src/` exists, empty, from the first test run onward.** `mkdirSync` is recursive and relative to
+   the working directory, so it creates the `src/` root as well. That is why AC-3's red cannot come
+   from *"`depcruise` cannot open `src`"*, as the step-2 draft predicted: the command succeeds and
+   cruises an empty directory. §7's prediction table and §5's AC-3 subsection now say the real reason
+   — **no module under `src/` is examined** — and the test asserts that rather than an exit code
+   alone. Nothing is tracked by git, since git does not record empty directories.
+2. **`npm run lint:arch` therefore behaves differently before and after a test run** — it fails on a
+   clean checkout at the red commit and exits 0 once `globalSetup` has run. That is a mild instance of
+   exactly the hazard this section rejects `withReuse()` for: *a run whose result depends on whether a
+   previous run happened is not evidence.* It is stated rather than engineered away. It lasts one
+   slice — from slice 00 `src/` is tracked and non-empty — and from green commit 9 the `lint:arch`
+   wrapper's per-root guard (§5) makes it harmless anyway, because the guard does not care whether a
+   root is absent or merely empty. Both are *not examined*.
+
 Two alternatives were considered and rejected. Moving migrations to a root `migrations/` directory is
 cleaner — it is `node-pg-migrate`'s own default and sidesteps the ownership collision entirely — but
 **ADR-0007 is accepted and immutable** and names `src/persistence/migrations/` in its Decision, so it
@@ -560,11 +610,24 @@ what follows.
 ### AC-3 lives in this file too
 
 The test-engineer proposed asserting AC-3 here — shell out to `npm run lint:arch` against the real
-repository, assert exit 0 — rather than leaving its evidence to a CI step. **Confirmed.** It gives
-AC-3 a genuine red at step 3 (`depcruise` cannot open `src`) and a genuine green at step 4, it needs
-no `src/` read because it observes a subprocess exit code, and it is the same argument this section
-already makes for passing `.dependency-cruiser.js` by path. AC-3 is by definition a claim about the
-real tree, which is why the prohibition above is scoped to the fixture cases.
+repository — rather than leaving its evidence to a CI step. **Confirmed**, and it needs no `src/`
+read because it observes a subprocess exit code, which is the same argument this section already
+makes for passing `.dependency-cruiser.js` by path. AC-3 is by definition a claim about the real
+tree, which is why the prohibition above is scoped to the fixture cases.
+
+**As built at step 3, the assertion is exit 0 *and* that the cruise examined `src/`** — and that is
+stronger than the step-2 draft for a reason worth stating. Asserting exit 0 alone would **not** have
+been red at the red commit: §4's `mkdirSync` creates `src/`, so `depcruise src tests` succeeds over an
+empty directory and exits 0 (F1). Asserting coverage is not a requirement bolted onto AC-3 either —
+AC-3 reads *"**Given the module tree of §5.2**, when `npm run lint:arch` runs, then it exits 0"*, so
+checking that the cruise saw that tree is checking the criterion's own *given* clause. It makes the
+red deterministic rather than dependent on a filesystem accident, and the red and the eventual green
+then concern the same property.
+
+From green commit 9 the wrapper enforces that property too (§5's `lint:arch` spec), so the assertion
+is deliberately redundant with it: the wrapper **enforces**, this test **checks the tool**, and the
+implementer owns the first while the test-engineer owns the second. A reviewer should read the
+overlap as layering, not as duplication.
 
 Two consequences, confirmed here rather than discovered at step 3:
 
@@ -574,15 +637,34 @@ Two consequences, confirmed here rather than discovered at step 3:
   one of the two arguments that carried the escalation.
 - **AC-4 is green on arrival** (§7).
 
+### The rule this slice keeps rediscovering
+
+> **A cruise that exits 0 says nothing about what it examined.** Every assertion about violations
+> must be preceded by an assertion about **coverage** — which files were cruised, not how many.
+
+Written here as a rule rather than as three patches, because it has now been found three times in one
+slice and the shape is not specific to `dependency-cruiser`:
+
+| Instance | The green thing that proved nothing |
+|---|---|
+| **O1** (step 2, measured) | A fixture with four planted violations, cruised with no resolvable compiler: exit 0, zero modules, zero violations |
+| **F1** (step 3) | AC-3's red was predicted to come from `depcruise` failing to *open* `src` — but §4's `mkdirSync` creates it, so the command succeeds over an empty directory |
+| **F2** (step 3) | The guard written to close O1 counted modules **overall**, so `tests/` alone kept the count non-zero while `src/` went unexamined |
+
+It generalises past this file. `test:tools` is a literal `&&` chain, so a tool test nobody wires in
+passes by never running (§11.4). A `verify` job that never executed the suite is green (§7, S-1). In
+each case the signal is an exit code standing in for a claim about work that was never done. **The
+fourth instance should be caught by reading this table, not by measuring.**
+
 ### The same failure mode in production: `lint:arch`
 
 O1's third consequence is the one that reaches past this slice, and it is why the remedy is not
 confined to the test. `npm run lint:arch` is `depcruise src tests --config .dependency-cruiser.js`.
-If `typescript` is absent in CI, or lands outside `>=2.0.0 <7.0.0`, that command **exits 0 having
-cruised nothing**, `collect-ci.mjs` records `checks.depcruise: "pass"`, and criterion **C4**
-(*"architecture held unprompted", measured from `depcruise` in `check.run`*) reports a clean
-architecture for twelve slices in which the ruleset never ran. QS-10 would switch itself off in
-silence.
+If `typescript` is absent, or outside the range `dependency-cruiser` supports (§11.5 — and the range
+is **not** a `peerDependency`, so nothing warns), that command **exits 0 having cruised nothing**,
+`collect-ci.mjs` records `checks.depcruise: "pass"`, and criterion **C4** (*"architecture held
+unprompted", measured from `depcruise` in `check.run`*) reports a clean architecture for twelve
+slices in which the ruleset never ran. QS-10 would switch itself off in silence.
 
 The guard therefore has to live inside whatever produces that `pass`, which is the `lint:arch` step
 itself. **`lint:arch` becomes `node tools/ci/lint-arch.mjs`**, which:
@@ -590,12 +672,31 @@ itself. **`lint:arch` becomes `node tools/ci/lint-arch.mjs`**, which:
 - spawns the same CLI with the same arguments — `depcruise src tests --config .dependency-cruiser.js`
   — adding `--output-type json`, so the artifact under test is still the file CI runs;
 - exits non-zero, naming the cause, if `summary.environment.issues` is non-empty;
-- exits non-zero if no modules were cruised;
+- **exits non-zero if any root passed on the command line contributed no modules, naming the root.**
+  Per **root**, not overall (F2): `depcruise` is handed `src` and `tests`, so a count over the whole
+  result is satisfied by `tests/` alone while `src/` — the thing QS-10 is about — goes unexamined
+  behind a green gate;
 - exits non-zero if any error-severity violation exists, re-rendering them readably (rule name,
   `from` → `to`) so the developer-facing output is no worse than today's;
 - exits 0 otherwise;
-- exports a pure **`judgeCruiseResult(summary)` → `{ ok, reason }`**, so the rule is unit-testable
-  without running a cruise.
+- exports a pure **`judgeCruiseResult(summary, roots)` → `{ ok, reason }`**, so the rule is
+  unit-testable without running a cruise.
+
+**Two constraints on how the per-root check is built**, both of which are ways to get it wrong:
+
+1. **The roots come from the wrapper's own argv, never from a hardcoded `['src', 'tests']`.** If
+   `lint:arch` ever gains a third root, a hardcoded pair silently stops covering it — the same bug a
+   fourth time, in the guard against it.
+2. **It stays one cruise.** Cruising each root separately and checking each result would *disable*
+   `outside-in-tests-do-not-import-src`, which only fires when `src` and `tests` are in the same
+   graph. The assertion is per-root; the cruise is not. A remedy that strengthens a guard while
+   turning off a rule is worse than the hole it closes.
+
+A stronger form was considered and rejected — requiring the module count under `src/` to match a walk
+of the filesystem. It duplicates what `dependency-cruiser` does, and `.d.ts` and ignored files would
+make it fail for reasons unrelated to layering. The fixture keeps the stronger per-**file** form
+above, where the file list is fixed and known; `lint:arch` runs against a tree that changes every
+slice, so per-root non-emptiness is the assertion that stays true without maintenance.
 
 Three cheaper options were considered and rejected. A `required` rule inside
 `.dependency-cruiser.js` cannot fire when the graph is empty — no modules, no violations. A second CI
@@ -604,11 +705,11 @@ different things on a laptop and in CI. Asserting it only inside `layering.test.
 `verify` job's `depcruise: "pass"` unguarded, and that record is exactly what C4 reads.
 
 **Ownership and sequencing.** `tools/ci/lint-arch.mjs` and the `lint:arch` script change are the
-**implementer's**, landing in a **green** commit. They must *not* land in the red commit: at that
-commit `lint:arch` has to stay today's raw CLI so AC-3's red is *"`src` does not exist"* rather than
-*"the wrapper does not exist"*. `tools/test/lint-arch.test.mjs` is the test-engineer's, authored at
-step 3 under the O3 arrangement (§11.4) and feeding `judgeCruiseResult` three summaries: an
-environment issue, zero modules, and a real violation.
+**implementer's**, landing in **green commit 9**. They must *not* land in the red commit: at that
+commit `lint:arch` has to stay today's raw CLI, so AC-3's red comes from the tree rather than from a
+missing wrapper. `tools/test/lint-arch.test.mjs` is the test-engineer's, authored at step 3 under the
+O3 arrangement (§11.4) and feeding `judgeCruiseResult` four summaries: an environment issue, a root
+that contributed no modules, a real violation, and a clean cruise over both roots.
 
 **`graph:modules` has the identical failure mode** and would render an empty graph in silence. It is
 cosmetic and is deliberately **not** gated — but §5.3's first render is to be eyeballed rather than
@@ -720,17 +821,33 @@ up agreeing with its own bug.
 
 ### How it is tested
 
-The module exports a pure `toCheckRunRecord(ghPayload, { slice, collectedVia })`; the `gh` invocation
-lives in the CLI wrapper. `tools/test/collect-ci.test.mjs` — **the test-engineer's**, per O3 (§11.4)
-— feeds `gh` payloads and asserts:
+**Two pure exports, and the division between them is load-bearing (F6).** The step-2 draft named only
+`toCheckRunRecord(ghPayload, { slice, collectedVia })` — a single-run mapper. But **constraint 4 is a
+property of a list**, so with only that export the ordering would have lived in the CLI wrapper,
+where no unit test can reach it: a constraint imposed in one place and enforced in another that is
+never exercised. The same defect as the `lint:arch` guard's, in a different file.
+
+| Concern | Where it lives | Why |
+|---|---|---|
+| field mapping, and `ts` from the run's `updatedAt` (constraint 5) | `toCheckRunRecord(ghRun, opts)` — pure | a per-run fact |
+| **ascending order by `updatedAt` (constraint 4)** | **`toCheckRunRecords(ghRuns, opts)` — pure** | a property of the list, and the only place a test can see it |
+| the `gh` invocation, reading `docs/team-log/.scope`, skipping runs already present by `checks.run_id` | the CLI wrapper | all of it is I/O, and idempotence requires reading the log |
+
+Both stay exported: the plural is authoritative for order, the singular for shape. Idempotence must
+**not** migrate into the pure function — it needs the log, which makes it I/O, and a pure function
+that reads a file is neither.
+
+`tools/test/collect-ci.test.mjs` — **the test-engineer's**, per O3 (§11.4) — feeds `gh` payloads and
+asserts:
 
 - the record validates against `schema.mjs`;
 - the `FAIL` invariant holds in **both** directions;
 - `depcruise` is lowercase `pass` on the green fixture;
 - `slice:check`'s *red before green* logic classifies the pair correctly — i.e. the two records are
   fed to the same predicate the DoD uses;
-- **(O-2)** given a payload holding two runs in `gh`'s newest-first order, the appended records are
-  ascending by `ts`, and each record's `ts` equals its run's `updatedAt` — not the collection time.
+- **(O-2)** given a payload holding two runs in `gh`'s newest-first order, **`toCheckRunRecords`**
+  returns them ascending by `ts`, and each record's `ts` equals its run's `updatedAt` — not the
+  collection time.
 
 The fourth assertion is the one worth having: it is easy to write a collector whose output looks
 right and which the gate tool reads as green. The fifth is the one that would otherwise be found by
@@ -806,7 +923,7 @@ enabled for it to occur.
 | Job | Expected | Why |
 |---|---|---|
 | `verify` | **PASS** | install, `docs:check`, `test:tools`, the diagram check and the log-integrity checks. The three new `tools/test/*.test.mjs` are deliberately unwired (§11.4), so `test:tools` stays green — which is now load-bearing for a second reason: a wired-in tool test would fail earlier in this job and abort the observation below |
-| `test` | **FAIL** | `tests/acceptance/health.test.ts` — both AC-2 cases, no service to spawn — and `tests/architecture/layering.test.ts`'s AC-3 case, `depcruise` cannot open `src`. **Passing in the same run:** `tests/integration/postgres-harness.test.ts` (§4's `mkdirSync` keeps `globalSetup` working) and `layering.test.ts`'s AC-4 fixture cases |
+| `test` | **FAIL** | `tests/acceptance/health.test.ts` — both AC-2 cases, no service to spawn — and `tests/architecture/layering.test.ts`'s AC-3 case, where **the cruise examines no module under `src/`**. *(Not "`depcruise` cannot open `src`": §4's `mkdirSync` creates it, so the command succeeds over an empty directory — F1, corrected at step 3.)* **Passing in the same run:** `tests/integration/postgres-harness.test.ts`, because that same `mkdirSync` keeps `globalSetup` working, and `layering.test.ts`'s AC-4 fixture cases |
 
 **That pair is the discrimination itself.** `verify` green proves the branch is sound; `test` red
 proves the acceptance suite failed. It is exactly what `red-proof` automates from slice 00 onward,
@@ -1040,7 +1157,7 @@ document also has a section of that number.)
 |---|---|
 | **§5.2** | The as-built file list of §1; the `Db` alias and why nothing above persistence names `Kysely`; **`ServerDeps` as the http seam, in the narrowed form of §2(c) — `src/http` cannot *name* the handle's type — with the generic-parameter counterexample recorded beside it**; `/health` described as an operational probe outside §8.6's table; `src/domain` recorded as deliberately empty until slice 01, with the reason |
 | **§5.3** | The first render of the module dependency graph. It shows **four** modules, not five: `src/domain` is deliberately empty, so nothing to cruise. Eyeball it rather than trust it — §5 explains why an empty graph and a clean graph look identical |
-| **§7.1** | **The compose delta, as the human ruled:** `docker-compose.yml` starts `postgres` and `otel-lgtm` only, and the service runs on the host via `npm start`. §7.1 currently draws a third `scheduler` container. Containerising the app needs a Dockerfile, a build stage and an image-caching story maintained through twelve slices for no demo benefit |
+| **§7.1** | **The compose delta, as the human ruled:** `docker-compose.yml` starts `postgres` and `otel-lgtm` only, and the service runs on the host via `npm start`. §7.1 currently draws a third `scheduler` container. Containerising the app needs a Dockerfile, a build stage and an image-caching story maintained through twelve slices for no demo benefit. **And the corrected Node range (F7):** §7.1's published *"Node ≥ 22.11 < 25"* is wrong in two ways, and the correction is a visible change to a published number rather than a silent fix — see §11.3 |
 | **§7.2** | The harness as built: global setup, one container per run, **no reuse** and why; `provide`/`inject` rather than ambient env; the migration call that applies zero migrations, why it is unconditional, and why `globalSetup` also ensures the directory exists; **the two Vitest projects, `db` and `nodb`, split by whether a test needs the database — `test:domain` becomes `test:nodb` and lands here rather than in slice 01, with the Docker-less reason (§4)**; the `build` → `pretest` → spawn `dist/main.js` path the acceptance tests take |
 | **§7.4** | Replace the PHASE 4 comment block's description with what shipped, **and with the split criterion that governs it — *needs `src/`*, not *belongs to phase 4***: the `test` job landing in the **red commit** so the red is observed in CI (`CLAUDE.md` §2.4), and only the two `verify` steps and the `red-proof` job deferred to green commit 9. Also: `red-proof`'s own checkout and tested script, the `test-results.json` artifact, **`lint:arch` as `tools/ci/lint-arch.mjs` and what it guards**, and the note that `red-proof` could not judge the commit that introduced it as a live job — only as a replay against that run's artifact |
 | **§8.5** | The `tests/setup/`, `tests/support/` and `vitest.config.ts` ownership ruling; the shape of `tests/architecture/layering.test.ts` including the negative control and the environment guard; `tools/test/` as the home of the three tool-level tests, now test-engineer-authored (§11.4); **and the `tests/integration/` boundary rule below** |
@@ -1169,7 +1286,8 @@ acceptance criterion needs one, and slice 10's cURL harness can use `start`.
 | `tsconfig.json` | `include: ["src","tests"]`, `noEmit`, NodeNext + `strict` + `verbatimModuleSyntax` | test-engineer, red commit — Vitest, `depcruise`'s `tsConfig.fileName` and the AC-4 fixture's mirrored `compilerOptions` all need it before any `src/` exists |
 | `tsconfig.build.json` | extends it; `include: ["src"]`, emit on, `outDir: "dist"` | implementer, green |
 | `vitest.config.ts` | **two projects, `db` and `nodb`** (§4); `globalSetup` on `db` only; **`include` scoped to `tests/**`** | test-engineer, red commit |
-| `.gitignore` | `dist/` | implementer, green |
+| `.gitignore` | `dist/` **and `test-results.json`** (F8 — the Vitest JSON reporter writes it locally as well as in CI, so it would otherwise appear in every working tree) | implementer, green |
+| `package.json` `engines` | **`">=22.22.0 <23 || >=24.0.0 <25"`** — see below (F7) | implementer, green |
 
 **The commit split.** The red commit carries the test toolchain: `tsconfig.json`, `vitest.config.ts`,
 `tests/**` (including `tests/setup/` and `tests/support/`), the three `tools/test/*.test.mjs` files
@@ -1178,7 +1296,8 @@ observed and the board cannot leave `red`), and these dependencies —
 
 - **devDependencies:** `vitest`, `@testcontainers/postgresql` (+ `testcontainers`), `node-pg-migrate`,
   **`typescript`** (O1: without it the fixture cruises nothing and `typecheck` cannot run),
-  `@types/pg`;
+  `@types/pg`, `@types/node` (F5 — the harness and the fixture builder use node builtins, and `tsc`
+  cannot resolve them without it);
 - **dependencies:** **`pg`** (O2). It is a runtime dependency of `src/persistence/db.ts`, so it must
   not land in `devDependencies` — `no-dev-dep-in-src` would fire on the legitimate import at step 4 —
   and the test-engineer's harness needs it from the red commit onward.
@@ -1206,6 +1325,44 @@ assertion into nine recorded runs — which also feeds C4.
 The implementer may still object that scaffolding is landing in a `test(…)` commit; the answer is
 AC-1 — *"`npm ci && npm test` starts a container and the suite connects"* is the acceptance
 criterion, so the harness that starts it is the test, not the implementation.
+
+**`engines.node` is wrong in two ways, and the fix is the implementer's to apply (F7).** The declared
+`">=22.11.0 <25"` promises support the dependency tree refuses. Verified from the installed packages
+rather than from report:
+
+```
+testcontainers@12.1.0       engines.node  >= 22.22
+vitest@5.0.0                engines.node  ^22.12.0 || ^24.0.0 || >=26.0.0
+dependency-cruiser@18.2.0   engines.node  ^22 || ^24 || >=26
+```
+
+So **22.11–22.21 passes the repository's own floor and then fails `npm ci --engine-strict`** on a
+transitive engine; and **23.x satisfies the declared range while `vitest` and `dependency-cruiser`
+both exclude it**. The honest intersection under the existing `<25` cap is
+**`">=22.22.0 <23 || >=24.0.0 <25"`**.
+
+CI is unaffected — `node-version: '22.x'` resolves above the floor — which is precisely why it must be
+fixed rather than deferred: the only person who hits it is a developer the repository told was
+supported. On authority: arc42 §7.1 records that *"versions are pinned here because **TC-10
+deliberately left them open at Gate A**"*, so TC-10's content is that a pin exists and is enforced,
+and the numbers are the architect's Gate B choice. Correcting a range that was never true is not a
+scope change, and §7.1 is already inside this slice's declared arc42 scope.
+
+**`typescript` is pinned exactly, and the pin is load-bearing rather than house style (F4).**
+`dependency-cruiser@18.2.0` declares its supported compiler range in
+`node_modules/dependency-cruiser/src/meta.cjs:14` as `typescript: ">=2.0.0 <7.0.0"` — **not** as a
+`peerDependency`. Nothing warns at install time. `npm i -D typescript` today resolves to **7.0.2**,
+which is outside that range, so the naïve command a future maintainer types turns every cruise in
+this repository into O1's inert cruise: exit 0, nothing examined, `depcruise: "pass"` recorded, C4
+reporting an architecture nobody checked.
+
+The pin at `6.0.3` is therefore the **preventive** control and the guards in §5 are the **detective**
+ones. Deliberately, this design does **not** claim which symptom an out-of-range compiler produces:
+O1 measured an *absent* compiler (`environment.issues` naming `missing-typescript-transpiler`), and
+an out-of-range one has not been measured here. The claim made instead is narrower and true — the
+`environment.issues` assertion and the per-root coverage assertion are **independent**, so a bump
+that evades one is caught by the other. Both the pin and its reason belong in a comment beside the
+dependency, where someone bumping it will read them.
 
 **The guard hook.** `.claude/hooks/guard-paths.mjs` did not cover `tests/setup/`, `tests/support/` or
 `vitest.config.ts`, so both roles could write all three — and C2 is measured from hook denials, which
@@ -1270,11 +1427,22 @@ being background:
 The reviewer should read the commit sequence with that in mind rather than treating it as
 carelessness.
 
+**A standing note that outlives this slice: re-check the supported-transpiler range on any bump.**
+Whenever `typescript` or `dependency-cruiser` moves, read
+`node_modules/dependency-cruiser/src/meta.cjs`'s `supportedTranspilers.typescript` range and confirm
+the pinned compiler falls inside it (§11.3, F4). It is not a `peerDependency`, so npm will not tell
+you; the symptom is a green `lint:arch` that examined nothing. This is the one maintenance obligation
+QS-10 carries into every later slice.
+
 **A second note for the reviewer.** `guard-paths.mjs`'s Bash branch is a substring test: any
 write-ish shell command containing the literal `src/` is denied wherever the path points, so ordinary
 shell work on a temp fixture is blocked. The test-engineer had to build its step-2 probe through a
 node script concatenating `'s' + 'rc'`. If something of that shape appears in the fixture builder,
-that is why — and it is the hook's heuristic, not an attempt to evade a boundary.
+that is why — and it is the hook's heuristic, not an attempt to evade a boundary. It has since bitten
+twice more, once on a `git commit -F` heredoc whose message contained the literal `src/`, and once on
+a `git restore --staged` naming `docs/team-log/` — the second blocking a *correction* to a boundary
+violation rather than the violation. Three false positives in three runs; the heuristic is the
+orchestrator's, and this is a data point rather than a ruling.
 
 ### 11.6 Deliberately not decided here
 
