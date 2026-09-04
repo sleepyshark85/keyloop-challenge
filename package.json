@@ -30,9 +30,12 @@
     "status": "node tools/status/generate.mjs",
     "test:docs": "node tools/test/docs-build.test.mjs",
     "defects": "node tools/defects/generate.mjs",
-    "defects:check": "node tools/defects/generate.mjs --check"
+    "defects:check": "node tools/defects/generate.mjs --check",
+    "mutation": "stryker run"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@testcontainers/postgresql": "12.1.0",
     "@types/node": "26.4.1",
     "@types/pg": "8.23.1",
