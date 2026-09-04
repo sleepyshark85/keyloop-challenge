@@ -1,0 +1,37 @@
+{
+  // Authored by the test-engineer in slice 00a's red commit (docs/slices/00a-design.md §11.3).
+  //
+  // It lands here, before any src/ exists, because three things need it first:
+  //   - Vitest, to transform tests/**/*.ts;
+  //   - `.dependency-cruiser.js`, whose `tsConfig.fileName` is this file and whose
+  //     `tsPreCompilationDeps: true` is meaningless without a real TypeScript config; and
+  //   - the AC-4 fixture in tests/architecture/layering.test.ts, which mirrors the
+  //     `compilerOptions` below into a temporary tree so the cruise it runs there behaves
+  //     the way the cruise CI runs here behaves.
+  //
+  // `noEmit` is deliberate: the build is tsconfig.build.json (implementer, green commit),
+  // so nothing that reads this file can accidentally emit into the repository root.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+
+    // Every import in this codebase is written the way NodeNext requires — `./x.js`
+    // pointing at `x.ts`. That convention is why slice 00a has no TypeScript loader and
+    // compiles instead (§11.3), and `verbatimModuleSyntax` is what keeps `import type`
+    // visible as a distinct thing rather than silently elided.
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "tests"]
+}

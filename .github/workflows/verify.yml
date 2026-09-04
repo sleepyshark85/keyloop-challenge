@@ -129,19 +129,72 @@ jobs:
             if (bad) process.exit(1);
           '
 
+  # The criterion that decides what lives here rather than in the PHASE 4 block below is
+  # "does it need `src/`", not "which phase does it belong to".  `npm test` does not need
+  # `src/` — it needs a Docker daemon, which `ubuntu-latest` has.  It therefore lands in
+  # slice 00a's RED COMMIT, authored by the test-engineer, and not three commits later.
+  #
+  # That is not tidiness.  CLAUDE.md §2.4 requires every slice's failing acceptance test to
+  # be "observed red in CI", and METHODOLOGY.md:272 says the board cannot leave `red` until
+  # CI has recorded it failing.  A red commit that creates a failure nobody can see has not
+  # discharged its obligation, and the step-3 log entry — "the red commit SHA and the CI run
+  # that observed it failing, with the failing assertion quoted" — could not be written
+  # truthfully.  The step-1 design offered four substitute evidence items instead and called
+  # the gap a bootstrap paradox; that was a workaround for a NON-NEGOTIABLE, and it was
+  # ruled a design defect (docs/slices/00a-design.md §0, S-1).  This job is the fix.
+  #
+  # On the red commit the discrimination is two job conclusions a human can read: `verify`
+  # green proves the branch is sound, `test` red proves the acceptance suite failed.  That
+  # is exactly what the `red-proof` job automates from slice 00 onward.
+  test:
+    name: suite (Testcontainers)
+    # ubuntu-latest ships a working Docker daemon (TC-9, ADR-0010), so no `services:` block
+    # is needed and none is wanted: CLAUDE.md §2.2 forbids substituting the database, and
+    # Testcontainers starts its own postgres:16 (arc42 §7.2).  No `needs:` and no
+    # `continue-on-error` — this job's conclusion IS the observation.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: install, with the engines pin enforced (TC-10)
+        run: npm ci --engine-strict
+
+      - name: npm test
+        # Both Vitest projects, `db` and `nodb`, in one invocation — so AC-1's
+        # "npm ci && npm test" is satisfied literally and the run produces ONE
+        # test-results.json, which is what tools/ci/red-proof.mjs's single --results input
+        # can consume.
+        run: npm test -- --reporter=json --outputFile=test-results.json
+
+      - name: the failing assertions, as an artifact
+        # if: always() because the interesting run is the one that failed.  90 days, so the
+        # red run's own artifact is still there when red-proof.mjs is replayed against it at
+        # the gate (docs/slices/00a-design.md §7, evidence item 3) and when
+        # collect-ci.mjs backfills the `check.run` record that makes C1 measurable.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.json
+          retention-days: 90
+          if-no-files-found: warn
+
 # ---------------------------------------------------------------------------------------
-# PHASE 4 — wired in when `src/` and the test suite arrive.  Not commented out because it
-# is unfinished, but because the commands it runs do not yet have anything to run against.
-# Full reasoning in ADR-0010 Decision 4.
+# PHASE 4 — what is left of it.  Wired in when `src/` arrives, at the implementer's green
+# commits.  Not commented out because it is unfinished, but because the commands it runs do
+# not yet have anything to run against.  Full reasoning in ADR-0010 Decision 4.
 #
-#   typecheck:                tsc --noEmit
-#   lint:arch:                npm run lint:arch                 # CLAUDE.md §2.3, QS-10
-#   test:                     npm test                          # Vitest + Testcontainers
+#   typecheck:                tsc --noEmit                      # a step on `verify`
+#   lint:arch:                npm run lint:arch                 # a step on `verify`; QS-10
 #
-# The test job needs Docker (TC-9), which is why the platform decision was a correctness
-# decision and not a convenience: §2.2 forbids substituting the database, so a Docker-less
-# runner can only run the tests that would pass anyway.  `ubuntu-latest` ships a working
-# daemon, so no `services:` block is needed — Testcontainers starts its own PostgreSQL.
+# `npm test` is NO LONGER HERE: it moved up into its own job above, in the red commit, for
+# the reason that job's comment gives.
 #
 #   red-proof:  runs only when the head commit subject matches ^test\(.+\): .*\(red\)$
 #               (CLAUDE.md §7 — exactly one such commit per slice, authored by the

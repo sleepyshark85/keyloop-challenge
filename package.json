@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Keyloop technical assessment \u2014 Scenario A, Unified Service Scheduler (backend)",
+  "description": "Keyloop technical assessment — Scenario A, Unified Service Scheduler (backend)",
   "engines": {
     "node": ">=22.11.0 <25",
     "npm": ">=10.9.0"
@@ -12,6 +12,8 @@
     "log": "node tools/team-log/query.mjs",
     "log:append": "node tools/team-log/append.mjs",
     "board": "node tools/board/generate.mjs",
+    "test": "vitest run",
+    "test:nodb": "vitest run --project nodb",
     "test:tools": "node tools/test/guard-paths.test.mjs && node tools/test/docs-build.test.mjs && node tools/test/capture-prompt.test.mjs && node tools/test/report-capture.test.mjs",
     "slice:check": "node tools/slice/check.mjs",
     "docs:build": "node tools/docs/build.mjs",
@@ -24,6 +26,16 @@
     "test:docs": "node tools/test/docs-build.test.mjs"
   },
   "devDependencies": {
-    "dependency-cruiser": "18.2.0"
+    "@testcontainers/postgresql": "12.1.0",
+    "@types/node": "26.4.1",
+    "@types/pg": "8.23.1",
+    "dependency-cruiser": "18.2.0",
+    "node-pg-migrate": "9.0.0",
+    "testcontainers": "12.1.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.0"
+  },
+  "dependencies": {
+    "pg": "8.23.0"
   }
 }

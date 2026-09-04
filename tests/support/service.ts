@@ -1,0 +1,208 @@
+import { spawn } from 'node:child_process';
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createServer } from 'node:net';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+/**
+ * The acceptance harness — test-engineer's, slice 00a red commit
+ * (docs/slices/00a-design.md §4 "Directory ownership", §7, §11.3).
+ *
+ * It spawns the COMPILED artifact, `node dist/main.js`. There is no TypeScript loader in
+ * this project: `tsx` is named in no ADR, and Node's --experimental-strip-types does not
+ * remap `./x.js` specifiers onto `x.ts`, which is how every import here is written. So the
+ * acceptance tests drive the artifact a deployment would actually run, which is a better
+ * answer to AC-2 than a loader can give — a loader-only project has never proved it emits.
+ *
+ * ────────────────────────────────────────────────────────────────────────────────────────
+ * WHY THIS NEVER THROWS
+ *
+ * `CLAUDE.md` §2.4 wants the red observed, and process criterion C1 distinguishes "a real
+ * assertion failure" from "a missing import". At the red commit there is no `dist/main.js`
+ * and no `src/` — so if this helper threw at module load, or from a `beforeAll`, the Vitest
+ * JSON would carry a collection error and the observation would prove nothing about the
+ * acceptance criteria.
+ *
+ * Instead every failure is returned as a `failure` STRING naming what was tried: the exact
+ * argv, the cwd, the port, the DATABASE_URL, the child's exit status, and whatever it wrote
+ * to stdout/stderr. The test asserts on that value inside its own body, so the artifact
+ * shows a failed assertion in a collected file.
+ *
+ * This file may not import src/ — `outside-in-tests-do-not-import-src` covers tests/support/
+ * exactly so a shared helper cannot hand an implementation detail to a test that may not
+ * see one. It reaches the service the way a client does: over HTTP, on a port.
+ */
+
+/** How long to wait for `GET /health` to answer at all before giving up. */
+const READY_TIMEOUT_MS = 15_000;
+const POLL_INTERVAL_MS = 100;
+
+/** The compiled entrypoint. `npm run build` (implementer, green commit) produces it. */
+export const ENTRYPOINT = 'dist/main.js';
+
+/**
+ * A DATABASE_URL that is well-formed and certain not to answer. Port 1 is reserved and
+ * nothing listens on it, so `connect()` fails immediately with ECONNREFUSED rather than
+ * hanging — AC-2's second case needs the 503 to be produced by a bounded failure, not by a
+ * test timeout.
+ */
+export const UNREACHABLE_DATABASE_URL =
+  'postgresql://keyloop:keyloop@127.0.0.1:1/keyloop_unreachable';
+
+export interface StartedService {
+  readonly baseUrl: string;
+  readonly port: number;
+  stop(): Promise<void>;
+}
+
+export interface StartAttempt {
+  /** Present iff the service answered on its port. */
+  readonly service?: StartedService;
+  /** Present iff it did not. A multi-line diagnosis naming everything that was tried. */
+  readonly failure?: string;
+}
+
+/** Ask the OS for a port nothing is listening on, then release it. */
+async function freePort(): Promise<number> {
+  return await new Promise((resolvePort, rejectPort) => {
+    const probe = createServer();
+    probe.on('error', rejectPort);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      if (address === null || typeof address === 'string') {
+        probe.close(() => rejectPort(new Error('could not determine a free port')));
+        return;
+      }
+      const { port } = address;
+      probe.close(() => resolvePort(port));
+    });
+  });
+}
+
+/**
+ * Start the service and wait, with a bound, for `GET /health` to answer.
+ *
+ * Never throws and never rejects: on any failure it resolves with `failure` set.
+ */
+export async function startService(options: {
+  databaseUrl: string;
+  logLevel?: string;
+}): Promise<StartAttempt> {
+  const cwd = process.cwd();
+  const entrypoint = resolve(cwd, ENTRYPOINT);
+  const port = await freePort();
+  const argv = ['node', ENTRYPOINT];
+
+  const attempted = [
+    `  command      ${argv.join(' ')}`,
+    `  cwd          ${cwd}`,
+    `  PORT         ${port}`,
+    `  DATABASE_URL ${options.databaseUrl}`,
+    `  entrypoint   ${entrypoint} (${existsSync(entrypoint) ? 'exists' : 'DOES NOT EXIST'})`,
+  ].join('\n');
+
+  let child: ChildProcessWithoutNullStreams;
+  try {
+    child = spawn(argv[0] as string, argv.slice(1), {
+      cwd,
+      env: {
+        ...process.env,
+        DATABASE_URL: options.databaseUrl,
+        PORT: String(port),
+        LOG_LEVEL: options.logLevel ?? 'silent',
+        NODE_ENV: 'test',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }) as ChildProcessWithoutNullStreams;
+  } catch (error) {
+    return {
+      failure:
+        `the service could not be spawned.\n${attempted}\n  spawn error  ${String(error)}`,
+    };
+  }
+
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', (chunk: string) => {
+    stdout += chunk;
+  });
+  child.stderr.on('data', (chunk: string) => {
+    stderr += chunk;
+  });
+
+  let exit: { code: number | null; signal: NodeJS.Signals | null } | undefined;
+  child.on('exit', (code, signal) => {
+    exit = { code, signal };
+  });
+  // A spawn of a non-existent binary emits 'error' asynchronously; without a listener it
+  // becomes an unhandled exception and takes the worker down instead of failing the test.
+  let spawnError: Error | undefined;
+  child.on('error', (error) => {
+    spawnError = error;
+  });
+
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const stop = async (): Promise<void> => {
+    if (exit !== undefined) return;
+    child.kill('SIGTERM');
+    await new Promise<void>((done) => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        done();
+      }, 5_000);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        done();
+      });
+    });
+  };
+
+  const deadline = Date.now() + READY_TIMEOUT_MS;
+  for (;;) {
+    if (exit !== undefined || spawnError !== undefined) {
+      return {
+        failure: [
+          'the service exited before it answered on its port.',
+          attempted,
+          `  exit         code=${String(exit?.code)} signal=${String(exit?.signal)}`,
+          spawnError === undefined ? undefined : `  spawn error  ${spawnError.message}`,
+          `  stdout       ${stdout.trim() === '' ? '(empty)' : `\n${indent(stdout)}`}`,
+          `  stderr       ${stderr.trim() === '' ? '(empty)' : `\n${indent(stderr)}`}`,
+        ]
+          .filter((line): line is string => line !== undefined)
+          .join('\n'),
+      };
+    }
+
+    try {
+      await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(2_000) });
+      return { service: { baseUrl, port, stop } };
+    } catch {
+      // Not listening yet. Fall through to the bound.
+    }
+
+    if (Date.now() >= deadline) {
+      await stop();
+      return {
+        failure: [
+          `the service did not answer GET ${baseUrl}/health within ${READY_TIMEOUT_MS} ms.`,
+          attempted,
+          `  stdout       ${stdout.trim() === '' ? '(empty)' : `\n${indent(stdout)}`}`,
+          `  stderr       ${stderr.trim() === '' ? '(empty)' : `\n${indent(stderr)}`}`,
+        ].join('\n'),
+      };
+    }
+
+    await new Promise((tick) => setTimeout(tick, POLL_INTERVAL_MS));
+  }
+}
+
+function indent(text: string): string {
+  return text
+    .trimEnd()
+    .split('\n')
+    .map((line) => `               ${line}`)
+    .join('\n');
+}
