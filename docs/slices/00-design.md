@@ -50,6 +50,21 @@ not.
 | **T-7** | `postgres-harness.test.ts:50` asserts `pgmigrations` is empty, so **the slice cannot reach all-green as specified**, and §8.3 assigns the fix to nobody | **(a)** accepted; ruled to the **structural** form, not the literal one | §4.1 cites that file four lines above the failing assertion. §8.3 enumerated files by ownership risk and never asked which existing *assertions* this slice falsifies |
 | **T-8** | Case 0's stated limit leaves an added singleton foreign key undetected, falsifying §6.2 while all ten cases pass | **(a)** accepted; the architect's **own limit narrowed** rather than defended | Extra constraints on the table every case writes to are not like the column types and unrelated objects the limit had bundled them with. Same query, same mechanism, no added fragility |
 
+**Step 5 findings, ruled 2026-09-04.** The reviewer returned five, the test-engineer one more.
+
+| # | Objection | Outcome | Reasoning, in one line |
+|---|---|---|---|
+| **R00-3** | `appointment_technician_in_dealership` is proven to exist and never proven to fire | **(a)** accepted; carried as arc42 §11.2 **R-11b** | Six of seven constraints have a case that provokes them. The technician half of A-9 rides on a catalogue assertion where the bay half has a behavioural one |
+| **R00-4** | AC-1 and AC-2 have no positive control **and the design's stated reason for exempting them is false** | **(a)** accepted; §4.6's reason **corrected, not deleted** | The read-back validates a different row than the one whose rejection is asserted. T-5's exact failure mode, unremedied in the two cases carrying the headline invariant |
+| **R00-5** | Four reference-table constraints arc42 specifies are asserted by nothing | **(a)** accepted; arc42 §8.1 and §11.2 **R-11a**, with a **narrower** remedy than case 0's | Measured: all four fire, all four droppable with the suite green. Assert them where slice 01's code relies on them, not by extending case 0 across nine tables |
+| **R00-1**, **R00-2** | Process findings — every slice file `status: ready`; the mutation gate passing on a measurement that could not fail | Not the architect's | R00-2 produced the human's third gate state, `N/A`: *we cannot know* still blocks, *there is nothing to know* does not |
+| **T-9** | AC-10's fixture clause contradicts its assertion clause | **(a)**, the human's, same day | The test-engineer authored the wording, measured that the literal fixture passes on 16.15 **by index order alone**, and raised the contradiction rather than following it |
+
+**T-9 is the one to read twice.** A role found a defect in a criterion it had itself recommended, in
+the direction that made its own work harder, and caught it because §11.2 A-2 — an assumption this
+design recorded and never expected to use again — said the passing result was not a guarantee. That is
+an assumption register earning its keep two steps after it was written.
+
 T-7's remedy was ruled **(a) over (b)** — a second test-engineer commit rather than an implementer
 obligation at step 4 — on a ground stronger than attribution: `tests/integration/` is not in
 `guard-paths.mjs`'s `TEST_OWNED`, so (b) would have had the implementer editing a test-engineer-owned
@@ -735,9 +750,27 @@ a promise about the fixture into an assertion about it — without it, a fixture
 second violation still reports the expected name whenever trigger order happens to favour it, and the
 case passes while proving something else.
 
-This is symmetry rather than an addition. §4.3 already reads the first row back, §4.4 has its negative
-control, §4.5 has its before-and-after pair. AC-5, AC-6 and AC-7 were the three that got prose
-instead.
+This is symmetry rather than an addition. §4.4 has its negative control, §4.5 has its
+before-and-after pair. AC-5, AC-6 and AC-7 were the three that got prose instead.
+
+**AC-1 and AC-2 were exempted here, and the stated reason was false — R00-4, corrected rather than
+deleted.** This section said §4.3 *"already reads the first row back"*, and treated that read-back as
+the positive control. **It validates a different row than the one whose rejection is asserted.** AC-1
+reads back the first appointment — `techA`, `standard` — and then asserts rejection on a *second* row
+built with `techB` and `quick`; AC-2 reads back `bayA` and asserts on `bayB`, which appears in the
+whole file exactly once, in the row that is expected to fail. Nothing established that the asserted
+row was bookable but for the overlap.
+
+The consequence is T-5's own failure mode in the two cases carrying the slice's headline invariant,
+and it follows from this design's own measurement M-2: **exclusion constraints fire before FK
+triggers.** So a `techB` outside the dealership, or a missing `techB`→`quick` qualification, leaves the
+second row violating *two* constraints, `no_bay_overlap` reported first, and **AC-1 passing green while
+proving nothing about the bay.** The exemption was the one place the design argued from a read-back
+being a control when the whole point of T-5 was that a control must be the same row minus the defect.
+
+**AC-1 and AC-2 carry positive controls too**, on the same ordering rule. The reason they looked
+exempt is worth keeping: they are the only cases whose *negative* row is the second insert rather than
+the first, which made an earlier read-back look like it had already done the work.
 
 > ### The ordering rule
 >

@@ -116,6 +116,7 @@ type edit produces code that compiles and is wrong.
 | R-7c | `src/platform` is importable-by-all and imports nothing, which is exactly the shape of a junk drawer | The leaf rule stops it acquiring behaviour, not contents. Reviewer's job |
 | R-7d | Down migrations are written and are exercised by no test (ADR-0007), so they are unverified by CI. *"Never run"* was true until 2026-09-04, when the architect reversed the whole corpus once by hand while designing slice 00 — a dated measurement, not a guarantee | The deployment is a fresh container; rollback in anger is not a story this system has |
 | R-7e | The retry loop must not be wrapped in a transaction (§6). Nothing structural enforces it | QS-3 fails immediately if it is — `25P02` on the second attempt |
+| R-7g | Case 0's constraint-set assertion filters `contype <> 'p'`. Measured across three majors: clean on 16.15 and 17.11, but **PostgreSQL 18 surfaces `NOT NULL` as `contype = 'n'` rows** — twelve of them on `appointment`, one per column. The fix is an allowlist, `contype IN ('c','f','u','x')` | Cannot fail today: the image is pinned and `postgres-harness.test.ts` asserts `^16\.`. **The direction of the failure is the finding, not the failure.** A denylist breaks with a dozen invented names that nobody added, so the bump reads as *"the assertion is too strict"* and invites loosening the one thing that makes §8.1's seven-and-only-seven enforceable — and the noise **scales with the `NOT NULL` count, so it gets louder the more correct the schema becomes.** An allowlist ignores what the *platform* adds while still catching everything a *developer* can add |
 | R-7f | Docker is required for everything but the `nodb` project — `tests/unit/` and `tests/architecture/` (TC-9, §7.2) | A consequence of §2.2 being right about where the invariant lives. At 00a neither implementer nor test-engineer had a container runtime, which is what forced the two-project split; **measured again at slice 00, all three roles have Docker**, so the split now stands on its merits rather than on that constraint (§7.2) |
 
 ### R-8 · Four things CI is *said* to enforce — one closed at slice 00a, three open
@@ -171,6 +172,35 @@ ruling both defer.
 migrations directory from a location the build actually populates, or **the conforming fix ships
 broken in the built artifact** — passing in development, failing in the first container. Whoever takes
 R-9a takes R-9b with it.
+
+### R-11 · Assertions that would survive their own subject being deleted
+
+Two items from slice 00, kept together because they share a shape: **a specification exists, the thing
+it specifies works, and nothing would notice if it stopped.**
+
+**R-11a — four reference-table constraints (R00-5).** `opening_hours.day_of_week BETWEEN 0 AND 6`,
+`opening_hours.closes_at > opens_at`, `service_type.duration_minutes > 0`, and `vehicle.vin UNIQUE`
+are specified in §8.1 and asserted by nothing. Measured live: all four exist and all four fire
+(`23514`, `23514`, `23514`, `23505`). Drop any one and the whole suite stays green. Every other
+reference-table constraint is structurally self-enforcing — the `UNIQUE (id, dealership_id)` pairs and
+`technician_qualification`'s primary key are foreign-key targets, so dropping one fails migration
+`0003` — which is why these four and only these four are exposed.
+
+**It is not symmetric with the `appointment` constraints and should not be paid the same way.** Slice
+00's case 0 asserts `appointment`'s seven by name-set and by definition because that is the table every
+case writes to. The remedy here is smaller: two of the four are about to acquire a *consumer*, since
+slice 01's opening-hours and duration code will assume `closes_at > opens_at` and
+`duration_minutes > 0` hold. **Assert them where the code that relies on them lands**, not by extending
+case 0 across nine tables — that is the first step back toward a whole-schema snapshot, which slice 00
+rejected as brittle.
+
+**R-11b — `appointment_technician_in_dealership` is proven to exist and not to fire (R00-3).** Six of
+the seven constraints have a case that provokes them; the seventh has only case 0. Measured: booking a
+D1 technician under D2 *is* correctly rejected `23503` on that constraint, so it works. But drop it
+from the migration and case 0's set-equality is the only assertion that fails; key it on the wrong
+column pair and case 0's definition-equality is the only one. **The technician half of A-9 rides on a
+catalogue assertion alone**, where the bay half has a behavioural one. Four lines against the
+two-dealership fixture AC-7 already seeds would close it.
 
 ### R-10 · `updated_at` is maintained by the writer, and nothing enforces it
 

@@ -126,6 +126,50 @@ CREATE TABLE appointment (
 );
 ```
 
+### As built at slice 00
+
+The schema above **is** what merged, statement for statement, across `0001_extensions.sql`,
+`0002_reference_data.sql` and `0003_appointment.sql` (ADR-0007). It had never been executed when it
+was written at Gate B; it applies clean to an empty `postgres:16`, and `pgmigrations` recording those
+three names is asserted by the suite. Ten acceptance criteria hold it — AC-10 was **added by the human
+at the gate** on 2026-09-04 and is discussed under §8.2 consequence 4.
+
+Five things a reader of the schema above will wonder about, settled rather than left to inference:
+
+- **Three columns carry no foreign key of their own, and that is complete rather than missing.**
+  `dealership_id`, `service_type_id` and `customer_id` are each covered *transitively*: an unknown
+  dealership fails `appointment_bay_in_dealership`, an unknown service type fails
+  `appointment_technician_qualified`, an unknown customer fails
+  `appointment_vehicle_owned_by_customer`. Adding the singletons as well would be redundant **and
+  harmful**: with two constraints violable at once, which one PostgreSQL reports is trigger order, and
+  §8.6 maps `422 /problems/unknown-reference` *by constraint name*. That absence is now asserted — the
+  set of non-primary-key constraints on `appointment` is exactly seven.
+- **Three of the four composite keys are unreachable from the API.** Under A-10 the *system* allocates
+  the bay and the technician, so `appointment_bay_in_dealership`,
+  `appointment_technician_in_dealership` and `appointment_technician_qualified` can only be violated
+  by a bug in the allocator — defence in depth, and correctly absent from §8.6's taxonomy, where such
+  a violation is a `500`. Only `appointment_vehicle_owned_by_customer` is client-reachable. **This is
+  therefore the only slice in which those three can be shown to fire at all**, which is why they were
+  tested here and not deferred.
+- **`appointment.id` has no default.** No `gen_random_uuid()`, so no `pgcrypto` and no `uuid-ossp`;
+  `btree_gist` stays the only extension the deployment requires (§7.1). The writer supplies the id,
+  consistent with A-10.
+- **`updated_at` has `DEFAULT now()` and no trigger.** Nothing maintains it. ADR-0003's move is an
+  `UPDATE`, so unless that statement sets it explicitly the column will be wrong from slice 06 onward.
+  Deliberate — the database holds the *invariant*, the application holds the convenience — and carried
+  as debt in §11.2 R-10.
+- **Nothing cascades.** No `ON DELETE` clause anywhere, correctly, because nothing in this system
+  deletes: cancellation is a status transition (ADR-0003). The down migrations drop child-first for
+  the same reason — a `CASCADE` would drop whatever a wrong order got wrong instead of failing on it.
+
+**Four reference-table constraints are specified here and asserted by nothing (R00-5).**
+`opening_hours`'s `day_of_week BETWEEN 0 AND 6` and `closes_at > opens_at`, `service_type`'s
+`duration_minutes > 0`, and `vehicle.vin`'s `UNIQUE`. All four were measured to exist and to fire, and
+all four can be dropped with the entire suite green. Every *other* reference-table constraint is
+structurally self-enforcing — the `UNIQUE (id, dealership_id)` pairs and the qualification primary key
+are foreign-key targets, so dropping one fails `0003`. These four have no such backstop, and
+**slice 01's opening-hours and duration code will assume two of them hold.** Carried in §11.2 R-11.
+
 ## 8.2 Persistence and the exclusion constraint
 
 Requirement 2's second half, and the reason this system exists. Reproduced from `CLAUDE.md` §2.1
@@ -154,10 +198,50 @@ Six consequences, each of which something elsewhere in this document depends on:
    ADR-0009 prunes on and what labels `booking_conflicts_total{resource}`. Renaming
    `no_bay_overlap` silently degrades the retry loop and mislabels the metric; QS-1 and QS-2 pin the
    names.
-4. **An `UPDATE` is checked against other rows, not against the version it replaces.** This is what
-   makes ADR-0003's atomic move work at all, and specifically what lets an appointment be extended or
-   nudged onto an interval overlapping its own. Non-obvious, therefore pinned by QS-6 rather than
-   asserted here.
+4. **An `UPDATE` is checked against other rows, not against the version it replaces — and it is the
+   *index* that never sees the superseded version, not a rule anyone wrote.** This is what makes
+   ADR-0003's atomic move work at all, and what lets an appointment be extended or nudged onto an
+   interval overlapping its own. **Asserted by AC-10** at slice 00, at the SQL level, before any
+   application code existed.
+
+   **The mechanism is the load-bearing part, and stating only the outcome was a defect in this
+   section.** The sentence above used to end at *"the version it replaces"*, and the test-engineer
+   showed at slice 00 step 5 that an outcome-worded consequence is satisfiable two ways with
+   completely different concurrency behaviour:
+
+   | | How it gets the property | What it costs |
+   |---|---|---|
+   | **`EXCLUDE USING gist`** (what §2.1 mandates) | **Structurally.** An `UPDATE` writes a new tuple and marks the old one dead; the index insertion compares the new tuple against *live* index entries, and the superseded version is not one. Nobody had to think of it, and nobody can forget it | Nothing. It is a property of MVCC and of index-enforced exclusion |
+   | **A `BEFORE UPDATE` trigger** computing overlap | **By memory.** It reads other rows, so it *does* see the row's own prior version, and it is correct only if whoever wrote it remembered `WHERE o.id <> NEW.id` | Everything. A trigger is check-then-act with the check moved inside the database: two concurrent triggers under `READ COMMITTED` both read *"free"* |
+
+   **This was measured, not argued.** The test-engineer mutant-checked AC-10 against exactly the
+   check-then-act trigger `CLAUDE.md` §2.1 forbids: the naive form fails AC-10's self-overlap step,
+   and **the patched form — one `o.id <> NEW.id` predicate — passes all three steps.** So a future
+   slice could satisfy this consequence, pass AC-10, and have lost the concurrency guarantee
+   entirely, which is the substitution §2.1 forbids on the `INSERT` path arriving by the `UPDATE`
+   path instead.
+
+   **So the consequence ADR-0003 rests on is not *"a row does not conflict with its own prior
+   version"*. It is *"the mechanism cannot be made to conflict with it, because it never sees
+   it."*** A single-threaded test can only ever establish the first. The second is what makes
+   `CLAUDE.md` §2.1's ban on check-then-act cover rescheduling as well as booking, and it is why
+   ADR-0003 could prohibit delete-then-insert without also having to prohibit a trigger — it did not
+   anticipate that a trigger satisfying the outcome would be available.
+
+   > **Inherited obligation for slice 06 (reschedule).** AC-10 fixes the **single-threaded** `UPDATE`
+   > semantics, and deliberately nothing more. ADR-0003 claims that *"two racing reschedules onto the
+   > same slot behave exactly like two racing bookings: one commits, the other gets `23P01`"* — and
+   > **no scenario and no test asserts that.** QS-4 and QS-5 assert what a *refused* move leaves
+   > behind; QS-6 asserts the self-overlap AC-10 now covers. The mirror of QS-1 on the `UPDATE` path —
+   > *N* simultaneous moves onto one slot, exactly one committing — is named by nothing.
+   >
+   > The patched trigger is the proof that this gap is real rather than theoretical: it passes
+   > everything slice 00 asserts and fails only under simultaneity, which is the one condition
+   > nothing yet applies to an `UPDATE`. **Slice 06 owes a concurrency test for racing moves**, and it
+   > is written here rather than left for slice 06 to notice because the last obligation left to be
+   > noticed was AC-10 itself — named in §8.5 beside cancellation-frees-the-slot, deferred by this
+   > section to a QS-6 with no slice, and carried by none of the three until the human added it at a
+   > gate.
 5. **`btree_gist` is required** (TC-3), because `bay_id WITH =` is an equality operator on a `uuid`
    and plain GiST cannot index it. This is the extension dependency that constrains deployment.
 6. **The GiST indexes serve the availability query too.** Its `tstzrange(...) && ...` predicate over

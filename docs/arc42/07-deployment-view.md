@@ -83,6 +83,23 @@ Three properties this arrangement buys, each of which cost a design choice:
   together is that they share **the same package, the same migrations directory and the same
   `pgmigrations` table** — three inputs, none of them a shared module.
 
+  **As built at slice 00, one assertion holds that together, and it is a property of the seam rather
+  than of the schema.** `tests/integration/exclusion-constraints.test.ts` case 0 asserts that
+  `pgmigrations` records exactly `0001_extensions`, `0002_reference_data`, `0003_appointment`, in
+  filename order — and it is **the only thing in the suite that establishes where the schema came
+  from.** Every other assertion in the repository inspects the schema and would be satisfied by one
+  created by a stray `CREATE TABLE` in a fixture, or baked into a container image, or applied by hand.
+  ADR-0007's entire argument is that the schema is reproducible from a corpus of ordered, immutable
+  `.sql` files; this is what holds it to that, and it belongs to the seam described here rather than to
+  the domain model of §8.1.
+
+  It lives in the per-slice file rather than in `postgres-harness.test.ts` deliberately. That file
+  asserted `pgmigrations` was *empty* at 00a — a property of the **corpus**, in a file whose job is
+  properties of the **harness** — which would have gone red inside the implementer's commit at this
+  slice and again at every migrating slice after, in a file the implementer must not edit. It now
+  asserts only that the seam **ran**; what the seam **carried** is a per-slice fact and moved to where
+  it changes with the slice.
+
   **This section previously called that a narrowing of arc42's own phase-2 overstatement. That was
   wrong, and correcting it is the point of this paragraph.** [ADR-0007](../adr/0007-node-pg-migrate-with-sql-files.md)'s
   Decision states that the runner is invoked *"programmatically … **both** by `npm run db:migrate`
