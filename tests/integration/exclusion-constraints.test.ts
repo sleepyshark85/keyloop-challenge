@@ -1007,6 +1007,140 @@ describe('slice 00 — the schema, the exclusion constraints and the seed fixtur
     expect(booked?.starts_at.getTime()).toBe(at(f, 0).getTime());
     expect(booked?.ends_at.getTime()).toBe(at(f, 60).getTime());
   });
+
+  it('AC-10 — an UPDATE is checked against other rows, not against the version it replaces', async () => {
+    const f = await seedDealership(client, 'ac10');
+
+    // arc42 §8.2 consequence 4, and the single property ADR-0003's atomic move rests on. It
+    // is the only case in this file that reaches the exclusion constraints through an UPDATE:
+    // every other case uses INSERT, and AC-4's UPDATE only RELAXES the predicate. Added by
+    // the human at the gate on 2026-09-04 after it was found asserted nowhere — named in
+    // arc42 §8.5 beside cancellation-frees-the-slot, which landed as AC-4, and deferred by
+    // §8.2 to QS-6, which has no slice.
+    //
+    // ── ONE DEPARTURE FROM AC-10's LITERAL WORDING, RAISED RATHER THAN TAKEN ─────────────
+    //
+    // AC-10 says "appointments A and B on the same bay AND TECHNICIAN" and asserts the
+    // rejection at `no_bay_overlap`. Those two clauses cannot both be evidence. If A and B
+    // share a technician, moving A onto B's interval makes `no_technician_overlap` violable
+    // TOO, and §11.2 A-2 says which of two simultaneously violable exclusion constraints is
+    // reported is index order and NOT guaranteed. Measured on postgres:16.15 — the literal
+    // fixture does report `no_bay_overlap` today, so the case would pass, for a reason that
+    // is not a guarantee. That is §4.2 rule 1 violated inside a criterion, and the wording is
+    // the test-engineer's own from the step-5 recommendation the human ruled on.
+    //
+    // So B here shares A's BAY and takes the OTHER technician, making `no_bay_overlap` the
+    // only violable constraint and the assertion real evidence. Everything AC-10 asserts is
+    // preserved — consequence 4, the rejection at `no_bay_overlap`, B unchanged. Raised as a
+    // finding for a (a) clarification; if it is ruled the other way this becomes one line,
+    // with A-2's caveat recorded here instead.
+    const a = validRow(f, { id: idFor('ac10', 'A'), startsAt: at(f, 0), endsAt: at(f, 60) });
+    const b = validRow(f, {
+      id: idFor('ac10', 'B'),
+      technicianId: f.technicians.techB,
+      serviceTypeId: f.serviceTypes.quick,
+      startsAt: at(f, 120),
+      endsAt: at(f, 180),
+    });
+    await insertAppointment(client, a);
+    await insertAppointment(client, b);
+
+    // 1. Both stored, and stored where the case thinks they are.
+    const storedA = await readBack(client, idFor('ac10', 'A'));
+    const storedB = await readBack(client, idFor('ac10', 'B'));
+    expect(storedA?.status, 'A was not stored').toBe('confirmed');
+    expect(storedB?.status, 'B was not stored').toBe('confirmed');
+    expect(storedA?.bay_id, 'A and B must share a bay or nothing below is about the bay').toBe(
+      f.bays.bayA,
+    );
+    expect(storedB?.bay_id).toBe(f.bays.bayA);
+    expect(storedA?.ends_at.getTime()).toBe(at(f, 60).getTime());
+    expect(storedB?.starts_at.getTime()).toBe(at(f, 120).getTime());
+
+    // 2. THE PROPERTY. A is extended onto an interval overlapping ITS OWN prior interval:
+    //    [anchor, +60) becomes [anchor, +90), and every instant of the old interval is inside
+    //    the new one. If the constraint were checked against the version being replaced this
+    //    would be rejected, and ADR-0003's atomic move — a reschedule as one UPDATE, same id,
+    //    no delete-then-insert and no compensating release — could not work at all.
+    const extended = await client.query(
+      'update appointment set ends_at = $2, updated_at = now() where id = $1',
+      [idFor('ac10', 'A'), at(f, 90)],
+    );
+    expect(extended.rowCount, 'the self-overlapping UPDATE matched no row').toBe(1);
+
+    const afterExtend = await readBack(client, idFor('ac10', 'A'));
+    expect(
+      afterExtend?.ends_at.getTime(),
+      'A must now end at anchor+90m — an UPDATE overlapping its own prior interval must succeed',
+    ).toBe(at(f, 90).getTime());
+    expect(afterExtend?.starts_at.getTime()).toBe(at(f, 0).getTime());
+    expect(afterExtend?.status).toBe('confirmed');
+
+    // 3. THE NEGATIVE. A is moved onto B's interval. Only the bay is violable, by the fixture
+    //    above, so the reported name is a fact about the bay rather than about index order.
+    const err = await rejection(
+      'AC-10',
+      client.query('update appointment set starts_at = $2, ends_at = $3 where id = $1', [
+        idFor('ac10', 'A'),
+        at(f, 90),
+        at(f, 150),
+      ]),
+    );
+    expectRejection(err, 'AC-10', '23P01', 'no_bay_overlap');
+
+    // COVERAGE BEFORE RESULT, and it is not ceremony: a rejected UPDATE that had silently
+    // modified B would satisfy the rejection above and destroy the invariant it exists to
+    // protect. B is read back whole. A is read back too — a partially applied UPDATE that
+    // moved `starts_at` and failed on `ends_at` would leave A somewhere neither interval.
+    const bAfter = await readBack(client, idFor('ac10', 'B'));
+    expect(
+      {
+        bay: bAfter?.bay_id,
+        technician: bAfter?.technician_id,
+        starts: bAfter?.starts_at.getTime(),
+        ends: bAfter?.ends_at.getTime(),
+        status: bAfter?.status,
+      },
+      'B must be untouched by the rejected UPDATE',
+    ).toEqual({
+      bay: f.bays.bayA,
+      technician: f.technicians.techB,
+      starts: at(f, 120).getTime(),
+      ends: at(f, 180).getTime(),
+      status: 'confirmed',
+    });
+
+    const aAfter = await readBack(client, idFor('ac10', 'A'));
+    expect(aAfter?.starts_at.getTime(), 'A must be untouched by the rejected UPDATE').toBe(
+      at(f, 0).getTime(),
+    );
+    expect(aAfter?.ends_at.getTime()).toBe(at(f, 90).getTime());
+
+    // 4. POSITIVE CONTROL, after the negative per §4.6's ordering rule. A moves to
+    //    [anchor+60, anchor+120) — ADJACENT to B, not overlapping it. This is what turns
+    //    step 3 from "some UPDATE was refused" into "that UPDATE was refused because it
+    //    overlapped", and it proves A was movable at all rather than pinned by something the
+    //    fixture got wrong.
+    const moved = await client.query(
+      'update appointment set starts_at = $2, ends_at = $3 where id = $1',
+      [idFor('ac10', 'A'), at(f, 60), at(f, 120)],
+    );
+    expect(moved.rowCount, 'the adjacent move matched no row').toBe(1);
+
+    const finalA = await readBack(client, idFor('ac10', 'A'));
+    expect(
+      finalA?.starts_at.getTime(),
+      'AC-10 control: A must be movable to an interval adjacent to B',
+    ).toBe(at(f, 60).getTime());
+    expect(finalA?.ends_at.getTime()).toBe(at(f, 120).getTime());
+
+    // Two live rows, back to back, one bay — the same half-open adjacency AC-3 proves for
+    // INSERT, now reached through UPDATE.
+    expect(
+      await countLive(client, 'bay_id', f.bays.bayA, at(f, 60), at(f, 180)),
+      'bayA must hold A and B back to back after the move',
+    ).toBe(2);
+  });
 });
 
 /* ══════════════════════════════════════════════════════════════════════ small helpers ══ */
