@@ -18,16 +18,19 @@
 | # | Question | Ruling |
 |---|---|---|
 | 1 | Does this slice change the schema? | **No.** No migration, no data-model delta. §1 |
-| 2 | Do the three domain modules import each other? | **Yes, type-only, and that is what `domain-is-pure` permits.** AC-5 and AC-6 are jointly unsatisfiable otherwise. §2.0 |
+| 2 | Do the three domain modules import each other? | **No. AC-6 is literal — ruled by the human on 2026-09-05.** The three modules exchange primitives and `src/application` composes them. §2.0 |
 | 3 | How do opening hours reach a pure core? | A **7-slot tuple indexed by `day_of_week`**, `null` for a closed day. Absence is unrepresentable. §3 |
 | 4 | Who owns the DST rule? | `openingHours.ts`, stated **once**, as *render both endpoints, then compare wall clock*. §4 |
 | 5 | How does an outside-in property test reach a module with no boundary? | Through the **built artifact** `dist/domain/*.js`, loaded at runtime. `.dependency-cruiser.js` is **not** amended. §6, ADR-0013 |
 | 6 | Does `tests/property/` pay the container cost? | **No — it splits.** `*.db.test.ts` runs in the `db` project; everything else under `tests/property/` runs in `nodb`. §6.3 |
-| 7 | How does the red stay an assertion failure? | Measured: a **literal** dynamic-import specifier fails `tsc` and therefore fails `verify`; a **computed** one does not. §8 |
+| 7 | Does the project split protect the red on its own? | **No, and claiming it did was this design's defect.** It also takes an invocation split, built as orchestrator tooling before step 3. §6.4, §8.3 |
+| 8 | How does the red stay an assertion failure? | Measured: a **literal** dynamic-import specifier fails `tsc` and therefore fails `verify`; a **computed** one does not. §8 |
 
-Two findings are raised rather than fixed here, because neither is mine to fix: **F-01-1** (arc42 §10
-QS-9 still carries the transposition the human corrected in AC-2 under O-13) and **F-01-2** (AC-5's
-`time_zone` clause collides with `referenceRepository` at a later slice). §11.
+**This design was amended on 2026-09-05 after step 2**, under two human rulings and one ruling of my
+own on a defect the test-engineer measured in it. §13 records what step 2 produced, including the two
+places where a reviewer was right and I was wrong. F-01-1 was corrected at step 1 and is no longer
+outstanding; **F-01-2** (AC-5's `time_zone` clause collides with `referenceRepository` at a later
+slice) is still open and still the human's. §11.
 
 ---
 
@@ -52,37 +55,36 @@ redundant.
 
 ## 2. The three modules
 
-### 2.0 Do they import each other? Yes, and AC-6 still holds
+### 2.0 They import nothing, including each other — AC-6 is literal, by the human's ruling
 
-`.dependency-cruiser.js`'s `domain-is-pure` is:
+**Ruled by the human on 2026-09-05: AC-6 means what it says.** `src/domain` imports nothing at all,
+intra-domain imports included. The human ruled it with the architectural cost in front of them —
+§11's debt entry is that cost, quoted to them from the architect's own step-2 reply and accepted
+rather than argued away.
 
-```js
-from: { path: '^src/domain/' },
-to:   { pathNot: '^src/domain/' },
-```
+**Consequently arc42 §5.2 line 40 stands unamended.** It reads *"It imports nothing at all — no other
+module, no npm package, no `node:` builtin"*, and it is now ratified rather than corrected. The
+step-1 draft of this design proposed to amend it, and that proposal is **withdrawn**, not deferred.
 
-An edge from `src/domain/interval.ts` to `src/domain/duration.ts` has a `to` that *does* match
-`^src/domain/`, so the rule does not fire on it. Intra-domain edges are outside the rule by
-construction, and always were.
+**What the step-1 draft got wrong, recorded rather than quietly replaced.** It claimed AC-5 and AC-6
+were *"jointly unsatisfiable"* under a literal reading. That claim was false, the test-engineer said
+so at step 2, and it was overstated in a document that instructs other roles not to assert mechanisms
+they have not checked. The implementer argued the same side I did — that `appointmentInterval` must
+convert minutes to milliseconds, so `interval.ts` must either import `durationMillis` or re-derive
+`* 60_000`, and *"there is no third path"*. **There is a third path, and the test-engineer named it:**
+change the signature so the conversion happens *before* the call. The application converts, then
+passes a plain millisecond count. No import, no duplicated arithmetic, AC-5 intact. The exhaustiveness
+claim had enumerated two responses to a real call site and called it a proof.
 
-AC-6 says *"`src/domain` imports nothing at all — the `domain-is-pure` rule holds with no
-allowlist."* The operative half is the second clause, and it is satisfied exactly: `depcruise`
-reports zero `domain-is-pure` violations and the rule keeps its empty allowlist. The first clause,
-read with maximum literalness, would forbid intra-domain edges — and then **AC-5 and AC-6 could not
-both be satisfied**, because AC-5 mandates three files each owning one concept and those concepts
-compose: an interval is built *from* a duration, and an opening-hours verdict is taken *about* an
-interval. The only ways out of a literal AC-6 are one file (AC-5 forbids it) or duplicated structural
-types in three places (which is how `DurationMinutes` and a raw `number` come to be confused, which
-is the entire reason the split exists).
+The honest form of what I should have written, and the shape this design now takes:
 
-Ruled: intra-`src/domain` type imports are permitted; §5.2's prose is corrected at step 7 from
-*"imports nothing at all"* to *"imports nothing outside `src/domain`"* (§12.1). **Flagged for step 2**
-— if the test-engineer or implementer reads AC-6 the other way, that is a DCR and the human decides,
-because AC-6 is the human's.
+> A literal AC-6 is satisfiable, at the cost of exchanging unbranded primitives across every
+> inter-module boundary inside the domain. That is a trade-off, and a real one — not an impossibility.
 
-Note that `import type` is visible to `dependency-cruiser` here: `tsPreCompilationDeps: true` is set
-and 00a measured that it catches type-only edges. So these edges appear in the graph and are silent
-because the rule permits them, not because the tool cannot see them.
+So the three modules compose through `src/application`, which imports all three (an edge *into* the
+domain, which `domain-is-pure` does not govern — it constrains edges *from* `^src/domain/`). The
+domain's own dependency list is empty, `depcruise` reports zero `domain-is-pure` violations, and there
+is nothing for `tsPreCompilationDeps` to catch because there is no `import type` to erase.
 
 ### 2.1 `src/domain/duration.ts` — how many minutes
 
@@ -119,10 +121,26 @@ then have to reason about call sites. A function keeps the scan's marker mechani
 and its return type does not change. Nothing above it moves, because everything above it takes a
 `DurationMinutes`.
 
+**The brand survives, shrunk — and this was the call the coordinator left to me.** Under a literal
+AC-6 a brand cannot cross a domain module boundary, so the choice was to delete the brands or keep
+them as per-module input validation. **Kept, for two reasons and one non-reason.**
+
+- `DurationMinutes` still protects `durationMillis`'s *input*: `src/application` may import the type
+  (an edge into the domain, permitted) and therefore cannot hand `durationMillis` a raw number it did
+  not obtain from `serviceDuration`. That is a real guarantee at a real boundary.
+- Deleting the brand would delete the smart constructor's return type, and with it the compiler's
+  insistence that the `null` branch be handled at every call site. That is the part of the brand that
+  was doing the most work, and it is entirely intra-module.
+- The non-reason: it does **not** protect the handoff into `appointmentInterval`, which is the
+  boundary the brand was introduced for. `interval.ts` cannot name `DurationMinutes`, so that
+  parameter is a bare `number`. A brand that cannot cross the boundary it was designed to guard is
+  doing a fraction of its original job, and §11 says so rather than letting the surviving fragment
+  imply the whole guarantee.
+
 ### 2.2 `src/domain/interval.ts` — which instants
 
 ```ts
-import type { DurationMinutes } from './duration.js';
+// NO IMPORTS. Not even from ./duration.js — AC-6 is literal (§2.0).
 
 /** An instant, as epoch milliseconds (A-8). Branded; the constructor is the only way in. */
 export type Instant = number & { readonly __brand: 'Instant' };
@@ -134,10 +152,14 @@ export function instant(epochMillis: number): Instant | null;
 export type Interval = { readonly startsAt: Instant; readonly endsAt: Instant };
 
 /**
- * AC-1 / A-1. TOTAL: both arguments are already validated, so there is no failure case.
- * The end is derived. No client-supplied end is consulted, and there is no parameter for one.
+ * AC-1 / A-1. TOTAL. The end is derived; no client-supplied end is consulted and there is no
+ * parameter for one.
+ *
+ * `durationMillis` is a BARE number, not a branded DurationMinutes, because this module may not
+ * import duration.ts. The caller converts first — src/application, which may import both.
+ * That unbranded parameter is the price of a literal AC-6 and is carried in §11.
  */
-export function appointmentInterval(startsAt: Instant, duration: DurationMinutes): Interval;
+export function appointmentInterval(startsAt: Instant, durationMillis: number): Interval;
 
 /**
  * A-4 — "the interval the constraint sees". TODAY THE IDENTITY, and that identity IS the
@@ -147,10 +169,24 @@ export function appointmentInterval(startsAt: Instant, duration: DurationMinutes
 export function occupancyInterval(interval: Interval): Interval;
 ```
 
+**`Instant` stays branded, and here the brand still crosses everything it needs to**, because
+`instant()`, `Interval` and `appointmentInterval` all live in this file. The literal AC-6 ruling costs
+this module exactly one unbranded parameter — `durationMillis` — and nothing else.
+
 **Two smart constructors, then total functions.** `instant()` and `serviceDuration()` are the only
 places a raw number becomes a domain value, and they are the only places that return `null`.
 Everything downstream is total. The alternative — every function returning `T | null` — spreads the
 same check across five call sites and gives four more places to get it wrong.
+
+**The composition, which now lives outside the domain.** `src/application` does:
+
+```
+serviceDuration(st)  ->  durationMillis(d)  ->  appointmentInterval(instant(ms), millis)
+                                            ->  withinOpeningHours(iv.startsAt, iv.endsAt, zone, weekly)
+```
+
+That ordering used to be expressed by the types and is now expressed by a use case. §11 carries what
+that costs.
 
 **`occupancyInterval` returning its argument is the point, not a placeholder.** §5.2 already argues
 this; what this slice adds is that it is *called*, so that when A-4 turns out to be wrong the call
@@ -162,7 +198,8 @@ as a limitation in §9.2 rather than claimed as satisfied.
 ### 2.3 `src/domain/openingHours.ts` — the only wall clock in the system
 
 ```ts
-import type { Interval } from './interval.js';
+// NO IMPORTS. Not even the Interval type — AC-6 is literal (§2.0), so the interval arrives
+// as its two endpoints.
 
 /** 0 = Sunday, mirroring opening_hours.day_of_week CHECK (day_of_week BETWEEN 0 AND 6). */
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -183,15 +220,34 @@ export type OpeningHoursVerdict =
       readonly opensAt: string; readonly closesAt: string }
   | { readonly kind: 'spans-local-days'; readonly startsOn: string; readonly endsOn: string }
   | { readonly kind: 'unknown-zone';    readonly ianaZone: string }
-  | { readonly kind: 'malformed-hours'; readonly dayOfWeek: DayOfWeek };
+  | { readonly kind: 'malformed-hours'; readonly dayOfWeek: DayOfWeek }
+  // Added by the literal AC-6 ruling. See below: this variant exists ONLY because the type
+  // that used to carry "ordered, and from the same interval" cannot cross the boundary.
+  | { readonly kind: 'malformed-interval' };
 
-/** ADR-0001 / GC-1. Reads reference data about one dealership and nothing about any booking. */
+/**
+ * ADR-0001 / GC-1. Reads reference data about one dealership and nothing about any booking.
+ *
+ * Takes two bare millisecond values rather than an Interval, because this module may not import
+ * interval.ts. An Instant is assignable to number, so a caller holding an Interval passes
+ * `iv.startsAt, iv.endsAt` and the brand degrades gracefully rather than needing a cast.
+ */
 export function withinOpeningHours(
-  interval: Interval,
+  startsAtMillis: number,
+  endsAtMillis: number,
   ianaZone: string,
   weekly: WeeklyOpeningHours,
 ): OpeningHoursVerdict;
 ```
+
+**The literal AC-6 ruling has one measurable cost right here, and it is worth naming precisely
+because it is small enough to be checked.** The `Interval` type carried two guarantees that a pair of
+`number` parameters does not: that the two values are ordered, and that they came from the same
+interval. The first is recoverable by a runtime check; the second is not recoverable at all. So the
+verdict union gains a seventh variant, `malformed-interval`, covering a non-finite or non-integer
+endpoint and `endsAtMillis <= startsAtMillis`. It is fail-closed, directly unit-testable, and it
+would not exist under the other reading of AC-6. That is the whole delta, and §11 records it as a
+consequence of a ruling rather than as a defect.
 
 **A verdict, not a boolean — three reasons, and the third is the load-bearing one.**
 
@@ -204,8 +260,9 @@ export function withinOpeningHours(
    (`true`/`false`), so a mutant that returns the *right refusal for the wrong reason* survives. A
    verdict makes every branch's identity assertable. §10 names the specific mutants.
 
-`withinOpeningHours` is deliberately **not** given the occupancy interval. ADR-0001 says *"the whole
-derived interval"*, meaning the appointment. Today they are equal so no test can tell the two apart;
+`withinOpeningHours` is deliberately **not** given the occupancy interval's endpoints. ADR-0001 says
+*"the whole derived interval"*, meaning the appointment. Today they are equal so no test can tell the
+two apart;
 when A-4 changes, whether a cleanup buffer must also fit inside opening hours is a **new question**
 and is recorded as OQ-01-1 in §11 rather than answered here by accident.
 
@@ -245,14 +302,23 @@ yields** and parses them itself. This is not incidental: parsing `'09:00:00'` in
 scalar is wall-clock reasoning, and AC-5 confines wall-clock reasoning to this file. If the assembler
 parsed, QS-12 would be violated by the very code that feeds the module QS-12 protects.
 
-The parser accepts `HH:MM` and `HH:MM:SS`, hours `00`–`24`, and normalises to seconds-of-day.
-**`24:00:00` is accepted and maps to 86400**, because PostgreSQL's `time` admits it and
-`CHECK (closes_at > opens_at)` permits `closes_at = '24:00:00'` — a dealership open until midnight is
-legitimate reference data and a parser that rejects it would break a valid row. *(That PostgreSQL
-accepts `24:00:00` in a `time` column is **assumed, not measured** in this design. It costs one branch
-either way, and the branch is required regardless because rejecting it would be worse than accepting
-it needlessly.)* Anything else — negative, out of range, non-numeric, `opensAt >= closesAt` — yields
-`malformed-hours`. **Fail closed.** A booking gate that cannot read its own configuration must refuse.
+The parser accepts `HH:MM` and `HH:MM:SS` in the range **`00:00:00`–`23:59:59`, plus the single exact
+value `24:00:00`**, and normalises to seconds-of-day (`24:00:00` → 86400).
+
+**That range is measured, and the measurement made the spec tighter rather than merely confirming
+it.** The step-1 draft said *"hours `00`–`24`"* and labelled PostgreSQL's acceptance of `24:00:00` as
+assumed. The implementer measured it at step 2 against a real `postgres:16-alpine`: `'24:00:00'::time`
+is accepted and round-trips, while `24:00:01` and `24:30:00` are **rejected by PostgreSQL itself**. So
+the draft's range was wrong in the permissive direction — it would have accepted `24:30`, a value the
+column cannot hold. Narrowing to one exact value **removes a branch reachable only by data that cannot
+exist**, which is worth more than the assumption it discharged: an unreachable branch is an unkillable
+mutant, and this slice's mutation score is the first that is a real number.
+
+`24:00:00` must be accepted rather than rejected as a tidy-looking simplification, because
+`CHECK (closes_at > opens_at)` permits `closes_at = '24:00:00'` and a dealership open until midnight
+is legitimate reference data. Anything else — negative, out of range, non-numeric, `opensAt >=
+closesAt` — yields `malformed-hours`. **Fail closed.** A booking gate that cannot read its own
+configuration must refuse.
 
 ### 3.3 Who assembles the tuple, and what this slice does not prove
 
@@ -310,16 +376,21 @@ Intl.DateTimeFormat('en-US', {
 The order is part of the design, because a mutant that reorders the checks is only killable if the
 order is asserted:
 
-1. Build the formatter for `ianaZone`; on `RangeError` → `unknown-zone`.
-2. Render `interval.startsAt` and `interval.endsAt`. Each yields `{ localDate, secondsOfDay, dayOfWeek }`.
-3. If `startsOn !== endsOn` (local calendar dates differ) → `spans-local-days`. §8.3: both endpoints
+1. **`startsAtMillis` and `endsAtMillis` are finite integers and `endsAtMillis > startsAtMillis`;
+   otherwise → `malformed-interval`.** First, because it is pure arithmetic and because everything
+   after it would otherwise be handed a value `new Date(...)` cannot render — a non-finite endpoint
+   makes `formatToParts` throw, and a pure function must not throw. This step exists only because of
+   the literal AC-6 ruling (§2.3).
+2. Build the formatter for `ianaZone`; on `RangeError` → `unknown-zone`.
+3. Render both endpoints. Each yields `{ localDate, secondsOfDay, dayOfWeek }`.
+4. If `startsOn !== endsOn` (local calendar dates differ) → `spans-local-days`. §8.3: both endpoints
    must fall within **one day's** opening hours, so an interval crossing local midnight is rejected —
    no weekly schedule can contain it.
-4. `weekly[startsOn.dayOfWeek]` is `null` → `closed-day`.
-5. Parse `opensAt` / `closesAt`; on failure or `opens >= closes` → `malformed-hours`.
-6. `opens <= startSeconds && endSeconds <= closes` → `within`; otherwise `outside-window`.
+5. `weekly[startsOn.dayOfWeek]` is `null` → `closed-day`.
+6. Parse `opensAt` / `closesAt`; on failure or `opens >= closes` → `malformed-hours`.
+7. `opens <= startSeconds && endSeconds <= closes` → `within`; otherwise `outside-window`.
 
-Step 6's second comparison is **inclusive on `closesAt`**: a job that ends exactly at closing time is
+Step 7's second comparison is **inclusive on `closesAt`**: a job that ends exactly at closing time is
 inside opening hours. ADR-0001's own example — *"starts twenty minutes before closing and runs an hour
 past it is rejected"* — is the case this excludes, and inclusivity does not admit it.
 
@@ -397,18 +468,24 @@ it therefore does not establish.
 
 | | Property | Criterion |
 |---|---|---|
-| **P1** | For every generated instant `t` and duration `d`, `withinOpeningHours(appointmentInterval(instant(t), serviceDuration({durationMinutes:d})), 'Europe/London', W)` is `within` **if and only if** the oracle says both endpoints fall on the same local date, `W` has an entry for that local weekday, and `opens ≤ localStart ∧ localEnd ≤ closes` | AC-2, QS-9 |
+| **P1** | For every generated instant `t` and duration `d`, composing the domain the way `src/application` will — `iv = appointmentInterval(instant(t), durationMillis(serviceDuration({durationMinutes:d})))`, then `withinOpeningHours(iv.startsAt, iv.endsAt, 'Europe/London', W)` — yields `within` **if and only if** the oracle says both endpoints fall on the same local date, `W` has an entry for that local weekday, and `opens ≤ localStart ∧ localEnd ≤ closes` | AC-2, QS-9 |
 | **P2** | For every `t` and `d`, `endsAt − startsAt === d × 60000` exactly — asserted on the instants, so it holds across both transitions by construction | AC-3 |
 | **P3** | For every generated week `W` and every `t` whose local weekday `w` has `W[w] === null`, the verdict is `closed-day` with `dayOfWeek === w` | AC-4 |
 | **P4** | An interval whose local end lands exactly on `closesAt` is `within`; the same interval one second later is `outside-window`. Same at `opensAt` | boundary |
 | **P5** | The two measured fall-back instants `2026-10-25T00:30Z` and `2026-10-25T01:30Z` render the same local time and receive the **same** verdict under the same window | AC-2, "both transitions" |
 | **P6** | An interval crossing local midnight is `spans-local-days`, and the equivalent interval one hour earlier is not | §8.3 |
+| **P7** | A reversed or non-finite endpoint pair yields `malformed-interval`, and a well-formed one never does | §2.3, literal AC-6 |
 
 P4 exists to name mutants rather than to add coverage: it is what kills Stryker's `EqualityOperator`
 mutations of `opens <= startSeconds` → `opens < startSeconds` and `endSeconds <= closes` →
 `endSeconds < closes`. Without a case that lands *exactly* on a boundary, both survive. (Those two
 mutants are killed here in the outside-in suite, which does **not** feed the mutation score — §10
 requires the implementer's unit tests to kill them again, and that duplication is deliberate.)
+
+P7 is new at the amendment and exists for the same reason P4 does: the literal AC-6 ruling added a
+branch, and a branch nobody targets is a surviving mutant. It is also the one property that would not
+exist under the other reading, which makes it the cheapest available check that the ruling was in fact
+applied rather than nodded at.
 
 ### 5.3 Generators — and the reason this is the hardest part of the slice
 
@@ -436,10 +513,20 @@ test examined, and a claim about a mechanism has to be run. The test therefore *
 generation and asserts afterwards**:
 
 - both UTC offsets (`+0` and `+60`) were observed among the generated instants;
-- at least one sample fell strictly within one hour *before* and one *after* each of the two
-  transition instants — four counters, each asserted `> 0`;
-- at least one sample produced each of `within`, `closed-day`, `outside-window` and
-  `spans-local-days`.
+- samples fell strictly within one hour *before* and one *after* each of the two transition
+  instants — four counters;
+- each of `within`, `closed-day`, `outside-window`, `spans-local-days` and `malformed-interval` was
+  produced at least once.
+
+**Each counter is asserted against a minimum count, not against `> 0`, and the step-1 draft was wrong
+to specify `> 0`.** The test-engineer measured it: **a bare `> 0` floor passes about 29% of the time
+under a deliberately broken stratified generator.** A guard with a 29% false-pass rate is not a guard;
+it is the same class of defect it was put there to catch, which makes this a defect in the step-1
+design rather than a refinement of it. The threshold must be sized so that reaching it from the
+*remaining* strata alone is negligible — with `numRuns` N and stratum weight w the expected count is
+about N·w, so a floor at a small fraction of N·w fails reliably when a stratum contributes nothing
+while staying far from the noise. The test-engineer sizes it; what is not negotiable is that the floor
+is a computed minimum rather than one.
 
 Without these, a wrong year, a wrong zone, a wrong anchor constant or an `fc.oneof` weight of zero
 produces a confident green over an empty region. `fc.statistics` reports but does not assert, so it is
@@ -519,10 +606,11 @@ consequence is a side effect of the fix, not its purpose.
   message naming the export. At red that assertion *is* the failure, which is the better trade: a
   compile error says "no such file" to CI, a shape assertion says "`withinOpeningHours` is not
   exported from `dist/domain/openingHours.js`" to a person.
-- It depends on the build being current. `npm test` has `pretest: npm run build`, so the CI path is
-  covered. `npm run test:nodb` has no such hook: **`pretest:nodb` must be added** so the Docker-free
-  path cannot run against a stale `dist`. npm runs `pre<name>` for any script name. That is a
-  test-running concern and belongs in the red commit.
+- It depends on the build being current, and **the step-1 draft's answer to that has been superseded
+  by something better.** The draft asked for a `pretest:nodb` npm hook to cover the Docker-free path,
+  which would have left two lifecycle hooks to keep in agreement. Under §6.4, `tools/ci/run-tests.mjs`
+  owns the build before *both* invocations, so there is one place that guarantees a current `dist`
+  rather than one per entry point. The requirement is unchanged; its home is better.
 - The one mechanical unknown this design carried is now **measured**, before the red commit rather
   than after it, the way 00a measured per-project `globalSetup`. Run by the orchestrator:
   `pathToFileURL(resolve('dist/domain/_spike.js')).href` fed to `await import(...)` typechecks clean
@@ -540,10 +628,14 @@ consequence is a side effect of the fix, not its purpose.
 `globalSetup: tests/setup/postgres.ts`. For this test that would start PostgreSQL to exercise three
 functions that import nothing.
 
-The cost is not the container time. It is that **a container failure turns this slice's red into a
-`globalSetup` crash instead of assertion failures** — the precise trap slice 00's design was built to
+The cost is not the container time. It is that a container failure turns this slice's red into a
+`globalSetup` crash instead of assertion failures — the precise trap slice 00's design was built to
 avoid, and the thing C1's second clause is about. The red evidence for a pure-domain slice must not be
 destroyable by a Docker hiccup.
+
+**The step-1 draft then claimed this split was sufficient, and that claim was false.** §6.4 is the
+correction, and it is not a footnote: without it the ruling below buys a Docker-free *capability* that
+nothing in CI ever invokes.
 
 **Ruled: split.** A property test that needs the database is named `*.db.test.ts` and runs in `db`;
 everything else under `tests/property/` runs in `nodb`. Rejected alternatives: a `tests/property/db/`
@@ -560,12 +652,63 @@ whatever edit lands:
   `configDefaults.exclude` or `node_modules` and `dist` come back into collection.
 
 Consequence worth having: after this, `npm run test:nodb` runs slice 01's entire outside-in surface
-with no Docker at all.
+with no Docker at all — **a capability, which §6.4 is about turning into a configuration.**
 
 The mutation config is **not** touched. `vitest.mutation.config.ts` stays `tests/unit/**` only, for the
 reason it already documents — a test that cannot be affected by a mutant of `src/` raises the score
 without killing anything. The property test loads `dist/`, which Stryker's sandbox may not rebuild, so
 adding it would be that failure mode twice over.
+
+### 6.4 The project split is necessary and was never sufficient — T-01-2, ruled (c)
+
+**The defect, and it was mine.** The step-1 draft's §8.3 gave three reasons the red is structurally an
+assertion failure, and reason 2 said that because §6.3 moved the property test out of the `db`
+project, *"a container failure cannot convert this evidence into a crash."* The test-engineer flagged
+it as an unmeasured mechanism claim and the orchestrator measured it. With `DOCKER_HOST` pointed at
+nothing:
+
+```
+npx vitest run                 ->  aborts in TestProject._initializeGlobalSetup
+                                   test-results.json: 0 test files, 0 tests
+npx vitest run --project nodb  ->  7 files, 94 tests, 94 passed
+```
+
+`red-proof --results` reads that one combined file. So the red could arrive as an **empty results
+file**: `judge()` takes the `failedFiles: []` branch, returns *"the commit is marked red but no
+test-engineer-owned suite failed"*, and CI records no observed red.
+
+**The shape of the error, named rather than softened.** I named the mechanism's *capability* — a
+Docker-free project exists — instead of its *configuration*, which is what CI actually invokes. That
+is Tier 1 in the phase-4 retro's taxonomy, committed in a design that quotes the retro's operational
+rule three sections later. For a mechanism claim, name the call site; I named the project membership
+and never looked at the caller.
+
+**Ruled (c), design defect, naming `CLAUDE.md` §2.4** — NON-NEGOTIABLE, *"observed red in CI"*. Not
+(a): the wording was not ambiguous, it was wrong, and the missing piece was absent from the design
+rather than unclearly stated. Not (b): (b) requires the work to be correct, and a design asserting a
+protection it does not provide is not correct. This is loopback **1 of 2**.
+
+**The remedy, which is the orchestrator's to build and mine to specify.** The human ruled it **tooling
+prep, not slice work** — it touches CI, `package.json` and `tools/` and no `src/` — so slice 01's
+declared scope is unchanged and it lands before step 3. `tools/ci/run-tests.mjs` becomes `npm test`
+and:
+
+1. runs the two projects as **two separate `vitest run` invocations**, each writing its own JSON, and
+   runs the second regardless of the first's exit code;
+2. merges them into the single `test-results.json` that `red-proof --results` reads, so 00a's
+   single-file invocation contract holds and `red-proof`'s interface does not change;
+3. **treats a project that did not run as a loud, distinct, non-zero failure, never an empty
+   contribution.** A missing or zero-file project JSON fails the step before `red-proof` is reached.
+
+Part 3 is the part I would not let be narrowed away, and the reason is worth keeping: with 1 and 2
+alone, a `db` project that never ran merges as *zero failures*, indistinguishable from a `db` project
+in which everything passed. That is 00a's "cruise with no resolvable compiler" moved one level up, and
+it would be a worse defect than the one it fixes — conditional on Docker before, invisible on every
+slice after. It gets `tools/test/run-tests.test.mjs` and is checked against mutants rather than
+asserted to discriminate.
+
+**This design is written against that description.** If what lands differs, this section is wrong and
+the orchestrator has undertaken to come back rather than let the two drift.
 
 ---
 
@@ -594,7 +737,7 @@ fixture paths taken as absolute against the local working directory, and it repo
 
 | Marker | Matches | Permitted in |
 |---|---|---|
-| `duration-arithmetic` | the literal `60_000` or `60000`; an exported **definition** of `serviceDuration` or `durationMillis` | `src/domain/duration.ts` |
+| `duration-arithmetic` | the literal `60_000` or `60000` **matched on word boundaries**; an exported **definition** of `serviceDuration` or `durationMillis` | `src/domain/duration.ts` |
 | `occupancy-interval` | an exported **definition** of `appointmentInterval`, `occupancyInterval`, or the type `Interval` | `src/domain/interval.ts` |
 | `wall-clock-and-zone` | `Intl.DateTimeFormat` (any whitespace), or the identifiers `timeZone`, `ianaZone`, `time_zone` | `src/domain/openingHours.ts` |
 
@@ -604,6 +747,14 @@ Corpus: `src/**/*.ts`. Migrations are `.sql` and are therefore outside it — wh
 Definitions, not call sites: the application legitimately *calls* `serviceDuration`. Match
 `^\s*export\s+(function|const|type)\s+<name>\b`. `60_000` and `Intl.DateTimeFormat` count anywhere,
 because there is no legitimate reason for either outside its file.
+
+**The `60_000` marker must be word-bounded, and the step-1 draft's version was defective.** It
+specified *"the literal `60_000` or `60000`"* as a plain substring match, and `600000` — an ordinary
+six-hundred-second timeout anywhere in `src/` — contains `60000`. In a scan that asserts *exactly one*
+file matches, that false positive either fails the suite spuriously or, worse, makes the count come
+out right while pointing at the wrong file. The test-engineer caught it; it is a defect in this design,
+not a refinement of it, and it is the second one this slice has produced in a mechanism whose whole
+job is discrimination.
 
 `3600` and `60` in `openingHours.ts`'s seconds-of-day normalisation are **not** duration arithmetic —
 they are wall-clock normalisation, which is that file's own concern. The marker is `60_000`
@@ -658,9 +809,14 @@ One commit, `test(01): ... (red)`, test-engineer, touching only:
 - `tests/property/opening-hours-dst.test.ts`
 - `tests/architecture/ambiguity-containment.test.ts`
 - `vitest.config.ts` (the project split, §6.3)
-- `package.json` (`pretest:nodb`, §6.2)
 
 No file under `src/`, so C2's ownership-zone check is untouched.
+
+**`tools/ci/run-tests.mjs` and the `package.json` wiring are NOT in this commit.** They are the
+orchestrator's tooling prep under the human's ruling (§6.4), land before step 3, and touch no `src/`.
+The `pretest:nodb` hook §6.2 asked for is subsumed by it: `run-tests.mjs` owns building before either
+invocation, which is a better home for it than a second npm lifecycle hook that only one of the two
+paths fires.
 
 ### 8.2 What passes, and why that is the interesting half
 
@@ -669,6 +825,7 @@ No file under `src/`, so C2's ownership-zone check is untouched.
 | `npm run typecheck` | **passes** — measured: the computed specifier does not resolve at compile time, §6.1 |
 | `npm run lint:arch` | **passes** — no `tests/property/ → src/` edge exists to violate |
 | `npm run build` | **passes** — `tsconfig.build.json` includes only `src`, which has no domain files to fail on |
+| `npm test` via `tools/ci/run-tests.mjs` | **runs both projects as two invocations** (§6.4), so the `nodb` results survive whatever the `db` project does |
 | the scanner's four fixture cases (§7.4) | **pass** — they test the scanner against fixtures, not against `src/` |
 | the property test's generator-coverage assertions (§5.3) | **pass** — the oracle and the strata need no implementation |
 | `tests/unit/**` | **passes** — nothing is added to it |
@@ -693,8 +850,14 @@ Every one is an `AssertionError` raised inside a collected test body. There is n
 collection error and no hook error, because:
 
 1. **Nothing is statically imported from `src/`.** Measured, §6.1.
-2. **Nothing this slice's tests need is behind `globalSetup`.** §6.3 moved them out of the `db`
-   project, so a container failure cannot convert this evidence into a crash.
+2. **Nothing this slice's tests need is behind `globalSetup`, and — the half the step-1 draft
+   missed — nothing CI invokes can discard their results.** §6.3 moves them out of the `db` project;
+   §6.4's `tools/ci/run-tests.mjs` runs the two projects as separate invocations, runs the second
+   regardless of the first's exit code, and fails loudly rather than merging a project that never ran
+   as zero failures. **The project split alone was measured insufficient** — one `vitest run` over
+   both projects aborts in `globalSetup` and yields a results file with zero tests. Reason 2 as
+   originally written was a claim about a capability nothing invoked; it is now a claim about two
+   mechanisms, and the second is being built before step 3 rather than assumed.
 3. **The module load is inside a `try` in a test body**, so "the file is not there yet" is a value the
    test asserts on, not an exception the runner reports.
 
@@ -750,6 +913,9 @@ by name.
 - `occupancyInterval` exists and is exported but has no production call site until the booking path
   lands (§2.2). A named identity function nobody calls is one refactor away from being deleted as dead
   code; `no-orphans` will not catch it because the module is imported.
+- **The three-file split is weaker than it was at step 1, and the honest statement is that QS-12 now
+  rests on containment alone.** This is answered in full in §11 under *the cost of the ruling*, because
+  it is a consequence of the human's AC-6 ruling rather than a limitation of the test.
 
 ---
 
@@ -765,7 +931,8 @@ The survivors to expect, named so they can be aimed at rather than discovered:
 |---|---|
 | `opens <= startSeconds` → `opens < startSeconds` | a unit test whose local start lands **exactly** on `opensAt` |
 | `endSeconds <= closes` → `endSeconds < closes` | a unit test whose local end lands **exactly** on `closesAt` |
-| `startsOn !== endsOn` → `startsOn === endsOn` (§4.2 step 3) | a same-day case *and* a crossing-midnight case |
+| `startsOn !== endsOn` → `startsOn === endsOn` (§4.2 step 4) | a same-day case *and* a crossing-midnight case |
+| `endsAtMillis > startsAtMillis` → `>=` and the finiteness checks (§4.2 step 1) | an equal-endpoint case, a reversed case, and a `NaN` case. **New at the amendment**: this branch exists only because of the literal AC-6 ruling, so nothing in the step-1 mutant list aimed at it |
 | each verdict's `kind` string literal | one assertion per verdict on `kind`, not on truthiness — the reason §2.3 chose a union |
 | `durationMillis`: `* 60_000` → `/ 60_000`, and the literal itself | any duration whose product is asserted exactly |
 | `serviceDuration`'s `> 0` → `>= 0`, and its integer check | a `0` case and a fractional case |
@@ -774,7 +941,14 @@ The survivors to expect, named so they can be aimed at rather than discovered:
 | `occupancyInterval` body → `{}` / identity variants | an assertion that it returns an interval **equal in both fields** to its argument. This one is the likeliest survivor in the slice: an identity function is hard to mutate detectably, and asserting only its type kills nothing |
 
 The order of §4.2's checks is behaviour, not style: a unit test that only ever supplies well-formed
-input cannot distinguish step 4 from step 5, and the reordering mutants survive.
+input cannot distinguish step 5 from step 6, and the reordering mutants survive.
+
+**One thing got easier and one got harder under the literal AC-6 ruling.** Easier: with no branded
+values crossing module boundaries, each module is callable from a unit test with plain numbers, so
+there is no constructor ceremony between the test and the branch it is aiming at. Harder: there is one
+more branch to cover (`malformed-interval`), and the three modules no longer share types, so a unit
+test that composes them has to do the composition by hand — which is exactly what `src/application`
+will do, and is therefore worth doing once in a test that mirrors it.
 
 ---
 
@@ -784,8 +958,8 @@ input cannot distinguish step 4 from step 5, and the reordering mutants survive.
 
 | id | Assumption | If wrong |
 |---|---|---|
-| **DA-1** | Intra-`src/domain` type imports satisfy AC-6, because `domain-is-pure` does not fire on them and the literal reading makes AC-5 and AC-6 jointly unsatisfiable (§2.0). The ruleset half is **measured, by a second reader**: `from: '^src/domain/'` → `to: { pathNot: '^src/domain/' }` does not match an intra-domain edge. The *reading of AC-6* remains the assumption | A DCR at step 2; the human rules on AC-6, and the fallback is duplicated structural types, which is worse |
-| **DA-2** | PostgreSQL's `time` admits `24:00:00`, so the parser accepts it (§3.2) | One branch is dead. It is cheaper than the alternative error |
+| ~~**DA-1**~~ | Intra-`src/domain` type imports satisfy AC-6 (§2.0) | **Discharged 2026-09-05 — and discharged against, by the human, not by me.** The human ruled AC-6 literal. The assumption was the architect's reading and it did not survive; the record says which reading won, because "discharged" would otherwise read as confirmed. The design was amended, not defended |
+| ~~**DA-2**~~ | PostgreSQL's `time` admits `24:00:00`, so the parser accepts it (§3.2) | **Discharged by measurement** against a real `postgres:16-alpine` at step 2: `'24:00:00'::time` accepted and round-tripping, `24:00:01` and `24:30:00` rejected by PostgreSQL. It did more than confirm the branch — it narrowed the parser's range, which had been wrong in the permissive direction |
 | ~~**DA-3**~~ | Vitest's module runner honours a computed `file://` dynamic import of `dist/**.js` (§6.2) | **No longer an assumption — measured**, with a control, before this design was accepted. See §6.2. Kept in the table struck through rather than deleted, so the record shows it was carried as an assumption and then discharged |
 | **DA-4** | The `pg` driver returns a `time` column as a string, which is why `DayHours` holds strings (§2.3) | The assembler adapts; the domain contract does not change. Nothing in slice 01 depends on it, since nothing queries |
 
@@ -794,9 +968,54 @@ input cannot distinguish step 4 from step 5, and the reordering mutants survive.
 - **OQ-01-1.** When A-4 is revised and a buffer exists, must the **occupancy** interval also fall
   inside opening hours, or only the appointment interval? ADR-0001 says *"the whole derived
   interval"*, written when the two were the same thing. Today no test can tell them apart.
-  `withinOpeningHours` takes the appointment interval; the question is deferred, not answered.
+  `withinOpeningHours` is handed the appointment interval's endpoints; the question is deferred, not
+  answered.
 - **OQ-01-2.** See F-01-2 below: AC-5's `time_zone` clause needs a reading before
   `referenceRepository` lands. It is an acceptance criterion, so the reading is the human's.
+
+### The cost of the literal AC-6 ruling — debt, and a consequence rather than a defect
+
+The human ruled AC-6 literal with these consequences in front of them. They are recorded here and
+proposed for arc42 §11 (§12.1) as **the price of a ratified decision**, not as something that went
+wrong. Nothing below is an argument for revisiting it.
+
+**D-01-1 — composition order moved out of the domain.** `serviceDuration → durationMillis →
+appointmentInterval → withinOpeningHours` used to be expressed by the types: you could not call the
+third without having called the first two, because the values were branded and only one function
+produced each. It is now expressed by a use case in `src/application`. The order is still correct; it
+is correct because someone wrote it correctly, not because the compiler refused the alternatives.
+
+**D-01-2 — unit confusion across domain boundaries is review-caught, not compiler-caught.** The two
+inter-module handoffs take bare `number`: `appointmentInterval`'s `durationMillis`, and
+`withinOpeningHours`'s two endpoints. Passing minutes where milliseconds are expected now compiles.
+The brands survive *inside* each module (§2.1, §2.2) and catch nothing between them — which is the
+boundary they were introduced for. This is the debt entry most likely to cash in, because a
+minutes-for-millis error produces a plausible-looking interval rather than a crash.
+
+**D-01-3 — one extra branch and one extra verdict variant.** `malformed-interval` exists only because
+the `Interval` type cannot cross the boundary and therefore cannot carry "ordered, and from the same
+interval" (§2.3). It is fail-closed and directly testable, so the cost is a branch to cover rather
+than a risk to carry — but it is a branch that would not exist under the other reading, and §10 names
+its mutants.
+
+**D-01-4 — the three-file split is weaker, and `interval.ts` is the file that feels it.** This was
+asked directly and it deserves a direct answer rather than reassurance.
+
+*Is `interval.ts` still carrying its weight, or does the split now exist only to satisfy the scan?*
+
+It is still carrying weight, but less, and the *kind* of weight has changed. Before the ruling the
+split had two independent justifications: each file absorbs one §1.4 ambiguity (A-1, A-4, ADR-0001),
+**and** the three types composed, so the decomposition expressed a relationship the compiler enforced.
+The second justification is gone. What remains for `interval.ts` is the `Interval` type — which still
+has consumers outside the domain, where imports are permitted — plus `occupancyInterval` as A-4's
+named seam, plus one addition. A reader can now reasonably ask why that addition is not simply inlined
+where it is needed, and the answer is A-4 and QS-12 rather than cohesion.
+
+So: **the split is no longer self-justifying and now rests on the containment criterion alone.** That
+is a real weakening. It is not fatal — AC-5 and QS-12 are exactly a containment criterion, all three
+files still hold a distinct §1.4 ambiguity, and the whole point of QS-12 is that a change lands in one
+file — but "the scan requires it" is a thinner reason than "the types require it", and a later slice
+that finds `interval.ts` looking anaemic should read this entry before deleting it.
 
 ### Findings raised by this design
 
@@ -838,11 +1057,11 @@ input cannot distinguish step 4 from step 5, and the reordering mutants survive.
 
 | Section | Edit |
 |---|---|
-| **§5.2** | Correct *"It imports nothing at all — no other module, no npm package, no `node:` builtin"* to *"no module outside `src/domain`, no npm package, no `node:` builtin"*, with §2.0's reason (AC-5 and AC-6 are otherwise jointly unsatisfiable) and the note that `import type` edges are visible to the cruise under `tsPreCompilationDeps`. Update the `interval.ts` / `duration.ts` / `openingHours.ts` rows to the as-built signatures, including that `withinOpeningHours` returns a verdict union rather than a boolean, and why. Extend the *As built* subsection with a `src/domain` row — it stops being empty at this slice, which §5.2 predicted |
+| **§5.2** | **Line 40 is NOT amended. The proposal to amend it is withdrawn**, under the human's ruling that AC-6 is literal — *"imports nothing at all"* is now ratified rather than corrected, and the step-1 draft's argument for changing it rested on a claim (*"jointly unsatisfiable"*) that was false. Still owed: update the `interval.ts` / `duration.ts` / `openingHours.ts` rows to the as-built signatures, which now take primitives rather than domain types; record that `withinOpeningHours` returns a verdict union rather than a boolean, and why; note that composition lives in `src/application` and why (§11 D-01-1). Extend the *As built* subsection with a `src/domain` row — it stops being empty at this slice, which §5.2 predicted |
 | **§8.3** | Add the measured DST facts: the two 2026 transition instants, AC-2's amended pair, AC-3's `00:30 → 02:30`, and the fall-back pair that renders identically. Add §4.2's fixed decision order, and the note that a fall-back day is legitimately longer in absolute terms than the wall clock says. Record the locale pin and `hourCycle: 'h23'` as measured constraints on the rendering |
-| **§8.5** | Record ADR-0013: outside-in tests reach a pure module through the built artifact, and `tests/property/` splits by database need. This is the section that already draws the line §2.2 of `CLAUDE.md` protects, and this ruling sits beside it |
+| **§8.5** | Record ADR-0013's three clauses: outside-in tests reach a pure module through the built artifact, `tests/property/` splits by database need, and **`npm test` runs the two projects as separate invocations with a project that did not run treated as a loud failure** (§6.4). This is the section that already draws the line §2.2 of `CLAUDE.md` protects, and these rulings sit beside it |
 | **§10** | **F-01-1 is already done — corrected at step 1, not owed at step 7** (see §11). Still owed here: narrow QS-9's *"generated instants"* clause to record what the test actually generates (§9.1), and add to QS-12 that the response measure is assumed, not measured (§9.2). Both are as-built corrections and belong at merge, not before |
-| **§11** | ADR-0013 as `status: proposed` is a debt item and appears in the generated table. Add: `occupancyInterval` has no production call site until the booking path (§9.2); QS-12's corpus is nearly empty at this slice; QS-9 examines one zone and one year; and the ICU dependency the `Intl` global introduces |
+| **§11** | ADR-0013 as `status: proposed` is a debt item and appears in the generated table. Add **D-01-1 … D-01-4 verbatim as the cost of a ratified ruling, not as defects** (§11): composition order out of the domain, unit confusion review-caught rather than compiler-caught, the extra branch, and the weakened three-file split. Add also: `occupancyInterval` has no production call site until the booking path (§9.2); QS-12's corpus is nearly empty at this slice; QS-9 examines one zone and one year; and the ICU dependency the `Intl` global introduces |
 | **§12** | The glossary entries below |
 
 **§12 glossary — proposed entries.** Note the ownership: §12's header reads *"Owner: scribe"*, and the
@@ -863,10 +1082,17 @@ design **proposes wording** and does not assume it applies it; the orchestrator 
 
 ### 12.2 ADR-0013
 
-Drafted as `docs/adr/0013-outside-in-tests-exercise-the-built-artifact.md`, `status: proposed`,
-following ADR-0012's convention: the architect proposes at step 1 and the human ratifies at the gate.
-It carries the five options of §6.2, both clauses (the built artifact, and the property-test split),
-and the costs of §6.2 in full.
+`docs/adr/0013-outside-in-tests-exercise-the-built-artifact.md`, `status: proposed`, following
+ADR-0012's convention: the architect proposes at step 1 and the human ratifies at the gate. It carries
+the five options of §6.2 and now **three** clauses of one seam — the built artifact, the property-test
+split, and the invocation split of §6.4.
+
+**Revised in place at the step-2 loopback rather than superseded, and the human has been told so.**
+`CLAUDE.md` §4 says *"Never edit an **accepted** ADR"*; 0013 is `status: proposed` and has never been
+ratified, so the rule does not bind. Superseding a decision nobody has taken manufactures a history of
+a decision that did not happen, which inverts the reason ADRs are immutable in the first place. The
+ADR carries a *Revision before ratification* note saying what changed and why, so the record does not
+depend on this design being read alongside it. The human can overrule the handling.
 
 It is put to the gate rather than taken unilaterally because, while testability is architecture, this
 changes what *outside-in* means operationally for every later property test — and the ownership of the
@@ -874,16 +1100,36 @@ test directories was itself a human ruling at Gate B.
 
 ---
 
-## 13. What step 2 should argue about
+## 13. What step 2 produced
 
-Objections are cheap here and expensive at step 5. The three worth pressing:
+Step 2 did what §6 says it is for: two objections against this design, one of them blocking, and the
+cheapest possible place to find both.
 
-1. **DA-1** — does the test-engineer or implementer read AC-6 as forbidding intra-domain imports? If
-   so it is a DCR to the human, and better raised now than after three modules exist.
-2. **§6.2's option C** — is loading `dist/` a legitimate outside-in boundary, or is it option B with
-   extra steps? The distinction this design rests on is that `dist/` is the published artifact and
-   `src/` is not. If the test-engineer disagrees, option E (defer QS-9) is the next best and the cost
-   is naming it now.
-3. **§5.3's coverage assertions** — the test-engineer owns the file and may have a better mechanism
-   than accumulate-and-assert. The mechanism is negotiable; a property test that cannot demonstrate
-   what it examined is not.
+| | Objection | Outcome |
+|---|---|---|
+| **T-01-2** | The step-1 §8.3 reason 2 was an unmeasured mechanism claim, and false | **Ruled (c), design defect**, naming `CLAUDE.md` §2.4. Loopback **1 of 2**. §6.4 |
+| **T-01-1** | *"AC-5 and AC-6 are jointly unsatisfiable"* was overstated | **Conceded.** The test-engineer's third path is real; the human then ruled AC-6 literal and the design was rebuilt around it. §2.0 |
+
+**Both reviewers disagreed with each other on T-01-1, and the record should show who was right.** The
+implementer argued alongside me that there was no third path, naming the call site
+(`appointmentInterval` must convert minutes to milliseconds) and enumerating two responses to it. The
+test-engineer named a third — change the signature so the conversion happens before the call. **The
+test-engineer was right and the implementer was wrong**, and the error was the same one I made: an
+exhaustiveness claim that had enumerated two options and called it a proof.
+
+**Four corrections were conceded, and two of them were defects in this design rather than refinements
+of it.** They are recorded as defects in the sections they belong to, not softened in a list here:
+
+| | Where | Kind |
+|---|---|---|
+| `> 0` coverage floors pass ~29% of the time under a broken generator | §5.3 | **Defect.** A guard with a 29% false-pass rate is the failure it was built to catch |
+| A substring match on `60000` false-positives on an ordinary `600000` timeout | §7.2 | **Defect.** In a scan asserting *exactly one* match, it points at the wrong file |
+| The parser's range was wrong in the permissive direction (`24:30` is not a `time`) | §3.2 | Correction; it removes a branch reachable only by impossible data |
+| The computed-import hole is no longer closed by review alone | ADR-0013 | Narrowing; the test-engineer is adding a source scan it owns |
+
+**What this slice has now cost, stated plainly.** One (c) loopback, two human rulings, one withdrawn
+arc42 amendment, and four corrections — two of them defects in a design that spends several sections
+telling other roles not to assert mechanisms they have not run. The design is better than it was and
+the process is why; the retro should read the second half of that sentence with the first.
+
+**One loopback remains before §6's automatic escalation.**

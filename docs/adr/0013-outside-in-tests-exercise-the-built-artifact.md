@@ -1,6 +1,6 @@
 ---
 id: "0013"
-title: Outside-in tests reach a pure module through the built artifact, and property tests split by database need
+title: Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost
 status: proposed
 date: 2026-09-04
 supersedes: null
@@ -22,7 +22,31 @@ ai-input: >
   authority under CLAUDE.md §6, but it changes what *outside-in* means operationally for every later
   property test, and the ownership of the test directories was itself a human ruling at Gate B — so it
   is put to the gate rather than taken unilaterally.
+
+  REVISED IN PLACE 2026-09-05, before ratification, after the test-engineer measured that the second
+  clause as first written did not do what it claimed. See "Revision before ratification" below. The
+  human was told this is how it is being handled and can overrule it.
 ---
+
+## Revision before ratification — 2026-09-05
+
+This ADR was revised in place at slice 01's step-2 loopback rather than superseded. `CLAUDE.md` §4
+says *"Never edit an **accepted** ADR"*; this one is `status: proposed` and has never been ratified,
+so the rule does not bind — and superseding a decision nobody has taken manufactures a history of a
+decision that did not happen, which inverts the reason ADRs are immutable. The orchestrator confirmed
+the reading rather than overruling it.
+
+**What changed.** The second clause originally said that splitting `tests/property/` between the `db`
+and `nodb` *projects* keeps a container failure from destroying a slice's red evidence. Measured with
+`DOCKER_HOST` pointed at nothing, that is false: `npx vitest run` aborts in
+`TestProject._initializeGlobalSetup` and writes a `test-results.json` with **0 test files and 0
+tests**, discarding the `nodb` project's results, while `npx vitest run --project nodb` alone passes 94
+tests across 7 files. `red-proof --results` reads the combined file, so the red could arrive as an
+empty results file and `CLAUDE.md` §2.4's *"observed red in CI"* would not be met.
+
+The project split was necessary and never sufficient. A third clause — the invocation split — is added
+below, and the *Bad, or deferred* list is narrowed where the test-engineer closed a hole it named.
+Nothing in the Decision was reversed; one clause was found to be doing less than it claimed.
 
 ## Context and problem statement
 
@@ -86,11 +110,17 @@ precisely the trap slice 00's design was built to avoid, and it is the same crit
 And, orthogonally, for the container seam: **keep `tests/property/**` in the `db` project**, or **split
 it** by whether the property needs a database.
 
+And, once the project split was measured insufficient: **keep one `vitest run` over both projects** and
+accept that a `globalSetup` abort discards everything, or **split the invocation** so each project's
+results survive the other's failure.
+
 ## Decision
 
 Chosen option: **C — outside-in tests reach a pure module through the built artifact** — together with
 **splitting `tests/property/` by database need**, on the naming convention `*.db.test.ts` for the
-tests that need a container and the `nodb` project for everything else under that directory.
+tests that need a container and the `nodb` project for everything else under that directory, **and
+splitting the test run itself so that no project's results can be discarded by another project's
+failure**.
 
 `.dependency-cruiser.js` is **not amended.** `outside-in-tests-do-not-import-src` stays absolute, and
 so does `domain-is-pure`.
@@ -129,6 +159,26 @@ Scope of the ruling, so no later slice has to guess:
   reason that file already documents and for a second one: Stryker's sandbox may not hold a current
   `dist/`.
 
+**Third clause — the invocation split.** `npm test` becomes `tools/ci/run-tests.mjs`, which:
+
+1. runs the two projects as **two separate `vitest run` invocations**, each writing its own JSON, and
+   runs the second regardless of the first's exit code;
+2. merges them into the single `test-results.json` that `red-proof --results` reads, preserving 00a's
+   single-file invocation contract so `red-proof`'s interface does not change;
+3. **treats a project that did not run as a loud, distinct, non-zero failure and never as an empty
+   contribution** — a missing or zero-file project JSON fails the step before `red-proof` is reached.
+
+Clause 3 is not optional and is the reason this is a decision rather than a chore. With 1 and 2 alone,
+a `db` project that never ran merges as *zero failures*, which is indistinguishable from a `db` project
+in which everything passed — 00a's "a cruise that exits 0 says nothing about what it examined", one
+level up, and worse than the defect it replaces: conditional on Docker before, invisible on every
+slice after.
+
+It is built as orchestrator tooling prep rather than slice work, by the human's ruling of 2026-09-05,
+on the precedent of `fast-check` and the phase-4 C7 cluster: it touches CI, `package.json` and
+`tools/`, and no `src/`. Slice 01's declared scope is unchanged. It gets `tools/test/run-tests.test.mjs`
+like every other tool, and is checked against mutants rather than asserted to discriminate.
+
 ## Consequences
 
 **Good**
@@ -148,7 +198,11 @@ Scope of the ruling, so no later slice has to guess:
   by a runtime shape assertion. A signature change that a compiler would have caught now surfaces as a
   test failure instead.
 - **`dependency-cruiser` cannot see a computed dynamic import.** The same technique would let a future
-  test import `src/` invisibly. Nothing structural prevents it; only review does. arc42 §11 carries it.
+  test import `src/` invisibly. **Narrowed at the step-2 revision**: the test-engineer is adding a
+  source scan it owns, under `tests/architecture/`, that fails when an outside-in test file references
+  `src/` by any route — which catches the computed form the cruise cannot. So this is no longer
+  *"review is the only thing standing there"*; it is a second mechanism, owned by the role that would
+  be the one to breach it. arc42 §11 carries what remains.
 - **A dependency on the build.** A stale `dist/` produces a green or a confusing red. `pretest` and
   `pretest:nodb` close the two paths that exist today; a third would need the same treatment.
 - ~~One mechanical unknown~~ — **measured before this ADR was accepted**, not left as a promise: a
@@ -161,6 +215,11 @@ Scope of the ruling, so no later slice has to guess:
 - A filename convention (`*.db.test.ts`) is a weaker guarantee than a directory the tooling enforces. A
   test that forgets the suffix runs without a container and fails on connection — loudly, which is the
   acceptable direction, but it is a convention rather than a constraint.
+- **The second clause was published claiming a protection it did not provide**, and it took a
+  reviewer's objection and a measurement to find. The clause is now two mechanisms rather than one,
+  but the general lesson is the one the phase-4 retro already recorded and this ADR failed to apply to
+  itself: naming a mechanism's capability is not naming its configuration, and the configuration here
+  was what `npm test` actually invokes.
 
 ## Pros and cons of the options
 
@@ -219,6 +278,16 @@ Scope of the ruling, so no later slice has to guess:
   someone who has since read the implementation.
 - Worth keeping as the fallback if the human rejects Option C, and the cost of that fallback is named
   here rather than discovered then.
+
+### The invocation seam — keep one `vitest run` over both projects
+
+- Good, because it is the status quo, needs no new tooling, and keeps one command as the whole story.
+- Good, because it produces `test-results.json` with no merge step, and a merge step is a new place to
+  be wrong about what ran.
+- **Bad, decisively, and measured:** a `globalSetup` abort in either project discards the other's
+  results entirely — 0 files, 0 tests — so `red-proof` sees no failing suite and §2.4's *observed red
+  in CI* is not met. The failure mode is not hypothetical; it is what `vitest.config.ts`'s own comment
+  already warned about, one level up from where it was written.
 
 ### The container seam — keep `tests/property/**` in the `db` project
 
