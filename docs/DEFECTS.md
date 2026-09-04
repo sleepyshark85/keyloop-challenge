@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **58** |
-| Severity | 9 blocking · 34 major · 15 minor |
-| Verdicts | 4 narrowed · 29 accepted · 1 escalated · 3 deferred |
-| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · architect 6 · orchestrator 6 · human 1 |
+| Findings recorded | **59** |
+| Severity | 9 blocking · 35 major · 15 minor |
+| Verdicts | 4 narrowed · 30 accepted · 1 escalated · 3 deferred |
+| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · orchestrator 7 · architect 6 · human 1 |
 | Awaiting a ruling | **21** |
-| Mean escape distance | 1.62 step(s) |
+| Mean escape distance | 1.61 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -440,6 +440,22 @@ rather than narrated.*
 - *scenario:* AC-10 said A and B are on the same bay AND technician and asserted rejection at 23P01 on no_bay_overlap. Sharing the technician makes no_technician_overlap violable too, and section 11.2 A-2 says which of two simultaneously violable exclusion constraints PostgreSQL reports is index order and not a guarantee. Measured: the literal fixture passes on 16.15 for exactly that reason. The wording came from the test-engineer own step-5 recommendation and the human ruled on it in good faith. In its words, a defect I introduced at the moment I was arguing hardest that nobody should rest an assertion on A-2.
 - *file:* `docs/slices/00-schema-and-exclusion-constraints.md`
 - *accepted* by human — Ruled (a) clarification by the human: delete and technician from AC-10. Everything the criterion asserts is preserved — consequence 4, the rejection at no_bay_overlap, B unchanged — and no_bay_overlap becomes the only violable constraint, so the assertion is evidence rather than a coin flip. The committed test already matches the clarified wording, because the test-engineer wrote the case correctly and raised the contradiction instead of following the criterion into a fixture it knew was wrong. Two alternatives rejected: widening the assertion to accept either constraint name, which would stop discriminating a constraint keyed on the wrong column and reopen T-4; and making the test match the AC literally, which would have it pass by index order.
+
+</details>
+
+## Slice 01
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **O-13** | MAJOR | 1 *(+1)* | orchestrator | AC-2's worked example is unsatisfiable: it describes Europe/London at UTC minus 1, an offset the zone never has | accepted |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**O-13** — AC-2's worked example is unsatisfiable: it describes Europe/London at UTC minus 1, an offset the zone never has
+
+- *scenario:* AC-2 reads 'the instant that is 08:30 local but 09:30 UTC is rejected and its counterpart accepted'. Europe/London is GMT (UTC+0) or BST (UTC+1), so local is never behind UTC and no instant is both 08:30 local and 09:30 UTC. Measured: 2026-03-28T08:30Z renders 08:30 local and is rejected against 09:00-17:00, while 2026-03-29T08:30Z renders 09:30 local and is accepted — which is the DST pair the criterion is plainly reaching for, with UTC and local transposed. Raised at step 1 rather than discovered at step 3, where the test-engineer would have had to either assert something impossible or silently reinterpret an acceptance criterion. Acceptance criteria are the human's under section 6, so this is not the architect's to fix.
+- *file:* `docs/slices/01-domain-policy-core.md`
+- *accepted* by human — Ruled a wording defect, not a design defect: AC-2's substance stands and only its illustrative pair was corrected, to 2026-03-28T08:30Z rejected at 08:30 local GMT and 2026-03-29T08:30Z accepted at 09:30 local BST. Decided by the human because section 6 reserves acceptance criteria to the human and the architect may not change them. Two things worth keeping about how it was found. It was caught at step 1 by checking the criterion against real Intl offsets before anyone was dispatched, not by reading it — the same operational rule the phase-4 retro produced, that a claim about a mechanism needs the mechanism run. And it is the second acceptance criterion in two slices to need a human ruling mid-slice, after AC-10 at slice 00; both were defects in what the criteria said rather than in what anyone built, which is an argument about where this process's remaining risk actually sits.
 
 </details>
 
