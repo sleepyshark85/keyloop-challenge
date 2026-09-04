@@ -13,21 +13,44 @@
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
   packageManager: 'npm',
-  testRunner: 'vitest',
 
-  // A dedicated config rather than the test-engineer's: the vitest runner cannot
-  // select one project (its schema offers only `dir`, `related` and `configFile`,
-  // and `dir` does not override a project's `include`), and `nodb` spans both
-  // tests/unit and tests/architecture. See vitest.mutation.config.ts for why the
-  // architecture tests are excluded — briefly, they assert the ruleset rather than
-  // `src/`, so they would survive every mutant and inflate the score.
-  // `related: false` because Vitest's related-mode maps a mutated file to its tests
-  // through the import graph, and it resolves nothing here: the unit tests import
-  // `../../../src/...` with an explicit `.js` extension (NodeNext), which does not
-  // match the mutant's own path. Measured — with related on, Stryker instrumented
-  // 142 mutants and then reported "No tests were found". Running the whole `nodb`
-  // project per mutant is cheap: it is 54 tests with no container.
-  vitest: { configFile: 'vitest.mutation.config.ts', related: false },
+  // THE COMMAND RUNNER, NOT THE VITEST RUNNER, AND THIS IS THE WHOLE REASON.
+  //
+  // `@stryker-mutator/vitest-runner@10.0.0` does not activate mutants under `vitest@5.0.0`.
+  // Its peer range is `vitest: ">=2.0.0"`, so npm warns about nothing — the same shape as
+  // dependency-cruiser's typescript range (F4), and the same shape as everything else this
+  // slice found: a tool reporting a number over work it never did.
+  //
+  // Measured, on the run that produced the 6.34 score the human ruled BLOCKING:
+  //
+  //   - 118 of the 130 "survivors" had `testsCompleted: 0` in mutation.json. Stryker ran
+  //     NO tests against them and recorded them as survived.
+  //   - Every mutant of `src/application/checkHealth.ts` survived, including the one that
+  //     empties the whole function body — against a file with six dedicated tests.
+  //   - Taking Stryker's OWN sandbox, unmodified, and activating that mutant by hand the
+  //     documented way — `__STRYKER_ACTIVE_MUTANT__=0 npx vitest run -c
+  //     vitest.mutation.config.ts` — five of those tests FAIL. The mutant is killed. The
+  //     runner simply never ran them.
+  //   - Same tree, same mutants, command runner: 76.06 rather than 6.34, and
+  //     `config.ts` 90.28 rather than 1.39.
+  //
+  // (A second, unrelated defect in the same runner: `--logLevel debug` crashes it outright
+  // with "Converting circular structure to JSON" from vitest-test-runner.js:95, which
+  // JSON.stringifies the resolved vitest config. So the integration cannot even be debugged
+  // through its own logging.)
+  //
+  // The command runner has no framework integration to break: Stryker sets
+  // `__STRYKER_ACTIVE_MUTANT__` in the environment, runs the command, and reads the exit
+  // code. It is the same thing a person does by hand, which is why it is trustworthy — and
+  // for a suite this size the cost is nothing: 142 mutants in ~33 seconds.
+  testRunner: 'command',
+  commandRunner: { command: 'npx vitest run -c vitest.mutation.config.ts' },
+
+  // `off` rather than `all` or `perTest`: without a framework integration there is no
+  // per-test attribution to collect, so every mutant runs the whole 47-test suite. That is
+  // the conservative direction — a mutant is never skipped as "not covered" — and it is
+  // what makes "Ran 1.00 tests per mutant" in the output mean one full suite run.
+  coverageAnalysis: 'off',
 
   mutate: [
     'src/**/*.ts',
@@ -47,17 +70,8 @@ export default {
   // Survivors are the deliverable, so they must be readable without opening the HTML.
   clearTextReporter: { allowColor: true, maxTestsToLog: 3 },
 
-  // `all` rather than the default `perTest`. Measured: with perTest, the dry run
-  // ran all 43 unit tests successfully and then reported 142 of 142 mutants as
-  // "no coverage" — a 6.34 score that says nothing about the tests. perTest needs
-  // the runner to attribute executed lines to individual tests, and the vitest
-  // runner does not do so for modules imported at the top of a spec, which is how
-  // every one of these tests imports its subject. `all` runs the whole suite per
-  // mutant; at 43 tests with no container that costs seconds.
-  coverageAnalysis: 'all',
-
   concurrency: 4,
-  timeoutMS: 20000,
+  timeoutMS: 60000,
   tempDirName: 'node_modules/.cache/stryker-tmp',
   disableTypeChecks: 'src/**/*.ts',
 };
