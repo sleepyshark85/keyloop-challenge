@@ -93,7 +93,15 @@ function jobsOf(ghRun, done = true) {
     // run's jobs are classified at all; anything else would put a FAIL in the record for a
     // job that has not yet had the chance to pass.
     if (!done && job.status !== 'completed') continue;
-    jobs[jobKey(job.name)] = passFail(job.conclusion);
+
+    // ON A KEY COLLISION, FAIL WINS. Two jobs can slug to the same key — a matrix, a
+    // renamed job, any two display names differing only in punctuation — and a plain
+    // assignment is last-write-wins, so a later PASS would overwrite an earlier FAIL and
+    // the record would stringify without it. That is constraint 2 corrupted inside the
+    // function that exists to enforce it, and it would read as a green run at the gate.
+    const key = jobKey(job.name);
+    const verdict = passFail(job.conclusion);
+    jobs[key] = jobs[key] === 'FAIL' ? 'FAIL' : verdict;
   }
   return jobs;
 }
