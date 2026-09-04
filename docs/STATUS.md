@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `6a8e2fd Merge pull request #6 from sleepyshark85/slice/00-schema-and-constraints` |
+| Last commit | `42b9c8a chore(gate-e): slice 00 done — the pilot's own checks all pass` |
 | Gates decided | A, B, C, E, E, E |
 | Agent runs recorded | 46 |
 | ADRs accepted | 10 |
