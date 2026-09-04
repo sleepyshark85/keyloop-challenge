@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **56** |
-| Severity | 9 blocking · 32 major · 15 minor |
-| Verdicts | 4 narrowed · 24 accepted · 1 escalated · 4 deferred |
-| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · architect 6 · orchestrator 5 |
+| Findings recorded | **57** |
+| Severity | 9 blocking · 33 major · 15 minor |
+| Verdicts | 4 narrowed · 25 accepted · 1 escalated · 4 deferred |
+| Raised by | reviewer 17 · test-engineer 16 · implementer 12 · architect 6 · orchestrator 5 · human 1 |
 | Awaiting a ruling | **23** |
-| Mean escape distance | 1.46 step(s) |
+| Mean escape distance | 1.54 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -300,6 +300,7 @@ rather than narrated.*
 | ref | sev | step | raised by | claim | verdict |
 |---|---|---|---|---|---|
 | **O-8** | MAJOR | 6 *(+6)* | orchestrator | The committed resume point advances the phase on a per-slice gate, so the first slice of the slice loop reports the project as finished building | accepted |
+| **O-11** | MAJOR | 6 *(+6)* | human | The committed resume point told a fresh session to do work that was already done and merged | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -308,6 +309,12 @@ rather than narrated.*
 - *scenario:* generate.mjs infers position as the phase after the last gate.decided, matching PHASES[p][1].startsWith(gate). PHASES[5][1] is the string E (per slice), so any gate E matches and reports current phase 6, Consolidation. Gate E fires on EVERY slice by design, so the first slice gate of phase 5 would report consolidation with twelve slices unbuilt. Observed live at slice 00a gate E: STATUS.md regenerated to phase 6 while the scope marker said 4 and the pilot had not run. STATUS.md is the file a resuming session reads first and its own header tells the reader to trust it over narration.
 - *file:* `tools/status/generate.mjs`
 - *accepted* by orchestrator — Fixed rather than deferred, unlike O-3, O-6 and O-7. Those mis-report a gate the human is standing in front of; this one mis-reports where the project is to a session that has no other context, and it would have fired on the first real slice regardless of how slice 00a gate was recorded. Per-slice gates now close nothing: PER_SLICE_GATES holds E and the inference skips it. STATUS.md is back to phase 4. Note the shape it shares with the deferred three — the generator agreed with itself right up until a gate was actually decided, so nothing was wrong until the first time it mattered.
+
+**O-11** — The committed resume point told a fresh session to do work that was already done and merged
+
+- *scenario:* STATUS.md what-happens-next was a static string per phase. After both pilot slices were done and the retro written, it still read Run slice 00 end-to-end, then hold the retro against process-criteria.md. A fresh session reading the file the project designates as its resume point — and whose own header says to trust it over narration — would have re-run a completed slice. Found by the human asking whether a fresh session would know where to start, which is the second time that question has caught this file: O-8 was the same file advancing the phase on a per-slice gate.
+- *file:* `tools/status/generate.mjs`
+- *accepted* by orchestrator — Fixed rather than deferred, for the same reason O-8 was: this file misreports where the project is to a session with no other context. The next action is now derived from the log — which pilot slices carry slice.done, and whether the retro handoff exists — so it reports Gate D open and undecided with the failing criteria named. Nine cases pin it, including the exact regression: with both slices done it must NOT still say run slice 00 end-to-end. Note the shape, which is the retro own finding one level up: a static string is a claim about the world that nothing re-derives, so it is right until the world moves and then wrong silently. Both O-8 and O-11 were caught by the human asking whether a fresh session would know where to start, not by the suite; now the suite asks it.
 
 </details>
 

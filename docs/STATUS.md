@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `42b9c8a chore(gate-e): slice 00 done — the pilot's own checks all pass` |
+| Last commit | `0c47f6e Merge pull request #7 from sleepyshark85/phase/04-retro-final` |
 | Gates decided | A, B, C, E, E, E |
 | Agent runs recorded | 46 |
 | ADRs accepted | 10 |
@@ -24,8 +24,11 @@
 
 ## What happens next
 
-- Run slice 00 end-to-end, then hold the retro against `team-log/process-criteria.md`.
-- **Gate D**: tune the machine, or proceed.
+- **Both pilot slices are done and the retro is written** — see [`team-log/phase-4-retro.md`](team-log/phase-4-retro.md).
+- Verdict: C1 PASS · C2 PASS on git, weakened on hooks · C3 PASS · C4 PASS · **C5 FAIL** · **C6 FAIL** · C7 PASS with three open defects · C8 the human's.
+- Two non-fatal criteria fail and neither is C1 nor C2, so the pre-registered decision rule reads: **tune the mechanisms and proceed to slice 01, no second pilot.**
+- **Gate D is open and undecided.** C6 is the one needing a ruling — its own wording says the response to a breach is to cut slices or reduce agent count, not to proceed and hope.
+- Open findings are in [`DEFECTS.md`](DEFECTS.md); the C2 and C7 clusters are what the retro says to tune first.
 
 ## Gate decisions
 
