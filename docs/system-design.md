@@ -80,6 +80,8 @@ without taking anyone's word for it.
 - [**ADR-0013**](adr/0013-outside-in-tests-exercise-the-built-artifact.md) — Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost *(accepted)*
 - [**ADR-0014**](adr/0014-an-instant-is-renderable-by-construction.md) — An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary *(accepted)*
 - [**ADR-0015**](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) — An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days *(accepted)*
+- [**ADR-0016**](adr/0016-a-capacity-refusal-requires-a-database-verdict.md) — A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification *(proposed)*
+- [**ADR-0017**](adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) — Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them *(proposed)*
 
 ---
 
