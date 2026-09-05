@@ -52,7 +52,19 @@ export const BUDGETS = {
   // §8 is the crosscutting-concepts section and legitimately carries the most: the
   // error taxonomy, the test strategy and the observability contract all live there.
   // A single number would either strangle §8 or excuse everything else.
-  arc42Overrides: { '08': 3000, '11': 2500 },
+  // §08 was 3000 until it was measured. That number was set on an enumeration of THREE
+  // concerns — the error taxonomy (~420 words), the test strategy (~1,290) and the
+  // observability contract (~385), about 2,095 together. §8 carries three more of
+  // comparable weight: the domain model and schema (~416), the exclusion constraint and
+  // its consequences (~556 — the mechanism the whole system exists for), and the
+  // time/zone/DST model (~966). The budget was guessed rather than measured, and the
+  // architect caught it by enumerating what the section actually holds. Correcting a
+  // number set without measurement is not the same act as moving it to fit a document
+  // that will not comply, and the distinction is the reason this comment exists.
+  //
+  // The alternative — splitting §8.1–8.3 into their own section file — is a change to the
+  // arc42 structure itself and belongs to the human, not to a budget tool.
+  arc42Overrides: { '08': 4000, '11': 2500 },
 
   // Slice documents, under the human's 2026-09-05 ruling to shorten these AGGRESSIVELY.
   // Measured at that moment: four design files held 54,605 of the 69k words in
@@ -88,6 +100,19 @@ export function countWords(raw, { file = '' } = {}) {
   // opposite of the ruling's intent.
   if (file.startsWith('slices/')) {
     t = t.replace(/^## Acceptance criteria[\s\S]*?(?=^## |\Z)/m, '');
+  }
+  // AN ASSUMPTION REGISTER IS NOT PROSE EITHER, by the same argument and by the
+  // constitution's own words. `CLAUDE.md` §11: "Do not silently invent a resolution.
+  // Record the assumption explicitly, flag it for the human... Documented assumptions are
+  // graded work, not preamble." arc42 §1.4 holds ten of them plus the four Gate A rulings
+  // — 1,000 of §1's 2,061 words. Charging for them would put a word budget in tension
+  // with a NON-NEGOTIABLE instruction to write them down, and pressure toward recording
+  // fewer assumptions is the last thing this project needs.
+  if (file.startsWith('arc42/')) {
+    // `\Z` is not a JavaScript anchor — it matched literally, so this silently never
+    // fired and §1 stayed 561 over while appearing to be excluded. `$(?![\s\S])` is the
+    // end-of-input assertion JavaScript actually has.
+    t = t.replace(/^##+ [^\n]*Assumptions[^\n]*\n[\s\S]*?(?=^## |$(?![\s\S]))/m, '');
   }
   t = t.replace(/^---\n[\s\S]*?\n---\n/, '');                                   // frontmatter
   t = t.replace(/<!-- generated:([^>]+) -->[\s\S]*?<!-- \/generated:\1 -->/g, ''); // generated

@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `6c9fbf1 docs(slices): the tombstones told Gate D's ruling three times` |
+| Last commit | `7b6aeee docs(arc42): condense seven sections under the human's concision ruling` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process |
-| Agent runs recorded | 62 |
+| Agent runs recorded | 71 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -162,7 +162,16 @@
 | 2026-09-05 06:08 | architect | 12m50 | 232 / 9,551 / 11,127,069 | `derived` |
 | 2026-09-05 06:15 | architect | 20m00 | 330 / 17,971 / 19,192,822 | `derived` |
 | 2026-09-05 07:56 | architect | 51m05 | 322 / 64,843 / 30,066,861 | `derived` |
-| | **total** | **4089m06** | **16,326 / 1,343,631 / 1,267,262,205** | |
+| 2026-09-05 11:05 | architect | 47m58 | 484 / 61,811 / 76,137,187 | `derived` |
+| 2026-09-05 11:45 | architect | 10m40 | 140 / 18,179 / 5,320,894 | `derived` |
+| 2026-09-05 11:53 | architect | 19m04 | 152 / 18,195 / 5,735,818 | `derived` |
+| 2026-09-05 12:01 | architect | 26m54 | 160 / 18,209 / 5,917,860 | `derived` |
+| 2026-09-05 12:03 | architect | 28m20 | 168 / 18,222 / 6,400,889 | `derived` |
+| 2026-09-05 12:04 | architect | 29m51 | 176 / 18,238 / 6,893,173 | `derived` |
+| 2026-09-05 12:09 | architect | 34m12 | 184 / 18,251 / 7,393,653 | `derived` |
+| 2026-09-05 12:13 | architect | 38m10 | 526 / 30,658 / 60,240,776 | `derived` |
+| 2026-09-05 12:14 | architect | 40m06 | 262 / 22,175 / 12,916,581 | `derived` |
+| | **total** | **4364m22** | **18,578 / 1,567,569 / 1,454,219,036** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
