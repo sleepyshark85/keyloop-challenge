@@ -139,6 +139,40 @@ function renderLocal(epochMillis: number, formatter: Intl.DateTimeFormat): Local
   };
 }
 
+/**
+ * The local calendar date immediately following `localDate`, as the same `YYYY-MM-DD` string
+ * `renderLocal` produces. ADR-0015: **"immediately following" is a CALENDAR-DATE SUCCESSOR
+ * TEST, not epoch arithmetic** — a DST transition changes how many milliseconds a local day
+ * holds, and this function's entire subject is DST.
+ *
+ * Month and year rollover are delegated to `Date.UTC`, exactly as §4.1 delegates the day of week
+ * to `Intl` rather than hand-rolling a calendar: a second calendar implementation inside the one
+ * module that must not be subtly wrong is the risk this design rejects. `Date.UTC` is used only
+ * as an arithmetic-free date successor here; no instant, zone or wall clock is derived from it.
+ *
+ * Returns `''` — a value no rendering can equal — for anything it cannot advance. Two residues,
+ * named rather than promised away, and both fail CLOSED (the interval stays `spans-local-days`,
+ * which is a refusal):
+ *
+ *  - a date beyond `Date`'s own range, which `Math.abs(...) <= MAX_RENDERABLE_EPOCH_MILLIS` at
+ *    step 1 already makes unreachable from a bounded interval;
+ *  - a BC date. `Intl` with no `era` renders year 271822 BC as `"271822"`, so the successor
+ *    computed here counts the wrong way. The comparison is still total and still refuses.
+ */
+function nextLocalDate(localDate: string): string {
+  const match = /^(\d+)-(\d{2})-(\d{2})$/.exec(localDate);
+  if (match === null) return '';
+
+  // `setUTCFullYear` rather than `Date.UTC`, which maps years 0-99 onto 1900-1999.
+  const next = new Date(0);
+  next.setUTCFullYear(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + 1);
+  const year = next.getUTCFullYear();
+  if (!Number.isFinite(year)) return '';
+
+  const pad = (value: number, width: number): string => String(value).padStart(width, '0');
+  return `${pad(year, 4)}-${pad(next.getUTCMonth() + 1, 2)}-${pad(next.getUTCDate(), 2)}`;
+}
+
 // ───────────────────────────────────────────────────── §4.2: the decision procedure ──
 
 /**
@@ -188,7 +222,25 @@ export function withinOpeningHours(
 
   // 4. Both endpoints must fall within one day's opening hours — no weekly schedule can
   // contain an interval crossing local midnight.
-  if (start.localDate !== end.localDate) {
+  //
+  // ADR-0015, before the `startsOn !== endsOn` comparison: an end rendering as EXACTLY
+  // `00:00:00` AND on the local date IMMEDIATELY FOLLOWING the start's is the CLOSE of the
+  // start's day, not the opening of the next one, so it is `secondsOfDay = 86400` on the
+  // start's day. Step 7 then compares 86400 <= 86400 for a dealership closing at '24:00:00'
+  // (within, AC-17) and 86400 <= 61200 for one closing at 17:00 (outside-window, and for the
+  // right reason). Nothing downstream changes.
+  //
+  // BOTH CLAUSES ARE LOAD-BEARING and each is killed by a different case:
+  //   - drop `secondsOfDay === 0` and a 23:00-01:00 crossing normalises to midnight and is
+  //     accepted — AC-18 catches it;
+  //   - drop the successor test and a 49-hour interval ending at local midnight two days later
+  //     normalises into the start's day and is silently accepted — AC-18 cannot see that,
+  //     because AC-18's end IS on the immediately following day. P-M2 catches it.
+  const endsAtLocalMidnight =
+    end.secondsOfDay === 0 && end.localDate === nextLocalDate(start.localDate);
+  const endSecondsOfDay = endsAtLocalMidnight ? 86_400 : end.secondsOfDay;
+
+  if (!endsAtLocalMidnight && start.localDate !== end.localDate) {
     return { kind: 'spans-local-days', startsOn: start.localDate, endsOn: end.localDate };
   }
 
@@ -206,7 +258,8 @@ export function withinOpeningHours(
   }
 
   // 7. Inclusive on closesAt: a job ending exactly at closing time is within opening hours.
-  if (opensSeconds <= start.secondsOfDay && end.secondsOfDay <= closesSeconds) {
+  // `endSecondsOfDay` is step 4's normalisation, not `end.secondsOfDay` — see ADR-0015.
+  if (opensSeconds <= start.secondsOfDay && endSecondsOfDay <= closesSeconds) {
     return { kind: 'within' };
   }
 
