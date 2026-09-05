@@ -169,6 +169,38 @@ const VIOLATING_SOURCES: Record<string, string> = {
   'src/domain/bad.ts':
     "import { config } from '../platform/config.js';\nexport const port = config.port;\n",
 
+  // domain-is-pure, THE INTRA-DOMAIN FORM — R-01-3, and the reason it is a separate file.
+  //
+  // AC-6's second clause reads "the domain-is-pure rule holds with NO ALLOWLIST", and the
+  // human ruled at slice 01's gate that `to: { pathNot: '^src/domain/' }` IS one: a standing
+  // exemption for exactly the class of import the literal AC-6 ruling had just forbidden. The
+  // case above cannot see that. It plants its violation OUTSIDE the domain
+  // (src/domain/bad.ts -> src/platform/config.ts), which the carve-out never covered, so it
+  // passed identically before and after the carve-out was removed. The rule's most important
+  // claim — a domain module may not import a SIBLING — had never been exercised by anything.
+  //
+  // THE MUTANT, measured three times independently (test-engineer, architect out of tree,
+  // orchestrator), and the third row is this case's whole justification:
+  //
+  //   to: {}                          clean tree      -> no violations, 54 modules cruised
+  //   to: {}                          this fixture    -> domain-is-pure: interval.ts -> duration.ts
+  //   to: { pathNot: '^src/domain/' } this fixture    -> CLEAN, at 91 dependencies (up from 90)
+  //
+  // The dependency count in the third row is the detail worth keeping: the cruise demonstrably
+  // SAW the edge and the old rule chose not to object. A green from a rule that never looked
+  // and a green from a rule that looked and shrugged are indistinguishable from the outside,
+  // which is why the control has to name the rule rather than count violations.
+  //
+  // Named after the real pair on purpose. `interval.ts` importing `durationMillis` from
+  // `duration.ts` is the concrete regression this guards — it is the import a future
+  // implementer would reach for first, and under the old `to` it would have merged green.
+  'src/domain/duration.ts':
+    'export const durationMillis = (minutes: number): number => minutes * 60_000;\n',
+  'src/domain/interval.ts':
+    "import { durationMillis } from './duration.js';\n" +
+    'export const endsAt = (startsAt: number, minutes: number): number =>\n' +
+    '  startsAt + durationMillis(minutes);\n',
+
   // sql-only-in-persistence: TYPE-ONLY on purpose. Without `tsPreCompilationDeps: true`
   // this import is erased before dependency-cruiser sees it and the rule stops catching the
   // most likely way infrastructure enters a layer that forbids it. A value import would
@@ -368,6 +400,9 @@ describe('AC-4 — every layering rule fires by name against an injected violati
 
   it.each([
     ['domain-is-pure', 'src/domain/bad.ts', 'src/platform/config.ts'],
+    // R-01-3: the intra-domain form. Restore `to: { pathNot: '^src/domain/' }` in
+    // .dependency-cruiser.js and this row alone fails while every other case stays green.
+    ['domain-is-pure', 'src/domain/interval.ts', 'src/domain/duration.ts'],
     ['sql-only-in-persistence', 'src/application/bad.ts', 'node_modules/kysely'],
     ['http-must-not-reach-persistence', 'src/http/bad.ts', 'src/persistence/db.ts'],
     ...OUTSIDE_IN_VIOLATIONS.map(
@@ -434,6 +469,7 @@ describe('AC-4 — every layering rule fires by name against an injected violati
     // catches a rule firing on a file nobody planted a violation in.
     const expected = [
       'src/domain/bad.ts',
+      'src/domain/interval.ts',
       'src/application/bad.ts',
       'src/http/bad.ts',
       ...OUTSIDE_IN_VIOLATIONS.map(([, from]) => from),
