@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `e6e4bec test(02): the split assertion compares two renderings of one fact (I-02-9)` |
+| Last commit | `95e4f9f chore(02): I-02-9 ruled (a); the suite is green` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process |
 | Agent runs recorded | 84 |
 | ADRs accepted | 13 |
