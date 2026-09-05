@@ -21,7 +21,14 @@
  * `time_zone` below is the only reason this file carries a zone identifier at all. QS-12's
  * `zone-transport` marker permits it here: naming a column is transport, not reasoning — nothing
  * in this file interprets the value, and nothing can, because it is a type declaration.
+ *
+ * `Generated<T>` marks the three columns `0003_appointment.sql` gives a DEFAULT — `status`,
+ * `created_at`, `updated_at`. It is not decoration: it is what makes them optional on an INSERT
+ * and present on a SELECT, so `insertAppointment` CANNOT set a status. Slice 05 cancels through
+ * an UPDATE, and until then "an appointment is created confirmed" is the database's statement
+ * rather than a value the application repeats.
  */
+import type { Generated } from 'kysely';
 
 /** `appointment` — the one table the API writes (`0003_appointment.sql`). */
 export interface AppointmentTable {
@@ -35,9 +42,9 @@ export interface AppointmentTable {
   starts_at: Date;
   ends_at: Date;
   /** The `appointment_status` enum. `cancelled` is slice 05's; the column exists today. */
-  status: 'confirmed' | 'cancelled';
-  created_at: Date;
-  updated_at: Date;
+  status: Generated<'confirmed' | 'cancelled'>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
 }
 
 /** `dealership` — reference data (`0002_reference_data.sql`), never written by the API (A-7). */
