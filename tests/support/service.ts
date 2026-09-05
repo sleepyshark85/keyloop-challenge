@@ -54,6 +54,41 @@ export interface StartedService {
   readonly baseUrl: string;
   readonly port: number;
   stop(): Promise<void>;
+  /**
+   * Everything the child has written so far, verbatim. Slice 02, I-02-6.
+   *
+   * AC-3 and AC-4 require the test to observe THE NAME OF THE CONSTRAINT PostgreSQL
+   * reported, and an outside-in test can observe exactly three things: the HTTP response,
+   * the database, and the process's stdout. The constraint name is in neither of the first
+   * two — ADR-0016 Option D deliberately declines to carry it on `BookOutcome`, and the
+   * problem schema has no member for it — so `docs/slices/02-design.md` §2.6 puts one
+   * structured `pino` line per `23P01` on stdout and this is how the harness reads it.
+   *
+   * The alternative the implementer rejected at step 2, recorded here so it is not
+   * reintroduced: having the test reproduce the conflict with its OWN SQL lets it choose
+   * the probe row's bay, so it can make either constraint appear at will — the assertion
+   * goes vacuous while staying green.
+   */
+  output(): { readonly stdout: string; readonly stderr: string };
+  /**
+   * stdout parsed as `pino` NDJSON, one object per line. Lines that are not JSON are
+   * skipped rather than thrown on — a crash banner on stdout must not turn an assertion
+   * failure into an exception (see WHY THIS NEVER THROWS, above).
+   */
+  logRecords(): readonly Record<string, unknown>[];
+  /**
+   * Poll `logRecords()` until `predicate` holds or the bound elapses, then return whatever
+   * was there. NEVER throws and never rejects: a timeout returns the records collected so
+   * far so the test asserts on them and reports what it actually saw.
+   *
+   * It exists because a child's stdout reaches the parent asynchronously: a booking that
+   * has already answered `409` on the socket may not yet have had its conflict line
+   * delivered to this process.
+   */
+  awaitLogRecords(
+    predicate: (records: readonly Record<string, unknown>[]) => boolean,
+    timeoutMs?: number,
+  ): Promise<readonly Record<string, unknown>[]>;
 }
 
 export interface StartAttempt {
@@ -149,6 +184,47 @@ export async function startService(options: {
   });
 
   const baseUrl = `http://127.0.0.1:${port}`;
+
+  const output = (): { readonly stdout: string; readonly stderr: string } => ({ stdout, stderr });
+
+  const logRecords = (): readonly Record<string, unknown>[] => {
+    const records: Record<string, unknown>[] = [];
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed === '' || !trimmed.startsWith('{')) continue;
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          records.push(parsed as Record<string, unknown>);
+        }
+      } catch {
+        // Not a JSON line. Skipped on purpose — `output()` still carries it verbatim, so a
+        // test that wanted it can assert on the raw text.
+      }
+    }
+    return records;
+  };
+
+  const awaitLogRecords = async (
+    predicate: (records: readonly Record<string, unknown>[]) => boolean,
+    timeoutMs = 5_000,
+  ): Promise<readonly Record<string, unknown>[]> => {
+    const until = Date.now() + timeoutMs;
+    for (;;) {
+      const records = logRecords();
+      let satisfied = false;
+      try {
+        satisfied = predicate(records);
+      } catch {
+        // A predicate that throws is treated as "not yet satisfied": the test's own
+        // assertion, not this helper, is what must report the failure.
+        satisfied = false;
+      }
+      if (satisfied || Date.now() >= until) return records;
+      await new Promise((tick) => setTimeout(tick, 25));
+    }
+  };
+
   const stop = async (): Promise<void> => {
     if (exit !== undefined) return;
     child.kill('SIGTERM');
@@ -183,7 +259,7 @@ export async function startService(options: {
 
     try {
       await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(2_000) });
-      return { service: { baseUrl, port, stop } };
+      return { service: { baseUrl, port, stop, output, logRecords, awaitLogRecords } };
     } catch {
       // Not listening yet. Fall through to the bound.
     }
