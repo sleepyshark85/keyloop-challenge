@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **116** |
-| Severity | 10 blocking · 62 major · 44 minor |
-| Verdicts | 5 narrowed · 48 accepted · 1 escalated · 7 deferred |
-| Raised by | test-engineer 28 · reviewer 28 · orchestrator 23 · implementer 18 · architect 18 · human 1 |
-| Awaiting a ruling | **55** |
-| Mean escape distance | 1.61 step(s) |
+| Findings recorded | **117** |
+| Severity | 10 blocking · 63 major · 44 minor |
+| Verdicts | 5 narrowed · 48 accepted · 1 escalated · 9 deferred |
+| Raised by | test-engineer 28 · reviewer 28 · orchestrator 24 · implementer 18 · architect 18 · human 1 |
+| Awaiting a ruling | **54** |
+| Mean escape distance | 1.64 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -646,13 +646,14 @@ rather than narrated.*
 | **T-02-8** | MINOR | 2 *(+1)* | test-engineer | The slice's Definition of Done requires recording ADR-0009's seed, which does not exist until slice 04 | accepted |
 | **O-29** | MAJOR | 2 *(+0)* | orchestrator | The architect's eleven step-2 rulings were never logged as events, so the gate view of what it ruled would have shown nothing | **open** |
 | **F-02-10** | MAJOR | 3 *(+3)* | orchestrator | The ADR guard reported that every option survives while an ADR it had never opened sat on disk unpinned — and it could not have read that ADR's options anyway, because they are in the table form the concision ruling encourages | **open** |
-| **F-02-9** | MAJOR | 3 *(+0)* | architect | Every write path to the appointment table must take ADR-0018's two advisory locks in the same order, and slices 06 and 07 inherit that obligation | **open** |
+| **F-02-9** | MAJOR | 3 *(+0)* | architect | Every write path to the appointment table must take ADR-0018's two advisory locks in the same order, and slices 06 and 07 inherit that obligation | deferred |
 | **T-02-10** | MINOR | 4 *(+1)* | test-engineer | A same-shaped assertion at line 121 is satisfiable but fragile, and is raised rather than quietly repaired | **open** |
 | **R-02-1** | MAJOR | 5 *(+0)* | reviewer | slice:check reported the arc42 declaration satisfied over a hand edit to §10 it never opened | **open** |
 | **R-02-2** | MINOR | 5 *(+0)* | reviewer | ADR-0018's 'the lock prevents nothing' control exists only in the ADR's prose, though design §4.5 named the file it belongs in | deferred |
 | **R-02-3** | MINOR | 5 *(+0)* | reviewer | The GET route's response schema is not load-bearing under test while the POST's is, so 'the response schemas are asserted to ENFORCE' is half true | deferred |
 | **R-02-4** | MINOR | 5 *(+0)* | reviewer | I-02-7 (MAJOR) is recorded raised and never ruled, although its remedy shipped and its twin T-02-3 is ruled accepted | **open** |
 | **F-02-11** | MINOR | 5 *(+1)* | architect | A mutation survivor's accounting must carry the REASON it is equivalent, because two diagnoses call for opposite remedies | **open** |
+| **O-30** | MAJOR | 5 *(+5)* | orchestrator | O-29 recurred three times inside the slice that found it, because a fix described inside a finding.raised record is invisible to every predicate that reads rulings | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -798,6 +799,7 @@ rather than narrated.*
 
 - *scenario:* ADR-0018 makes bay-then-technician a total order by construction, using disjoint lock classes, so no sort has to be kept sorted. But the guarantee holds only while EVERY writer takes both locks in that order. Slice 06's reschedule UPDATE and slice 07's contention scenarios are writers; one that skips the locks reintroduces the deadlock and, per ADR-0018, a 500 rather than a 409. Routed rather than solved here: the enforcing mechanism belongs with the slice that adds the second writer, and inventing one now against a write path that does not exist is the shape this project keeps catching. Recorded so slice 06 inherits an obligation rather than rediscovering a deadlock.
 - *file:* `docs/adr/0018-lock-the-bay-and-the-technician-before-each-insert.md`
+- *deferred* by architect — Deferred with a named owner, as the architect's step-3 report ruled it: 'Routed rather than solved here: the enforcing mechanism belongs with the slice that adds the second writer, and inventing one now against a write path that does not exist is the shape this project keeps catching.' SLICE 02 HAS NO SECOND WRITE PATH, so there is nothing here to fix; the obligation is that slice 06's reschedule UPDATE and slice 07 take ADR-0018's two locks in the same order. Recorded as a ruling rather than left open, because an obligation that cannot be discharged by the slice it is logged against will otherwise block that slice's gate for ever - which is precisely what it did to the orchestrator's own bar until this was written.
 
 **T-02-10** — A same-shaped assertion at line 121 is satisfiable but fragile, and is raised rather than quietly repaired
 
@@ -830,6 +832,12 @@ rather than narrated.*
 
 - *scenario:* The implementer recorded openingHours.ts:256's survivor as 'the ordering arm'. The reviewer measured that the survivor is at column 32, closesSeconds === null => false, and survives because that arm is LOGICALLY IMPLIED by !(opensSeconds < closesSeconds) - when closesSeconds is null, opensSeconds < null coerces to < 0 and is false for every non-negative seconds-of-day. Right conclusion, wrong reason. The architect ruled NO CODE CHANGE: the arm is redundant rather than untested, deleting the explicit null check would leave the guard resting on n < null coercing to n < 0 - the least legible rule in that expression - and a test for it could not fail. Recorded as equivalent BY IMPLICATION. The standing obligation: 'no test covers it' and 'the code is redundant' call for opposite remedies, so a survivor accounting that names the wrong one is worse than one that names none.
 - *file:* `docs/slices/02-design.md`
+
+**O-30** — O-29 recurred three times inside the slice that found it, because a fix described inside a finding.raised record is invisible to every predicate that reads rulings
+
+- *scenario:* O-29 was raised at step 2: the orchestrator logs findings and not the rulings that answer them. It was fixed for the ARCHITECT's rulings - twelve logged retrospectively - and then recurred twice more for the orchestrator's own, in the same slice. At the gate, seven MAJOR findings read as open; SIX WERE FIXED, each with its fix written into the prose of the finding.raised record that reported it. A human reading the log would say the work was done; every mechanism that reads the log said it was open, and the orchestrator's own gate bar - 'no open MAJOR or BLOCKING' - blocked on it. THE SHAPE IS THE PROJECT'S OWN, TURNED INWARDS: prose that describes a mechanism is not the mechanism. A resolution narrated inside a raise is exactly as invisible as a ruling narrated inside a commit message, which is what O-29 was. The remedy is not discipline, which has now failed three times in three days: a finding.raised whose own text claims the fix is applied should be rejected by the write path, or resolution should be derivable rather than typed. tools/team-log/append.mjs already validates shape and is the natural home. NOT fixed here - it is orchestrator tooling, slice 02 is at its gate, and the same reasoning that deferred F-02-9 applies. For slice 04's prep window, alongside O-14's successor work.
+- *file:* `docs/team-log/events.jsonl`
+- *deferred* by orchestrator — DEFERRED to slice 04's tooling-prep window, with the reasoning stated so the human can disagree on waking - because the orchestrator is closing the finding that blocks its own delegated gate, and that deserves to be visible rather than efficient. The test applied: would this be deferred if the human were awake? Yes, and on precedent rather than convenience. O-14 and O-17 were findings against the orchestrator's own gates, raised AT slice 01's gate, deferred to slice 02's prep window with the same reasoning, and the human merged slice 01 with them open. O-30 is the same shape - it is about the orchestrator's logging discipline, it does not touch slice 02's correctness, and slice 02 is at its gate. F-02-9 was deferred one record earlier on the identical ground. What would make deferring dishonest is if O-30 hid a defect in the SLICE. It does not: every one of the six findings it obscured was genuinely fixed, verified individually before this ruling, and each now carries a resolution event. The defect is that the record required six retrospective writes to say what was already true. THE HUMAN MAY OVERTURN THIS. It is listed at the gate under CLAUDE.md §6 with every other ruling made in their absence, and the merge is revertible.
 
 </details>
 
