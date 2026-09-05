@@ -1,7 +1,7 @@
 ---
 id: "01"
 title: The domain policy core — duration, occupancy interval, and opening hours
-status: ready
+status: done
 depends_on: ["00"]
 arc42: ["§5.2", "§8.3", "§10.2", "§12"]
 adr: [1]

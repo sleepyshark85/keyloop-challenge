@@ -20,8 +20,8 @@ what it costs now.
 |---|---|---|
 | Treat /health as an operational probe outside the API contract, not as a sixth operation | [ADR-0011](../adr/0011-health-is-an-operational-probe.md) | proposed — not yet agreed |
 | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | [ADR-0012](../adr/0012-seed-fixtures-are-a-test-owned-loader.md) | proposed — not yet agreed |
-| An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | [ADR-0014](../adr/0014-an-instant-is-renderable-by-construction.md) · [slice 12](../slices/12-domain-input-bounds.md) · deferred from R-01-1 | **agreed and unbuilt** |
-| An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | [ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) · [slice 13](../slices/13-interval-ending-at-local-midnight.md) · deferred from R-01-4 | **agreed and unbuilt** |
+| An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | [ADR-0014](../adr/0014-an-instant-is-renderable-by-construction.md) · [slice 02](../slices/02-book-and-read-an-appointment.md) · deferred from R-01-1 | **agreed and unbuilt** |
+| An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | [ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) · [slice 02](../slices/02-book-and-read-an-appointment.md) · deferred from R-01-4 | **agreed and unbuilt** |
 <!-- /generated:debt-register -->
 
 The register held nothing until slice 00a, and that was the correct reading rather than an omission.

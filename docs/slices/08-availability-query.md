@@ -7,6 +7,7 @@ arc42: ["§6.5", "§8.6"]
 adr: [8]
 quality_scenarios: [QS-8]
 loopbacks: 0
+gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
 ---
 
 ## Goal

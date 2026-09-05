@@ -94,10 +94,11 @@ const build = (events, { commits = [], slice = SLICE } = {}) => {
 
   const sha = git(dir, ['rev-parse', 'HEAD']).stdout.trim();
   const rootSha = git(dir, ['rev-list', '--max-parents=0', 'HEAD']).stdout.trim();
+  const shas = git(dir, ['rev-list', 'HEAD']).stdout.trim().split('\n');   // newest first
   writeFileSync(join(dir, 'docs/team-log/events.jsonl'),
     events.map((e) => JSON.stringify(typeof e === 'function' ? e(sha) : e)).join('\n'), 'utf8');
   const r = spawnSync('node', [CHECK, '77'], { cwd: dir, encoding: 'utf8' });
-  return { out: (r.stdout ?? '').replace(/\x1b\[[0-9;]*m/g, ''), sha, rootSha, dir };
+  return { out: (r.stdout ?? '').replace(/\x1b\[[0-9;]*m/g, ''), sha, rootSha, shas, dir };
 };
 
 const run = (events, opts) => build(events, opts).out;
@@ -195,7 +196,7 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
   const seed = build([], { commits: [{ subject: 'feat(77): later work', files: { 'src/later.ts': 'export const x = 1;\n' } }] });
   const { out, sha } = build([ciRun({ checks: { head_sha: seed.rootSha } })],
     { commits: [{ subject: 'feat(77): later work', files: { 'src/later.ts': 'export const x = 1;\n' } }] });
-  ok('a run on an ANCESTOR of HEAD fails — it did not test this commit',
+  ok("a run predating the slice's last commit fails — it ran before the work finished",
     row(out, 'tests green').startsWith('FAIL') && row(out, 'tests green').includes('ancestor'),
     row(out, 'tests green'));
   ok('...and the failure names the remedy rather than only the problem',
@@ -206,6 +207,28 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
   const out = run([ciRun({ checks: { head_sha: 'de1e7ed0000000000000000000000000deadbeef' } })]);
   ok('a head_sha git cannot relate to HEAD is UNVERIFIED, not PASS',
     row(out, 'tests green').startsWith('UNVERIFIED'), row(out, 'tests green'));
+}
+
+{
+  // The retarget, and the reason for it: pinning to HEAD meant every later commit to
+  // `main` retroactively invalidated the gate of every slice already done. A merged
+  // slice's approval is a fact about the work that was approved, and that work stopped
+  // changing when its last commit landed.
+  // THE RUN IS RECORDED AT THE SLICE'S COMMIT, not at HEAD, and that is the whole
+  // discrimination. The first version of this case recorded it at HEAD — which the
+  // pre-retarget code accepts too, since HEAD === HEAD — so the mutant that pins the
+  // target back to HEAD SURVIVED it. A case that passes under the change it was written
+  // to catch is not evidence, and this is the second time in this project that a
+  // fixture's convenient default hid exactly the property under test.
+  const commits = [
+    { subject: 'feat(77): the slice\'s last commit', files: { 'src/a.ts': 'export const a = 1;\n' } },
+    { subject: 'chore(99): unrelated later work on main', files: { 'src/b.ts': 'export const b = 2;\n' } },
+  ];
+  const seeded = build([], { commits });
+  const sliceCommit = seeded.shas[1];
+  const { out } = build([ciRun({ checks: { head_sha: sliceCommit } })], { commits });
+  ok('a run on the slice\'s last commit still passes after main moves on',
+    row(out, 'tests green').startsWith('PASS'), row(out, 'tests green'));
 }
 
 // --- the gate reads a MEANING, not a spelling --------------------------------

@@ -15,11 +15,11 @@
 
 | | |
 |---|---|
-| Last commit | `af20234 chore(01): Gate E recorded, three ADRs ratified, step 7 logged` |
+| Last commit | `6b6d1ed fix(tooling): the gates that read a record which exists rather than one that applies` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process |
 | Agent runs recorded | 61 |
 | ADRs accepted | 13 |
-| Slices defined | 12 |
+| Slices defined | 10 |
 | Open DCRs | none |
 
 ## What happens next

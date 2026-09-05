@@ -97,23 +97,30 @@ const SLICE_REL = basename(SLICES);
 // remedy.
 const adrById = new Map(adrList.map((a) => [String(a.id).padStart(4, '0'), a]));
 const proposed = adrList.filter((a) => a.status === 'proposed');
+// `deferred_from` is a LIST OF PAIRS, `"<finding>:<adr>"`, and the pairing is explicit
+// because it has to survive a fold. Gate D folded slices 12 and 13 into 02, and a slice
+// that absorbs two deferrals carries two of these; picking "the first accepted ADR on
+// the slice" would have rendered one row and silently dropped the other, which is
+// AB-01-7 again one turn on. A bare `"<finding>"` with no ADR is legal and renders as a
+// deferral whose remedy is not yet an accepted decision.
 const agreedUnbuilt = sliceList
   .filter((s) => s.deferred_from && s.status !== 'done')
-  .map((s) => ({
-    slice: s,
-    adr: (Array.isArray(s.adr) ? s.adr : []).map((n) => adrById.get(String(n).padStart(4, '0')))
-      .find((a) => a && a.status === 'accepted') ?? null,
-  }));
+  .flatMap((s) => (Array.isArray(s.deferred_from) ? s.deferred_from : [s.deferred_from])
+    .map((entry) => {
+      const [ref, adrId] = String(entry).split(':');
+      return { slice: s, ref, adr: adrId ? adrById.get(adrId.padStart(4, '0')) ?? null : null };
+    }));
 
 const debtRows = [
   ...proposed.map((a) =>
     `| ${a.title ?? a.id} | [ADR-${a.id}](../${ADR_REL}/${a.file}) | proposed — not yet agreed |`),
-  ...agreedUnbuilt.map(({ adr, slice }) =>
+  ...agreedUnbuilt.map(({ adr, slice, ref }) =>
     `| ${adr?.title ?? slice.title ?? slice.id} | `
     + (adr ? `[ADR-${adr.id}](../${ADR_REL}/${adr.file}) · ` : '')
-    + `[slice ${slice.id}](../${SLICE_REL}/${slice.file}) `
-    + `· deferred from ${slice.deferred_from} | `
-    + (adr ? '**agreed and unbuilt**' : 'deferred — remedy not yet an accepted ADR') + ' |'),
+    + `[slice ${slice.id}](../${SLICE_REL}/${slice.file}) · deferred from ${ref} | `
+    + (adr && adr.status === 'accepted'
+        ? '**agreed and unbuilt**'
+        : 'deferred — remedy not yet an accepted ADR') + ' |'),
 ];
 const debtTable = debtRows.length
   ? ['| Item | Origin | Status |', '|---|---|---|', ...debtRows].join('\n')

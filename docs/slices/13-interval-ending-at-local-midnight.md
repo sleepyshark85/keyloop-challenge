@@ -1,16 +1,36 @@
 ---
-id: "13"
-title: An interval ending at local midnight ends on the day it started
-status: ready
-depends_on: ["01"]
-arc42: ["§5.2", "§8.2", "§8.3", "§11"]
-adr: [15]
-quality_scenarios: [QS-9]
-loopbacks: 0
-deferred_from: "R-01-4"   # §6 (b) ruling at slice 01 step 5; remedy ratified as ADR-0015
+folded_into: "02"
+folded_at: 2026-09-05
+folded_by: human-cost-ruling
+deferred_from: "R-01-4:0015"
 ---
 
-## Goal
+# Slice 13 — folded into slice 02
+
+**This is a tombstone. It is not a slice and carries no `id:`, so no tool counts it, schedules it or
+waits on it.** It is kept because the backlog's shape is part of the record — the same reason
+`docs/slices/03-error-taxonomy.md` is kept.
+
+**Was:** An interval ending at local midnight ends on the day it started
+
+**Why it existed.** Raised as **R-01-4** by the reviewer at slice 01 step 5 and ruled **(b) deferred
+improvement** by the architect — explicitly by §6's naming test rather than by preference. The
+architect named the remedy exactly rather than leaving a shrug, and the human ratified it as
+**ADR-0015** on 2026-09-05.
+
+**Why it was folded.** The human's cost ruling of 2026-09-05, taken on measured figures: slice 01 cost
+9.5 hours and 8.30 Mtok against 30.7 and 26.1 hours for the two pilot slices. Running a full
+seven-step loop to apply a decision that is *already agreed and already specified* is the slicing
+problem §6's loopback governor warns about, seen from the other end — the design step this slice would
+consume has effectively already happened.
+
+**Where it went.** `docs/slices/02-book-and-read-an-appointment.md`, **AC-17 to AC-19**, carried across
+unchanged in substance. Slice 02 declares `absorbs: ["03", "12", "13"]` and
+`deferred_from: ["R-01-1:0014", "R-01-4:0015"]`, so the debt register still shows both remedies as
+*agreed and unbuilt* until slice 02 is done — which is the point of AB-01-7's fix, and would have been
+undone by a tombstone that dropped the pairing.
+
+**The goal it carried, unchanged:**
 
 A job running 23:00–24:00 local is rejected as `spans-local-days`. It should be accepted: step 4 of
 `withinOpeningHours` renders the half-open interval's **exclusive** endpoint, so an end *at* midnight
@@ -29,45 +49,3 @@ The irony is on the record and is worth keeping: it was the implementer's own re
 measurement that discharged DA-2 and argued `'24:00:00'` must be supported. That measurement was
 right, the branch it justified was correct to add, and its consumer made it inert. The measurement is
 not what failed.
-
-## Acceptance criteria
-
-- **AC-1** — Given a dealership open 09:00–24:00 local and a 60-minute job starting 23:00 local, when
-  `withinOpeningHours` is called, then the verdict is **within**, not `spans-local-days`. *(QS-9)*
-- **AC-2** — Given an end that renders as `00:00:00` on the local day **immediately following** the
-  start's local date, when step 4 normalises it, then it is treated as `secondsOfDay = 86400` on the
-  **start's** day.
-- **AC-3** — Given an interval that genuinely spans two local days — 23:00 to 01:00 the next day —
-  when `withinOpeningHours` is called, then the verdict is still `spans-local-days`. This is the
-  negative control: AC-1 alone is satisfied by deleting the check.
-- **AC-4** — Given reference data holding `'24:00:00'` in a closing-time column, when it is read and
-  parsed, then it yields `86400` and the row is **not** rejected as `malformed-hours`. `'24:00:00'` is
-  accepted by PostgreSQL's `time` type and a row can hold it, so rejecting it at the parser would turn
-  valid reference data into an error.
-- **AC-5** — Given the parse arm for `'24:00:00'`, when the mutation run completes, then it is
-  **reachable and killed** — retiring the unreachable-branch and unkillable-mutant finding rather than
-  suppressing it.
-
-## In scope
-
-- The step-4 normalisation branch in `src/domain/openingHours.ts` and the tests that make AC-1 and
-  AC-3 a boundary rather than a floor.
-
-## Out of scope
-
-- **Deleting the `'24:00:00'` parse arm.** Refused explicitly in ADR-0015 as Option C, on the
-  `'24:00:00'::time` measurement.
-- Opening hours that wrap past midnight into the next day (an 18:00–02:00 window). That is a different
-  shape — a genuinely two-day window — and neither ADR-0001 nor this ADR addresses it.
-
-## Definition of done
-
-Beyond `CLAUDE.md` §10:
-
-- **ADR-0015 was accepted by the human on 2026-09-05** and is now immutable. The precondition this line
-  used to carry is satisfied, but the reason it existed is worth keeping: the architect **declined to
-  decide this one**, holding that whether a dealership open until midnight may take a 23:00–24:00
-  booking is an acceptance question, and refusing to treat *"the half-open convention should be
-  consistent"* as authority to cross into the human's side of the line. The human answered it
-  directly. So this slice implements a ratified behaviour change, and AC-1 is a scope decision that
-  was made rather than a consequence that was inferred.

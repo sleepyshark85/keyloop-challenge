@@ -8,6 +8,7 @@ arc42: ["§3.1", "§8.4", "§8.6", "§10.2", "§11.1"]
 adr: [5, 6, 10]
 quality_scenarios: [QS-13, QS-11, QS-14]
 loopbacks: 0
+gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
 ---
 
 > **Absorbs slices 10 and 11 by the Gate D ruling of 2026-09-04**, the second half of the C6 cut.

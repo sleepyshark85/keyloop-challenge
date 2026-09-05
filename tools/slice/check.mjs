@@ -271,17 +271,39 @@ if (!onlyReady) {
     const r = spawnSync('git', args, { encoding: 'utf8' });
     return r.status === 0 ? r.stdout.trim() : null;
   };
-  const head = git(['rev-parse', 'HEAD']);
+  // THE TARGET IS THE SLICE'S OWN LAST COMMIT, not today's HEAD.
+  //
+  // Pinning to HEAD was the first version and it is wrong in the direction that
+  // matters: `main` keeps moving after a slice merges, so every later commit would
+  // retroactively invalidate the gate of every slice already done, and `slice:check 01`
+  // would go red for work that was correctly approved. The question this gate asks is
+  // "did CI pass on the work being approved", and that work stopped changing when the
+  // slice's last commit landed.
+  //
+  // So: FAIL when the recorded run is a STRICT ANCESTOR of the slice's newest scoped
+  // commit — the run happened before the work finished. A run at or after it is fine,
+  // which covers the ordinary case where the gate's CI run is on a later log commit.
+  // With no scoped commits yet, HEAD is the only target available.
+  const sliceHead = (() => {
+    const log = git(['log', '--format=%H %s', '--', '.']) ?? '';
+    const scoped = log.split('\n').filter(Boolean)
+      .filter((l) => new RegExp(`^\\S+ [a-z]+\\(0*${String(id).replace(/^0+/, '')}\\)!?:`).test(l))
+      .map((l) => l.split(' ')[0]);
+    return scoped[0] ?? null;
+  })();
+  const head = sliceHead ?? git(['rev-parse', 'HEAD']);
   const runSha = lastRun?.checks?.head_sha;
   const coversHead = (() => {
     if (!head || !runSha) return null;
     if (runSha === head) return true;
-    // A run on an ANCESTOR of HEAD is stale; a run on HEAD's own commit is current.
     // `merge-base --is-ancestor` exits 0 when the first is an ancestor of the second,
-    // so this is "the run is behind us", which is exactly the failure being caught.
-    const anc = spawnSync('git', ['merge-base', '--is-ancestor', runSha, head], { encoding: 'utf8' });
-    if (anc.status === 0) return false;
-    return null; // unrelated or unknown commit — cannot tell
+    // so this reads "the run is behind the slice's last commit" — exactly the failure
+    // being caught, and nothing more.
+    const isAncestor = (a, b) =>
+      spawnSync('git', ['merge-base', '--is-ancestor', a, b], { encoding: 'utf8' }).status === 0;
+    if (isAncestor(runSha, head)) return false;     // the run is BEHIND the work
+    if (isAncestor(head, runSha)) return true;      // the run is at or AFTER it
+    return null;                                    // unrelated or unknown — cannot tell
   })();
 
   // ONE derivation, not two. The first version of this computed the verdict and the
@@ -298,8 +320,9 @@ if (!onlyReady) {
     if (/FAIL/.test(JSON.stringify(lastRun.checks))) return [FAIL, JSON.stringify(lastRun.checks)];
     if (coversHead === false) {
       return [FAIL,
-        `the newest recorded run is ${String(runSha).slice(0, 7)}, an ancestor of HEAD `
-        + `${String(head).slice(0, 7)} — it did not test this commit. Run `
+        `the newest recorded run is ${String(runSha).slice(0, 7)}, an ancestor of this `
+        + `slice's last commit ${String(head).slice(0, 7)} — it ran before the work `
+        + 'finished. Run '
         + '`node tools/team-log/collect-ci.mjs --run <id> --slice <id>` for the current run.'];
     }
     if (coversHead === null) {

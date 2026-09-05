@@ -87,8 +87,13 @@ function makeFixture() {
       `---\nid: "${id}"\ntitle: ${title}\n${fm}\n---\n\n## Goal\n`);
 
   sliceFile('50', 'Ordinary unbuilt work', 'status: ready\nadr: [1]');
-  sliceFile('51', 'A deferred remedy', 'status: ready\nadr: [2]\ndeferred_from: "R-99-1"');
-  sliceFile('52', 'A deferred remedy already built', 'status: done\nadr: [1]\ndeferred_from: "R-99-2"');
+  sliceFile('51', 'A deferred remedy', 'status: ready\nadr: [2]\ndeferred_from: ["R-99-1:0002"]');
+  sliceFile('52', 'A deferred remedy already built', 'status: done\nadr: [1]\ndeferred_from: ["R-99-2:0001"]');
+  // A slice that ABSORBED two deferrals — the Gate D fold. Picking "the first accepted
+  // ADR on the slice" renders one row and silently drops the other, which is AB-01-7
+  // one turn on, so both must appear.
+  sliceFile('53', 'A slice absorbing two deferrals',
+    'status: ready\nadr: [1, 2]\ndeferred_from: ["R-99-3:0001", "R-99-4:0002"]');
 
   return { root, arc42, adr, slices, out: join(root, 'system-design.md') };
 }
@@ -158,8 +163,15 @@ check('an ordinary unbuilt slice is NOT debt — its founding ADR is the archite
   + 'and listing it would bury the real items under "the project is not finished"',
   !s11.includes('slice 50'), s11);
 check('a deferred slice that is DONE is no longer debt', !s11.includes('slice 52'), s11);
-check('an accepted ADR alone does not reach the register',
-  !/First decision.*agreed and unbuilt/.test(s11), s11);
+check('a slice absorbing TWO deferrals renders BOTH rows, not the first one it finds',
+  s11.includes('deferred from R-99-3') && s11.includes('deferred from R-99-4'), s11);
+// Derived rather than counted by hand: three deferrals are unbuilt (51, and 53 twice),
+// so three rows. A `>= 1` here would pass on a register that rendered one row and
+// dropped two — which is the exact bug slice 53 exists to catch, so the assertion that
+// guards it must not be the loose kind design §5.3 rules out.
+check('exactly the unbuilt deferrals reach the register — no more, no fewer',
+  (s11.match(/agreed and unbuilt/g) ?? []).length === 3,
+  (s11.match(/agreed and unbuilt/g) ?? []).length + ' rows');
 
 // --- ↩ --check must catch drift in BOTH places ---
 check('--check passes immediately after a build', run(f, ['--check']).status === 0);
