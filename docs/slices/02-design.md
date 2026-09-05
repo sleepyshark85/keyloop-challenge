@@ -15,188 +15,76 @@ Nothing here re-derives ADR-0014 or ADR-0015. Both are accepted and immutable; �
 
 ## 0. Rulings and escalations, up front
 
-Three things needed the human, and none of them was mine to settle. **E-02-1 and E-02-2 were both
-ruled on 2026-09-06** and are recorded here as ruled; E-02-3's routing stands. They are listed first so
-the orchestrator can queue them without reading the rest, and so nobody spends a cycle discovering them
-at step 5.
+Three things needed the human and were ruled on 2026-09-06 (E-02-1, E-02-2; E-02-3's routing stands).
+**T-02-9 is different: I ruled it**, under the human's amendment of the same day, and it is the entry
+to read first. They are listed up front so the orchestrator can queue them without reading the rest,
+and so nobody spends a cycle discovering them at step 5.
 
 ### E-02-1 — AC-4 cannot be satisfied without ADR-0004's retry loop · **ruled 2026-09-06: the loop is in scope**
 
-**The minimal prune-and-retry loop is in this slice** (`s-02-ruling-E-02-1`); the slice file's *Out of
-scope* now names only ADR-0009's seeded ordering and cap. Why it is load-bearing rather than an
-optimisation — §2.6 is built on it and step 3 asserts against it:
+**Condensed 2026-09-06 (T-02-9), from ~950 words to this.** The ruling is in `events.jsonl`
+(`s-02-ruling-E-02-1`) and the slice file's *Out of scope* now names only ADR-0009's seeded ordering
+and cap; §2.6 is the loop's specification and step 3 asserts against it. The full derivation — the
+creation-order measurement, the test-engineer's P1 and P2 alternatives, and T-02-1's per-value
+correction — is in this file's git history. What must survive is why the loop is load-bearing:
 
-AC-4 requires a doubly-violating insert to report `no_technician_overlap`. Measured against
-`postgres:16-alpine`, on this repository's own migrations:
+**Which constraint PostgreSQL names when both are violated is decided by index creation order.**
+Measured on this repository's migrations: a doubly-violating insert reports `no_bay_overlap`, and in
+a scratch table with the constraints created in reverse it reports the technician one.
+`ExecInsertIndexTuples` walks indexes in OID order and `0003_appointment.sql` creates the bay
+constraint first. So without a loop, AC-3 needs the doubly-violating insert to report
+`no_bay_overlap` and AC-4 needs it to report `no_technician_overlap`, and one index ordering cannot
+give both.
 
-| Case | Reported constraint |
-|---|---|
-| Same bay, same technician as the winning row — **both** constraints violated | `no_bay_overlap` |
-| Different bay, same technician | `no_technician_overlap` |
-| Same bay, different technician | `no_bay_overlap` |
+**The test-engineer supplied a better argument for the loop than mine, and it is adopted because it
+is stronger, not because it agrees.** Without the loop the refusal names whichever index was created
+first — systematically the **abundant** resource, not the scarce one. That breaks **AC-11**
+(*`resource` set to the contended resource*) and poisons `booking_conflicts_total{resource}` at slice
+09, so the defect is client- and metric-visible rather than a fixture artefact. Its P1 and P2
+alternatives also corrected an absolute I had written where a trade-off existed — *whether something
+is impossible or merely a trade-off decides who rules it*, which is T-01-1 from slice 01.
 
-and, creating the two constraints in the reverse order in a scratch table, the doubly-violating insert
-reports `no_technician_overlap2` instead. **Which constraint PostgreSQL names when both are violated
-is decided by index creation order** — `RelationGetIndexList` returns indexes sorted by OID and
-`ExecInsertIndexTuples` walks them in that order — and `0003_appointment.sql` creates
-`no_bay_overlap` first.
+**With prune-by-constraint the ambiguity disappears**, because the constraint reported at *refusal*
+is the one whose list emptied rather than the one whose index was checked first: one bay ⇒ pruning
+walks the technicians and the bay list empties ⇒ always `no_bay_overlap`; one technician ⇒ symmetric.
+The loop is what turns *"which constraint fired"* from a PostgreSQL implementation detail into a fact
+about which resource was scarce.
 
-Now run AC-4 without a retry loop. Twenty racers, bays plentiful, one qualified technician:
-
-- **With a deterministic candidate order** every racer picks the same bay, so every loser violates
-  *both* constraints and every loser is told `no_bay_overlap`. AC-4 fails, 20 times out of 20.
-- **With a per-request shuffled order** a loser is told `no_technician_overlap` unless it happened to
-  draw the winner's bay, which for 20 racers over *B* bays happens with probability ≈ 19/*B*. AC-4
-  becomes a flake whose rate is a fixture parameter.
-
-Those two are the only options *that keep AC-4's wording*, because AC-3 pins the opposite: AC-3 needs a
-doubly-violating insert to report `no_bay_overlap`, AC-4 needs it to report `no_technician_overlap`,
-and one index ordering cannot give both.
-
-> **Corrected at step 2, T-02-1's sibling finding — this paragraph said "there is no third option" and
-> that was wrong.** The test-engineer reproduced the creation-order flip and then named two: **P1**,
-> reword AC-4 as a pre-occupied race — deterministic, needs no loop, but the race degenerates into a
-> sequential case and stops testing what AC-4 names; **P2**, split AC-4 — keep the 20-racer race for
-> the over-the-table half, and prove the constraint→resource mapping in a database-invariant
-> integration test. Both are real, and writing an absolute where a trade-off existed was exactly the
-> error T-01-1 was raised about at slice 01: **whether something is *impossible* or merely a
-> *trade-off* decides who rules it.** An impossibility is mine to report; a trade-off is the human's to
-> choose. This is a trade-off, and the correction is load-bearing rather than cosmetic.
-
-**The test-engineer also supplied a better argument for the loop than the one above**, and it is
-adopted because it is stronger, not because it agrees with me. Without the loop, under double
-violation the refusal names whichever constraint's index was created first — which is the **abundant**
-resource, systematically, not the scarce one. So the defect is not confined to AC-4's fixture:
-**AC-11** requires the `409` to carry `resource` set to *the contended resource*, and it would carry
-the wrong one whenever both constraints are violable. `booking_conflicts_total{resource}` inherits the
-same lie at slice 09 (QS-13). That is client-visible and metric-visible, not a fixture artefact, and it
-is the argument the ruling turned on — P1, P2 and deferring AC-4 all leave AC-11 wrong.
-
-**The retry loop removes the ambiguity entirely, and this is the interesting part.** With
-prune-by-constraint, the constraint reported at *refusal* is the one whose candidate list emptied, not
-the one whose index happened to be checked first:
-
-- AC-3 (one bay): whatever the first failure names, pruning walks the technician list, every retry
-  fails on the bay, the bay list empties first. Refusal names **`no_bay_overlap`**, always.
-- AC-4 (one technician): symmetric. Refusal names **`no_technician_overlap`**, always.
-
-So the loop is not an optimisation here. **It is what turns "which constraint fired" from a
-PostgreSQL implementation detail into a fact about which resource was actually scarce** — which is
-what AC-3 and AC-4 are asking about, and what `booking_conflicts_total{resource}` will need to be
-truthful in slice 09.
-
-**Two further readings of the slice file point the same way**, and I note them rather than lean on
-them: AC-5 says *"a single `INSERT` per attempt"*, which presupposes attempts; AC-11 says *"when
-**every candidate** is refused"*, which is ADR-0004's exhaustion condition verbatim. And arc42 §6.1 —
-the section AC-3 and AC-4 are drawn from — already draws prune-and-refuse as the booking path.
-
-**What is in, and what stays out.** §2.6 designs the minimal loop — **attempt, classify, drop the failing
-resource *value* from its list, attempt the next candidate, refuse when a list empties** — and leaves
-in slice 04 the three things that are genuinely ADR-0009's and that QS-3 measures: the **seeded
-shuffle**, the **16-attempt cap**, and QS-3 itself.
-
-**The wording of that remedy was wrong here until step 2 and is corrected — T-02-1.** It read *"prune
-the whole resource"*, which the test-engineer read as *the whole resource **class***, i.e. empty the
-bay list on a bay conflict. Under that reading AC-4 fails on the first attempt: `(B0,T0)` violates
-both, reports `no_bay_overlap`, empties the bay list, and refuses with `resource: 'bay'`. **The
-intended reading is ADR-0009's and is per-value** — *"`no_bay_overlap` → drop **that bay** from the bay
-list"* — where "the whole resource" means the whole row or column of the candidate cross-product
-rather than only the pair just tried. §0's own AC-3 and AC-4 traces above already describe per-value
-pruning (*"pruning walks the technician list"*, *"prune B_i → retry (B_k, T1)"*), so three statements
-in this design disagreed and one of them was the one an implementer would build from.
-
+**Pruning is per resource *value*, not per class (T-02-1)** — `no_bay_overlap` drops *that bay* and
+leaves the others. The seeded shuffle, the 16-attempt cap and QS-3 stay in slice 04.
 
 ### E-02-2 — QS-12's `wall-clock-and-zone` marker becomes unsatisfiable at this slice · **ruled 2026-09-06**
 
-`tests/architecture/ambiguity-containment.test.ts`, as merged at slice 01, defines:
+**Condensed 2026-09-06 (T-02-9), from ~1,100 words to this.** The ruling is recorded in
+`events.jsonl` (`s-02-ruling-E-02-2`), the marker specification now lives in arc42 §10.2 *"in the
+scenario's own words"*, and the split is implemented and merged in
+`tests/architecture/ambiguity-containment.test.ts`. The derivation is in this file's git history. It
+was three statements of the same thing; only the evidence is kept here.
 
-```ts
-{ name: 'wall-clock-and-zone',
-  test: (c) => /Intl\s*\.\s*DateTimeFormat/.test(c) || /\b(?:timeZone|ianaZone|time_zone)\b/.test(c) }
-```
+Slice 01's marker matched `Intl.DateTimeFormat` **or** the identifiers `timeZone` / `ianaZone` /
+`time_zone`, permitted in exactly one file. This slice must carry a dealership's IANA zone from a
+`text` column into a pure function, so the token appears in at least three — and no query layer
+avoids it, which the test-engineer measured across raw `pg`, `select *` and a `sql` template. **ADR-0006
+is not implicated and must not be offered as a remedy.**
 
-with `PERMITTED_FILE['wall-clock-and-zone'] = 'src/domain/openingHours.ts'` — **exactly one file**.
+And it was simultaneously too loose. Three zone-reasoning violations planted into a copy of `src/`:
 
-This slice must carry a dealership's IANA zone from a `text` column into a pure function that takes it
-as a parameter. That path is at minimum:
-
-| File | Why the token is unavoidable |
+| Planted | Today's marker |
 |---|---|
-| `src/persistence/schema.ts` | the Kysely `Database` interface names columns exactly, so the property is `time_zone` (`0002_reference_data.sql`) |
-| `src/persistence/referenceRepository.ts` | **any code that reads the column names it** |
+| `d.toLocaleString('en-GB')` in a route — the **ambient** server zone, the worst bug available here | **MISSED** |
+| `d.getHours()` in a use case | **MISSED** |
+| `Intl.DateTimeFormat` + `formatToParts` in a repository | caught |
 
-**Corrected at step 2 — this table blamed Kysely and that is not the cause.** As first written it read
-*"Kysely's `Database` interface … cannot be spelled otherwise"*, which invites the remedy *use a
-different query layer*. The test-engineer measured the alternatives and every one of them is caught
-identically: raw `pg` with a column list, `select *` followed by `row.time_zone`, a `sql` template.
-**The column has a name and a runtime read has to say it.** ADR-0006 is not implicated and must not be
-offered to the human as a remedy — reconsidering the query layer would change nothing here.
-
-**No naming discipline avoids it either**, which is what makes it a defect in the scenario rather than
-a constraint on the implementation. QS-12 as written says the containment holds in *one* file; from
-the moment a repository exists the zone must appear in at least three. §11 already anticipated the
-shape — *"a marker matching in exactly one file is a much weaker claim now than it will be"* — but
-predicted a weakening, not an impossibility.
-
-**And the marker is simultaneously too loose, which is the half that makes it stop being evidence.**
-Measured on this repository, planting three zone-reasoning violations into a copy of `src/`:
-
-| Planted | Form | Today's marker |
-|---|---|---|
-| `d.toLocaleString('en-GB')` in a route | wall clock in the **ambient** zone — the worst bug available here, because it silently uses the *server's* zone | **MISSED** |
-| `d.getHours()` in a use case | same class | **MISSED** |
-| `new Intl.DateTimeFormat(…)` + `formatToParts` in a repository | explicit formatter, no `timeZone` key | caught |
-
-Two of three, including the one that would produce wrong opening-hours verdicts on a server in a
-different zone. Combined with the transport problem above, the marker reports very nearly the same
-file set whether or not the tree contains zone reasoning — **a scan that cannot discriminate is not
-evidence**, which is the standard this project applied to `domain-is-pure` at slice 01 and to
-`duration-arithmetic` at R-01-6.
-
-**The marker specification is mine under R-01-6's precedent** — the architect defines the marker as a
-*concept*, the test-engineer implements it with the four mechanisms. Split in two, because it is
-currently two concepts wearing one name:
-
-- **`wall-clock-reasoning`** — deriving a wall clock or calendar field from an instant, by any route.
-  Permitted in `src/domain/openingHours.ts` and nowhere else. The concept, not the spelling, is the
-  marker; the forms below enumerate it and are open (arc42 §10.2, GC-1, ADR-0001).
-
-  | | Forms |
-  |---|---|
-  | explicit formatting | `Intl.DateTimeFormat`, `formatToParts`, `hourCycle`, `timeZone` as an option key |
-  | ambient-zone rendering | `toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`, `toString`, `toDateString`, `toTimeString` |
-  | ambient-zone field reads | `Date.prototype.getHours` / `getMinutes` / `getSeconds` / `getMilliseconds` / `getDay` / `getDate` / `getMonth` / `getFullYear`, their `set` counterparts, and **`getTimezoneOffset`** |
-  | **out, deliberately** | the `getUTC*` family — zone-*free* by construction, and the correct way to read an instant outside the domain |
-  | **out, deliberately** | ambient-zone **construction**: `new Date(y, m, d, …)`, a zone-less `Date.parse('2026-03-28T09:00')` |
-
-  Of the three ambient forms added after step 2's routing, `getTimezoneOffset` is the one that matters:
-  it is the cheapest hand-rolled route to a local rendering, so a list stopping before it leaves the
-  obvious escape open — R-01-6 exactly, a marker enumerating the spellings its author thought of. The
-  `get*` completions matter for a second reason: a list stopping at `getFullYear` invites the reading
-  that its omissions are *deliberate*, the way `getUTC*`'s genuinely is, and an accidental gap that
-  looks intentional is worse than an obvious one.
-
-  **Ambient-zone construction is excluded by drawing the boundary, not by missing it.** It is the same
-  bug class, but it builds an instant **from** a wall clock rather than deriving one from an instant,
-  so it falls outside the concept as worded. Widening the concept to reach it would also catch
-  legitimate fixture construction, and `tests/` is outside the scan. The residue is booked, not
-  dangling: at step 7 it becomes a **deliberate** row in arc42 §11's irreducible-for-a-text-scan table,
-  beside `duration-arithmetic`'s. §11 is not in this slice's declared arc42 scope, so the row is
-  written when the scope is.
-- **`zone-transport`** — the identifier `time_zone` or `ianaZone`. Permitted in a short, *named* list:
-  `src/persistence/schema.ts`, `src/persistence/referenceRepository.ts`,
-  `src/application/deriveInterval.ts`, `src/domain/openingHours.ts`. Carrying an opaque string is not
-  reasoning about a zone.
-
-**QS-12's response measure survives the split, and that is the test of whether the split is honest.**
-The transport files hold a string they never interpret: if ADR-0001's rule grows breaks, holidays or a
-second zone per dealership, only `openingHours.ts` changes — still *"one source file plus one
-migration"*. A split that moved real reasoning into the permitted list would break that measure.
-
-**Ruled 2026-09-06** (`s-02-ruling-E-02-2`): QS-12 reads by concept, not by spelling; the split above
-stands as specified. arc42 §10.2 now says so in the scenario's own words. §10 was outside this slice's
-declared arc42 scope (`["§5.2", "§6.1", "§8.6"]`), which is why it was flagged rather than taken — the
-routing, not the design, was the part that needed the human.
+A scan that reports nearly the same file set whether or not the tree contains zone reasoning is not
+evidence — the standard applied to `domain-is-pure` at slice 01 and to `duration-arithmetic` at
+R-01-6. **Ruled:** QS-12 reads by **concept**, not by spelling, and the marker splits in two —
+`wall-clock-reasoning` (deriving a wall clock or calendar field from an instant by any route,
+including `getTimezoneOffset` and the ambient `get*`/`toLocale*` families; `getUTC*` and ambient-zone
+*construction* deliberately out) permitted only in `src/domain/openingHours.ts`, and `zone-transport`
+(the bare identifier) permitted in a short named file list. QS-12's response measure survives the
+split, which is the test of whether the split was honest: the transport files hold a string they
+never interpret. The excluded ambient-*construction* residue becomes a deliberate row in arc42 §11's
+irreducible-for-a-text-scan table at step 7, beside `duration-arithmetic`'s.
 
 ### E-02-3 — arc42 §8.5's serialiser table is incomplete, and the missing rows change its guidance · **route**
 
@@ -219,6 +107,74 @@ having the right answer written in for it.
 That is a §8.5 edit and §8.5 is outside this slice's declared scope. Flagged. §5.2 below uses the
 measured behaviour regardless — the design does not need §8.5 to be amended to be correct, it needs
 §8.5 amended to stop being *misleading*.
+
+### T-02-9 — a simultaneous loser is refused with `40P01`, and this design called that a `500` · **ruled 2026-09-06: (c) design defect** · [ADR-0018](../adr/0018-lock-the-bay-and-the-technician-before-each-insert.md)
+
+**The first ruling made under the human's amendment of 2026-09-06.** Between steps 1 and 5 nothing
+escalates: scope, acceptance criteria and quality goals are mine, **provisionally until the gate**.
+Everything in this block is provisional in that sense and `slice:check` lists it for step 6. I am
+naming that at the top rather than at the bottom, because the record of *who decided* is the whole of
+what makes delegated authority safe.
+
+**The finding, reproduced rather than taken on trust — and worse than reported.** `postgres:16-alpine`,
+this repository's own migrations, 20 racers on one bay released from a hard barrier, 20 trials:
+20 confirmed, 95 `23P01`, **285 `40P01`**. `check_exclusion_constraint` inserts the index tuple and
+*then* scans, so simultaneous inserters wait on each other's in-progress tuples and cycle. Exactly one
+row survived every trial — **§2.1 is untouched, and was never in question.**
+
+**What fails, named, because (c) requires it.** **AC-3** and **AC-4** — *"the other 19 receive `409`
+with `type=/problems/no-capacity`"* — and arc42 §10's **QS-1** and **QS-2**, which use the same words.
+The failing clause is §2.6's `other ⇒ rethrow ⇒ 500` arm and nothing else: not the loop, not the
+taxonomy, not the brand.
+
+**Not (b), and not (a).** (b) requires the work to be *correct* under the agreed ADR; a booking that
+returns `500` to three losers in four is not correct, it is unshippable. (a) requires the design to be
+right and the wording ambiguous; `other ⇒ 500` is unambiguous and wrong. Worth naming the shape,
+because it will recur: the constraint guarantees *at most one row*, which is a claim about the
+**table**, and every criterion in this slice that a race can break is a claim about the
+**responses**. §2.1 can be perfectly intact while the API is unshippable, and this design's
+`Definition of done` insistence that QS-1 and QS-2 assert over the table is exactly what let the
+response half go unexamined until a test-engineer ran it.
+
+**The obvious remedy does not work, and that is the substance.** My own first draft was the
+test-engineer's remedy with better constants — retry, with backoff scaled to `deadlock_timeout`
+rather than to nothing. Measured, *N* = 20, one bay, five configurations: **every one livelocks.**
+An aborted racer re-inserts its index tuple, so the population of in-flight inserters never falls to
+one and nobody commits.
+
+| Retry configuration | Deadlocks | Racers left with no verdict | Race |
+|---|---|---|---|
+| immediate, `deadlock_timeout` 1 s, 30 s budget | 292 | 114 / 120 | 48 s |
+| exponential 50 ms → 1 s, 1 s | 241 | 95 / 120 | 48 s |
+| immediate, 25 ms, 5 s budget | 2100 | 171 / 200 | 5.5 s |
+| exponential 5 → 200 ms, 25 ms | 1305 | 114 / 200 | 5.5 s |
+| jitter 0–25 ms, 25 ms | 1352 | 114 / 200 | 5.5 s |
+
+`deadlock_timeout` is also a **superuser** GUC — the application role is refused — so it could never
+have been a `platform/config.ts` value. And `ON CONFLICT DO NOTHING`, which does *not* deadlock, is
+worse still: all twenty racers bail on each other's in-progress tuples and **3 of 10 trials produced
+no appointment at all**. ADR-0018 records all eight options with what each was measured to do.
+
+**The ruling.** Each attempt takes two class-scoped transaction advisory locks — class 1 on the bay,
+class 2 on the technician — before its `INSERT`. Disjoint key spaces make *bay-then-technician* a
+total order by construction, so no attempt can take the pair in reverse and there is no sort for
+anyone to keep sorted. Measured across 56 races at *N* = 20 and *N* = 40, bay-contended,
+technician-contended and both at once: **0 deadlocks, 0 retries, every racer a verdict, the expected
+constraint name**, 20 racers resolved in 76 ms median, and 0.4 ms added to an uncontended booking.
+`40P01` becomes its own `PgOutcome` variant, `no-verdict`, which mints no `ContendedResource` — so
+**ADR-0016 answered the human's question before I did**: a `409` here is not merely dishonest, it is
+unconstructible without a cast. Under the lock a deadlock can only mean a write path skipped the
+locks, so it is an internal fault, not retried, `500 /problems/internal`. **§8.6 gains no row and the
+taxonomy does not grow.**
+
+**What this costs §4, said plainly rather than buried.** Under a per-resource lock a reintroduced
+check-then-act would be **correct**, not merely harmless. §4's argument is weaker after this ruling
+than before it, and §4.5 now says so and states what survives.
+
+**This ruling changes what an acceptance criterion asserts — AC-5, and only AC-5.** AC-3 and AC-4 are
+unchanged in substance: the design now *earns* their nineteen `409`s instead of assuming them, which
+is the outcome I wanted and not the one I expected to reach. The exact wording I want for AC-5 is in
+§9 under R-02-1; the slice file is the orchestrator's and I have not edited it.
 
 ---
 
@@ -279,10 +235,18 @@ export type ContendedResource = ('bay' | 'technician') & { readonly __brand: 'Co
 export type PgOutcome =
   | { readonly kind: 'conflict'; readonly resource: ContendedResource; readonly constraint: string }
   | { readonly kind: 'bad-reference'; readonly constraint: string }   // 23503
+  | { readonly kind: 'no-verdict' }                                   // 40P01 — T-02-9, ADR-0018
   | { readonly kind: 'other'; readonly cause: unknown };
 
 export function classify(error: unknown): PgOutcome;
 ```
+
+`no-verdict` is `40P01` and **only** `40P01`: the one SQLSTATE measured to reach this path. It
+carries no `constraint`, no `resource` and no cause, because a deadlock reports none — and the
+absence is the point. It is the variant a refusal cannot be built from, which is ADR-0016 doing its
+job at the one moment it was most likely to be argued around. `40001` is *not* included: at `READ
+COMMITTED` it cannot arise here, and adding an unmeasured SQLSTATE to the one classifier the design
+calls total is how a total function starts guessing.
 
 `constraint` is carried on the conflict variant as well as the resource, because ADR-0009 prunes on
 the resource but AC-3 and AC-4 assert on the **name**, and a test that can only see `'bay'` cannot
@@ -445,6 +409,7 @@ export type BookOutcome =
       readonly reference: 'dealership' | 'service-type' | 'customer' | 'vehicle' }
   | { readonly kind: 'vehicle-not-owned' }
   | { readonly kind: 'no-capacity'; readonly resource: ContendedResource; readonly attempts: number }
+  | { readonly kind: 'no-verdict' }                                   // T-02-9, ADR-0018 ⇒ 500
   | { readonly kind: 'reference-data-invalid'; readonly detail: string };
 
 export interface BookDeps {
@@ -498,8 +463,12 @@ The shape:
 4  candidateResources(...)   ← reference data only, §2.2
    bays empty                                         ⇒ reference-data-invalid   ⇒ 500   … ruled below
    technicians empty                                  ⇒ unknown-reference: service-type  … ruled below
-5  loop over candidates, OUTSIDE any transaction:
-     insertAppointment(one statement)
+5  loop over candidates, EACH ATTEMPT ITS OWN TRANSACTION (T-02-9, ADR-0018):
+     BEGIN
+       pg_advisory_xact_lock(1, hashtext(bay))        ← class 1 = bays
+       pg_advisory_xact_lock(2, hashtext(technician)) ← class 2 = technicians; disjoint ⇒ total order
+       insertAppointment(one INSERT)
+     COMMIT
        ok       ⇒ confirmed
        23P01    ⇒ classify → {resource, constraint}
                   LOG {event:'booking.conflict', constraint, resource, attempt}   ← I-02-6
@@ -508,12 +477,31 @@ The shape:
        23503 on appointment_vehicle_owned_by_customer
                 ⇒ classifyOwnership → unknown-customer | unknown-vehicle | not-owned   (never retried)
        23503 other constraint ⇒ reference-data-invalid          (never retried)
+       40P01    ⇒ no-verdict                                     ⇒ 500   (never retried, ADR-0018)
+                  LOG {event:'booking.deadlock', level:'error', bay, technician}
        other    ⇒ rethrow                                        ⇒ 500
    a list empties ⇒ no-capacity, resource = the list that emptied
 ```
 
 Steps 1–3 run once. The loop varies only the candidate — ADR-0004, and arc42 §6.2's three
 reviewer checks.
+
+**Each attempt is its own transaction, and the loop is still not wrapped in one.** ADR-0004 already
+required this — *"a constraint violation aborts the enclosing transaction, so each needs its own
+transaction or a savepoint"* — and QS-3 already fails a design that wraps the loop, because the
+second attempt would raise `25P02`. The locks are `pg_advisory_xact_lock`, not the session-scoped
+form, precisely so an attempt releases them as it ends and no lock survives into the next candidate.
+
+**A `40P01` is not retried, and that is a deliberate choice to fail loudly.** The obvious objection is
+flakiness: if one deadlock ever slips through on a CI machine I have not measured, AC-3 fails with a
+`500`. That is the outcome I want. A retry here would convert *"a write path skipped ADR-0018's
+locks"* — the only thing a deadlock can now mean — into a latency blip nobody investigates, and
+F-02-9 makes that a live risk from slice 06 onwards. A guard that hides the fault it exists to detect
+is the failure mode this project has removed six times.
+
+**The locks decide nothing, and §4.5 is the control that says so.** They stop two inserters being in
+flight against the same bay or the same technician at once; they never read `appointment` and never
+determine an outcome. The `INSERT` is still exactly one statement and is still what adjudicates.
 
 **Pruning is per resource *value*, not per resource *class* — T-02-1.** A `no_bay_overlap` drops
 **that bay** and leaves the other bays; a `no_technician_overlap` drops **that technician**. ADR-0009's
@@ -615,37 +603,29 @@ difference between QS-11's contract test being able to fail and not.
 
 ### The taxonomy could escape itself, and now cannot — I-02-5
 
-This section claimed a handler computing a URI outside the set *"gets a loud `500`"*. **Measured, and
-that is not what the client receives:**
+**Condensed 2026-09-06 (T-02-9), from ~550 words.** The measurement table and its argument are in
+this file's git history; the two mechanisms and the reason for each are kept.
 
-| Route | Handler sends | On the wire |
-|---|---|---|
-| `409`, `Problem` response schema | `type: '/problems/TYPO'` | **`500`**, `application/json`, `{"code":"FST_ERR_FAILED_ERROR_SERIALIZATION", …}` |
-| `500`, `Problem` response schema | a `type` outside the set | the same |
-| `500`, **no** response schema | `{type:'/problems/internal', …}` | `500`, `application/problem+json`, **exactly what was sent** |
+This section claimed a handler computing a URI outside the set *"gets a loud `500`"*. Measured, that
+is not what the client receives: with a `Problem` response schema, a mistyped `type` produces `500`,
+`application/json`, `FST_ERR_FAILED_ERROR_SERIALIZATION` — **not `problem+json`, no `type`, wrong
+status**. §8.6's `500 | Anything else` claims totality and this escapes it. The union was a backstop
+that could itself become the defect. Two changes, belt and braces on purpose:
 
-So a single mistyped URI does not merely fail loudly — it converts that taxonomy row into a response
-that is **not `application/problem+json`, carries no `type`, and reports the wrong status**. §8.6's
-`500 /problems/internal | Anything else` claims totality, and this escapes it. The union was a
-backstop that could itself become the defect.
-
-Two changes, and they are belt and braces on purpose:
-
-1. **A compile-time constructor**, so a URI outside the taxonomy cannot be built in the first place:
+1. **A compile-time constructor**, so an out-of-taxonomy URI cannot be built:
 
    ```ts
    export type ProblemType = (typeof PROBLEM_TYPES)[number];
    export function problem(type: ProblemType, status: number, title: string, extra?: ProblemExtra): Problem;
    ```
 
-   `PROBLEM_TYPES` is `as const`, so `ProblemType` is the union of the seven literals and a typo is a
-   compiler error at the call site rather than a serialisation failure at the client. This is the same
-   move as ADR-0016's brand, one layer up, and it costs three lines.
-2. **The `500` carries no `response` schema.** The last-resort renderer must not be able to fail: a
-   schema on the one status whose job is to catch everything is a dependency the catch-all cannot
-   afford. Measured above — unschema'd, it renders exactly what the handler sent, with the right
-   content type. `400`, `404`, `409` and `422` keep their schemas, for the OpenAPI document ADR-0005
-   emits from them and as the runtime backstop behind (1).
+   `PROBLEM_TYPES` is `as const`, so a typo is a compiler error at the call site rather than a
+   serialisation failure at the client. Same move as ADR-0016's brand, one layer up, three lines.
+2. **The `500` carries no `response` schema.** Measured: unschema'd, it renders exactly what the
+   handler sent with the right content type. The last-resort renderer must not be able to fail —
+   a schema on the one status whose job is to catch everything is a dependency the catch-all cannot
+   afford. `400`, `404`, `409` and `422` keep theirs, for ADR-0005's emitted OpenAPI document and as
+   the runtime backstop behind (1).
 
 **Status mapping** — one exhaustive `switch` over `BookOutcome`, in the route:
 
@@ -657,9 +637,15 @@ Two changes, and they are belt and braces on purpose:
 | `unknown-reference` | `422` | `/problems/unknown-reference` + `reference` |
 | `vehicle-not-owned` | `422` | `/problems/vehicle-not-owned` |
 | `no-capacity` | `409` | `/problems/no-capacity` + `resource` |
+| `no-verdict` (`40P01` under ADR-0018's locks — a write path skipped them) | `500` | `/problems/internal` |
 | `reference-data-invalid` (verdict `unknown-zone`, `malformed-hours`) | `500` | `/problems/internal` |
 
-The last row settles OQ-02-2 and I am settling it rather than escalating it: a dealership whose
+The two `500` rows are one taxonomy row and two *outcomes*, deliberately. Both are the system's
+fault rather than the client's, so they render identically; they stay separate in `BookOutcome` so
+the exhaustive `switch` still names them apart and the operator's log line can. `PROBLEM_TYPES` is
+unchanged: T-02-9 grew the outcome union by one and §8.6's client contract by nothing.
+
+The `reference-data-invalid` row settles OQ-02-2 and I am settling it rather than escalating it: a dealership whose
 `time_zone` is unparseable or whose `opens_at` is garbage is **the system's fault, not the client's**.
 §8.6 has no row for it and needs none — `500 /problems/internal` is the row that already exists. A new
 `4xx` type would tell a service advisor to fix something they cannot see and did not send. It is
@@ -710,33 +696,21 @@ no import and `no-dev-dep-in-src` and the layering rules are untouched.
 
 ## 3. Sequencing, and why one red commit is enough
 
-The slice file invites a DCR: *"If your design concludes it genuinely needs two red commits, say so
-plainly."*
+**Condensed 2026-09-06 (T-02-9): the red is committed at `34b057b` and observed, so this section's
+argument has been settled by events.** It concluded that §7's *"exactly one red commit per slice"*
+counts commits and not files, that one commit carrying every outside-in test satisfies it, and that
+all three test families fail as **assertions** rather than collection errors (criterion C1) because
+`dist/` exists and answers wrongly rather than not existing. The test-engineer's report confirms it:
+291 tests, 27 failed, **0 non-assertion failures**.
 
-**It does not, and the reason is that §7's rule counts commits, not files.** *"Exactly one red commit
-per slice, authored by the test-engineer"* is satisfied by one commit containing every outside-in test
-this slice needs — acceptance, contract, concurrency and property. Sequencing is a property of the
-**green** work, which §7 requires to be many small commits anyway.
+Recommended **green** order, which is the part still ahead:
 
-For that single red to be honest it must fail as **assertions**, not as collection errors (process
-criterion C1, and 00a's whole harness design). All three families do:
-
-| Test family | At the red commit | Fails as |
-|---|---|---|
-| acceptance / contract / concurrency (HTTP) | `dist/main.js` exists and starts — `/health` works — but has no `/appointments` route | a `404`/assertion inside the test body, via `tests/support/service.ts`, which never throws |
-| property / unit-facing domain (AC-13–AC-19) | `dist/domain/*.js` exists and exports the right names, and returns today's answers | an assertion on a verdict — `spans-local-days` where `within` is expected, an `Instant` where `null` is expected |
-
-So nothing needs stubbing and nothing fails at import. Recommended **green** order, which is the
-sequencing the slice file asks for:
-
-1. **AC-13 to AC-19** — `src/domain` only. Independent of everything else, and they get the strictest
-   mutation attention because they are pure.
+1. **AC-13 to AC-19** — `src/domain` only, independent of everything else, strictest mutation.
 2. `schema.ts`, `pgError.ts`, the three repositories.
-3. `deriveInterval.ts` (pure; unit-tested without Docker), then `bookAppointment.ts`, `readAppointment.ts`.
+3. `deriveInterval.ts` (pure), then `bookAppointment.ts`, `readAppointment.ts`.
 4. `problem.ts`, the routes, `server.ts`, `main.ts` → **AC-1, AC-2, AC-6**.
-5. **AC-7 to AC-12** — the taxonomy. Mostly falls out of step 4; the one genuinely new piece is
-   `classifyOwnership` (§5.3).
-6. **AC-3, AC-4** last. They are the integration of all of it, and they are the slice.
+5. **AC-7 to AC-12** — the taxonomy; the one new piece is `classifyOwnership` (§5.3).
+6. **AC-3, AC-4** last, now including ADR-0018's locks. They are the integration of all of it.
 
 ---
 
@@ -863,6 +837,35 @@ check-then-act with the read supplied by reference data. §2.6 step 4 is exactly
 it maps to `unknown-reference` rather than `no-capacity` — but the reason it is safe is an argument in
 this document, not a mechanism. It is the residue, it is small, and it is review's.
 
+### 4.5 ADR-0018's locks make this section weaker, and here is exactly how much — T-02-9
+
+Everything above rests on an uncomfortable fact stated in ADR-0016: the exclusion constraint makes
+check-then-act **harmless**, so no behavioural test can catch it. ADR-0018 makes that worse. Under a
+per-resource lock, a booking path that reads availability and then decides would no longer merely be
+harmless — inside the lock it would be **correct**. That is ADR-0004 Option D's own honest admission
+arriving through a side door, and softening it here would be the failure this project has spent four
+slices removing.
+
+What survives, and it is not nothing:
+
+- **The brand still holds.** A refusal is still constructible only from a value `classify` minted
+  from a `23P01`, and `no-verdict` deliberately carries nothing to mint one from. Locking changed
+  neither the type nor its single minting site.
+- **The scan still holds.** The locks are taken on `hashtext(bay_id)` and `hashtext(technician_id)`
+  — reference ids. Nothing on the booking path reads `appointment`, so `appointment-table-access`
+  still fires on a reintroduced check.
+- **The controls still hold, and one is new.** §4.4 drops the DDL and shows the constraint is what
+  adjudicates. Its mirror drops the *lock* and shows the lock is not: measured, 20 racers, locks
+  removed and constraints kept ⇒ **exactly one row** and 108 deadlocks; constraints removed and
+  locks kept ⇒ **20 overlapping rows**. Correctness is entirely the constraint's; liveness is
+  entirely the lock's, and the pair is what turns that sentence from a claim into a reading.
+
+The lock-drop control belongs beside §4.4's in
+`tests/integration/exclusion-constraint-adjudicates.test.ts`, under QS-1 and QS-2 as §4.4's already
+does. It is one added case in an existing file, **not a new acceptance criterion** — I considered
+adding one and rejected it, because a new AC needs a new red and this slice's file already says that
+a second red commit means it was two slices.
+
 ---
 
 ## 5. The error taxonomy — AC-7 to AC-12
@@ -963,7 +966,9 @@ ruling to avoid a duplicated constant is a scope change and the human's. It is c
 Measured, so AC-14 and AC-15 are written against facts: `new Date(8_640_000_000_000_000).toISOString()`
 is `+275760-09-13T00:00:00.000Z`; at `8_640_000_000_000_001` it throws `RangeError`. The bound is
 inclusive and both signs must be asserted (AC-14) — a mutant flipping `<=` to `<` is killed only by the
-exact-boundary case, and a mutant deleting `Math.abs` only by the negative one.
+exact-boundary case. **Corrected at step 3 by the test-engineer's measurement:** deleting `Math.abs`
+is *not* killed by AC-14's negative bound, because `−MAX <= MAX` holds; it is killed only by a
+negative value **beyond** the bound. I wrote that claim without running it and it was wrong.
 
 ### 6.2 ADR-0015 — an interval ending at local midnight
 
@@ -992,7 +997,7 @@ discriminating ones:
 | Mutant | Killed only by |
 |---|---|
 | `<=` → `<` on the epoch bound | AC-14's exact `±8_640_000_000_000_000` |
-| delete `Math.abs` | AC-14's negative bound |
+| delete `Math.abs` | a negative value **beyond** the bound — *not* AC-14's `−MAX`, measured |
 | delete the whole step-4 normalisation | AC-17 |
 | **delete the "immediately following" clause**, keeping the `00:00:00` test | a >24h interval ending at local midnight — *not* by AC-17 |
 | delete step 4 entirely | AC-18, the negative control — AC-17 alone is satisfied by deleting the check |
@@ -1005,7 +1010,10 @@ The slice declares `[QS-1, QS-2, QS-11, QS-9, QS-12]`. All five apply. Notes onl
 changes what the scenario means.
 
 - **QS-1 / QS-2** (AC-3, AC-4) — become executable end to end for the first time. Both must assert
-  over the **table**, not the responses. Their determinism comes from §2.6's loop (E-02-1), and the constraint name
+  over the **table**, not the responses. **Their response half is determinate only because of
+  ADR-0018** (T-02-9): without the locks, three losers in four are told `500`, and the constraint
+  name each loser reports is a property of who won rather than of the constraint. Their determinism
+  otherwise comes from §2.6's loop (E-02-1), and the constraint name
   they require is observed through §2.6's `booking.conflict` log line (I-02-6). On the failure message:
   there is no seed to record in this slice — see F-02-7 — so it carries the candidate order and the
   fixture ids instead. **§4.4's DDL-drop control belongs to this pair**: it is what makes QS-1 evidence
@@ -1047,33 +1055,30 @@ measurements, all re-runnable.
 | 7 | A schema violation is `400` before the handler, as problem+json | Fastify 5.12.1 `inject`, RFC 3339 pattern | `400`, handler never ran, `application/problem+json` |
 | 8 | `Type.Literal` substitutes; a literal **union** enforces; `Type.String({enum})` does neither | three response schemas, one bad value each | substituted / `500` / passed through |
 | 9 | `time` arrives as a string and `'24:00:00'` survives; `timestamptz` arrives as a `Date` | `pg` 8.23 against a real container | `"09:00:00"`, `"24:00:00"`, `Date` |
+| 16 | T-02-9's finding, re-run on this repository's migrations | 20 racers, one bay, hard barrier, 20 trials | 20 ok, 95 `23P01`, **285 `40P01`**; 1 row every trial |
+| 17 | Retry cannot rescue it | 5 configurations of backoff × `deadlock_timeout` | **all livelock**; 95–171 of 200 left with no verdict |
+| 18 | `deadlock_timeout` could not have been configuration | `SET` as an ordinary role | `ERROR: permission denied` — superuser GUC |
+| 19 | `ON CONFLICT DO NOTHING` avoids the deadlock and is worse | 10 trials, 20 racers | 193/200 zero rows; **3 trials produced no appointment at all** |
+| 20 | ADR-0018's locks | 56 races, *N* = 20 and 40, bay / technician / mixed | **0 deadlocks, 0 retries**, every racer a verdict, right constraint |
+| 21 | The lock is liveness, not correctness | drop the lock; then drop the constraints | 1 row + 108 deadlocks; **20 overlapping rows** |
+| 22 | What the lock costs when nobody is racing | 200 uncontended bookings, median / p95 | 3.22 → **3.60 ms** median; p95 5.77 → 5.79 ms |
 
 Two of these corrected an assumption I had written down before running it, and both are recorded
 rather than quietly fixed: I expected `Date.parse('2026-02-30T10:00:00Z')` to be `NaN` and it is not
 (F-02-2), and I expected `additionalProperties: false` to **reject** an extra property, where Fastify
 in fact **strips** it (§2.7).
 
-### Measured again at step 2, adjudicating the objections
+### Measured again at step 2, and again at step 3
 
-Both roles reported measurements. **They were re-run here rather than taken on trust**, which is the
-same standard step 1 was held to and the only way an adjudication can disagree with a measurement on
-anything but authority. All six reproduce.
+**Every measurement either role reported was re-run rather than taken on trust** (rows 10–15 at step
+2, rows 16–22 at step 3). That is not distrust: it is the only way an adjudication can disagree with
+a measurement on anything but authority. All six step-2 re-runs reproduced, and one of them produced
+the disagreement recorded in §12.
 
-| # | Claim under adjudication | Result | Ruling it supports |
-|---|---|---|---|
-| 10 | `/\bappointment\b/` over `src/**/*.ts` at HEAD | 2 files — `domain/interval.ts`, `persistence/schema.ts` | T-02-2 |
-| 11 | the §4.2 concept form on the same tree, and on a fixture with a Kysely `selectFrom('appointment')` and a `sql` template planted | **0** at HEAD; **both** planted forms caught | T-02-2 — incomplete, **not** blind |
-| 12 | QS-12's `wall-clock-and-zone` against three planted zone-reasoning violations | `toLocaleString` **MISSED**, `getHours` **MISSED**, `Intl.DateTimeFormat` caught | E-02-2 — genuinely blind |
-| 13 | Stryker's shipped mutator set | 20 mutators; **none** reorders or moves a statement. `block-statement` empties a block | I-02-3 |
-| 14 | a `409` whose body fails its own `Problem` response schema | **`500`**, `application/json`, `FST_ERR_FAILED_ERROR_SERIALIZATION` — outside the taxonomy entirely | I-02-5 |
-| 15 | a `500` with **no** response schema | renders exactly what the handler sent, `application/problem+json` | I-02-5, remedy 2 |
-
-Measurement 11 is the one that produced a **disagreement** rather than an agreement, and it is the
-reason §4.2's remedy is "add the four mechanisms" and E-02-2's is "redefine the concept". Two findings
-that looked like the same defect are not, and applying either remedy to the other marker would have
-left the real hole open.
-
----
+T-02-9's re-run went further and is the reason the ruling is what it is. The reported figure was
+*"roughly one race in three"*; on this repository's own migrations under a hard barrier it is **285
+of 400 losers**. Had I ruled from the reported number, a 33% `500` rate would have looked survivable
+enough to reach for a retry — which is measurement 17, and which livelocks.
 
 ## 9. Assumptions, open questions and findings
 
@@ -1125,6 +1130,37 @@ left the real hole open.
   by construction with nothing to record. What the failure message should carry instead is the
   candidate order actually used and the fixture ids. **The DoD wording is the human's and is routed,
   not edited here**; the substance is settled above so step 3 is not blocked on it.
+- **F-02-8** *(T-02-9)* — `hashtext` is an undocumented internal function. ADR-0018 needs only *a*
+  deterministic `int4` per id, so an application-side hash would serve identically. **Route to §11.**
+- **F-02-9** *(T-02-9)* — **every write path to `appointment` must take ADR-0018's two locks in its
+  order.** Slice 06's reschedule `UPDATE` and slice 07 inherit it; one that skips them reintroduces
+  the deadlock against a booking. This sits beside arc42 §8.2's existing *"inherited obligation for
+  slice 06"* and is the second thing that slice owes. **Route to §11 and §8.2.**
+
+- **F-02-10** *(T-02-9)* — **`docs:adr-check` does not notice a new ADR.** It checks only records
+  already in `tools/docs/adr-baseline.json`, so ADR-0018 is unpinned: a later condensation could drop
+  one of its eight options and the guard would stay green while reporting *"17 ADR(s) checked"*.
+  Running `--rebaseline` fixes it and also rewrites all 17 existing pins, because the pinned file is
+  stale relative to the tool's current extraction — 367 insertions, 175 deletions of unrelated churn.
+  I did **not** take that inside a DCR commit: it would bury the one entry it was meant to add. It is
+  a tooling commit of its own, and the guard should fail on an unbaselined ADR rather than skip it.
+  **Route to the tooling owner.**
+
+### The acceptance-criterion wording I want changed — R-02-1
+
+`docs/slices/02-book-and-read-an-appointment.md` is the orchestrator's; this is the exact wording,
+not an edit. **AC-3 and AC-4 are unchanged.** AC-5 changes what it permits, and I am calling that a
+change rather than a clarification because it is one:
+
+> **AC-5** — Given the source tree, when it is inspected, then no code path reads availability and
+> then decides whether to insert. Each booking attempt is one transaction containing exactly one
+> `INSERT` into `appointment`, preceded only by ADR-0018's two advisory-lock acquisitions — which
+> read no table and decide nothing.
+
+Without it, AC-5's *"the booking path is a single `INSERT` per attempt"* reads as *a single
+statement*, and a reviewer applying it literally at step 5 would be right to block on the lock. The
+substance AC-5 exists for — no read-then-decide — is untouched, and the added clause is a
+restriction on what may precede the insert, not a permission slip.
 
 ---
 
@@ -1140,14 +1176,20 @@ pure; that `occupancyInterval` has its first production call site; and the `Cont
 with its measured claim **and** its measured cast escape, narrowed exactly as the 00a
 partial-application claim was.
 
-**§6.1** — the sequence gains the `23503` classification step (§5.3) and the precedence measurement
+**§6.1** — **T-02-9 first**: the diagram's *"R2 **blocks** on R1's in-progress row … and resumes when
+R1 ends"* is measured to be false under simultaneity — R2 and R1 form a cycle and one is aborted with
+`40P01`. §6.1's sequence gains ADR-0018's two lock acquisitions before the `INSERT`, the `40P01` arm,
+and a corrected note saying what the serialisation point actually is. It also gains the `23503`
+classification step (§5.3) and the precedence measurement
 (F-02-3): `23P01` is raised at index insertion and beats the FK's after-row trigger. An as-built note
 that slice 02 builds ADR-0004's loop without ADR-0009's seeded shuffle or attempt cap, both of which
 remain slice 04's (E-02-1). **Added at step 2:** pruning is per resource **value** (T-02-1),
 and the `booking.conflict` log line is where the constraint name is observable until QS-13's span
 carries `db.constraint` at slice 09 (I-02-6).
 
-**§8.6** — five additions: the `500 /problems/internal` reading for broken reference data, now
+**§8.6** — **no new row**, and that is worth recording rather than assuming: T-02-9 added an outcome
+and not a status. The `500 | Anything else` row's *"Decided by"* column gains `40P01` beside broken
+reference data. Then five additions: the `500 /problems/internal` reading for broken reference data, now
 including a dealership with **zero service bays** (§2.6, ruled at step 2); the precedence rule of
 F-02-3; that a `(dealership, service-type)` pair with no qualified technician is
 `422 /problems/unknown-reference` and **not** a new taxonomy row; the rule that the problem schema
@@ -1158,7 +1200,12 @@ a non-`problem+json` `FST_ERR_FAILED_ERROR_SERIALIZATION` (measurements 14–15)
 `400`-versus-`422` tension for out-of-hours is left recorded and not harmonised, per the slice file's
 definition of done.
 
-**Outside the declared scope — flagged for the orchestrator to route, not taken:** §10 (E-02-2,
+**§5.2** additionally gains the `PgOutcome` `no-verdict` variant and the sentence that earns it: a
+capacity refusal requires a verdict, and a deadlock is the absence of one.
+
+**Outside the declared scope — flagged for the orchestrator to route, not taken:** §8.2 (F-02-9's
+lock obligation, beside the existing slice-06 obligation), §11 (F-02-8, F-02-9, and §4.5's admission
+that ADR-0018 weakens ADR-0016's argument), §10 (E-02-2,
 QS-12's marker — **blocking on step 3**), §8.5 (E-02-3, two measured rows and reversed guidance),
 §11 (F-02-1, F-02-2, F-02-4, F-02-5, and the D-01-2 duplication cashing in for the second time).
 
@@ -1166,7 +1213,7 @@ QS-12's marker — **blocking on step 3**), §8.5 (E-02-3, two measured rows and
 
 ## 11. ADRs
 
-Two genuinely new decisions. Both `status: proposed`: they are the architect's recommendation and the
+Three genuinely new decisions. All `status: proposed`: they are the architect's recommendation and the
 human's to rule at this slice's gate, which is the pattern ADR-0011 through ADR-0015 established. Both
 therefore appear in §11.1's generated register as debt until ruled.
 
@@ -1175,6 +1222,10 @@ therefore appear in §11.1's generated register as debt until ruled.
 - **[ADR-0017](../adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md)** — the
   three failures that share `appointment_vehicle_owned_by_customer` are separated by a classification
   read **after** the insert is refused, never by a pre-flight check. §5.3.
+- **[ADR-0018](../adr/0018-lock-the-bay-and-the-technician-before-each-insert.md)** — two
+  class-scoped advisory locks per attempt, and a deadlock is an internal fault rather than a
+  refusal. T-02-9, §4.5. **Decided by me under the 2026-09-06 amendment**, unlike the other two,
+  which are recommendations awaiting the human. It is provisional until the gate all the same.
 
 **No ADR is proposed for the retry loop.** ADR-0004 already decided it; E-02-1 was a scope conflict
 between two statements in a human-authored slice file, and the remedy was a ruling, not a new decision
@@ -1208,6 +1259,7 @@ except authority, and one of the six re-runs is what produced the disagreement b
 | **E-02-2** | misattributed to ADR-0006; the marker is also too loose | **AGREE** | **(a)** for the spec, **queued** for the arc42 wording | §0: attribution corrected, two markers specified |
 | — | *addition*: DDL-drop negative control | **ADOPTED** | — | §4.4 |
 | — | *addition*: `pg_stat_statements` runtime detector | **not now** | — | F-02-6, routed |
+| **T-02-9** *(step 3)* | `40P01`, not `23P01`, refuses a simultaneous loser; §2.6 maps it to `500` | **AGREE** | **(c)**, mine to rule | ADR-0018; §2.1, §2.6, §2.7, §4.5, §7. AC-5's wording proposed in §9 |
 
 ### Where I disagreed, and why the disagreements are the load-bearing part
 
@@ -1237,14 +1289,15 @@ cheap; the same ambiguity found at step 5 costs a full cycle plus a loopback"*, 
 governor exists to bound defects found **after work has been done**. Nothing has been built. Spending
 a loopback on a design corrected before its own red commit would punish the step that worked.
 
-**No loopback is consumed. The slice remains at 0 of 2.**
+**No loopback is consumed by step 2. The slice was at 0 of 2 when step 3 began.**
 
-### What still blocks the red commit
+**T-02-9 takes it to 1 of 2**, and that is the right price. Every step-2 objection was answered before
+anything was built; T-02-9 was found by a test-engineer running the design against a real container
+after the red was committed, which is exactly the class the governor exists to count. One more design
+change on this slice and it auto-escalates — and the honest reading of that is that a slice carrying
+19 acceptance criteria, a whole taxonomy and two absorbed slices was always going to spend one.
 
-- **Nothing from these rulings.** T-02-1, T-02-3/I-02-7, T-02-4, I-02-3, I-02-5, I-02-6 and
-  I-02-8/T-02-7 are all settled above and step 3 can be written against this document.
-- **E-02-2 no longer blocks anything.** It was ruled on 2026-09-06 and arc42 §10.2 carries the
-  concept, so the QS-12 assertions are unblocked with the rest: both markers are specified above and
-  the test-engineer implements them from that specification.
-- **E-02-1 is ruled and nothing is queued behind it.** The loop is in scope, §2.6 is its
-  specification, and AC-4's determinism comes from there.
+### What still blocks the red commit — closed
+
+Nothing did; the red is committed at `34b057b` and observed in CI. **What blocks step 4 is T-02-9**,
+ruled above: the implementer builds §2.6 *with* ADR-0018's locks, or three losers in four get a `500`.
