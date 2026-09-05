@@ -68,7 +68,7 @@ const mutationRun = (over) => ({
  */
 const git = (dir, args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
 
-const build = (events, { commits = [], slice = SLICE } = {}) => {
+const build = (events, { commits = [], slice = SLICE, branch = null } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'slice-check-'));
   mkdirSync(join(dir, 'docs/team-log'), { recursive: true });
   mkdirSync(join(dir, 'docs/slices'), { recursive: true });
@@ -81,6 +81,9 @@ const build = (events, { commits = [], slice = SLICE } = {}) => {
   git(dir, ['config', 'user.name', 'fixture']);
   git(dir, ['add', '-A']);
   git(dir, ['commit', '-qm', 'chore: fixture root']);
+  // A branch makes the arc42 check gate-relative rather than message-relative; without
+  // one, HEAD is the merge-base and the scope fallback applies (see R-02-1).
+  if (branch) git(dir, ['checkout', '-q', '-b', branch]);
 
   // Extra commits, each { subject, files: { path: contents } }, so a case can plant a
   // scoped commit that touches a declared or undeclared arc42 section.
@@ -301,9 +304,29 @@ const MARKED = '# 9\n\n<!-- generated:adr-index -->\nold\n<!-- /generated:adr-in
   ok('a hand edit to a DECLARED section passes (§1 is declared by the fixture)',
     row(declared, 'arc42 edits').startsWith('PASS'), row(declared, 'arc42 edits'));
 
+  // POST-GATE, NOT DIFFERENTLY-SPELLED — R-02-1.
+  //
+  // This case used to assert that a commit not scoped to the slice is not the slice's
+  // edit, on the ground that step 7's `docs(arc42)` commits are post-gate. That is true
+  // of WHERE they run, not of how they are spelled, and slice 02 broke the assumption:
+  // `dd9bd44` hand-edited §10 at STEP 2 under a `docs(arc42)` subject, and the check
+  // reported "0 hand-edited" over a file it never opened.
+  //
+  // The distinction that actually holds is the branch. On a branch, every commit is the
+  // slice's work whatever its subject says — so this now asserts the opposite of what it
+  // did, and the fixture builds a branch to say so.
+  const onBranchUnscoped = build([ciRun()], { branch: 'slice/77-fixture', commits: [
+    { subject: 'docs(arc42): a mid-slice hand edit wearing a post-gate subject',
+      files: { 'docs/arc42/05-building-blocks.md': '# 5\nedited\n' } }] }).out;
+  ok('a docs(arc42) commit ON THE BRANCH is caught — a subject line cannot make it post-gate',
+    row(onBranchUnscoped, 'arc42 edits').startsWith('FAIL')
+      && row(onBranchUnscoped, 'arc42 edits').includes('05'),
+    row(onBranchUnscoped, 'arc42 edits'));
+
   const unscoped = build([ciRun()], { commits: [
-    { subject: 'docs(arc42): as-built, not slice work', files: { 'docs/arc42/05-building-blocks.md': '# 5\nedited\n' } }] }).out;
-  ok('a commit NOT scoped to the slice is not the slice’s edit — step 7 is post-gate',
+    { subject: 'docs(arc42): as-built, run on main after the gate',
+      files: { 'docs/arc42/05-building-blocks.md': '# 5\nedited\n' } }] }).out;
+  ok('the same commit on main is NOT the slice\'s edit — step 7 runs there, post-gate',
     row(unscoped, 'arc42 edits').startsWith('N/A') || row(unscoped, 'arc42 edits').startsWith('PASS'),
     row(unscoped, 'arc42 edits'));
 

@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `95e4f9f chore(02): I-02-9 ruled (a); the suite is green` |
+| Last commit | `a6c558b docs: regenerate §9 and §11 for ADR-0018` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process |
-| Agent runs recorded | 84 |
+| Agent runs recorded | 85 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -195,7 +195,8 @@
 | 2026-09-05 21:02 | implementer | 104m17 | 654 / 25,639 / 95,674,562 | `derived` |
 | 2026-09-05 21:15 | architect | 11m36 | 148 / 5,680 / 7,149,519 | `derived` |
 | 2026-09-05 21:18 | test-engineer | 2m05 | 60 / 2,065 / 1,244,743 | `derived` |
-| | **total** | **4681m39** | **21,368 / 1,901,863 / 1,695,576,360** | |
+| 2026-09-05 21:48 | reviewer | 24m04 | 296 / 13,938 / 23,681,391 | `derived` |
+| | **total** | **4705m43** | **21,664 / 1,915,801 / 1,719,257,751** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

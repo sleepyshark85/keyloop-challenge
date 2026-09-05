@@ -4,7 +4,7 @@ title: Book an appointment, read it back, and give every failure one status and 
 status: ready
 depends_on: ["01"]
 absorbs: ["03", "12", "13"]
-arc42: ["§5.2", "§6.1", "§8.6"]
+arc42: ["§5.2", "§6.1", "§8.6", "§10.2"]
 adr: [1, 2, 4, 5, 6, 8, 14, 15]
 quality_scenarios: [QS-1, QS-2, QS-11, QS-9, QS-12]
 loopbacks: 0

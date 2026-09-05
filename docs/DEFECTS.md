@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **111** |
-| Severity | 10 blocking · 61 major · 40 minor |
-| Verdicts | 5 narrowed · 47 accepted · 1 escalated · 5 deferred |
-| Raised by | test-engineer 28 · reviewer 24 · orchestrator 23 · implementer 18 · architect 17 · human 1 |
-| Awaiting a ruling | **53** |
-| Mean escape distance | 1.68 step(s) |
+| Findings recorded | **115** |
+| Severity | 10 blocking · 62 major · 43 minor |
+| Verdicts | 5 narrowed · 48 accepted · 1 escalated · 5 deferred |
+| Raised by | test-engineer 28 · reviewer 28 · orchestrator 23 · implementer 18 · architect 17 · human 1 |
+| Awaiting a ruling | **56** |
+| Mean escape distance | 1.62 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -634,7 +634,7 @@ rather than narrated.*
 | **I-02-6** | MAJOR | 2 *(+1)* | implementer | The constraint name that AC-3, AC-4 and arc42 QS-1/QS-2 all assert on is minted in src/persistence and reaches no observer the test-engineer is permitted to use | accepted |
 | **I-02-3** | MINOR | 2 *(+1)* | implementer | Design §2.5 claims the composition order 'gets a mutation score instead' of the compiler it lost at D-01-1; Stryker cannot generate that mutant | accepted |
 | **I-02-5** | MAJOR | 2 *(+1)* | implementer | The union of literals is right but the runtime 500 is the wrong mechanism, and its own fallback exits the taxonomy | accepted |
-| **I-02-7** | MAJOR | 2 *(+1)* | implementer | There is no 201/200 response schema, no AppointmentView field list and no ReadOutcome union, so the contract test and the implementation will diverge on field names | **open** |
+| **I-02-7** | MAJOR | 2 *(+1)* | implementer | There is no 201/200 response schema, no AppointmentView field list and no ReadOutcome union, so the contract test and the implementation will diverge on field names | accepted |
 | **I-02-8** | MINOR | 2 *(+1)* | implementer | The empty-candidate-set case is annotated as a white lie rather than decided, and the implementer is the one who writes the arm | accepted |
 | **T-02-1** | MAJOR | 2 *(+1)* | test-engineer | §2.6's 'prune that WHOLE resource' makes AC-4 fail even with the retry loop the escalation exists to argue for | accepted |
 | **T-02-2** | MAJOR | 2 *(+1)* | test-engineer | §4.2's appointment-table-access marker is defined by a token rather than a concept and already false-positives twice on the tree at HEAD | accepted |
@@ -648,6 +648,10 @@ rather than narrated.*
 | **F-02-10** | MAJOR | 3 *(+3)* | orchestrator | The ADR guard reported that every option survives while an ADR it had never opened sat on disk unpinned — and it could not have read that ADR's options anyway, because they are in the table form the concision ruling encourages | **open** |
 | **F-02-9** | MAJOR | 3 *(+0)* | architect | Every write path to the appointment table must take ADR-0018's two advisory locks in the same order, and slices 06 and 07 inherit that obligation | **open** |
 | **T-02-10** | MINOR | 4 *(+1)* | test-engineer | A same-shaped assertion at line 121 is satisfiable but fragile, and is raised rather than quietly repaired | **open** |
+| **R-02-1** | MAJOR | 5 *(+0)* | reviewer | slice:check reported the arc42 declaration satisfied over a hand edit to §10 it never opened | **open** |
+| **R-02-2** | MINOR | 5 *(+0)* | reviewer | ADR-0018's 'the lock prevents nothing' control exists only in the ADR's prose, though design §4.5 named the file it belongs in | **open** |
+| **R-02-3** | MINOR | 5 *(+0)* | reviewer | The GET route's response schema is not load-bearing under test while the POST's is, so 'the response schemas are asserted to ENFORCE' is half true | **open** |
+| **R-02-4** | MINOR | 5 *(+0)* | reviewer | I-02-7 (MAJOR) is recorded raised and never ruled, although its remedy shipped and its twin T-02-3 is ruled accepted | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -723,6 +727,7 @@ rather than narrated.*
 
 - *scenario:* §2.7 specifies the request body and the problem schema in full and neither success response. AppointmentView is named in BookOutcome and never defined; DA-02-2 fixes the rendering of two fields and no others. ReadOutcome is not defined at all, so §2.7's status table covers only BookOutcome and the 'one exhaustive switch' claim does not reach the GET route. AC-1 requires the 201 body to name the allocated bay and technician and the contract test asserts on it, so the test-engineer and the implementer will guess bayId vs bay, whether status is present, whether createdAt is exposed - independently, and discover the mismatch at step 5. Precisely the ambiguity §6 step 2 exists to catch, which is the argument for fixing it now at the cost of a paragraph.
 - *file:* `docs/slices/02-design.md`
+- *accepted* by architect — Ruled (a) at the step-2 adjudication as the twin of T-02-3 - AppointmentView's field list, the 201/200 response schemas and the ReadOutcome union are pinned in §2.7, and the remedy is in the tree. LOGGED RETROSPECTIVELY at step 5 under R-02-4: the orchestrator recorded T-02-3's ruling, whose own text says 'raised independently by both roles (also I-02-7)', and never recorded I-02-7's. That left the only unruled MAJOR in the slice sitting against a gate bar of 'no open MAJOR or BLOCKING', blocking a merge it has no business blocking. Second instance of O-29 in one slice: the orchestrator logs findings and forgets the rulings that answer them.
 
 **I-02-8** — The empty-candidate-set case is annotated as a white lie rather than decided, and the implementer is the one who writes the arm
 
@@ -797,6 +802,26 @@ rather than narrated.*
 
 - *scenario:* `${scenario.bayIds.length} bays seeded, ${distinctBays.size} used` compared against the literal '24 bays seeded, 1 used'. Both sides carry the words, so unlike I-02-9 it is satisfiable and passes. The fragility: the left side DERIVES the seeded count while the right side PINS it, so changing the fixture's bay count fails the assertion on the seeded number rather than on the thing it is about - bays being plentiful. Arguably correct as written, since the literal pins the fixture the case was designed for. RAISED, NOT REPAIRED, and the orchestrator asked for exactly that: the value of I-02-9 is that it was found and named, and a silent repair alongside a named one teaches the opposite lesson. The test-engineer also swept every `.toBe(` in tests/{acceptance,contract,property,concurrency,integration} and reports those three lines are the complete set of this shape - a bounded claim rather than an impression.
 - *file:* `tests/concurrency/no-technician-overlap.test.ts`
+
+**R-02-1** — slice:check reported the arc42 declaration satisfied over a hand edit to §10 it never opened
+
+- *scenario:* dd9bd44 hand-edits docs/arc42/10-quality-requirements.md at STEP 2 - QS-12's wording, implementing the human's E-02-2 ruling - under the subject docs(arc42). check.mjs selected the slice's commits by Conventional Commit scope, which docs(arc42) does not match, so the file was never read and the gate line said '0 hand-edited, all within §5.2 §6.1 §8.6'. The exemption was deliberate AND TESTED, on the assumption that docs(arc42) appears only at step 7, post-gate - the assumption this slice broke. Same family as F-02-10 and O-29: a guard green over something it did not examine. The edit itself is legitimate and recorded; what was wrong is that the line the gate reads was vacuous.
+- *file:* `tools/slice/check.mjs`
+
+**R-02-2** — ADR-0018's 'the lock prevents nothing' control exists only in the ADR's prose, though design §4.5 named the file it belongs in
+
+- *scenario:* §4.5 says the lock-drop control belongs beside §4.4's in tests/integration/exclusion-constraint-adjudicates.test.ts, 'one added case in an existing file'. That file has one it() and its race() issues raw INSERTs with no advisory lock, so the suite covers cells (b) and (c) and not (a). MINOR deliberately: the reviewer RAN cell (a) itself on postgres:16-alpine and it holds - locks on with constraints dropped gives 20 overlapping rows - and cells (b)+(c), both in the suite, already carry the §2.1 claim between them. Nothing behaves wrongly; a ruled design instruction was dropped without a record.
+- *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
+
+**R-02-3** — The GET route's response schema is not load-bearing under test while the POST's is, so 'the response schemas are asserted to ENFORCE' is half true
+
+- *scenario:* Mutant appointments.ts:203:19, ObjectLiteral '{}' over the whole response map for GET, SURVIVES; its sibling at 126:46 on the POST route is KILLED. Delete the GET route's response map and no test notices. Behaviour is identical today so it is not a defect - but slice 05 renders `cancelled` at this URL, and the design's argument for the union-of-literals is precisely that the response schema enforces.
+- *file:* `src/http/routes/appointments.ts`
+
+**R-02-4** — I-02-7 (MAJOR) is recorded raised and never ruled, although its remedy shipped and its twin T-02-3 is ruled accepted
+
+- *scenario:* I-02-7 is the only step-2 finding in slice 02 with no finding.ruled event. T-02-3's own ruling text says 'Raised independently by both roles (also I-02-7)', and the remedy is in the tree - AppointmentView, ReadOutcome and both response schemas. check.mjs computes open MAJOR/BLOCKING from exactly this, and the orchestrator's stated gate bar is 'no open MAJOR or BLOCKING', so an unruled finding blocks a merge it has no business blocking. Same family as O-29: the orchestrator logged the findings and not the rulings that answered them.
+- *file:* `docs/team-log/events.jsonl`
 
 </details>
 

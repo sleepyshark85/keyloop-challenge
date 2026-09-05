@@ -137,18 +137,37 @@ if (!onlyDone) {
     // human gate — they are the architect reconciling arc42 to what merged, not slice
     // work, and the slice's declaration has no business governing them. R-01-7 was
     // about undeclared edits made DURING a slice, and that is exactly what this reads.
-    const log = g(['log', '--format=%H %s', '--', '.']) ?? '';
-    const shas = log.split('\n').filter(Boolean)
+    // GATE-RELATIVE, NOT MESSAGE-RELATIVE — R-02-1.
+    //
+    // This selected the slice's commits by Conventional Commit scope, exempting anything
+    // not scoped `(NN)` on the stated ground that step 7's `docs(arc42)` commits are
+    // post-gate and the slice's declaration has no business governing them. The exemption
+    // was deliberate and tested. The assumption underneath it — that `docs(arc42)` appears
+    // only after the gate — is what slice 02 broke: `dd9bd44` hand-edited §10's QS-12
+    // wording at STEP 2, scoped `docs(arc42)`, and this check reported "0 hand-edited, all
+    // within §5.2 §6.1 §8.6" over a file it never opened. The edit was legitimate — it
+    // implements the human's E-02-2 ruling — but the gate line was not evidence.
+    //
+    // A commit message cannot separate a mid-slice `docs(arc42)` from a post-gate one. The
+    // BRANCH can: while the slice is in flight everything on its branch is its work,
+    // whatever the subject line says, and step 7 runs on `main` after the merge, so its
+    // commits are not on the branch to be caught. Once merged there is no branch left, and
+    // scope is the only selector that still resolves — so it stays as the fallback, and the
+    // detail line says which was used, because the two answer subtly different questions.
+    const base = g(['merge-base', 'origin/main', 'HEAD']) ?? g(['merge-base', 'main', 'HEAD']);
+    const headSha = g(['rev-parse', 'HEAD']);
+    const onBranch = Boolean(base && headSha && base !== headSha);
+    const scoped = (g(['log', '--format=%H %s', '--', '.']) ?? '').split('\n').filter(Boolean)
       .filter((l) => new RegExp(`^\\S+ [a-z]+\\(0*${String(id).replace(/^0+/, '')}\\)!?:`).test(l))
       .map((l) => l.split(' ')[0]);
-    // N/A rather than UNVERIFIED: a slice with no commits of its own has not edited
-    // arc42 undeclared, and it cannot — there is nothing to correspond to. UNVERIFIED
-    // would block Done on a slice that the Done checks already block for having no red
-    // commit and no CI run, which is noise standing in front of the real reason.
-    if (!shas.length) return [NA, `no commits scoped (${id}) yet — nothing has been edited to declare`];
+    const shas = onBranch
+      ? (g(['rev-list', `${base}..HEAD`]) ?? '').split('\n').filter(Boolean)
+      : scoped;
+    const selector = onBranch ? 'on this branch' : `scoped (${id})`;
+    if (!shas.length) return [NA, `no commits ${selector} yet — nothing has been edited to declare`];
     const files = [...new Set(shas.flatMap((s) =>
       (g(['show', '--name-only', '--format=', s, '--', 'docs/arc42/']) ?? '').split('\n').filter(Boolean)))];
-    if (!files.length) return [PASS, `no arc42 file changed by the ${shas.length} commit(s) scoped (${id})`];
+    if (!files.length) return [PASS, `no arc42 file changed by the ${shas.length} commit(s) ${selector}`];
 
     const declared = new Set(arc.map((s) => String(s).replace(/^§/, '')));
 
@@ -200,7 +219,7 @@ if (!onlyDone) {
     const gen = files.length - handEdited.length;
     return undeclared.length
       ? [FAIL, `hand-edited but not declared: ${undeclared.join(', ')} — declared ${arc.join(' ')}`]
-      : [PASS, `${files.length} arc42 file(s) changed by commits scoped (${id}): `
+      : [PASS, `${files.length} arc42 file(s) changed by commits ${selector}: `
           + `${handEdited.length} hand-edited, all within ${arc.join(' ')}`
           + `${gen ? `; ${gen} generated-block only` : ''}`];
   };
