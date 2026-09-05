@@ -75,8 +75,20 @@ export const BUDGETS = {
 };
 
 /** Authored prose only — see the header for why each exclusion is narrow. */
-export function countWords(raw) {
+export function countWords(raw, { file = '' } = {}) {
   let t = raw;
+  // ACCEPTANCE CRITERIA ARE THE CONTRACT, NOT PROSE, and are not charged for.
+  //
+  // Slice 02 carries nineteen criteria in 613 words — irreducible, because each one is a
+  // Given/When/Then a test asserts and a human gated. A budget that squeezed them would
+  // push toward vaguer criteria, and this project has already paid twice for exactly
+  // that: AC-10 needed a human ruling mid-slice at 00, and AC-2 and AC-6 both did at 01,
+  // every time because of what the criterion SAID rather than what anyone built. Creating
+  // pressure to compress the one artifact whose ambiguity has cost the most would be the
+  // opposite of the ruling's intent.
+  if (file.startsWith('slices/')) {
+    t = t.replace(/^## Acceptance criteria[\s\S]*?(?=^## |\Z)/m, '');
+  }
   t = t.replace(/^---\n[\s\S]*?\n---\n/, '');                                   // frontmatter
   t = t.replace(/<!-- generated:([^>]+) -->[\s\S]*?<!-- \/generated:\1 -->/g, ''); // generated
   t = t.replace(/```[\s\S]*?```/g, '');                                          // fenced code
@@ -129,7 +141,7 @@ export function survey({ arc42 = ARC42, adr = ADR, slices = SLICES } = {}) {
       // The meaning half is not left to good intentions: tools/docs/adr-invariants.mjs
       // pins every considered option and every chosen option against a baseline captured
       // before the condensation pass, so an option quietly dropped fails the build.
-      rows.push({ file: key, words: countWords(raw), budget: budgetFor(key, fm),
+      rows.push({ file: key, words: countWords(raw, { file: key }), budget: budgetFor(key, fm),
                   contested: Boolean(fm.contested) });
     }
   };

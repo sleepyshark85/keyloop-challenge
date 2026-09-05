@@ -18,11 +18,9 @@ improvement** by the architect — explicitly by §6's naming test rather than b
 architect named the remedy exactly rather than leaving a shrug, and the human ratified it as
 **ADR-0014** on 2026-09-05.
 
-**Why it was folded.** The human's cost ruling of 2026-09-05, taken on measured figures: slice 01 cost
-9.5 hours and 8.30 Mtok against 30.7 and 26.1 hours for the two pilot slices. Running a full
-seven-step loop to apply a decision that is *already agreed and already specified* is the slicing
-problem §6's loopback governor warns about, seen from the other end — the design step this slice would
-consume has effectively already happened.
+**Why it was folded.** The human's cost ruling of 2026-09-05 — the remedy was already agreed
+and specified, so a full seven-step loop to apply it is §6's slicing problem seen from the other
+end. Figures and reasoning: `docs/team-log/events.jsonl`.
 
 **Where it went.** `docs/slices/02-book-and-read-an-appointment.md`, **AC-13 to AC-16**, carried across
 unchanged in substance. Slice 02 declares `absorbs: ["03", "12", "13"]` and

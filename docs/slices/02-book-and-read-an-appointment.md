@@ -11,32 +11,15 @@ loopbacks: 0
 deferred_from: ["R-01-1:0014", "R-01-4:0015"]
 ---
 
-> **Absorbs slice 03 (the error taxonomy) by the Gate D ruling of 2026-09-04.** C6 — "the budget is
-> real" — failed by more than an order of magnitude, and the human ruled the disjunction its own
-> wording offers: cut slices, do not reduce agent count. The taxonomy has no separate red of its own
-> here; AC-7 to AC-12 below are slice 03's acceptance criteria carried across unchanged in substance,
-> and `docs/slices/03-error-taxonomy.md` is the tombstone recording where they went.
+> **Absorbs slice 03** (Gate D, 2026-09-04) and **slices 12 and 13** (the human's cost ruling,
+> 2026-09-05). AC-7–AC-12 are slice 03's criteria; AC-13–AC-19 apply ADR-0014 and ADR-0015, both
+> ratified, so this slice implements agreed decisions rather than proposing them. Rationale for both
+> folds is in `docs/team-log/events.jsonl` (`s-02-ruling-fold-12-13`, Gate D).
 >
-> The fold is not free and the cost is stated rather than discovered at step 5: this slice was already
-> the flagship concurrency slice, and it now also carries the whole of §8.6. **Sequence it** — the
-> booking path green on AC-1 to AC-6 first, then the taxonomy on top. If it needs two red commits it
-> is two slices after all, and that is a DCR, not a workaround.
+> **Sequence it**: booking path green first, taxonomy on top, the two domain fixes independent of
+> both. This slice carries three things at once, which is why it keeps the full human gate. If it
+> needs a second red commit it is two slices after all — a DCR, not a workaround.
 
-> **Also absorbs slices 12 and 13 by the human's cost ruling of 2026-09-05.** Both were raised as §6
-> **(b)** deferred improvements at slice 01 step 5 — R-01-1 and R-01-4 — and both had their remedies
-> *named exactly* by the architect and then **ratified** as ADR-0014 and ADR-0015. Running two full
-> seven-step loops to apply two decisions that are already agreed is the slicing problem §6's loopback
-> governor warns about, seen from the other end: the design step each would consume has effectively
-> already happened.
->
-> **AC-13 to AC-19 are their acceptance criteria, carried across unchanged in substance.** They are
-> domain-layer work and touch `src/domain` only, so they neither depend on nor block the booking path
-> above and can go green in either order.
->
-> The cost, stated rather than discovered: this slice now carries the booking path, the whole error
-> taxonomy, **and** two ratified domain fixes. That is precisely why it keeps the **full human gate**
-> under the same ruling that granted 05, 08 and 09 a light one. If it needs a second red commit it is
-> two slices after all — DCR, not workaround.
 
 ## Goal
 

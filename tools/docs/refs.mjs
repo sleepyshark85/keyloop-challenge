@@ -20,6 +20,13 @@
  * Shortening may cut the argument around a definition; it may not cut the definition out
  * from under a citation.
  *
+ * THE EVENT LOG IS A CITATION SOURCE, and it is the one that matters most. §9 makes
+ * `docs/team-log/events.jsonl` append-only, so a citation there can NEVER be repaired —
+ * arc42 and an ADR can drop a reference in the same commit that drops its definition, and
+ * the log cannot. The first version of this tool read only arc42 and the ADRs and so
+ * missed exactly that: the design condensation left `F-01-2` cited four times in the log
+ * and no longer defined anywhere, and every guard stayed green.
+ *
  * It is deliberately one-directional. An identifier defined in a design and cited
  * nowhere is not an error — a design is allowed to name its own debt before anything
  * refers to it, and flagging that would push authors to delete records rather than keep
@@ -32,6 +39,7 @@ const flag = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i === 
 const ARC42 = resolve(flag('arc42', 'docs/arc42'));
 const ADR = resolve(flag('adr', 'docs/adr'));
 const SLICES = resolve(flag('slices', 'docs/slices'));
+const LOG = resolve(flag('log', 'docs/team-log/events.jsonl'));
 
 /** `D-01-2`, `OQ-02-1`, `DA-00a-3`, `F-02-6` — a design-local identifier. */
 export const REF = /\b(?:D|F|DA|OQ|A)-\d{2}[a-z]?-\d+\b/g;
@@ -45,14 +53,34 @@ export const REF = /\b(?:D|F|DA|OQ|A)-\d{2}[a-z]?-\d+\b/g;
  * design" and "is defined in a design" are different facts, and collapsing them is the
  * same spelling-versus-concept error this project has now found in four markers.
  *
- * A definition here is the identifier introduced as a heading or a labelled entry: bold
- * or a heading at the start of a line, or the leading cell of a table row — the shape
- * `**D-01-2 — unit confusion across domain boundaries…**` actually uses. A prose mention
- * mid-sentence is a citation however emphatic it is.
+ * A definition here is the identifier appearing in the LABEL of a heading, list item or
+ * table row — the part before the em dash or colon that introduces it. Not merely at the
+ * start of that label: `**OQ-01-2 / F-01-2** — AC-5 confines…` defines BOTH identifiers,
+ * and an earlier version of this that anchored the ref to the start of the bold span
+ * reported `F-01-2` as orphaned when its definition was sitting right there. It produced
+ * a false positive against a correct document, which is the failure mode that gets a
+ * guard switched off.
  */
-export const DEFINITION = (ref) => new RegExp(
-  `(?:^|\\n)\\s*(?:#{1,6}\\s*|[-*]\\s*|\\|\\s*)?\\*{0,2}${ref}\\b`, 'm',
-);
+export const DEFINITION = (ref) => {
+  const rx = new RegExp(`\\b${ref}\\b`);
+  return {
+    test(text) {
+      for (const line of text.split('\n')) {
+        // A definition line is a heading, list item or table row — or a bold label
+        // paragraph, which is the form §11's debt entries actually use:
+        // `**D-01-1 — composition order left the domain.**` has no list marker at all.
+        const m = line.match(/^\s*(?:#{1,6}\s+|[-*]\s+|\|\s*)(.*)$/)
+          || line.match(/^\s*(\*\*.*)$/);
+        if (!m) continue;
+        // The label is what introduces the entry: everything before the em dash, en dash
+        // or colon that starts its explanation. A ref further into the prose is a mention.
+        const label = m[1].split(/\s[—–]\s|:\s/)[0];
+        if (rx.test(label)) return true;
+      }
+      return false;
+    },
+  };
+};
 
 const readAll = (dir, filter = () => true) => {
   if (!existsSync(dir)) return [];
@@ -61,7 +89,7 @@ const readAll = (dir, filter = () => true) => {
     .map((f) => ({ file: `${dir.split('/').pop()}/${f}`, text: readFileSync(join(dir, f), 'utf8') }));
 };
 
-export function check({ arc42 = ARC42, adr = ADR, slices = SLICES } = {}) {
+export function check({ arc42 = ARC42, adr = ADR, slices = SLICES, log = LOG } = {}) {
   const designs = readAll(slices, (f) => f.endsWith('-design.md'));
   const defined = new Set();
   for (const d of designs) {
@@ -71,7 +99,9 @@ export function check({ arc42 = ARC42, adr = ADR, slices = SLICES } = {}) {
   }
 
   const citations = new Map(); // ref -> [files]
-  for (const { file, text } of [...readAll(arc42), ...readAll(adr)]) {
+  const sources = [...readAll(arc42), ...readAll(adr)];
+  if (existsSync(log)) sources.push({ file: 'team-log/events.jsonl (append-only)', text: readFileSync(log, 'utf8') });
+  for (const { file, text } of sources) {
     for (const ref of text.match(REF) ?? []) {
       if (!citations.has(ref)) citations.set(ref, []);
       if (!citations.get(ref).includes(file)) citations.get(ref).push(file);

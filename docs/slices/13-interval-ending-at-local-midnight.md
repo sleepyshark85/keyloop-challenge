@@ -13,16 +13,13 @@ waits on it.** It is kept because the backlog's shape is part of the record — 
 
 **Was:** An interval ending at local midnight ends on the day it started
 
-**Why it existed.** Raised as **R-01-4** by the reviewer at slice 01 step 5 and ruled **(b) deferred
-improvement** by the architect — explicitly by §6's naming test rather than by preference. The
-architect named the remedy exactly rather than leaving a shrug, and the human ratified it as
-**ADR-0015** on 2026-09-05.
+**Why it existed.** Raised as **R-01-4** at slice 01 step 5 and ruled **(b)** — but with the
+finding *upgraded*: the reviewer called it a dead branch; the architect ruled the dead branch the
+**symptom** and the wrongly-refused booking the defect. Ratified as **ADR-0015** on 2026-09-05.
 
-**Why it was folded.** The human's cost ruling of 2026-09-05, taken on measured figures: slice 01 cost
-9.5 hours and 8.30 Mtok against 30.7 and 26.1 hours for the two pilot slices. Running a full
-seven-step loop to apply a decision that is *already agreed and already specified* is the slicing
-problem §6's loopback governor warns about, seen from the other end — the design step this slice would
-consume has effectively already happened.
+**Why it was folded.** The human's cost ruling of 2026-09-05 — the remedy was already agreed
+and specified, so a full seven-step loop to apply it is §6's slicing problem seen from the other
+end. Figures and reasoning: `docs/team-log/events.jsonl`.
 
 **Where it went.** `docs/slices/02-book-and-read-an-appointment.md`, **AC-17 to AC-19**, carried across
 unchanged in substance. Slice 02 declares `absorbs: ["03", "12", "13"]` and
@@ -45,7 +42,3 @@ arm of the time parser being unreachable — and the architect ruled that the de
 existing, because a backlog item reading *"a branch is unreachable"* invites the fix of deleting the
 branch, and deleting it would be exactly wrong. **ADR-0015** records it.
 
-The irony is on the record and is worth keeping: it was the implementer's own real-PostgreSQL
-measurement that discharged DA-2 and argued `'24:00:00'` must be supported. That measurement was
-right, the branch it justified was correct to add, and its consumer made it inert. The measurement is
-not what failed.
