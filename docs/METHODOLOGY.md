@@ -1,30 +1,29 @@
 # Agent Team Methodology
 
 **Project:** Keyloop Technical Assessment — Scenario A, Unified Service Scheduler (backend, TypeScript/Node/PostgreSQL)
-**Status:** Agreed, pre-implementation · **Audience:** humans. Machine-facing files are derived from this — see §12.
+**Status:** Agreed, pre-implementation · **Audience:** humans. Three things in `.claude/agents/` are generated from it; the rest is related by citation — §12.
 
 How a team of AI agents and one human engineer build software together: who decides what, in what
 order, under what evidence requirements, and how it is observed.
 
-Designed against two failure modes. **Unowned generation** — accepting plausible AI output because
-it looks plausible; every claim here must be checkable by something other than an agent's
-assertion. **Methodology theater** — ceremonies that signal rigor without producing it; §11 measures
-whether each rule earned its cost.
+**[`CLAUDE.md`](../CLAUDE.md) is the normative home of the operative rules.** Rules stated there are
+**cited by section number** here, never restated: two wordings of one rule give an agent no way to
+know which wins. What is left is the part no rule can carry — the role model, the phase model, the
+principles, and the reasoning, including the near-misses that shaped each rule.
+
+Designed against two failure modes. **Unowned generation**: accepting plausible AI output because it
+looks plausible, so every claim here must be checkable by something other than an agent's assertion.
+**Methodology theater**: ceremony that signals rigor without producing it, so §11 measures whether
+each rule earned its cost.
 
 ---
 
 ## 0. Prerequisites
 
-| Requirement | Why | Notes |
-|---|---|---|
-| Node + npm | Tooling and the application stack | Versions pinned at Gate B |
-| Docker | Testcontainers and the local `grafana/otel-lgtm` stack | Tests will not run without it |
-| Python ≥ 3.10 | The `diagram-design` validators | 3.12 verified |
-| `diagram-design` plugin | Presentation diagrams (phase 2, refreshed phase 6) | Registered in the repo's `.claude/settings.json`; opening the repo prompts to install from `cathrynlavery/diagram-design`. Third-party code — a deliberate choice, stated here rather than discovered |
-| Playwright *(optional)* | PNG export only | `pip install playwright && playwright install chromium`. SVG export, which is what arc42 uses, does not need it |
-
-Diagram output is committed as both `.html` and `.svg`, so nothing above is required merely to
-*read* the design document.
+Node + npm, pinned at Gate B. **Docker**, for Testcontainers and the local `grafana/otel-lgtm` stack —
+tests will not run without it. Python ≥ 3.10 and the third-party `diagram-design` plugin, for authoring
+presentation diagrams only: both `.html` and `.svg` are committed, so neither is needed to *read* the
+design. Build and run instructions become the README's at phase 6.
 
 ---
 
@@ -45,7 +44,8 @@ Everything below derives from these. Resolve uncovered situations by returning t
 
 ## 2. Roles
 
-Defined by what they may **decide**, not what they produce.
+Defined by what they may **decide**, not what they produce. Authority and the one-round resolution
+rule are `CLAUDE.md` §6.
 
 | Role | Decides | Never | Model |
 |---|---|---|---|
@@ -57,11 +57,9 @@ Defined by what they may **decide**, not what they produce.
 | **Reviewer** | Whether a diff conforms; may block a merge | Change the design — may only raise a DCR | Opus |
 | **Scribe** | Nothing; records | Claim anything not supported by an artifact | Sonnet |
 
-Deliberately absent: a separate analyst (requirements and design are one conversation at this size)
-and a product owner (that is the human).
-
-**Resolution:** one round of discussion, then the responsible role decides. No multi-turn agent
-debate — that is spend, not rigor. Unresolved after one round escalates to the human.
+*Generator source (§12): these cells are written into `.claude/agents/*.md`.* Deliberately absent: an
+analyst, since requirements and design are one conversation at this size, and a product owner, since
+that is the human.
 
 ---
 
@@ -74,96 +72,62 @@ debate — that is spend, not rigor. Unresolved after one round escalates to the
 
 | Phase | Who | Produces | Gate |
 |---|---|---|---|
-| **0 Foundation** | human + orchestrator | Scaffold, constitution, agent definitions, hooks, event log, board seeded with a synthetic slice | Human reviews the instrument |
-| **1 Requirements** | architect | arc42 §1–§3 + assumptions and open questions | **A** — human resolves ambiguity; answers become ADRs |
-| **2 Architecture** | architect | arc42 §4–§8, §10, §11; founding ADRs; `.dependency-cruiser.js` | **B** — plan-mode approval; stack confirmed |
-| **3 Backlog** | orchestrator + human | 12–14 slice files | **C** — approve scope and ordering |
-| **4 Pilot** | all | Slice 00 end-to-end, then retro against pre-registered criteria | **D** — tune the machine, or proceed |
+| **0 Foundation** | human + orchestrator | Scaffold, constitution, agent definitions, hooks, event log, board | Human reviews the instrument |
+| **1 Requirements** | architect | arc42 §1–§3, assumptions, open questions | **A** — ambiguity resolved; answers become ADRs |
+| **2 Architecture** | architect | arc42 §4–§8, §10, §11; founding ADRs; `.dependency-cruiser.js` | **B** — stack confirmed |
+| **3 Backlog** | orchestrator + human | 12–14 slice files | **C** — scope and ordering |
+| **4 Pilot** | all | Slice 00 end-to-end, then a retro against pre-registered criteria | **D** — tune, or proceed |
 | **5 Slice loop** | all | The system, one slice at a time (§6) | **E** — every slice |
-| **6 Consolidation** | architect + scribe | As-built arc42, presentation diagrams, `system-design.md`, README, §13 narrative, as-designed/as-built delta | **F** — final read |
-| **7 Video** | scribe + human | Shot list from real artifacts | — |
+| **6 Consolidation** | architect + scribe | As-built arc42, diagrams, `system-design.md`, README, the as-designed/as-built delta | **F** — final read |
+| **7 Video** | scribe + human | Shot list, from real artifacts | — |
 
-Phase 0 is instrumentation-first because observability added later never gets added, and the pilot
-is worthless unobserved. Phase 4 exists because the methodology is itself untested — running the
-full pipeline on a trivial slice against **criteria written beforehand** is cheaper than discovering
-at slice 9 that it does not work.
+Phase 0 is instrumentation-first because observability added later never gets added and an unobserved
+pilot is worthless. Phase 4 exists because the methodology is itself untested: running the pipeline on
+a trivial slice against **criteria written beforehand** beats discovering at slice 9 that it does not
+work.
 
 ---
 
 ## 4. Documentation
 
-| Concern | Home | Owner |
-|---|---|---|
-| Architecture — **the SSOT** | `docs/arc42/` | architect |
-| Decisions | `docs/adr/` (MADR) | architect |
-| Units of work | `docs/slices/` (doubles as PR body) | orchestrator |
-| Team telemetry | `docs/team-log/` | orchestrator |
-| Where the project is | `docs/STATUS.md` (generated) | orchestrator |
-| Build/run/test, AI narrative | `README.md` | scribe |
-| Operative rules | `CLAUDE.md` | human (derived, §12) |
+Homes and owners are `CLAUDE.md` §4, plus two nothing else writes: `docs/STATUS.md`, the generated
+resume point, and `CLAUDE.md` itself. arc42 keeps all twelve sections for recognisability, several
+deliberately thin and saying so — which reads as judgement where invented detail reads as padding —
+plus one honestly numbered outside the standard twelve, **§13 AI Collaboration**. It is written
+as-designed at Gate B and corrected at each merge, and that delta is kept: where the plan was wrong is
+stronger evidence than a plan pretending it never was.
 
-**arc42**, all twelve sections retained for recognisability; several deliberately thin and saying
-so, which reads as judgement where invented detail reads as padding. One added section, honestly
-numbered outside the standard twelve: **§13 AI Collaboration**. Weight goes to §4 (the
-exclusion-constraint decision, with check-then-act named and rejected), §6 (concurrent-booking
-sequence), §8 (observability, persistence, testability), §10, §11.
+**Traceability**, walkable both ways — `arc42 §10 quality scenario → slice acceptance criterion → test
+name → CI result` — because a quality attribute not traceable to a test is aspiration, and a test not
+traceable to a scenario is unexplained.
 
-**Traceability chain** — walkable both ways, and CI verifies every `QS-*` names a real test:
+**Three tiers of trust.** *Generated*, cannot drift: module graph, OpenAPI, §11's debt register,
+`system-design.md`. *Enforced* in CI: the assembly matches its sections, diagrams have their exports
+and links resolve, the log is append-only and schema-valid, citations resolve, budgets hold. `QS-*` →
+test is claimed and **not yet enforced** (arc42 R-8). *Written*, therefore drifting — so keep it small
+and about **why**.
 
-```
-arc42 §10 quality scenario → slice acceptance criterion → test name → CI result
-```
+**ADRs.** Immutability is `CLAUDE.md` §4. MADR, extended with `proposed-by` / `decided-by` /
+`ai-input` as direct evidence for the AI-verification criterion. *Considered Options* must be
+populated honestly — one option considered is a note, not a decision record.
 
-A quality attribute not traceable to a test is aspiration; a test not traceable to a scenario is
-unexplained.
+**Diagrams** are refreshed once at phase 6, not per slice: SVG is not cheaply diffable and each
+drawing costs several hundred lines of mandatory reference reading. Both the `.html` and the exported
+`.svg` are committed, because an evaluator reading this on GitHub has no plugin installed and would
+otherwise find the §6 runtime view invisible. CI checks existence and linkage but **not layout** — the
+validators live outside the repository, so layout is *reported*, not proven (R-8).
 
-**Three tiers of trust.** *Generated* (cannot drift): module graph from `dependency-cruiser`,
-OpenAPI from route schemas, §11's debt register from `proposed` ADRs and deferred slices,
-`system-design.md` from section files. *Enforced* (CI): the assembly matches its section files,
-every diagram has its export and every diagram link resolves, the event log is append-only and
-schema-valid. Link integrity beyond diagrams, ADR existence and `QS-*` → test are **claimed here
-but not yet enforced** — arc42 §11.2 R-8 carries the gap.
-*Written* (drifts, so keep small and about **why**): §4, §9, §11 commentary.
-
-**As-designed → as-built.** arc42 is written as-designed at Gate B and corrected at each merge. The
-delta is kept deliberately: where the plan was wrong is stronger evidence than a plan that pretends
-it never was.
-
-**ADRs are immutable** — never edited, only superseded by one that references them. MADR, extended
-with `proposed-by` / `decided-by` / `ai-input`, which is direct evidence for the AI-verification
-criterion. *Considered Options* must be populated honestly; one option considered is a note, not a
-decision record.
-
-**Diagrams.** Presentation diagrams (architecture, sequence, data model, deployment) use the
-`diagram-design` skill. Refreshed once at phase 6, not per slice, since SVG is not cheaply diffable
-and each drawing costs several hundred lines of mandatory reference reading. Derived diagrams
-(module graph, board) stay generated.
-
-**Both the `.html` source and the exported `.svg` are committed**, and arc42 references the `.svg`.
-An evaluator reading the repository on GitHub has no plugin installed; without the exported file the
-§6 runtime view is invisible to exactly the audience it exists for. CI enforces that much: every
-committed `.html` has its exported `.svg`, and every diagram link under `docs/` resolves.
-
-**Layout itself is not enforced.** The skill's `self_check.py` and `verify-geometry.py` do validate
-it — no clipped label masks, no overlapping nodes — but they live in the `diagram-design` plugin
-cache outside the repository, so a fresh checkout does not contain them and CI cannot run them. The
-architect runs both at authoring time; that result is *reported*, not proven. Diagrams therefore sit
-in the **enforced** tier for existence and linkage, and the **written** tier for layout. Vendoring
-the two scripts was considered and rejected: ~560 lines of third-party code forked into a repository
-that is itself under assessment, to enforce a property of drawings refreshed once at phase 6.
-Recorded as arc42 §11.2 R-8.
-
-*Rejected: a second specification framework.* Spec-Kit and BMAD both overlap arc42; adopting either
-alongside it creates two answers to "what is a task" plus a pipeline to keep them in sync. What was
-lost — Spec-Kit's `/clarify` and `/analyze` — is reproduced as Gate A and the reviewer.
+*Rejected: a second specification framework.* Spec-Kit and BMAD overlap arc42, so either would create
+two answers to "what is a task" and a pipeline to sync them. What is lost, Spec-Kit's `/clarify` and
+`/analyze`, is reproduced as Gate A and the reviewer.
 
 ---
 
 ## 5. Work management
 
-Kanban, not Scrum — fixed iterations exist to batch human coordination, and there is no team to
-coordinate (P1). **WIP limit 1.** Board columns are the TDD cycle, so the board *displays* that a
-failing test preceded implementation:
+Kanban, not Scrum: fixed iterations batch human coordination and there is no team to coordinate (P1).
+WIP limit 1 (`CLAUDE.md` §8). Board columns are the TDD cycle, so the board *displays* that a failing
+test preceded implementation:
 
 ```
 ready · speccing · red · green · review · done          (blocked is orthogonal)
@@ -174,7 +138,6 @@ ready · speccing · red · green · review · done          (blocked is orthogo
 ```yaml
 ---
 id: 03
-title: Availability query
 status: ready
 depends_on: [01, 02]
 arc42: ["§5.2", "§8.3"]           # sections this slice may touch — nothing else may move
@@ -192,147 +155,87 @@ The `arc42:` field is what prevents slice work from silently rewriting architect
 
 ![The slice loop](diagrams/slice-loop.svg)
 
-*Source: [`diagrams/slice-loop.html`](diagrams/slice-loop.html) · regenerate the SVG with
-`npm run diagram:export`*
+*Source: [`diagrams/slice-loop.html`](diagrams/slice-loop.html) · `npm run diagram:export`*
 
-| # | Step | Role | Produces |
-|---|---|---|---|
-| 1 | Design | architect | Blocks touched, interfaces, data-model delta, applicable `QS-*`, proposed arc42 edits, ADR if a decision is involved |
-| 2 | Agree | test-engineer + implementer | `agreed`, or objections |
-| 3 | Red | test-engineer | Acceptance/contract/property tests, committed red, failure observed in CI |
-| 4 | Green | implementer | Unit TDD, small commits, each green |
-| 5 | Review | reviewer | Findings vs design and AC; `dependency-cruiser`; Stryker survivors |
-| 6 | Gate | human | Exploratory testing, approve, merge |
-| 7 | As-built | architect | Reconcile arc42 to what merged |
-
-**Architecture governs; it is not discovered** — step 1 precedes all downstream work. A no-impact
-slice says so in three lines, but one later generating design churn signals the backlog was sliced
-badly.
-
-**Step 2 is the cheapest step in the loop.** Ambiguity caught there costs one round; the same
-ambiguity at step 5 costs a full cycle plus a loopback. Objections are more informative than
-agreements. It interrupts the human **only** on disagreement or a new ADR — otherwise thirteen
-slices becomes twenty-six interruptions and the gates stop meaning anything (P1).
-
-### Design Change Requests
-
-Any role, any step, on a mismatch. Slice goes `blocked`; WIP 1 puts the team's attention on it. The
-architect convenes **one** round, then rules:
-
-| Outcome | Criterion | Effect |
-|---|---|---|
-| **(a) Clarification** | Design right, wording ambiguous | Update slice file; resume from raising step |
-| **(b) Deferred improvement** | Work is **correct** under the agreed ADR; something better exists | **Merge as-is.** Backlog slice + ADR `status: proposed` |
-| **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede the ADR; **revise** prior work, never delete |
-| **(d) Escalate** | Genuine trade-off or scope question | Human decides |
+The seven steps, the DCR outcomes and the loopback governor are `CLAUDE.md` §6. Three things about the
+loop's shape are not rules. **Architecture governs; it is not discovered** — step 1 precedes all
+downstream work, and a no-impact slice says so in three lines, but one later generating design churn
+signals the backlog was sliced badly. **Step 2 interrupts the human only** on disagreement or a new
+ADR; otherwise thirteen slices becomes twenty-six interruptions and the gates stop meaning anything
+(P1). **A DCR puts the whole team on one slice** because WIP is 1 — what the limit buys, not a side
+effect. And ruling **(b)** can become a dumping ground, so the deferred count is on the board and
+triaged at every gate: three items read as judgement, fifteen as avoidance.
 
 ### Where defects live
 
 *Added 2026-09-04, after slice 00a produced ~25 findings that existed only in PR prose.*
 
-`review.finding` is the reviewer's, at step 5. A **DCR** blocks the slice. Neither fits the ordinary
-case — a finding one role raises about another's work at step 2, 3 or 4, which is argued and
-resolved without ever blocking anything. So those had no home, `log:audit` could not see them, and
-**defect-escape distance — the shift-left measure this section's own criteria table names — had no
-data at all.**
+`review.finding` is the reviewer's, at step 5; a **DCR** blocks the slice. Neither fits the ordinary
+case — a finding one role raises about another's work at step 2, 3 or 4, argued and resolved without
+blocking anything. Those had no home, `log:audit` could not see them, and **defect-escape distance,
+the shift-left measure §11 names, had no data at all.** They are now `finding.raised` /
+`finding.ruled` events, and [`DEFECTS.md`](DEFECTS.md) is generated from them, so the register cannot
+drift from the record: it *is* the record.
 
-They are now `finding.raised` / `finding.ruled` events, and [`DEFECTS.md`](DEFECTS.md) is generated
-from them by `npm run defects`, checked in CI by `npm run defects:check`. Generated tier: the
-register cannot drift from the record, because it *is* the record.
+Recorded: anything crossing a role boundary, including a role's finding against its own earlier work.
+An *in-flight self-correction* is not a defect — recording those would make a careful role look worse
+than a careless one. Severity `BLOCKING` · `MAJOR` · `MINOR`; verdict `accepted` · `narrowed` ·
+`rejected` · `deferred` · `escalated`. **Rejected findings stay, with their ruling**: one argued down
+on reasoning is evidence the adjudication worked.
 
-| | |
-|---|---|
-| **What is recorded** | Anything crossing a role boundary, including a role's finding against its own earlier work. A role's in-flight self-correction is **not** a defect — recording those would make a careful role look worse than a careless one |
-| **Severity** | `BLOCKING` · `MAJOR` · `MINOR`, as for reviewer findings |
-| **Verdict** | `accepted` · `narrowed` · `rejected` · `deferred` · `escalated` |
-| **Rejected findings stay** | With their ruling. A finding argued down on reasoning is evidence the adjudication worked |
+**`narrowed` is the load-bearing verdict**, and it exists because of one case: slice 00a's most
+valuable finding had a *correct measurement* and a *remedy that would have broken the following
+slice*. Accept-or-reject forces that into one bucket and loses the distinction the DCR rules exist to
+produce. **The finding and the remedy are separate verdicts.**
 
-**`narrowed` is the load-bearing verdict** and it exists because of a specific case. Slice 00a's
-most valuable finding was one whose *measurement was correct* and whose *proposed remedy would have
-broken the following slice* — the implementer's `red-proof` red zone, where excluding
-`tests/integration/` would have made slice 00's only test file unclassifiable. A taxonomy with only
-accept and reject forces that into one bucket or the other and loses the distinction §6's
-adjudication rules exist to produce. **The finding and the remedy are separate verdicts.**
-
-Escape distance is `step_found − step_introduced`, and zero is the target: caught in the step that
-produced it. It is the one number that says whether steps 2 and 5 are earning their cost.
-
-**To rule (c) the architect must name the acceptance criterion, `QS-*`, or `CLAUDE.md` §2 standing
-invariant that would fail.** If it cannot, the ruling is (b) — a forcing function against dramatising
-preference into blockage.
-
-*§2 joined that list on 2026-09-04.* Slice 00a's design worked around §2.4 — the red observed in CI
-— and offered four evidence items in its place. No acceptance criterion failed and no `QS-*` failed,
-because the end state was green under either wiring; the defect was that the board could never
-truthfully leave `red` (§9 above requires step 3 to log *the CI run that observed it failing*). So
-the rule's narrow test made the most serious available defect — breaching a NON-NEGOTIABLE — the one
-class it could not name, and the architect had to rule (c) on §2's authority while flagging the
-wording. The forcing function is unharmed: a §2 breach is citable and NON-NEGOTIABLE, which is the
-opposite of the preference this test was written to exclude. (b)
-exists because blocking correct work destroys throughput; it also makes §11 self-generating. But it
-can become a dumping ground: three deferred items read as judgement, fifteen as avoidance, so the
-count is on the board and triaged at every gate.
-
-**Governor:** max 2 loopbacks per slice; a third auto-escalates. Three design changes is a slicing
-problem, not a design problem.
+Escape distance is `step_found − step_introduced`, and zero is the target. It is the one number saying
+whether steps 2 and 5 earn their cost.
 
 ---
 
 ## 7. Tests
 
-| Level | Owner | Why |
-|---|---|---|
-| Acceptance, contract, property, concurrency | **test-engineer** | Independence at the boundary that defines *done*; the implementer is the wrong author for the test that breaks their own assumption |
-| Integration (repo ↔ real Postgres) | implementer, **except** DB-invariant tests | Mostly design work; invariants belong to the test-engineer |
-| **Unit** | **implementer** | A design tool — must be freely writable and deletable during refactor |
+Ownership by path, and the reasoning for it: `CLAUDE.md` §5. Four things it does not say.
 
 **Double-loop TDD.** Outer: the test-engineer's failing acceptance test, committed red. Inner: the
-implementer's red→green→refactor until the outer test passes on its own. Same division real teams
-use — the tester's assertions define *done*, the developer's define *how*.
+implementer's red→green→refactor until the outer test passes on its own — the division real teams use,
+where the tester's assertions define *done* and the developer's define *how*.
 
-**The test-engineer never reads `src/`.** Independence is a read restriction, not just a write one —
-tests derived from an implementation restate it rather than check it. It derives only from the slice
-file, arc42 and the ADRs, and the rule holds on loopbacks too, when an implementation does already
-exist.
+**The test-engineer never reads `src/`.** Independence is a read restriction, not just a write one:
+tests derived from an implementation restate it rather than check it. It works from the slice file,
+arc42 and the ADRs only, and the rule holds on loopbacks, when an implementation does exist.
 
-**Enforced by path**, symmetrically, via a `PreToolUse` hook (`agent_id` is present in the payload
-only for subagents, so per-role file permissions are mechanically enforceable):
+**The paths are machine-enforced** by a `PreToolUse` hook — `agent_id` reaches the payload only for
+subagents, which is what makes per-role file permissions enforceable at all.
 
-```
-tests/{acceptance,contract,property,concurrency}/  → test-engineer only
-tests/unit/                                        → implementer only
-tests/integration/            → shared; invariant tests are the test-engineer's
-```
-
-If the implementer believes an acceptance test is wrong it **raises a DCR** rather than editing it.
-That escalation is high-signal — it usually means the AC were ambiguous.
-
-**Who checks the tests.** "The AI wrote tests and they passed" is worth nothing alone. *Mutation
-testing (Stryker), run by the reviewer* — survivors are findings, so test quality is audited by a
-role that wrote neither tests nor code. And *a test that has never failed is not evidence* — the
-board cannot leave `red` until CI has recorded the acceptance test failing.
-
-**Human keeps exploratory testing** at every gate. Scripted tests assert only what someone already
-thought of, which is exactly where agents are weakest. Anything the human breaks becomes a new
-acceptance test, attributed to them.
+**Who checks the tests.** "The AI wrote tests and they passed" is worth nothing alone. Mutation testing
+is the **reviewer's**, so test quality is audited by a role that wrote neither tests nor code, and
+survivors are findings. The **human keeps exploratory testing** at every gate, because scripted tests
+assert only what someone already thought of — exactly where agents are weakest, and what the human
+breaks becomes a new acceptance test attributed to them.
 
 ---
 
 ## 8. Commits
 
-**What gets a PR.** Everything from phase 1 onward; `main` takes no direct commits after phase 0.
+Commit and branch discipline — one red commit per slice, every implementer commit green, the
+~150-line ceiling — is `CLAUDE.md` §7. What that leaves open:
 
-| Work | Vehicle | Why |
-|---|---|---|
-| Phase 0 | direct to `main` | No agent ran, no acceptance test, no gate. A PR with no reviewer is ceremony |
-| Phases 1–3 | PR per phase (`phase/NN-name`) | Each ends in a human gate. **The PR is the gate artifact** — the decision and its rationale become the record rather than something the orchestrator reports |
-| Phase 5 | PR per slice (`slice/NN-name`) | |
-| Phases 6–7 | PR | Gate F |
+**Everything from phase 1 onward goes through a PR** — one per phase, one per slice in phase 5 —
+because **the PR is the gate artifact**: the decision and its rationale become the record rather than
+something the orchestrator reports. Phase 0 went direct to `main`, having no agent, no acceptance test
+and no gate; a PR with no reviewer is ceremony.
 
-One branch and PR per slice; the slice file is the PR body. **Exactly one red commit per slice**, by
-the test-engineer (`test(acceptance): … (red)`); **every implementer commit green** (unit test plus
-the code it drives); `main` receives only green merges. Conventional Commits referencing the slice.
-Past ~150 changed lines it should have been two commits.
+The single red commit resolves what would otherwise conflict — auditable TDD needs a visible red
+state, "every commit deliverable" forbids one. It is authored by a **different agent** than the
+implementer, so the evidence beats a self-reported cycle and mainline discipline is intact.
+
+Two repository settings follow, and neither is a style preference. **Merge commits only**, because
+squashing collapses the red and green commits into one and rebasing rewrites the SHAs the log records
+in `git.commits` — either destroys the trail C1 and C2 are measured from. **Zero required approvals**,
+because nobody may approve their own PR on GitHub and requiring one would hard-block every merge on a
+single account; the gate artifact is instead the **merge plus a comment carrying the human's
+rationale**, timestamped against the diff.
 
 <!-- agents:committing -->
 **Commit by explicit pathspec: `git commit --only <paths> -F <message-file>`.** Never a bare
@@ -347,32 +250,17 @@ have recorded an authority violation in git history, which is what criterion C2 
 `git add` of the same path. Pathspec-pinning is the only thing that closes it.
 <!-- /agents:committing -->
 
-**Every role commits by explicit pathspec — `git commit --only <paths>`, never a bare `git commit`
-or `git add -A`.** The git index is shared by every agent in the worktree, and roles run
-concurrently when their *files* are disjoint. At slice 00 the architect's `git add` and the
-implementer's staging interleaved, and a bare `git commit` took the index as it found it: the record
-briefly showed **the architect committing `src/`**, which is an authority violation on its face and
-would have corrupted **C2**, measured from git history. It was caught on the commit stat and
-recommitted pathspec-pinned, so nothing was lost.
-
-Two things that near-miss establishes. Parallelism was chosen for file disjointness, and **the index
-is not a file** — the shared resource was never reasoned about. And `guard-paths.mjs` cannot see git
-operations at all: it denies the architect a `Write` under `src/`, and cannot deny it a `git add`
-that stages the same path. So the hook enforces authorship at the point of authoring and nothing
-enforces it at the point of recording, which is the artifact every other record reconciles against.
-`--only` closes it by construction rather than by timing.
-
-This resolves what would otherwise conflict — auditable TDD needs a visible red state, "every commit
-deliverable" forbids one. The single red commit is authored by a **different agent** than the
-implementer, so the evidence is stronger than a self-reported cycle and mainline discipline is
-untouched. Reviewer↔implementer conversation lives in PR threads.
+*Generator source (§12): copied verbatim into all five agent definitions — reword it here and it
+reaches every role, or nowhere.*
 
 ### Attribution in PR threads
 
-Every comment posts under the repository owner's account, because the agents have no identity of
-their own. Left alone that would make a PR thread unreadable as evidence — the reviewer's findings
-and the human's judgement would look like the same person talking to themselves. So every comment
-made **on behalf of an agent** opens with an attribution line:
+Agents have no identity, so every comment posts under the repository owner's account — which left
+alone makes the thread unreadable as evidence, the reviewer's findings and the human's judgement
+looking like one person talking to themselves. Every comment made **on behalf of an agent** therefore
+opens with an attribution line, and **a comment with no attribution line is the human's** — an
+asymmetry chosen because the human types comments by hand and should not have to remember a
+convention.
 
 ```
 **reviewer** · `.claude/agents/reviewer.md@6f70521` · MAJOR
@@ -381,230 +269,134 @@ claim:     a slot ending exactly at another slot's start is treated as overlappi
 scenario:  bay 7 booked 09:00–10:00; a request for 10:00–11:00 is refused, but tstzrange is half-open
 ```
 
-**A comment with no attribution line is the human's.** That asymmetry is deliberate — the human
-types comments by hand and should not have to remember a convention.
+Naming the **agent definition and its commit SHA** beats a bot identity, because it says which
+*version* of the reviewer produced a finding — so tightening a role's prompt mid-project leaves
+before-and-after distinguishable rather than smeared together. Honest limit: the header is
+self-asserted and only partly corroborated by `log:audit`, which puts it on the footing of `handoff`
+in §9's coverage table rather than `agent.finish`.
 
 ### What the PR thread must carry
 
-The prompt library records what each agent was *asked* and what it *returned*. It does not record
-what the team **decided between those two points**, and that reasoning is a graded artifact: the
-brief asks for the process of guiding and verifying AI output, not only its results. The PR thread
-is where that lives, because it is the one place a decision sits beside the diff it applies to and
-carries its own timestamp.
+The prompt library records what each agent was *asked* and what it *returned*, not what the team
+**decided between those two points** — and that reasoning is a graded artifact, since the brief asks
+for the process of guiding and verifying AI output, not only its results. The thread is the one place
+a decision sits beside the diff it applies to, with its own timestamp. So every slice PR opens as a
+**draft at step 1**, when the design is committed: opened after the work it is a publication, opened
+before it a venue. The orchestrator posts every row but the gate, on a role's behalf.
 
-Every slice PR therefore opens as a **draft at step 1**, as soon as the design is committed, and is
-marked ready for review when the red commit lands at step 3. A PR opened after the work is a
-publication; a PR opened before it is a venue — and steps 1 and 2 are precisely the ones whose
-reasoning is otherwise lost, because they produce discussion rather than diff.
+| Step | Carries |
+|---|---|
+| 1 Design | Key decisions, ambiguities flagged, and what the architect expects to be argued |
+| 2 **Agree** | An explicit **agree** or **object** per role; an objection names the AC or design statement it disputes. Silence is not agreement and may not be recorded as one |
+| 3 Red | The red commit SHA and the CI run that observed it failing, assertion quoted — evidence for C1. The PR leaves draft here |
+| 5 Review | Findings in `claim:` / `scenario:` form, plus surviving mutants. A no-findings review must still report a mutation score |
+| 6 Gate | The human's ruling and rationale, unattributed. That comment plus the merge *is* the gate artifact |
+| DCR | The mismatch, the round of discussion, and the ruling with its outcome letter |
 
-| Step | Posted by | Carries |
-|---|---|---|
-| 1 Design | orchestrator, for the architect | The design's key decisions, the ambiguities it flagged, and what it expects to be argued |
-| 2 **Agree** | orchestrator, for each of test-engineer and implementer | An explicit **agree** or **object**, per role. An objection names the acceptance criterion or design statement it disputes. Silence is not agreement and may not be recorded as one |
-| 3 Red | orchestrator | The red commit SHA and the CI run that observed it failing, with the failing assertion quoted — evidence for C1. The PR leaves draft here |
-| 5 Review | orchestrator, for the reviewer | Findings with `claim:` and `scenario:` lines per §290's format, plus surviving mutants. An explicit no-findings review must report a mutation score |
-| 6 Gate | **the human, unattributed** | The ruling and its rationale. This comment plus the merge *is* the gate artifact |
-| — DCR | orchestrator, for the raising role | The mismatch, the round of discussion, and the architect's ruling with its `(a)`–`(d)` outcome |
-
-Step 2 is the one most easily skipped, and skipping it is measured: `process-criteria.md` C3 treats a
-reviewer who produces no substance as a failure, and the same reasoning applies here — **an agree
-step that has never produced an objection is rubber-stamping**, and the pilot retro reads it as
-defect-escape distance. Two agents agreeing at step 2 costs a comment; the same ambiguity found at
-step 5 costs a full cycle plus a loopback.
+Step 2 is the easiest to skip, and skipping it is measured: `process-criteria.md` C3 treats a reviewer
+who produces no substance as a failure, and by the same reasoning **an agree step that has never
+produced an objection is rubber-stamping**.
 
 ### Answering an objection
 
-*Added 2026-09-04, after the first real use of step 2 produced five objections and the adjudicating
-prompt asked the architect to rule and amend in a single run.* That is a defect in the process, not
-in the architect: an adjudicator drafting the amendment while deciding whether it is warranted has
-already conceded. `CLAUDE.md` §6 now makes the separation NON-NEGOTIABLE, and the thread is where it
-is visible:
+The rule is `CLAUDE.md` §6, NON-NEGOTIABLE. *It was added on 2026-09-04, after the first real use of
+step 2 produced five objections and the adjudicating prompt asked the architect to rule and amend in
+one run* — a defect in the process, not in the architect: an adjudicator drafting the amendment while
+deciding whether it is warranted has already conceded.
 
-| | |
-|---|---|
-| **Reply first, edit second** | One verdict per objection — AGREE or DISAGREE, with reasoning — posted **before** any file changes. Agreement states the exact amendment; it does not make it |
-| **Finding ≠ remedy** | A measured finding is a fact. The fix proposed beside it is an argument, and may be rejected on its own merits or narrowed |
-| **Disagreement opens a loop** | The objector answers once. Still deadlocked, the architect may call a **vote**: a third role owning neither side returns a reasoned verdict — advisory to the architect on architecture, to the human on scope, recorded either way |
-| **Then amend, in one pass** | With the rulings attached, so step 3 builds against one current document rather than a design plus a thread of corrections |
-
-The reason this is worth the extra round: the brief grades *the process for verifying and refining*
-AI output. A design that was argued into shape, with the losing arguments preserved, is stronger
-evidence than the same design arrived at by an agent agreeing with whoever spoke last. **A vote is
-also the only mechanism here that lets a role be outnumbered rather than overruled** — which is what
-keeps the architect's authority (§6) from collapsing into the last reviewer's preference.
-
-Agents do not post. They return structured reports, and the orchestrator posts on their behalf under
-§290's attribution line — the same asymmetry that makes an unattributed comment the human's.
-
-Naming the **agent definition and its commit SHA** is worth more than a bot identity would be: it
-says which *version* of the reviewer produced the finding, so tightening a role's prompt mid-project
-leaves before-and-after distinguishable rather than smeared together.
-
-Honest limit: the header is self-asserted text, so the orchestrator could in principle attribute a
-comment to an agent that never ran. It is partially corroborated — `log:audit` would show no
-matching `agent.finish` or transcript — which puts it on the same footing as `handoff` and
-`board.move` in §9's coverage table rather than on the footing of `agent.finish`.
-
-*A machine account would make identity forgery-proof and would allow branch protection to require an
-approval, mechanically enforcing Gate E. Rejected for this project: it adds credential management to
-a solo assessment for a gain the audit already partly covers. Worth revisiting for a real team.*
-
-**Merge commits only — squash and rebase are disabled at the repository.** This is not a style
-preference. Squashing collapses the red commit and the green commits into one, destroying the trail
-that criteria C1 and C2 are measured from. Rebasing rewrites SHAs, and the event log records SHAs in
-`git.commits`, so every logged reference would dangle and `log:audit` would report false omissions.
-`required_linear_history` stays off for the same reason — it would force one or the other.
-
-**On gate approval.** GitHub does not permit approving one's own pull request, and with a single
-account no configuration changes that; requiring approvals would hard-block every merge. The gate
-artifact is therefore the **merge plus a comment carrying the human's rationale** — the same
-evidence a formal approval would give, timestamped and attached to the diff. Branch protection
-requires a PR with *zero* required approvals, and `enforce_admins` stays off so the author can merge.
+Why the extra round earns its cost: the brief grades *the process for verifying and refining* AI
+output, and a design argued into shape with the losing arguments preserved is stronger evidence than
+the same design reached by an agent agreeing with whoever spoke last. **A vote is also the only
+mechanism here that lets a role be outnumbered rather than overruled**, which keeps the architect's
+authority from collapsing into the last reviewer's preference.
 
 ---
 
 ## 9. Observability
 
 The team is a distributed system too, so it is instrumented like one: **a slice is a trace, an agent
-invocation is a span, handoffs are links, gates are events.**
+invocation is a span, handoffs are links, gates are events.** The application plane — the OTel/`pino`
+contract, the domain metrics, the probes — is arc42 §8. One choice there is methodology rather than
+architecture: the availability check and the insert get *separate* spans, so if check-then-act ever
+reappears, the window `CLAUDE.md` §2.1 forbids is visible in a waterfall.
 
-**Application plane.** OpenTelemetry with `pino` correlated by trace id; spans around the
-availability check and the insert *separately*, so the check-then-act window is visible in a
-waterfall; `/health`, `/ready`; one `grafana/otel-lgtm` container. Metrics are domain metrics:
-`appointments_booked_total{dealership,service_type}`,
-`booking_conflicts_total{resource="bay"|"technician"}` — the invariant made observable —
-`availability_query_duration_seconds`.
+**Team plane:** append-only `docs/team-log/events.jsonl`, trace-shaped so it renders as a waterfall now
+and exports to OTLP later. The record shape and event vocabulary are executable, in
+`tools/team-log/schema.mjs`; re-listing them here would drift, and did. Three of its rules are
+methodology rather than plumbing. **Every record is scoped to a `slice` or a `phase`** and one that is
+neither is rejected, so phases 1–3 — no slice, but carrying the requirements and architecture
+reasoning — are logged as `phase-N` traces. **A `dcr.resolved` ruling `(c)` must name a
+`failing_criterion`**, so §6's forcing function is enforced by the log rather than the architect's
+restraint. And **phase 0 is not backfilled**: events written after the fact for work predating the log
+would be narration dressed as history, the fabrication the trust model exists to prevent. Its evidence
+is its git history, which is derived and therefore better.
 
-**Team plane.** Append-only `docs/team-log/events.jsonl`, trace-shaped so it renders as a waterfall
-now and exports to OTLP later.
-
-Every record is scoped to a **`slice`** or a **`phase`**, and the schema rejects one that is neither.
-Phases 1–3 have no slice but produce the requirements and architecture reasoning — the most
-substantial evidence in the submission — so they are logged as `phase-N` traces. **Phase 0 is
-deliberately not backfilled:** writing events after the fact for work that predates the log would be
-narration dressed as history, which is the fabrication the trust model exists to prevent. Its
-evidence is its git history, which is derived and therefore better.
-
-Per record: `ts`, `slice` or `phase`, `trace_id`, `span_id`, `parent_span_id`,
-`actor`, `event`, `board{from,to}`, `duration_ms`, `inputs[]`, `outputs[]`,
-`git{commits,files,+,-}`, `checks{}`, `agent_sha`, `transcript`, and `message`.
-
-Events: `slice.ready` · `board.move` · `agent.start` · `agent.finish` · `handoff` ·
-`review.finding` · `review.response` · `dcr.raised` · `dcr.discussed` · `dcr.resolved` ·
-`loopback` · `escalation` · `gate.opened` · `gate.decided` · `check.run` · `adr.recorded` ·
-`arc42.updated` · `slice.done`
-
-Each record carries a `source` naming its trust tier — `derived`, `reported` or `narrated` — and
-the schema **rejects** a `dcr.resolved` with ruling `(c)` that does not name a `failing_criterion`.
-The forcing function in §6 is enforced by the log, not by the architect's restraint.
-
-**Trust (P5).** The log is written by the orchestrator, so on its own it would depend on the
-orchestrator's diligence — and a record that depends on the diligence of the thing being recorded is
-not evidence. Three mechanisms close that:
-
-- **`derived` cannot be asserted.** The tier claiming a fact came from tooling is refused from the
-  orchestrator's write path entirely; only collectors that compute the fact may set it.
-- **A `SubagentStop` hook records every role-agent run automatically**, outside the model's context,
-  with duration and token counts computed from the agent's own transcript. It fires whether or not
-  the orchestrator remembers or wants it to.
-- **`npm run log:audit` reconciles the log against artifacts the orchestrator does not author** —
-  subagent transcripts and git history — reporting `OMISSION` (a run the log is silent about),
-  `UNSUPPORTED` (a run nothing corroborates) and `MISMATCH` (a duration that disagrees). Omissions
-  catch forgetting; unsupported records catch invention. Run it at every gate.
-
-Agent reports are schema-validated or the slice cannot advance. Only `message` is narration, and the
-view marks it as such.
+**Trust (P5).** The log is the orchestrator's, so on its own it would depend on the orchestrator's
+diligence — and a record depending on the diligence of the thing recorded is not evidence. Three
+mechanisms close that. **`derived` cannot be asserted**: the tier claiming a fact came from tooling is
+refused from the orchestrator's write path, and only collectors that compute a fact may claim it. **A
+`SubagentStop` hook records every role-agent run automatically**, outside the model's context, whether
+or not the orchestrator remembers or wants it to. **`log:audit` reconciles the log against artifacts
+the orchestrator does not author** — transcripts and git history — reporting `OMISSION`, `UNSUPPORTED`
+and `MISMATCH`: omissions catch forgetting, unsupported records catch invention. Agent reports are
+schema-validated or the slice cannot advance, and only `message` is narration.
 
 ![What the record can be trusted for](diagrams/logging-trust.svg)
 
 ### Coverage — what is logged, and how far it can be trusted
 
-`Writer`: **H** harness hook · **T** tooling · **O** orchestrator. *Corroborated* means an
-independent artifact could contradict a false record.
+`Writer`: **H** hook · **T** tooling · **O** orchestrator. *Corroborated* means an independent
+artifact could contradict a false record.
 
-| Step | Event | Tier | Writer | Corroborated by | Residual risk |
-|---|---|---|---|---|---|
-| any agent finishes | `agent.finish` | derived | **H** | its own transcript | **none** — automatic |
-| agent invoked | `agent.start` | reported | O | transcript first-timestamp | low — audit could check, doesn't yet |
-| step transitions | `handoff` | reported | O | — | **omittable, unverifiable** |
-| board column change | `board.move` | reported | O | — | **omittable, unverifiable** |
-| slice opens / closes | `slice.ready` `slice.done` | reported | O | slice-file `status` | low |
-| CI run, incl. step-3 red proof | `check.run` | derived | **T** | — | **NOT EMITTED YET** — C1 cannot pass |
-| commits | `git` on other events | reported | O | `git log` | low — audit reports unreferenced commits |
-| step 5 findings and replies | `review.finding` `review.response` | reported | O | PR threads | low once PRs are live |
-| DCR raised | `dcr.raised` | reported | O | — | **omittable** |
-| DCR ruled | `dcr.resolved` | reported | O | superseding ADR | medium — ruling (c) needs `failing_criterion` (enforced) |
-| loopback | `loopback` | reported | O | ADR supersession chain | medium |
-| gates | `gate.opened` `gate.decided` | reported | O | PR approval | low once PRs are live |
-| ADR written | `adr.recorded` | reported | O | `docs/adr/*.md` | low — audit could check, doesn't yet |
-| arc42 corrected | `arc42.updated` | reported | O | `git diff docs/arc42/` | low — audit could check, doesn't yet |
-| escalation | `escalation` | reported | O | — | **omittable** |
+| Event | Tier | Writer | Corroborated by | Residual risk |
+|---|---|---|---|---|
+| `agent.finish` | derived | **H** | its own transcript | **none** — automatic |
+| `check.run` | derived | **T** | the GitHub API | **none** — collected, not typed |
+| `agent.start` | reported | O | transcript first-timestamp | low — audit could check, doesn't yet |
+| `handoff` | reported | O | — | **omittable, unverifiable** |
+| `board.move` | reported | O | — | **omittable, unverifiable** |
+| `slice.ready` `slice.done` | reported | O | slice-file `status` | low |
+| `git` on other events | reported | O | `git log` | low — audit reports unreferenced commits |
+| `review.*` `finding.*` | reported | O | PR threads | low once PRs are live |
+| `gate.opened` `gate.decided` | reported | O | PR merge + rationale comment | low |
+| `dcr.resolved` `loopback` | reported | O | superseding ADR | medium — a (c) needs `failing_criterion` (enforced) |
+| `adr.recorded` `arc42.updated` | reported | O | the files themselves | low — audit could check, doesn't yet |
+| `dcr.raised` `escalation` | reported | O | — | **omittable** |
 
-Read honestly, that table says: **one** event type is fully trustworthy; **one** is not emitted at
-all, which makes criterion C1 unpassable until slice 00 produces a test command; **four** are
-omittable and unverifiable — if they go unwritten nothing notices, and that is the residual trust
-surface; and **three** have ground truth sitting on disk that `log:audit` does not yet read, which
-is cheap to close before phase 5.
+Read honestly: **two** event types are fully derived; **four** are omittable and unverifiable, so if
+they go unwritten nothing notices — that is the residual trust surface; and **three** have ground
+truth on disk that `log:audit` does not yet read.
 
 ### Commands
 
+`package.json` is the index; four of them are process obligations rather than conveniences.
+
 | | |
 |---|---|
-| `npm run status` | **regenerate `docs/STATUS.md` — the committed resume point; run before ending a session** |
-| `npm run board` | the four panels — board, waterfall, thread, metrics (local, gitignored) |
-| `npm run log -- --slice 03` | the same data in the terminal |
-| `npm run log:audit` | **reconcile the log against reality — run at every gate** |
-| `npm run slice:check 03` | Ready / Done gate; `UNVERIFIED` blocks Done |
-| `npm run test:tools` | path-guard regression suite |
-| `npm run docs:build` | assemble `docs/system-design.md` from arc42 sections |
-| `npm run diagram:export <f.html>` | re-export a diagram's SVG |
+| `npm run status` | **regenerate `docs/STATUS.md`, the committed resume point — before ending a session** |
+| `npm run log:audit` | **reconcile the log against reality — at every gate** |
+| `npm run slice:check 03` | the Ready / Done gate; `UNVERIFIED` blocks Done |
+| `npm run board` | four panels — board, waterfall (loopback rewinds visible), thread, metrics. Gitignored |
 
 **Prompts, tokens, cost.** Prompts are written **before** invocation to
-`docs/team-log/prompts/<slice>-<agent>-<n>.md` with the report beside them, so the record cannot
-drift from what ran; the prompt library is the primary evidence for *strategy for directing AI*.
+`docs/team-log/prompts/`, with the report beside them, so the record cannot drift from what ran; the
+prompt library is the primary evidence for *strategy for directing AI*. *Corrected 2026-09-04:* that
+rule was enforced by the orchestrator's discipline and the discipline failed — phases 2 and 3 ran with
+no prompt files at all. Both halves are now hooks, writing the prompt as sent and extracting the
+report from the agent's own transcript, so neither is typed by hand. **P3 applies to this methodology
+as much as to the system it builds: a rule whose only enforcement is discipline records nothing on the
+day it matters.**
 
-*Corrected 2026-09-04.* That rule was enforced by the orchestrator's discipline, and the discipline
-failed: phases 2 and 3 ran with no prompt files at all, and no report was ever written beside one.
-Both halves are now hooks — `capture-prompt.mjs` on `PreToolUse:Task` writes the prompt as sent,
-before the agent runs; `log-agent-finish.mjs` on `SubagentStop` extracts the report from the agent's
-own transcript. Neither is typed by hand, so neither can drift. The five prompts that predate the
-hooks are backfilled and labelled as backfilled in their own headers. P3 applies to this
-methodology as much as to the system it builds: a rule whose only enforcement is discipline records
-nothing on the day it matters.
-Each event records the **SHA of the agent definition used**, so tuning a role yields comparable
-before/after rather than anecdote.
-
-Per-agent attribution is **exact** (verified, Claude Code v2.1.259): each subagent has
-`~/.claude/projects/<slug>/<session-id>/subagents/agent-<agentId>.jsonl` plus an
-`agent-<agentId>.meta.json` carrying `agentType`, `toolUseId` and `spawnDepth`. Collection is
-mechanical — sum `message.usage` per file, join to the spawn point via `toolUseId`. Fields:
-`input_tokens`, `output_tokens`, `output_tokens_details.thinking_tokens`,
-`cache_creation_input_tokens`, `cache_read_input_tokens`, `message.model`. **Cost is not recorded**
-— computed from tokens × pricing, keeping the cache breakdown, since cache reads bill far below
-fresh input. Claude Code's OTel export (`CLAUDE_CODE_ENABLE_TELEMETRY=1`) is a secondary cross-check
-on session totals; per-agent tagging there is unconfirmed. Transcript-derived cost is a faithful
-reconstruction, not a billing record, and is labelled as such.
-
-Cost per role answers a question worth putting in the video: *what did the quality process actually
-cost?*
-
-**The view.** `npm run board` generates `docs/board.html` (`--watch` for live). Four panels:
-**board** (where things are) · **waterfall** (which agent did what when, including visible loopback
-rewinds) · **thread** (handoffs, findings and resolutions, DCRs, gate rationale) · **metrics**
-(results and trend). Rows link to PRs, comments and transcripts. `npm run log -- --slice 03
---actor reviewer` for terminal use.
+Token attribution is mechanical, from each subagent's own transcript; cost is tokens × pricing with
+the cache breakdown kept — a faithful reconstruction, not a billing record, labelled as such. It
+answers a question worth putting in the video: *what did the quality process actually cost?*
 
 ---
 
 ## 10. Ready / Done
 
-**Ready:** AC present · dependencies merged · `arc42:` declared · `quality_scenarios:` linked · no
-open clarifications.
-
-**Done:** tests green · mutation score above threshold on changed files · `dependency-cruiser` clean
-· arc42 reconciled · ADRs recorded · human approved.
-
-`npm run slice:check <id>` returns pass/fail. A slice does not reach `done` because an agent says so.
+Both definitions are `CLAUDE.md` §10, and `npm run slice:check <id>` returns pass/fail against them.
+A slice does not reach `done` because an agent says so.
 
 ---
 
@@ -631,34 +423,30 @@ The retro **acts**: tighten a prompt, upgrade a role's model, or re-slice.
 
 ## 12. How this instructs agents
 
-It does not — directly. This is a human artifact carrying rationale. Agents need short, imperative,
-role-scoped instructions: one given rules *plus the arguments for them* follows them less reliably
-than one given the rules alone, and pays for the tokens on every call. So this is the source of
-truth and the machine files are **projections** (P2).
+It does not — directly. This is a human artifact carrying rationale, and agents need short,
+imperative, role-scoped instructions: one given rules *plus the arguments for them* follows them less
+reliably than one given the rules alone, and pays for the tokens on every call.
 
-| Derived file | Carries | From |
-|---|---|---|
-| `CLAUDE.md` | Operative rules only; read by every agent, every invocation | §1, §5–§8, §10 |
-| `.claude/agents/architect.md` | Authority, outputs, DCR adjudication, ADR rules | §2, §4, §6 |
-| `.claude/agents/test-engineer.md` | Owned paths, outer loop, red-commit duty | §2, §7 |
-| `.claude/agents/implementer.md` | Owned paths, inner loop, commit discipline, DCR duty | §2, §7, §8 |
-| `.claude/agents/reviewer.md` | Conformance checks, mutation audit, finding format | §2, §7, §9 |
-| `.claude/agents/scribe.md` | Evidence-only rule, README and §13 ownership | §2, §4 |
-| `.claude/settings.json` + hooks | Path locks, green-commit gate | §7, §8 |
-| `docs/slices/_template.md` · `docs/adr/_template.md` | Work-item and decision contracts | §5, §4 |
+**Exactly three things are generated** from this file by `tools/agents/generate.mjs`
+(`npm run agents:build`, checked in CI): each role's `model:` frontmatter and its Decides / Never
+constraints from §2's table, and the committing rule marked in §8. The narrowness is the point, and it
+is measured — `generate.mjs`'s header carries the count and the reasoning. This section once claimed
+more than any tool did, at a time when there was no tool at all, so its "regenerate" instruction named
+a process that did not exist while the files drifted. **A generated block that claims less than it
+does is worth more than a header that claims more.**
 
-**Maintenance rule:** changes land here first, then propagate to derived files in the same commit. A
-derived file disagreeing with this document is a defect in the derived file.
+Everything else machine-facing is hand-maintained and related by citation, not derivation: `CLAUDE.md`
+is the human's and normative; `.claude/settings.json` and its hooks are the enforcement §7 and §9
+describe; the slice and ADR templates are the work-item and decision contracts.
 
 ---
 
 ## Glossary
 
-**Slice** vertical unit of work — one branch, one PR, one gate · **DCR** Design Change Request, a
-raised design/reality mismatch · **Loopback** returning a blocked slice to step 1 after a (c);
-prior work is revised, not deleted · **Gate** a point where the human decides and it is recorded ·
-**QS-n** numbered arc42 §10 quality scenario, traceable to a test · **Escape distance** steps
-between where a defect originated and where it was caught · **Red commit** the single failing-test
-commit per slice, proving test-first.
+**Slice** vertical unit of work — one branch, one PR, one gate · **DCR** a raised design/reality
+mismatch · **Loopback** returning a blocked slice to step 1 after a (c); prior work is revised, never
+deleted · **Gate** a point where the human decides and it is recorded · **QS-n** an arc42 §10 quality
+scenario, traceable to a test · **Escape distance** steps between where a defect originated and where
+it was caught · **Red commit** the single failing-test commit per slice, proving test-first.
 
-*arc42 used under CC BY-SA.*
+*Domain vocabulary is arc42 §12. arc42 used under CC BY-SA.*
