@@ -70,3 +70,43 @@ describe('occupancyInterval', () => {
     expect(occupancyInterval(ivA)).not.toEqual(occupancyInterval(ivB));
   });
 });
+
+/**
+ * ADR-0014 — an `Instant` is renderable by construction (AC-13, AC-14).
+ *
+ * The property test in `tests/property/instant-bounds.test.ts` is the test-engineer's and
+ * generates over the whole range; these are the implementer's boundary cases, written to name
+ * the two mutants ADR-0014's remedy is exposed to. Both are asserted here so a `npm run
+ * mutation` survivor at either site is a defect in this file and not in the property suite.
+ */
+describe('instant — the renderable bound (ADR-0014)', () => {
+  const MAX = 8_640_000_000_000_000;
+
+  it('accepts exactly +MAX: the bound is inclusive (kills `<=` -> `<`)', () => {
+    expect(instant(MAX)).toBe(MAX);
+  });
+
+  it('accepts exactly -MAX: the bound is inclusive on the negative side too', () => {
+    expect(instant(-MAX)).toBe(-MAX);
+  });
+
+  it('rejects one millisecond beyond the positive bound', () => {
+    expect(instant(MAX + 1)).toBeNull();
+  });
+
+  it('rejects a value beyond the NEGATIVE bound (kills `delete Math.abs`)', () => {
+    // Measured and corrected at step 3: `-MAX` does NOT kill the `Math.abs` deletion, because
+    // `-MAX <= MAX` holds. Only a value beyond the bound on the negative side does.
+    expect(instant(-(MAX + 1))).toBeNull();
+    expect(instant(Number.MIN_SAFE_INTEGER)).toBeNull();
+  });
+
+  it('rejects a value far beyond the positive bound', () => {
+    expect(instant(Number.MAX_SAFE_INTEGER)).toBeNull();
+  });
+
+  it('still accepts an ordinary instant, so the bound is not a blanket rejection', () => {
+    const ordinary = Date.parse('2026-09-08T09:00:00.000Z');
+    expect(instant(ordinary)).toBe(ordinary);
+  });
+});

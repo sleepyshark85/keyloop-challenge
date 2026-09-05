@@ -384,3 +384,49 @@ describe('withinOpeningHours — the seconds-of-day arithmetic is hours*3600 + m
     expect(withinOpeningHours(atClose, atClose + 1000, ZONE, weekly).kind).toBe('outside-window');
   });
 });
+
+/**
+ * ADR-0014 step 1 (AC-16) — an endpoint outside the renderable bound is `malformed-interval`,
+ * and the function does not throw.
+ *
+ * Without the bound, step 3 hands `new Date(1e18)` to `formatToParts` and a pure function
+ * raises `RangeError`. The property test asserts the same thing generatively; these name the
+ * two mutants the arithmetic is exposed to and assert the SIGN symmetry the property's
+ * `-(MAX + 1)` case is the only other cover for.
+ */
+describe('withinOpeningHours — step 1 bounds both endpoints (ADR-0014, AC-16)', () => {
+  const MAX = 8_640_000_000_000_000;
+  const weekly = weekOpen('00:00:00', '24:00:00');
+
+  it('a start beyond the positive bound is malformed-interval, and does not throw', () => {
+    expect(withinOpeningHours(MAX + 1, MAX + 2, ZONE, weekly)).toEqual({
+      kind: 'malformed-interval',
+    });
+  });
+
+  it('an END beyond the positive bound is malformed-interval, from an ordinary start', () => {
+    expect(withinOpeningHours(1_760_000_000_000, MAX + 1, ZONE, weekly)).toEqual({
+      kind: 'malformed-interval',
+    });
+  });
+
+  it('a start beyond the NEGATIVE bound is malformed-interval (kills `delete Math.abs`)', () => {
+    expect(withinOpeningHours(-(MAX + 1), 0, ZONE, weekly)).toEqual({
+      kind: 'malformed-interval',
+    });
+  });
+
+  it('exactly ±MAX is NOT rejected by the bound: the comparison is `>`, not `>=`', () => {
+    // The interval is one second at the extreme positive instant, which renders. If the bound
+    // were exclusive this would be `malformed-interval` and AC-14's two endpoints would be
+    // unreachable through this function.
+    expect(withinOpeningHours(MAX - 1_000, MAX, ZONE, weekly).kind).not.toBe(
+      'malformed-interval',
+    );
+  });
+
+  it('an ordinary in-hours interval is still `within`, so the bound is not a blanket rejection', () => {
+    const start = Date.parse('2026-09-08T09:00:00.000Z');
+    expect(withinOpeningHours(start, start + 3_600_000, ZONE, weekly).kind).toBe('within');
+  });
+});

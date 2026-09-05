@@ -49,6 +49,17 @@ export type OpeningHoursVerdict =
   // type used to (§2.3).
   | { readonly kind: 'malformed-interval' };
 
+/**
+ * ADR-0014, applied here as well as in `instant()` — and this is a consequence of the literal
+ * AC-6 ruling rather than belt-and-braces. This module may not import `Interval`, so "my caller
+ * used `instant()`" is uncheckable from inside it; without the bound, step 3 hands an
+ * unrenderable value to `formatToParts` and a PURE FUNCTION THROWS `RangeError`.
+ *
+ * The literal is written twice on purpose (D-01-2, ADR-0014's "Bad, or deferred", arc42 §11):
+ * `domain-is-pure` has no allowlist, so there is no module either file may import it from.
+ */
+const MAX_RENDERABLE_EPOCH_MILLIS = 8_640_000_000_000_000;
+
 // ─────────────────────────────────────────────────────────────── §3.2: parsing `time` ──
 
 /**
@@ -149,9 +160,14 @@ export function withinOpeningHours(
   // 1. Pure arithmetic, first: everything after this would otherwise be handed a value
   // `new Date(...)` cannot render, and a pure function must not throw. Exists only because
   // of the literal AC-6 ruling — the `Interval` type used to make this unrepresentable.
+  //
+  // The RENDERABLE BOUND (ADR-0014, AC-16) is part of this step and returns the EXISTING
+  // `malformed-interval`: ADR-0014 is explicit that no new verdict variant is introduced.
   if (
     !Number.isInteger(startsAtMillis) ||
     !Number.isInteger(endsAtMillis) ||
+    Math.abs(startsAtMillis) > MAX_RENDERABLE_EPOCH_MILLIS ||
+    Math.abs(endsAtMillis) > MAX_RENDERABLE_EPOCH_MILLIS ||
     !(endsAtMillis > startsAtMillis)
   ) {
     return { kind: 'malformed-interval' };
