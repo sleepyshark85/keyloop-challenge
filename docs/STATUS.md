@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `6b6d1ed fix(tooling): the gates that read a record which exists rather than one that applies` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process |
-| Agent runs recorded | 61 |
+| Last commit | `9a37b72 docs(arc42): cite the origin, not the pointer` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process |
+| Agent runs recorded | 73 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -71,6 +71,10 @@
 **Gate process** · 2026-09-05 · fold-12-and-13-into-02
 
 > Ruled 2026-09-05 alongside the light-gate decision. Backlog slices 12 and 13 - the R-01-1 instant bound and the R-01-4 midnight-ending interval - fold into slice 02 rather than running as two separate loops. Both are small domain fixes whose remedies are already NAMED EXACTLY by the architect and now RATIFIED as ADR-0014 and ADR-0015, so the design step they would each consume has effectively already happened; running two full seven-step loops to apply two ratified decisions is the slicing problem §6's loopback governor warns about, seen from the other end. The 06/07 seam is again NOT touched, per Gate C. Backlog goes from 10 remaining to 8. Explicitly accepted as a cost: slice 02 grows from AC-1..AC-12 to carry both remedies and their negative controls, and a bigger slice is a bigger unit to review - which is precisely why 02 keeps the FULL human gate under the ruling above. Scoped to slice 02 rather than to phase 5 because the schema deliberately rejects phase 5 - slice work uses `slice` - and a cross-slice PROCESS ruling made during phase 5 has no other home. Slice 02 is where both rulings first take effect. Recorded as O-18.
+
+**Gate process** · 2026-09-05 · concise-docs-one-home-per-fact-and-shorten-accepted-adrs
+
+> Ruled 2026-09-05 on measured figures, not impression: arc42 31.8k words, ADRs 35.4k, slices 69k - about 136k words, with an average ADR of 2,080 against a normal MADR's 400-800, and 'Considered options' plus 'Pros and cons of the options' spending 11.5k words on one job. DECIDED: ONE HOME PER FACT. The ADR carries the decision, its options table and its consequences; arc42 says what the system IS, present tense, no history; a slice design carries only that slice's delta; narrative and measurement live in the event log and on the PR. The duplication being removed is ACROSS artifacts rather than inside them - R-01-4's dead-branch-versus-live-defect argument was told five times. SECOND RULING, overriding §4. Accepted ADRs MAY be shortened, provided the meaning does not change. §4 says an accepted ADR is immutable and must be superseded rather than edited; the human overrode that for length only. The override holds on §4's own terms: its stated purpose is that 'the history of how thinking changed is the point', and that history is in git and in this log rather than in the file being frozen. What immutability uniquely protects is that a reader citing ADR-0006 later gets the same DECISION, which a meaning-preserving condensation does not touch. The orchestrator's earlier §4-derived exemption for the thirteen accepted ADRs is therefore withdrawn and they are back in scope. THIRD RULING: the slice designs are in scope too, and are to be shortened AGGRESSIVELY. Measured: four design files hold 54,605 of the 69k words in docs/slices/ - 00a 17,459, 00 15,294, 01 11,573, 02 10,279 - while every slice file itself is between 156 and 1,416. A merged slice's design has already been reconciled into arc42 by step 7, which is what step 7 IS, so keeping the working prose afterwards is the cross-artifact duplication this ruling is about in its purest form.
 
 ## Decisions on record
 
@@ -157,7 +161,19 @@
 | 2026-09-05 06:03 | architect | 7m42 | 156 / 8,338 / 6,159,757 | `derived` |
 | 2026-09-05 06:08 | architect | 12m50 | 232 / 9,551 / 11,127,069 | `derived` |
 | 2026-09-05 06:15 | architect | 20m00 | 330 / 17,971 / 19,192,822 | `derived` |
-| | **total** | **4038m01** | **16,004 / 1,278,788 / 1,237,195,344** | |
+| 2026-09-05 07:56 | architect | 51m05 | 322 / 64,843 / 30,066,861 | `derived` |
+| 2026-09-05 11:05 | architect | 47m58 | 484 / 61,811 / 76,137,187 | `derived` |
+| 2026-09-05 11:45 | architect | 10m40 | 140 / 18,179 / 5,320,894 | `derived` |
+| 2026-09-05 11:53 | architect | 19m04 | 152 / 18,195 / 5,735,818 | `derived` |
+| 2026-09-05 12:01 | architect | 26m54 | 160 / 18,209 / 5,917,860 | `derived` |
+| 2026-09-05 12:03 | architect | 28m20 | 168 / 18,222 / 6,400,889 | `derived` |
+| 2026-09-05 12:04 | architect | 29m51 | 176 / 18,238 / 6,893,173 | `derived` |
+| 2026-09-05 12:09 | architect | 34m12 | 184 / 18,251 / 7,393,653 | `derived` |
+| 2026-09-05 12:13 | architect | 38m10 | 526 / 30,658 / 60,240,776 | `derived` |
+| 2026-09-05 12:14 | architect | 40m06 | 262 / 22,175 / 12,916,581 | `derived` |
+| 2026-09-05 14:57 | architect | 22m10 | 182 / 75,824 / 11,488,798 | `derived` |
+| 2026-09-05 15:10 | architect | 6m52 | 112 / 4,073 / 3,660,512 | `derived` |
+| | **total** | **4393m23** | **18,872 / 1,647,466 / 1,469,368,346** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

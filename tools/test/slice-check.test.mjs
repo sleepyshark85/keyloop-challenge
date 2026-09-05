@@ -42,11 +42,12 @@ loopbacks: 0
 
 // `head_sha` defaults to the fixture's HEAD, so a case that is about something else
 // does not silently become a case about O-17. Pass `head_sha` explicitly to make it one.
-const ciRun = (over = {}) => (sha) => ({
+const ciRun = (over = {}) => (sha, ctx) => ({
   ts: '2026-01-01T00:00:00Z', slice: '77', event: 'check.run', source: 'derived',
   ...over,
   checks: { run_id: 1, conclusion: 'success', depcruise: 'pass', jobs: { verify: 'PASS' },
-            head_sha: sha, ...(over.checks ?? {}) },
+            head_sha: sha,
+            ...(typeof over.checks === 'function' ? over.checks(ctx) : over.checks ?? {}) },
 });
 const mutationRun = (over) => ({
   ts: '2026-01-01T05:00:00Z', slice: '77', event: 'check.run', source: 'reported',
@@ -95,8 +96,14 @@ const build = (events, { commits = [], slice = SLICE } = {}) => {
   const sha = git(dir, ['rev-parse', 'HEAD']).stdout.trim();
   const rootSha = git(dir, ['rev-list', '--max-parents=0', 'HEAD']).stdout.trim();
   const shas = git(dir, ['rev-list', 'HEAD']).stdout.trim().split('\n');   // newest first
+  // Event entries may be functions of THIS repository's context. They were functions of
+  // `sha` alone, which forced any case needing a non-HEAD commit to build a SECOND repo
+  // and borrow a sha from it — and two repos only share a commit id when both `git
+  // commit` calls land in the same clock second, because the timestamp is hashed in.
+  // That made the O-17 case fail about one run in three, in `test:tools`, in CI.
+  const ctx = { sha, rootSha, shas };
   writeFileSync(join(dir, 'docs/team-log/events.jsonl'),
-    events.map((e) => JSON.stringify(typeof e === 'function' ? e(sha) : e)).join('\n'), 'utf8');
+    events.map((e) => JSON.stringify(typeof e === 'function' ? e(sha, ctx) : e)).join('\n'), 'utf8');
   const r = spawnSync('node', [CHECK, '77'], { cwd: dir, encoding: 'utf8' });
   return { out: (r.stdout ?? '').replace(/\x1b\[[0-9;]*m/g, ''), sha, rootSha, shas, dir };
 };
@@ -193,8 +200,7 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
 // part of the remedy — while the run for the real HEAD had FAILED, invisibly, because a
 // failing run nobody collected is indistinguishable from one that does not exist.
 {
-  const seed = build([], { commits: [{ subject: 'feat(77): later work', files: { 'src/later.ts': 'export const x = 1;\n' } }] });
-  const { out, sha } = build([ciRun({ checks: { head_sha: seed.rootSha } })],
+  const { out, sha } = build([ciRun({ checks: (ctx) => ({ head_sha: ctx.rootSha }) })],
     { commits: [{ subject: 'feat(77): later work', files: { 'src/later.ts': 'export const x = 1;\n' } }] });
   ok("a run predating the slice's last commit fails — it ran before the work finished",
     row(out, 'tests green').startsWith('FAIL') && row(out, 'tests green').includes('ancestor'),
@@ -224,9 +230,7 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
     { subject: 'feat(77): the slice\'s last commit', files: { 'src/a.ts': 'export const a = 1;\n' } },
     { subject: 'chore(99): unrelated later work on main', files: { 'src/b.ts': 'export const b = 2;\n' } },
   ];
-  const seeded = build([], { commits });
-  const sliceCommit = seeded.shas[1];
-  const { out } = build([ciRun({ checks: { head_sha: sliceCommit } })], { commits });
+  const { out } = build([ciRun({ checks: (ctx) => ({ head_sha: ctx.shas[1] }) })], { commits });
   ok('a run on the slice\'s last commit still passes after main moves on',
     row(out, 'tests green').startsWith('PASS'), row(out, 'tests green'));
 }

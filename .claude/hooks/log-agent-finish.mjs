@@ -21,6 +21,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, appendFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { resolveScope } from './scope.mjs';
 
 const ROLES = new Set(['architect', 'test-engineer', 'implementer', 'reviewer', 'scribe']);
 
@@ -107,18 +108,10 @@ try {
   }
 
   // ---- scope ------------------------------------------------------------
-  // The harness has no idea which slice is in flight; the orchestrator writes a
-  // marker at the start of each slice or phase. Scope is not the falsifiable
-  // part — whether the run happened, and how long it took, is, and that is
-  // computed above.
-  let scope = { phase: '0' };
-  const markerPath = join(cwd, 'docs/team-log/.scope');
-  if (existsSync(markerPath)) {
-    try { scope = JSON.parse(readFileSync(markerPath, 'utf8')); }
-    catch { note(`unparseable scope marker; defaulted to phase 0`); }
-  } else {
-    note(`no scope marker when ${role} finished; defaulted to phase 0`);
-  }
+  // Derived from the BRANCH first and the orchestrator's marker only as a fallback;
+  // see .claude/hooks/scope.mjs for why, and for the four slice-02 runs that were
+  // filed under slice 01 before it did.
+  const scope = resolveScope(cwd, (m) => note(`${m} (${role} finished)`));
 
   appendRecords({
     ...scope,

@@ -1,0 +1,213 @@
+{
+ "0001-validate-dealership-opening-hours.md": {
+  "options": [
+   "Option A \u2014 Unbounded time",
+   "Option A \u2014 Unbounded time. No working-window rule of any kind. Validity is non-overlap and",
+   "Option B \u2014 Opening-hours validation only",
+   "Option B \u2014 Opening-hours validation only. Each dealership carries opening hours as referen",
+   "Option C \u2014 Full working-calendar modelling",
+   "Option C \u2014 Full working-calendar modelling. Dealership opening hours plus technician shift"
+  ],
+  "decision": "Chosen option: Option B \u2014 opening-hours validation only, because it removes the visibly absurd"
+ },
+ "0002-service-advisor-actor-no-authentication.md": {
+  "options": [
+   "Option A \u2014 Service advisor, no authentication",
+   "Option A \u2014 Service advisor, no authentication. The caller is trusted. customerid travels i",
+   "Option B \u2014 Customer self-service with authenticated identity",
+   "Option B \u2014 Customer self-service with authenticated identity. Identity arrives with the re",
+   "Option C \u2014 Service advisor with an API key or token on the boundary",
+   "Option C \u2014 Service advisor, with a shared API key or token on the boundary. Authentication"
+  ],
+  "decision": "Chosen option: Option A \u2014 service advisor, no authentication, because the actor the brief's"
+ },
+ "0003-cancellation-and-rescheduling-in-scope.md": {
+  "options": [
+   "Option A \u2014 Neither in scope",
+   "Option A \u2014 Neither in scope. Booking only. The WHERE (status <> 'cancelled') clause stays ",
+   "Option B \u2014 Cancellation only, rescheduling deferred",
+   "Option B \u2014 Cancellation only; rescheduling deferred to a backlog slice.",
+   "Option C \u2014 Both in scope, move as one atomic UPDATE",
+   "Option C \u2014 Cancellation and rescheduling, the move being a single atomic UPDATE on the exi",
+   "Option D \u2014 Both in scope, move as cancel-then-insert",
+   "Option D \u2014 Cancellation and rescheduling, the move being implemented as a compensating pai"
+  ],
+  "decision": "Chosen option: Option C \u2014 both in scope; a move is one atomic UPDATE."
+ },
+ "0004-retry-across-remaining-candidates.md": {
+  "options": [
+   "Option A \u2014 Refuse immediately",
+   "Option A \u2014 Refuse immediately. The first 23P01 becomes a 409. One attempt per request.",
+   "Option B \u2014 Retry across the remaining candidates from the single advisory read, then refus",
+   "Option B \u2014 Retry across the remaining candidates, then refuse",
+   "Option C \u2014 Retry with a fresh candidate read after each failure. On 23P01, re-query",
+   "Option C \u2014 Retry with a fresh candidate read each time",
+   "Option D \u2014 Serialise bookings per dealership",
+   "Option D \u2014 Serialise bookings per dealership. Take a per-dealership advisory lock (or run "
+  ],
+  "decision": "Chosen option: Option B \u2014 on 23P01, attempt the next candidate; refuse only when the candidate"
+ },
+ "0005-fastify-with-typebox-schemas.md": {
+  "options": [
+   "Option A \u2014 Fastify + TypeBox",
+   "Option A \u2014 Fastify, with TypeBox schemas on every route and @fastify/swagger emitting the",
+   "Option B \u2014 Express (5.x) with a validation middleware (zod/ajv) and a separately authored",
+   "Option B \u2014 Express + validation middleware",
+   "Option C \u2014 Hono + @hono/zod-openapi",
+   "Option C \u2014 Hono with @hono/zod-openapi.",
+   "Option D \u2014 NestJS",
+   "Option D \u2014 NestJS with @nestjs/swagger decorators.",
+   "Option E \u2014 node:http directly",
+   "Option E \u2014 node:http directly, hand-rolled routing and validation."
+  ],
+  "decision": "Chosen option: Option A \u2014 Fastify with TypeBox route schemas."
+ },
+ "0006-kysely-as-typed-sql-builder.md": {
+  "options": [
+   "Option A \u2014 pg (node-postgres) alone, with hand-written SQL strings and hand-written row ty",
+   "Option A \u2014 pg alone, hand-written SQL",
+   "Option B \u2014 Kysely",
+   "Option B \u2014 Kysely over the pg driver: a typed query builder that compiles to SQL, with an",
+   "Option C \u2014 Prisma",
+   "Option C \u2014 Prisma.",
+   "Option D \u2014 Drizzle ORM",
+   "Option D \u2014 Drizzle ORM.",
+   "Option E \u2014 TypeORM or Sequelize",
+   "Option E \u2014 TypeORM or Sequelize (a classic data-mapper/active-record ORM)."
+  ],
+  "decision": "Chosen option: Option B \u2014 Kysely as a typed SQL builder over pg, with no ORM anywhere in the"
+ },
+ "0007-node-pg-migrate-with-sql-files.md": {
+  "options": [
+   "Option A \u2014 node-pg-migrate with .sql files",
+   "Option A \u2014 node-pg-migrate, with migrations authored as plain .sql files.",
+   "Option B \u2014 node-pg-migrate with its JavaScript DSL",
+   "Option B \u2014 node-pg-migrate, with migrations authored in its JavaScript DSL (pgm.createTabl",
+   "Option C \u2014 a hand-rolled runner",
+   "Option C \u2014 a hand-rolled runner: numbered .sql files and a schemamigrations table, applied",
+   "Option D \u2014 dbmate",
+   "Option D \u2014 dbmate: up/down in one .sql file, applied by a single Go binary.",
+   "Option E \u2014 Umzug with a PostgreSQL storage adapter and raw-SQL migration bodies.",
+   "Option E \u2014 Umzug with raw SQL",
+   "Option F \u2014 the query layer's own migrator",
+   "Option F \u2014 the query layer's own migrator (kysely migrator, drizzle-kit, prisma migrate)."
+  ],
+  "decision": "Chosen option: Option A \u2014 node-pg-migrate executing plain .sql migration files."
+ },
+ "0008-module-decomposition.md": {
+  "options": [
+   "Option A \u2014 technical layering (routes/services/repositories/models)",
+   "Option A \u2014 technical layering: routes/, services/, repositories/, models/.",
+   "Option B \u2014 hexagonal / ports and adapters: a persistence-ignorant domain owning a",
+   "Option B \u2014 hexagonal, with repository ports",
+   "Option C \u2014 vertical feature slices",
+   "Option C \u2014 vertical feature slices: features/booking/, features/reschedule/,",
+   "Option D \u2014 layered modules around a dependency-free policy core, with the layer boundaries",
+   "Option D \u2014 layered modules around a pure core",
+   "Option E \u2014 no decomposition",
+   "Option E \u2014 no decomposition: one src/ of cohesive files, layering by convention."
+  ],
+  "decision": "Chosen option: Option D. Five modules, one permitted dependency direction, and a core that is"
+ },
+ "0009-candidate-ordering-and-attempt-cap.md": {
+  "options": [
+   "Bound-1 \u2014 attempt pairs one at a time, prune only the pair that failed. Worst case",
+   "Bound-2 \u2014 prune by the constraint that fired: a nobayoverlap violation eliminates that bay",
+   "Order-A \u2014 deterministic by id. Stable, reproducible, identical across concurrent requests.",
+   "Order-B \u2014 uniform random shuffle, freshly randomised per request.",
+   "Order-C \u2014 seeded shuffle: a deterministic permutation from a per-request seed, with the se",
+   "Order-D \u2014 load-balancing: order by fewest appointments that day, so work spreads across"
+  ],
+  "decision": ""
+ },
+ "0010-github-actions-and-check-run-collection.md": {
+  "options": [
+   "Option A \u2014 GitHub Actions on GitHub-hosted ubuntu-latest runners.",
+   "Option A \u2014 GitHub Actions, GitHub-hosted runners",
+   "Option B \u2014 GitHub Actions on a self-hosted runner (the human's machine, or a VM).",
+   "Option B \u2014 GitHub Actions, self-hosted runner",
+   "Option C \u2014 CircleCI",
+   "Option C \u2014 CircleCI, connected to the same GitHub repository.",
+   "Option D \u2014 GitLab CI",
+   "Option D \u2014 GitLab CI, with the repository mirrored or moved.",
+   "Option E \u2014 no CI; every check run locally before merge. The status quo.",
+   "Option E \u2014 no CI; run everything locally"
+  ],
+  "decision": "Chosen option: Option A \u2014 GitHub Actions on GitHub-hosted ubuntu-latest runners, because"
+ },
+ "0011-health-is-an-operational-probe.md": {
+  "options": [
+   "Option A \u2014 an operational probe, outside the contract",
+   "Option A \u2014 an operational probe, outside the contract. Plain JSON body on both 200 and 503",
+   "Option B \u2014 a sixth operation, inside the contract",
+   "Option B \u2014 a sixth operation, inside the contract. 503 rendered as application/problem+jso",
+   "Option C \u2014 split /health (liveness) and /ready (readiness)",
+   "Option C \u2014 split: /health (liveness, no dependencies) and /ready (readiness, checks the",
+   "Option D \u2014 no endpoint; connectivity is observed from logs and metrics only.",
+   "Option D \u2014 no endpoint; observe connectivity from logs and metrics"
+  ],
+  "decision": "Chosen option: Option A \u2014 /health is an operational probe outside the API contract."
+ },
+ "0012-seed-fixtures-are-a-test-owned-loader.md": {
+  "options": [
+   "Option A \u2014 a fourth migration, 0004seed.sql",
+   "Option A \u2014 a fourth migration, 0004seed.sql. Reference rows arrive with the schema, applie",
+   "Option B \u2014 a loader module under src/persistence/seed/",
+   "Option B \u2014 a loader module under src/persistence/seed/, exported and called by the test",
+   "Option C \u2014 a .sql fixture under src/, executed by path",
+   "Option C \u2014 a checked-in .sql fixture under src/, executed by path from the test, the way",
+   "Option D \u2014 a loader in tests/support/seed.ts",
+   "Option D \u2014 a loader in tests/support/seed.ts, owned by the test-engineer, issuing raw SQL",
+   "Option E \u2014 Option D for the suite, plus a separate src/persistence/seed/ dataset and",
+   "Option E \u2014 Option D plus the demo dataset, both now"
+  ],
+  "decision": "Chosen option: Option D, with Option E's second half deferred \u2014 the suite's fixtures are a"
+ },
+ "0013-outside-in-tests-exercise-the-built-artifact.md": {
+  "options": [
+   "Option A \u2014 Widen outside-in-tests-do-not-import-src to allow tests/property/ \u2192 src/domain/",
+   "Option A \u2014 widen the ruleset",
+   "Option B \u2014 Computed dynamic import of src/domain/.ts, so tsc cannot resolve the specifier",
+   "Option B \u2014 computed dynamic import of src/",
+   "Option C \u2014 Load the built artifact dist/domain/.js through a computed dynamic import, guar",
+   "Option C \u2014 load the built artifact",
+   "Option D \u2014 Move the test to tests/unit/, the implementer's directory, and drop QS-9's",
+   "Option D \u2014 move it to tests/unit/",
+   "Option E \u2014 Defer QS-9 to an HTTP-level property at the slice that adds the booking route.",
+   "Option E \u2014 defer QS-9 to an HTTP-level property"
+  ],
+  "decision": "Chosen option: C \u2014 outside-in tests reach a pure module through the built artifact \u2014 together with"
+ },
+ "0014-an-instant-is-renderable-by-construction.md": {
+  "options": [
+   "Option A \u2014 bound in instant() only",
+   "Option A \u2014 bound it in instant() only.",
+   "Option B \u2014 bound in withinOpeningHours step 1 only",
+   "Option B \u2014 bound it in withinOpeningHours step 1 only.",
+   "Option C \u2014 both",
+   "Option C \u2014 bound it in instant() AND in withinOpeningHours step 1.",
+   "Option D \u2014 bound in the HTTP request parser only",
+   "Option D \u2014 bound it in the HTTP request parser only.",
+   "Option E \u2014 catch the RangeError and return malformed-interval",
+   "Option E \u2014 catch the RangeError inside withinOpeningHours and return malformed-interval.",
+   "Option F \u2014 do nothing; document the range as a precondition",
+   "Option F \u2014 do nothing; document the range as a precondition."
+  ],
+  "decision": "Chosen option: C \u2014 the bound is applied in both places, instant() primarily and"
+ },
+ "0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md": {
+  "options": [
+   "Option A \u2014 normalise the endpoint: an end rendering as 00:00:00 on the local day immediate",
+   "Option A \u2014 normalise the exclusive endpoint to 86400 on the start's day",
+   "Option B \u2014 compare endsAtMillis - 1, the last instant actually occupied",
+   "Option B \u2014 compare the last instant of the interval (endsAtMillis - 1) instead of endsAt.",
+   "Option C \u2014 delete the '24:00:00' parser arm",
+   "Option C \u2014 delete the '24:00:00' parser arm and reject the value.",
+   "Option D \u2014 leave it; document spans-local-days as covering this",
+   "Option D \u2014 leave the behaviour; document spans-local-days as covering midnight-ending jobs",
+   "Option E \u2014 allow the date to differ whenever the end renders as 00:00:00, and skip the",
+   "Option E \u2014 skip the seconds comparison for an endpoint rendering 00:00:00"
+  ],
+  "decision": "Chosen option: A \u2014 an end rendering as 00:00:00 on the local day immediately following the start's"
+ }
+}

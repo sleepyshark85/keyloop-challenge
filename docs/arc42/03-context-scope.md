@@ -7,9 +7,8 @@ this section is the text it will illustrate.*
 
 ## 3.1 Business context
 
-The system sits alone. It has human actors and one persistent store, and **no neighbouring systems** —
-that is the single most consequential fact about the context, and §3.1.2 justifies it rather than
-leaving it as an omission.
+The system sits alone: human actors, one persistent store, and **no neighbouring systems** — the single
+most consequential fact about the context, justified in §3.1.2 rather than left as an omission.
 
 ### 3.1.1 Actors
 
@@ -27,14 +26,13 @@ leaving it as an omission.
 
 The scenario is titled *"The Unified Service Scheduler"*, which reads as though it might federate
 existing booking systems. The task text does not support that: *"Build an Appointment Scheduler
-application to replace manual booking systems."* The thing being replaced is a **manual** process — a
+application to replace manual booking systems."* What is being replaced is a **manual** process — a
 paper diary, a whiteboard, a phone call — so "unified" is read as *one scheduler across a dealership
-group* (A-9), not *one view over several schedulers*. Scenario D is the integration scenario; this is
-not it.
+group* (A-9), not *one view over several schedulers*. Scenario D is the integration scenario.
 
-A production deployment would still have neighbours — a DMS owning customers and vehicles, an
-identity provider, a notification service, a parts system. Every one of them is excluded in §3.3 and
-carried in §11 rather than quietly ignored, because "no integrations" is a decision with a shelf life.
+A production deployment would still have neighbours — a DMS owning customers and vehicles, an identity
+provider, a notification service, a parts system. Each is excluded in §3.3 and carried in §11 rather
+than quietly ignored, because "no integrations" is a decision with a shelf life.
 
 ## 3.2 Technical context
 
@@ -47,9 +45,8 @@ The same boundaries as protocols and formats. There are three.
 | **Scheduler → PostgreSQL** | outbound | PostgreSQL wire protocol over TCP, pooled. `timestamptz` columns; `tstzrange` in the exclusion constraint; the `btree_gist` extension (TC-3) | Not a generic persistence port. The correctness of the system lives on this boundary, which is why §2.1 forbids substituting it in tests |
 | **Scheduler → telemetry collector** | outbound | **OTLP** traces and metrics to a local `grafana/otel-lgtm` container; `pino` JSON log lines on stdout, correlated by trace id | Availability check and insert are separate spans by design, so the window that check-then-act would have raced in is visible in a waterfall even though the code never relies on it |
 
-Transport security, gateways, load balancers and TLS termination are absent: the deployment is a
-single local container (§7 will say so and say why). Adding them is a deployment concern that does
-not move any boundary in this table.
+Transport security, gateways, load balancers and TLS termination are absent: the deployment is a single
+local container (§7). Adding them moves no boundary in this table.
 
 ## 3.3 Out of scope
 
@@ -113,6 +110,5 @@ validated (ADR-0001). Their absence from the exclusions below is deliberate, not
 - GDPR-grade PII handling, retention policies, and data subject requests. Personal data is limited to
   a customer name and a vehicle identifier. **†**
 
-A reader who disagrees with any line above is disagreeing about scope, not about architecture. Gate A
-is closed, so that disagreement is now resolved by superseding the ADR that decided it — which is the
-point of keeping the ADRs immutable.
+A reader who disagrees with any line above is disagreeing about scope, not architecture. Gate A is
+closed, so that disagreement is resolved by superseding the ADR that decided it.

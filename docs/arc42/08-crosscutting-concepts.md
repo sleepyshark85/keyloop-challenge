@@ -22,13 +22,11 @@ writes, and `opening_hours` is the only one that exists because of a Gate A ruli
 **The brief's requirement 2 has two halves, and neither is left to application care.** *"A qualified
 Technician"* is enforced by a composite foreign key from `appointment (technician_id,
 service_type_id)` to `technician_qualification`; *"available… for the entire service duration"* is
-enforced by the exclusion constraint in §8.2. An appointment naming an unqualified technician is as
-unstorable as one that double-books a bay.
-
-The same trick carries A-9 and A-6. Composite foreign keys make *"a bay and a technician belong to
-the appointment's dealership"* and *"the vehicle belongs to the named customer"* structural rather
-than procedural — so booking stays the **single `INSERT`** A-6's rationale depends on, with no
-validating pre-reads to go stale.
+enforced by §8.2's exclusion constraint. An appointment naming an unqualified technician is as
+unstorable as one that double-books a bay. The same trick carries A-9 and A-6: composite foreign keys
+make *"a bay and a technician belong to the appointment's dealership"* and *"the vehicle belongs to the
+named customer"* structural rather than procedural, so booking stays the **single `INSERT`** A-6's
+rationale depends on, with no validating pre-reads to go stale.
 
 ### The schema
 
@@ -126,55 +124,36 @@ CREATE TABLE appointment (
 );
 ```
 
-### As built at slice 00
-
-The schema above **is** what merged, statement for statement, across `0001_extensions.sql`,
-`0002_reference_data.sql` and `0003_appointment.sql` (ADR-0007). It had never been executed when it
-was written at Gate B; it applies clean to an empty `postgres:16`, and `pgmigrations` recording those
-three names is asserted by the suite. Ten acceptance criteria hold it — AC-10 was **added by the human
-at the gate** on 2026-09-04 and is discussed under §8.2 consequence 4.
-
-Five things a reader of the schema above will wonder about, settled rather than left to inference:
+The schema above is what runs, statement for statement, across `0001_extensions.sql`,
+`0002_reference_data.sql` and `0003_appointment.sql` (ADR-0007). Five things a reader will wonder
+about, settled rather than left to inference:
 
 - **Three columns carry no foreign key of their own, and that is complete rather than missing.**
-  `dealership_id`, `service_type_id` and `customer_id` are each covered *transitively*: an unknown
-  dealership fails `appointment_bay_in_dealership`, an unknown service type fails
-  `appointment_technician_qualified`, an unknown customer fails
-  `appointment_vehicle_owned_by_customer`. Adding the singletons as well would be redundant **and
-  harmful**: with two constraints violable at once, which one PostgreSQL reports is trigger order, and
-  §8.6 maps `422 /problems/unknown-reference` *by constraint name*. That absence is now asserted — the
-  set of non-primary-key constraints on `appointment` is exactly seven.
+  `dealership_id`, `service_type_id` and `customer_id` are covered *transitively* by the three
+  composite keys. Adding the singletons would be redundant **and harmful**: with two constraints
+  violable at once, which one PostgreSQL reports is trigger order, and §8.6 maps
+  `422 /problems/unknown-reference` *by constraint name*. The absence is asserted — the set of
+  non-primary-key constraints on `appointment` is exactly seven.
 - **Three of the four composite keys are unreachable from the API.** Under A-10 the *system* allocates
-  the bay and the technician, so `appointment_bay_in_dealership`,
-  `appointment_technician_in_dealership` and `appointment_technician_qualified` can only be violated
-  by a bug in the allocator — defence in depth, and correctly absent from §8.6's taxonomy, where such
-  a violation is a `500`. Only `appointment_vehicle_owned_by_customer` is client-reachable. **This is
-  therefore the only slice in which those three can be shown to fire at all**, which is why they were
-  tested here and not deferred.
-- **`appointment.id` has no default.** No `gen_random_uuid()`, so no `pgcrypto` and no `uuid-ossp`;
-  `btree_gist` stays the only extension the deployment requires (§7.1). The writer supplies the id,
-  consistent with A-10.
-- **`updated_at` has `DEFAULT now()` and no trigger.** Nothing maintains it. ADR-0003's move is an
-  `UPDATE`, so unless that statement sets it explicitly the column will be wrong from slice 06 onward.
-  Deliberate — the database holds the *invariant*, the application holds the convenience — and carried
-  as debt in §11.2 R-10.
-- **Nothing cascades.** No `ON DELETE` clause anywhere, correctly, because nothing in this system
-  deletes: cancellation is a status transition (ADR-0003). The down migrations drop child-first for
-  the same reason — a `CASCADE` would drop whatever a wrong order got wrong instead of failing on it.
+  the bay and the technician, so those three can only be violated by a bug in the allocator — defence
+  in depth, and correctly absent from §8.6's taxonomy, where such a violation is a `500`. Only
+  `appointment_vehicle_owned_by_customer` is client-reachable.
+- **`appointment.id` has no default**, so no `pgcrypto` and no `uuid-ossp`: `btree_gist` stays the only
+  extension the deployment requires (§7.1). The writer supplies the id, consistent with A-10.
+- **`updated_at` has `DEFAULT now()` and no trigger.** Nothing maintains it, deliberately — the
+  database holds the *invariant*, the application holds the convenience — so ADR-0003's `UPDATE` must
+  set it explicitly. Carried as debt in §11.2 R-10.
+- **Nothing cascades.** No `ON DELETE` clause anywhere, because nothing in this system deletes:
+  cancellation is a status transition (ADR-0003). The down migrations drop child-first for the same
+  reason — a `CASCADE` would drop whatever a wrong order got wrong instead of failing on it.
 
-**Four reference-table constraints are specified here and asserted by nothing (R00-5).**
-`opening_hours`'s `day_of_week BETWEEN 0 AND 6` and `closes_at > opens_at`, `service_type`'s
-`duration_minutes > 0`, and `vehicle.vin`'s `UNIQUE`. All four were measured to exist and to fire, and
-all four can be dropped with the entire suite green. Every *other* reference-table constraint is
-structurally self-enforcing — the `UNIQUE (id, dealership_id)` pairs and the qualification primary key
-are foreign-key targets, so dropping one fails `0003`. These four have no such backstop, and
-**slice 01's opening-hours and duration code will assume two of them hold.** Carried in §11.2 R-11.
+Four reference-table constraints are specified above and asserted by nothing; §11.2 R-11a carries
+them, and which two slice 01's code assumes.
 
 ## 8.2 Persistence and the exclusion constraint
 
 Requirement 2's second half, and the reason this system exists. Reproduced from `CLAUDE.md` §2.1
-**verbatim**, because paraphrasing the one thing that must be exactly right is how it stops being
-exactly right:
+**verbatim**, because paraphrasing the one thing that must be exactly right is how it stops being so:
 
 ```sql
 ALTER TABLE appointment ADD CONSTRAINT no_bay_overlap
@@ -188,60 +167,38 @@ ALTER TABLE appointment ADD CONSTRAINT no_technician_overlap
 
 Six consequences, each of which something elsewhere in this document depends on:
 
-1. **`tstzrange` is half-open, `[starts_at, ends_at)`.** 09:00–10:00 and 10:00–11:00 do **not**
-   overlap, so back-to-back appointments in one bay are legal. That *is* A-4 — no setup or cleanup
-   buffer — expressed in a bound rather than in prose.
+1. **`tstzrange` is half-open, `[starts_at, ends_at)`**, so 09:00–10:00 and 10:00–11:00 do not overlap
+   and back-to-back appointments in one bay are legal. That *is* A-4 — no buffer — expressed in a
+   bound rather than in prose.
 2. **The predicate makes the index partial.** Cancelling removes a row from the constraint's scope
    without deleting it, so the slot frees itself through the same mechanism that guards every write
-   (§6.4). No compensating release exists to be forgotten.
-3. **The constraint's names are behaviour, not documentation.** `err.constraint` is what
-   ADR-0009 prunes on and what labels `booking_conflicts_total{resource}`. Renaming
-   `no_bay_overlap` silently degrades the retry loop and mislabels the metric; QS-1 and QS-2 pin the
-   names.
+   (§6.4), and no compensating release exists to be forgotten.
+3. **The constraint's names are behaviour, not documentation.** `err.constraint` is what ADR-0009
+   prunes on and what labels `booking_conflicts_total{resource}`; QS-1 and QS-2 pin the names, and
+   §11.2 R-3 carries the coupling.
 4. **An `UPDATE` is checked against other rows, not against the version it replaces — and it is the
-   *index* that never sees the superseded version, not a rule anyone wrote.** This is what makes
-   ADR-0003's atomic move work at all, and what lets an appointment be extended or nudged onto an
-   interval overlapping its own. **Asserted by AC-10** at slice 00, at the SQL level, before any
-   application code existed.
+   *index* that never sees the superseded version, not a rule anyone wrote.** That is what makes
+   ADR-0003's atomic move work, and what lets an appointment be extended or nudged onto an interval
+   overlapping its own. Asserted by AC-10, at the SQL level.
 
-   **The mechanism is the load-bearing part, and stating only the outcome was a defect in this
-   section.** The sentence above used to end at *"the version it replaces"*, and the test-engineer
-   showed at slice 00 step 5 that an outcome-worded consequence is satisfiable two ways with
-   completely different concurrency behaviour:
+   **The mechanism is the load-bearing half, because the outcome alone is satisfiable two ways with
+   completely different concurrency behaviour.** `EXCLUDE USING gist` gets it **structurally**: an
+   `UPDATE` writes a new tuple, marks the old one dead, and the index compares the new tuple only
+   against *live* entries. A `BEFORE UPDATE` trigger computing overlap gets it **by memory**: it reads
+   other rows, so it *does* see the prior version, and is correct only if whoever wrote it remembered
+   `WHERE o.id <> NEW.id` — check-then-act with the check moved inside the database, two concurrent
+   triggers under `READ COMMITTED` both reading *"free"*. Measured: the naive trigger fails AC-10's
+   self-overlap step and **the patched one passes all three steps**. So what ADR-0003 rests on is not
+   *"a row does not conflict with its own prior version"* but *"the mechanism cannot be made to
+   conflict with it, because it never sees it"*.
 
-   | | How it gets the property | What it costs |
-   |---|---|---|
-   | **`EXCLUDE USING gist`** (what §2.1 mandates) | **Structurally.** An `UPDATE` writes a new tuple and marks the old one dead; the index insertion compares the new tuple against *live* index entries, and the superseded version is not one. Nobody had to think of it, and nobody can forget it | Nothing. It is a property of MVCC and of index-enforced exclusion |
-   | **A `BEFORE UPDATE` trigger** computing overlap | **By memory.** It reads other rows, so it *does* see the row's own prior version, and it is correct only if whoever wrote it remembered `WHERE o.id <> NEW.id` | Everything. A trigger is check-then-act with the check moved inside the database: two concurrent triggers under `READ COMMITTED` both read *"free"* |
-
-   **This was measured, not argued.** The test-engineer mutant-checked AC-10 against exactly the
-   check-then-act trigger `CLAUDE.md` §2.1 forbids: the naive form fails AC-10's self-overlap step,
-   and **the patched form — one `o.id <> NEW.id` predicate — passes all three steps.** So a future
-   slice could satisfy this consequence, pass AC-10, and have lost the concurrency guarantee
-   entirely, which is the substitution §2.1 forbids on the `INSERT` path arriving by the `UPDATE`
-   path instead.
-
-   **So the consequence ADR-0003 rests on is not *"a row does not conflict with its own prior
-   version"*. It is *"the mechanism cannot be made to conflict with it, because it never sees
-   it."*** A single-threaded test can only ever establish the first. The second is what makes
-   `CLAUDE.md` §2.1's ban on check-then-act cover rescheduling as well as booking, and it is why
-   ADR-0003 could prohibit delete-then-insert without also having to prohibit a trigger — it did not
-   anticipate that a trigger satisfying the outcome would be available.
-
-   > **Inherited obligation for slice 06 (reschedule).** AC-10 fixes the **single-threaded** `UPDATE`
-   > semantics, and deliberately nothing more. ADR-0003 claims that *"two racing reschedules onto the
-   > same slot behave exactly like two racing bookings: one commits, the other gets `23P01`"* — and
-   > **no scenario and no test asserts that.** QS-4 and QS-5 assert what a *refused* move leaves
-   > behind; QS-6 asserts the self-overlap AC-10 now covers. The mirror of QS-1 on the `UPDATE` path —
-   > *N* simultaneous moves onto one slot, exactly one committing — is named by nothing.
-   >
-   > The patched trigger is the proof that this gap is real rather than theoretical: it passes
-   > everything slice 00 asserts and fails only under simultaneity, which is the one condition
-   > nothing yet applies to an `UPDATE`. **Slice 06 owes a concurrency test for racing moves**, and it
-   > is written here rather than left for slice 06 to notice because the last obligation left to be
-   > noticed was AC-10 itself — named in §8.5 beside cancellation-frees-the-slot, deferred by this
-   > section to a QS-6 with no slice, and carried by none of the three until the human added it at a
-   > gate.
+   > **Inherited obligation for slice 06.** AC-10 fixes the **single-threaded** `UPDATE` semantics and
+   > nothing more. ADR-0003 claims that *"two racing reschedules onto the same slot behave exactly like
+   > two racing bookings: one commits, the other gets `23P01`"* — and **no scenario and no test asserts
+   > that.** QS-4 and QS-5 assert what a *refused* move leaves behind, QS-6 the self-overlap; the
+   > mirror of QS-1 on the `UPDATE` path is named by nothing. The patched trigger proves the gap is
+   > real: it passes everything slice 00 asserts and fails only under simultaneity. **Slice 06 owes a
+   > concurrency test for racing moves.**
 5. **`btree_gist` is required** (TC-3), because `bay_id WITH =` is an equality operator on a `uuid`
    and plain GiST cannot index it. This is the extension dependency that constrains deployment.
 6. **The GiST indexes serve the availability query too.** Its `tstzrange(...) && ...` predicate over
@@ -249,9 +206,8 @@ Six consequences, each of which something elsewhere in this document depends on:
    throughput (§11.2) pays for the read path.
 
 **The one thing this does not give for free** is agreement between the constraint's range expression
-and the availability query's. They are two expressions in two files. §4.2 records why a shared
-`IMMUTABLE` SQL function is a trap — redefining one that a GiST index depends on does not rebuild the
-index, it silently corrupts it — so the agreement is held by QS-8, a property test, instead.
+and the availability query's: two expressions in two files, held together by QS-8 rather than by a
+shared `IMMUTABLE` SQL function, which §4.2 records as a trap.
 
 ## 8.3 Time, zones and the calendar
 
@@ -270,33 +226,29 @@ by validating opening hours, which are stated in wall-clock time. The two coexis
 | Duration | **Absolute minutes**, added to the start instant |
 
 **The conversion runs one way only: instant → local wall clock**, via
-`Intl.DateTimeFormat(…, { timeZone }).formatToParts()` in `src/domain/openingHours.ts`. That
-direction is chosen because it is *total and unambiguous*, and the other is neither: at a
-spring-forward, local 01:30 does not exist; at a fall-back, local 01:30 happens twice. Every instant,
-by contrast, has exactly one rendering in a zone. A rule that converts the other way has to answer
-questions with no answer; this one never encounters them.
+`Intl.DateTimeFormat(…, { timeZone }).formatToParts()` in `src/domain/openingHours.ts`. That direction
+is *total and unambiguous*, and the other is neither: at a spring-forward, local 01:30 does not exist;
+at a fall-back it happens twice. Every instant has exactly one rendering in a zone, so this rule never
+encounters a question with no answer.
 
-Two consequences worth stating because they look like bugs and are not:
+Two consequences that look like bugs and are not:
 
 - **Duration is added in absolute time.** A 60-minute job starting at 00:30 local on a spring-forward
-  night ends at 02:30 local, not 01:30. The car is on the ramp for sixty real minutes; wall clocks
-  are not what occupies a bay.
+  night ends at 02:30 local, not 01:30. The car is on the ramp for sixty real minutes; wall clocks are
+  not what occupies a bay.
 - **The bookable window shifts by an hour, in absolute terms, twice a year.** A dealership open
-  09:00–17:00 local is a different pair of instants in summer and winter. That is the correct
-  behaviour and it is the reason QS-9 exists — the check is the only wall-clock reasoning in the
-  system, and zone bugs are notoriously easy to write and hard to see.
+  09:00–17:00 local is a different pair of instants in summer and winter. That is the reason QS-9
+  exists — this check is the only wall-clock reasoning in the system.
 
-Both `starts_at` and `ends_at` must fall within one day's opening hours (ADR-0001: *"a job that
-starts twenty minutes before closing and runs an hour past it is rejected"*). An interval whose local
-start and end fall on different days is therefore rejected too — no weekly schedule can contain it.
-Holidays, one-off closures and mid-day breaks are not modelled (§3.3), and land in this module when
-they are.
+Both `starts_at` and `ends_at` must fall within one day's opening hours (ADR-0001), so an interval
+whose local start and end fall on different days is rejected too: no weekly schedule can contain it.
+Holidays, one-off closures and mid-day breaks are not modelled (§3.3) and land in this module when they
+are.
 
-### As built at slice 01 — the decision procedure, and the numbers behind it
+### The decision procedure
 
-**The order of the checks is part of the design, not an implementation detail.** `withinOpeningHours`
-runs six steps in a fixed order, and the order is asserted, because a mutant that reorders them is
-otherwise unkillable:
+**The order of the checks is part of the design.** `withinOpeningHours` runs six steps in a fixed
+order, and the order is asserted, because a mutant that reorders them is otherwise unkillable:
 
 | # | Step | Verdict if it fails |
 |---|---|---|
@@ -307,17 +259,16 @@ otherwise unkillable:
 | 5 | that local weekday has an `opening_hours` row | `closed-day` |
 | 6 | the row's `time` values parse, and `opens ≤ start` and `end ≤ closes` | `malformed-hours` / `outside-window` |
 
-Step 1 exists **only** because the literal AC-6 ruling took the `Interval` type out of this module's
-reach; the type used to make an unordered or non-finite pair unrepresentable (§5.2, and §11 D-01-3).
-Every step fails closed: a booking gate that cannot read its own configuration refuses rather than
-guesses.
+Step 1 exists **only** because the literal AC-6 ruling took the `Interval` type — which made an
+unordered or non-finite pair unrepresentable — out of this module's reach (§5.2, §11 D-01-3). Every
+step fails closed: a booking gate that cannot read its own configuration refuses rather than guesses.
 
-**Two rendering options are pinned, and both are correctness choices rather than style.** The locale
-is `'en-US'`, never `undefined` — a pure function must not vary with the host's default locale — and
-the hour is `hourCycle: 'h23'` rather than `hour12: false`, which has historically rendered midnight
-as `24`. The weekday comes from the formatter's `weekday: 'short'` part through an explicit
-seven-entry lookup, never hand-rolled calendar arithmetic: a second calendar implementation inside the
-one module that must not be subtly wrong is the risk this design exists to avoid.
+**Two rendering options are pinned as correctness choices rather than style**: the locale is `'en-US'`,
+never `undefined`, because a pure function must not vary with the host's default locale; and the hour is
+`hourCycle: 'h23'` rather than `hour12: false`, which has historically rendered midnight as `24`. The
+weekday comes from the formatter's `weekday: 'short'` part through an explicit seven-entry lookup, never
+hand-rolled calendar arithmetic — a second calendar implementation inside this module is exactly the
+risk the design avoids.
 
 **The transitions, measured on this runtime rather than reasoned about** (Node 24, full ICU,
 `Europe/London` open 09:00–17:00 local). Spring forward is `2026-03-29T01:00:00Z`; fall back is
@@ -332,33 +283,27 @@ one module that must not be subtly wrong is the risk this design exists to avoid
 | `2026-10-25T01:30:00Z` | `Sun 25/10 01:30` (GMT) | same verdict as the row above |
 
 The first pair is AC-2's worked pair: the same UTC wall time, the same window, opposite verdicts. The
-last pair is the fall-back ambiguous hour — **two distinct instants render identically and the rule
-gives them the same verdict, and that is the correct answer**, not something to engineer around. The
-doors are either open at 01:30 local or they are not, and they are in the same state both times round.
-The ambiguity that makes fall back hard belongs to *local → instant*, and this rule never performs
-that conversion. The property test asserts the equality explicitly (QS-9, P5), because a silent green
-over the case a reviewer will look for proves nothing.
+last is the fall-back ambiguous hour — **two distinct instants render identically and the rule gives
+them the same verdict, which is the correct answer**, because the doors are in the same state both
+times round. The ambiguity that makes fall back hard belongs to *local → instant*, which this rule
+never performs. QS-9 asserts that equality explicitly. A related consequence that reads like a bug and
+is not: on 25 October a dealership open 00:00–06:00 local is open for **seven** absolute hours and on
+29 March for **five**, which the rule produces without knowing it, because it never counts hours.
 
-**A consequence that reads like a bug and is not:** on 25 October a dealership open 00:00–06:00 local
-is open for **seven** absolute hours, and on 29 March for **five**. The rule produces that without
-knowing it, because it never counts hours.
-
-**One case the as-built rule gets wrong, recorded here rather than in a commit message.** An interval
-ending exactly at local midnight is rejected as `spans-local-days` — its end renders on the next local
-date. A job finishing at closing time on a dealership open until 00:00 is therefore refused. The time
-parser accepts `'24:00:00'` and normalises it to 86 400 seconds-of-day precisely to describe such a
-window, so the two halves disagree and the `'24:00:00'` arm is currently unreachable. **[ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) settles it
-and was accepted on 2026-09-05**: an interval ending at local midnight ends on the day it started, so
-an end rendering as `00:00:00` on the local date immediately following the start's is normalised to
-`secondsOfDay = 86400` before step 4's comparison — and a genuine crossing, 23:00 to 01:00, stays
-rejected. The decision is agreed; the code is not yet written. Slice 13 is the agreed remedy, and §11
-carries it under *Agreed and unbuilt* because the generated register cannot.
+**One case the rule as built gets wrong.** An interval ending exactly at local midnight is rejected as
+`spans-local-days`, its end rendering on the next local date, so a job finishing at closing time on a
+dealership open until 00:00 is refused — while the time parser accepts `'24:00:00'` and normalises it
+to 86 400 seconds-of-day precisely to describe such a window, leaving that arm unreachable.
+[ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) settles it: an
+end rendering as `00:00:00` on the local date immediately after the start's is normalised to
+`secondsOfDay = 86400` before step 4's comparison, while a genuine crossing (23:00 to 01:00) stays
+rejected. **Accepted, and not yet written**; §11.1 carries it as agreed and unbuilt.
 
 ## 8.4 Observability
 
-`CLAUDE.md` §3 and TC-8 fix OpenTelemetry with `pino`. §1.2 goal 4 says what for: *the check-then-act
-window is visible in a waterfall even though the code never relies on it*, and the invariant is
-measurable in production rather than only in tests.
+TC-8 fixes OpenTelemetry with `pino`. §1.2 goal 4 says what for: *the check-then-act window is visible
+in a waterfall even though the code never relies on it*, and the invariant is measurable in production
+rather than only in tests.
 
 ### Spans
 
@@ -398,157 +343,91 @@ Telemetry export failures are logged and dropped. A collector outage must not fa
 
 ## 8.5 Testability
 
-`CLAUDE.md` §5 fixes ownership by path. This is what each level is *for*, which is the part the path
-rule does not say.
+`CLAUDE.md` §5 fixes ownership by path; this is what each level is *for*, which the path rule does not
+say.
 
 | Level | Owner | Runs against | What it is for |
 |---|---|---|---|
-| `tests/unit/` | implementer | `src/`, with the database's **driver** stubbed where a container is not needed | A design tool, freely rewritable during refactor. **This is where the Stryker mutation budget is spent** — scoped to `src/**` less `main.ts`, and see *What a unit test may substitute* below, which is narrower than "`src/domain` is the whole unit-testable surface" |
-| `tests/property/` | test-engineer | the **built artifact** under `dist/`, and real PostgreSQL only where the property needs it | `fast-check` over interval arithmetic, candidate ordering, opening hours across DST — and QS-8, which is the only thing holding the availability query and the exclusion constraint in agreement. **Split by database need**, not by subject: see *How an outside-in test reaches a module with no boundary* below |
+| `tests/unit/` | implementer | `src/`, with the database's **driver** stubbed where a container is not needed | A design tool, freely rewritable during refactor. **This is where the Stryker mutation budget is spent**, scoped to `src/**` less `main.ts` |
+| `tests/property/` | test-engineer | the **built artifact** under `dist/`, and real PostgreSQL only where the property needs it | `fast-check` over interval arithmetic, candidate ordering, opening hours across DST — and QS-8, the only thing holding the availability query and the exclusion constraint in agreement. **Split by database need**, not by subject |
 | `tests/integration/` | shared; DB-invariant tests are the test-engineer's | Testcontainers PostgreSQL | Single-threaded persistence behaviour: self-overlapping reschedule, cancellation releasing a slot |
 | `tests/concurrency/` | test-engineer | Testcontainers PostgreSQL, several pooled connections | The invariant. Genuinely simultaneous statements; nothing here is simulatable |
 | `tests/contract/` | test-engineer | the running service | The emitted OpenAPI document, and the error taxonomy of §8.6 |
 | `tests/acceptance/` | test-engineer | the running service | *Done*, expressed as the slice's acceptance criteria over HTTP |
 
-Two structural supports rather than conventions:
-
-- **`outside-in-tests-do-not-import-src`** (§5.3) forbids every test directory the test-engineer owns
-  — as built, `acceptance`, `contract`, `property`, `concurrency`, `architecture`, `performance`,
-  `setup` and `support` — from importing `src/`. The path hook cannot catch this, because the file
-  being written is one the test-engineer legitimately owns; `dependency-cruiser` can. It is OC-5 and
-  METHODOLOGY P4 made structural: tests that define *done* reach the system the way a client does.
-  `setup/` and `support/` were added at 00a to close the indirect route — a `globalSetup` or a spawn
-  helper that imports `src/` and hands it to a test that may not.
-- **Isolation is by data, not by truncation** (§7.2). Each test seeds its own dealership, so the
-  suite parallelises and every test is implicitly asserting A-9's scoping.
+Two structural supports rather than conventions: **`outside-in-tests-do-not-import-src`** (§5.3) makes
+OC-5 structural — tests that define *done* reach the system the way a client does, and the path hook
+cannot catch a violation because the file is one the test-engineer legitimately owns; and **isolation
+is by data, not by truncation** (§7.2), each test seeding its own dealership, so the suite parallelises
+and every test implicitly asserts A-9's scoping.
 
 ### How an outside-in test reaches a module with no boundary
 
-Every level in the table above except `tests/unit/` reaches the system the way a client does, and
-`outside-in-tests-do-not-import-src` enforces it. **`src/domain` has no boundary to reach it through.**
-QS-9 is a property over three pure functions with no HTTP route and no SQL; the rule forbids the
-property test from importing them; and widening the rule does not even work, because a literal dynamic
-`import()` of a module that does not exist yet fails `tsc`, which fails the `verify` job, which makes
-`red-proof` reject the red commit. Two phase-2 artifacts of this design contradicted each other, and
-the contradiction was structural rather than a matter of degree.
+**`src/domain` has no boundary to reach it through**: QS-9 is a property over three pure functions with
+no HTTP route and no SQL.
+[ADR-0013](../adr/0013-outside-in-tests-exercise-the-built-artifact.md) resolves that in three clauses,
+all in force:
 
-**Three clauses resolve it, and all three are built and in force at `f661988`.**
-[ADR-0013](../adr/0013-outside-in-tests-exercise-the-built-artifact.md) was raised by the architect at
-slice 01 step 1, revised twice before ratification, and **accepted on 2026-09-05, after Gate E** — as
-a separate act from the merge, because a merge is not a ratification and slice 01 merged with this
-decision still open. It is immutable from here and can only be superseded.
-
-1. **An outside-in test reaches a pure module through the built artifact.** It loads
-   `dist/domain/*.js` — the output of `npm run build`, which `pretest` guarantees is current — never
-   `src/`. The dependency rule stands unwidened, and the test exercises the thing that ships rather
-   than the thing that compiles. It costs a dynamic `import()` and an `await` in each test file.
-2. **`tests/property/` splits by whether the property needs a database.** A property test that talks
-   to PostgreSQL is named `*.db.test.ts` and runs in the `db` project behind
-   `globalSetup: tests/setup/postgres.ts`; everything else runs in `nodb` with no container. QS-9's
-   `opening-hours-dst.test.ts` needs no database and runs in `nodb` — which also means a Docker
-   failure can no longer turn its red evidence into a `globalSetup` crash instead of an assertion
+1. **An outside-in test reaches a pure module through the built artifact.** It loads `dist/domain/*.js`
+   — the output of `npm run build`, which `pretest` guarantees is current — never `src/`. The
+   dependency rule stands unwidened, and the test exercises the thing that ships rather than the thing
+   that compiles. It costs a dynamic `import()` and an `await` per test file.
+2. **`tests/property/` splits by whether the property needs a database.** A property test that talks to
+   PostgreSQL is named `*.db.test.ts` and runs in the `db` project behind
+   `globalSetup: tests/setup/postgres.ts`; everything else runs in `nodb` with no container, so a
+   Docker failure cannot turn QS-9's red evidence into a `globalSetup` crash instead of an assertion
    failure.
-3. **`npm test` runs the two projects as separate invocations, and a project that did not run is a
-   loud failure.** It is `tools/ci/run-tests.mjs`, not `vitest run`; a missing or empty project report
-   exits `EXIT_DID_NOT_RUN = 2` rather than merging as zero failures. This clause was **not** part of
-   the ADR as first written — it was added after objection T-01-2 was **ruled (c), a design defect,
-   naming `CLAUDE.md` §2.4**. §7.2 carries the measurement and the failure mode.
+3. **`npm test` runs the two projects as separate invocations, and a project that did not run is a loud
+   failure.** It is `tools/ci/run-tests.mjs`, not `vitest run`; a missing or empty project report exits
+   `EXIT_DID_NOT_RUN = 2` rather than merging as zero failures. §7.2 carries the failure mode.
 
-**What the mechanisms do not catch, measured rather than assumed.** The source scan beside the rule
-catches **relative** `../src/` references — the form a test reaches for first — and catches neither
-root-anchored path construction (`join(ROOT, 'src', 'domain', …)`) nor any other computed form;
-`dependency-cruiser` catches no computed form at all. The hole is **narrowed, not closed**, and the
-residue is review. A text scan cannot separate *constructing a path to `src/`* from *importing from
-`src/`*, because at the level it reads the source those are the same characters — widening the pattern
-would false-positive on the scan's own host file, which constructs exactly such a path. §11 carries the
-residue, and this document does not promise a cleverer regex that will not arrive.
+The residue those mechanisms leave — computed paths to `src/`, which no text scan can separate from
+imports — is review, and §11 records it.
 
-### What a unit test may substitute, and where the line actually falls
-
-§5.2 said at Gate B that removing the repository port left `src/domain` as the whole unit-testable
-surface. Slice 00a falsified that: `checkHealth` is a use case in `src/application`, takes a `Db`, and
-is unit-tested with no container at all. The line `CLAUDE.md` §2.2 draws is not the one this section
-first assumed, so it is restated here in the form that is true.
+### What a unit test may substitute, and where the line falls
 
 **A unit test may replace the driver beneath Kysely. It may not replace what the database decides.**
-The stub keeps the production dialect — compiler, adapter, introspector — and swaps only the
-transport, so the SQL a test observes is the SQL PostgreSQL would receive, and a `catch` block that a
-reachable database would never enter becomes reachable. That is how `pingDatabase` is proved not to
-rethrow a driver error, and how a released connection is proved released.
-
-The boundary is the assertion, not the seam:
+The stub keeps the production dialect — compiler, adapter, introspector — and swaps only the transport,
+so the SQL a test observes is the SQL PostgreSQL would receive, and a `catch` block a reachable
+database would never enter becomes reachable. The boundary is the assertion, not the seam:
 
 | The assertion is about | Legitimate substitute | Why |
 |---|---|---|
 | the code *around* the database — an outcome mapping, a `catch`, a released handle, the SQL emitted | driver stub, `tests/unit/` | The database's answer is not the evidence; the code's response to a given answer is |
 | what the database **decides** — a constraint firing, a SQLSTATE, an ordering, an interleaving | **none.** Real PostgreSQL, `tests/integration/` or `tests/concurrency/` | This is `CLAUDE.md` §2.2 verbatim, and §4.1's reason: the invariant lives in the database, so a test that substitutes it tests the substitute's imitation — and the imitation would necessarily be check-then-act |
 
-Stated this way the rule keeps its teeth while being true. "Nothing outside `domain` is unit-testable"
-was easy to state and false, and a rule that is visibly false is a rule the next person routes around
-on their own judgement.
+So the unit-testable surface is not `src/domain` alone: `checkHealth` is a use case in
+`src/application`, takes a `Db`, and is unit-tested with no container. Removing the repository port
+(§5.2) forecloses substituting the *repository*; it does not foreclose substituting the *transport*.
 
-### Mutation testing does not run through Stryker's Vitest runner, and the reason is a false negative
+### Mutation testing runs through Stryker's command runner, not its Vitest runner
 
-`CLAUDE.md` §10 makes a mutation score part of Definition of Done and `tools/slice/check.mjs` gates
-on **0.75**,
-so a slice cannot reach `done` without this running. It is run by the **reviewer** at step 5 and
-deliberately not in CI: survivors are findings for a role that wrote neither the tests nor the code,
-and a number in a pipeline answers that question by ignoring it. Scope is `src/**` less `main.ts`.
+`CLAUDE.md` §10 makes a mutation score part of Definition of Done and `tools/slice/check.mjs` gates on
+**0.75**. It is run by the **reviewer** at step 5 and deliberately not in CI: survivors are findings for
+a role that wrote neither the tests nor the code, and a number in a pipeline answers that by ignoring
+it. Scope is `src/**` less `main.ts`.
 
-**It runs through Stryker's `command` runner, over a separate `vitest.mutation.config.ts`, and that is
-a workaround for a measured defect rather than a preference.**
-`@stryker-mutator/vitest-runner@10.0.0` **does not activate mutants** under `vitest@5.0.0`. Its peer
-range is `vitest: ">=2.0.0"`, so npm warns about nothing — the same shape as `dependency-cruiser`'s
-TypeScript range in §5.3, and the same shape as everything else this project keeps finding: a tool
-reporting a number over work it never did.
+**The `command` runner, over a separate `vitest.mutation.config.ts`, is a workaround for a measured
+defect rather than a preference.** `@stryker-mutator/vitest-runner@10.0.0` **does not activate mutants**
+under `vitest@5.0.0` — 118 of 130 survivors on the blocking run had `testsCompleted: 0`, and every
+mutant of a file with six dedicated tests survived, including the one emptying its body — while its
+peer range `vitest: ">=2.0.0"` means npm warns about nothing. The command runner has no framework
+integration to break: Stryker sets `__STRYKER_ACTIVE_MUTANT__`, runs the command, reads the exit code.
+Its one consequence is `coverageAnalysis: 'off'` — with no per-test attribution every mutant runs the
+whole suite, the conservative direction.
 
-The evidence, from the run whose 6.34 score the human ruled blocking:
-
-| Measured | |
-|---|---|
-| survivors that ran no test at all | **118 of 130** had `testsCompleted: 0` in `mutation.json` — Stryker ran nothing against them and recorded them as *survived* |
-| `src/application/checkHealth.ts` | **every** mutant survived, including the one that empties the whole function body, against a file with six dedicated tests |
-| the same mutant, activated by hand | in Stryker's own unmodified sandbox, `__STRYKER_ACTIVE_MUTANT__=0 npx vitest run -c vitest.mutation.config.ts` makes **five of those tests fail**. The mutant is killed. The runner simply never ran them |
-| same tree, same mutants, command runner | **76.06** rather than 6.34; `config.ts` 90.28 rather than 1.39 |
-
-A second defect in the same runner: `--logLevel debug` crashes it with *"Converting circular structure
-to JSON"* at `vitest-test-runner.js:95`, which `JSON.stringify`s the resolved Vitest config — so the
-integration cannot be debugged through its own logging.
-
-The command runner has no framework integration to break: Stryker sets `__STRYKER_ACTIVE_MUTANT__`,
-runs the command, reads the exit code. It is what a person does by hand, which is why it is
-trustworthy, and at this size it costs nothing — 142 mutants in about 33 seconds. Its one consequence
-is `coverageAnalysis: 'off'`: with no per-test attribution to collect, every mutant runs the whole
-suite. That is the conservative direction — a mutant is never skipped as *not covered* — and it is
-what makes *"Ran 1.00 tests per mutant"* in the output mean one full suite run.
-
-**What would make removing the workaround safe.** A future reader upgrading Stryker or Vitest must not
-infer from a plausible score that the integration is fixed; the broken runner's tell is not a low
-score, it is unrun tests. Re-measure, in this order:
-
-1. Set `testRunner: 'vitest'`, remove `commandRunner`, run `npx stryker run` on an unchanged tree.
-2. **Open `reports/mutation/mutation.json` and count mutants with `testsCompleted: 0`.** Over files
-   that have unit tests this must be **zero**. Any non-zero count means mutants are not being
-   activated, whatever the score says. This is the check that matters and it is the one a score
-   comparison alone will not give you.
-3. Compare the score against the command runner's on the same tree. A large drop is the same signal
-   arriving the slower way.
-4. **Positive control**: pick one mutant a test should kill, activate it by hand with
-   `__STRYKER_ACTIVE_MUTANT__=<id> npx vitest run -c vitest.mutation.config.ts`, and confirm the
-   tests fail. If they fail by hand while Stryker reports *survived*, the integration is still broken
-   no matter what changed upstream.
-5. Only with 2 and 4 both clean is `coverageAnalysis` worth revisiting — it is `off` because of the
-   workaround, not on its own merits.
-
-§11 carries this as a risk, because a Definition-of-Done gate that can report a clean number over
-mutants it never activated is a gate that can be passed without being satisfied.
+**What would make removing the workaround safe.** The broken runner's tell is unrun tests, not a low
+score, so a plausible score after an upgrade proves nothing. Set `testRunner: 'vitest'`, drop
+`commandRunner`, run `npx stryker run`, then **count mutants with `testsCompleted: 0` in
+`reports/mutation/mutation.json` — over files that have unit tests this must be zero**, whatever the
+score says; and confirm with a positive control, activating by hand one mutant a test should kill. Only
+with both clean is `coverageAnalysis` worth revisiting. §11.2 R-12 carries the standing risk.
 
 ### The response-schema seam is a serialiser, not an assertion
 
 **A TypeBox `response` schema does not validate what a handler produced. It reshapes it on the way
-out**, through `fast-json-stringify`, and it has four distinct behaviours that the design, the route
-docblock and the unit test all described as one. Measured on this repository's pinned Fastify, at
-step 5 by the reviewer and re-run independently at step 7:
+out**, through `fast-json-stringify`, with four distinct behaviours. Measured on this repository's
+pinned Fastify:
 
 | The handler sends | On the wire | Behaviour |
 |---|---|---|
@@ -557,37 +436,20 @@ step 5 by the reviewer and re-run independently at step 7:
 | a wrongly-typed value (`"42"` for a number) | `42` | **coerced**, silently |
 | a wrong value for a `Type.Literal` | **the schema's constant** | **substituted**, silently |
 
-The fourth is the dangerous one and it is a property of every route this system will have, which is
-why it is here rather than in a commit message. **A handler emitting `{status:'', checks:{database:''}}`
-produces a byte-identical `200 {"status":"ok","checks":{"database":"up"}}`** — which is why four
-mutants of the health route survived a suite that looked thorough. The committed test proving *"the
-schema is enforcement rather than decoration"* proves **stripping**, on a throwaway route with a plain
-string schema. **Nothing proves substitution, and nothing can, from the wire.**
-
+The fourth is the dangerous one and it is a property of every route this system will have: a handler
+emitting `{status:'', checks:{database:''}}` produces a byte-identical
+`200 {"status":"ok","checks":{"database":"up"}}`, which is why four mutants of the health route
+survived a suite that looked thorough. **Nothing proves substitution, and nothing can, from the wire.**
 Two consequences bind every later slice:
 
 1. **Where a value is computed, the schema must not pin it.** §8.6's taxonomy gives each status code a
-   `type` URI; expressed as a `Type.Literal` per code, a handler's computed URI is silently rewritten
-   to the constant. A contract test asserting on the response body then reads the constant back and
-   passes — **QS-11's own test unable to fail for the reason it names.** Either the schema does not
-   pin the value, or the test does not assert it from the body.
+   `type` URI; as a `Type.Literal` per code, a handler's computed URI is silently rewritten to the
+   constant, and a contract test asserting on the body reads that constant back and passes — **QS-11's
+   own test unable to fail for the reason it names.** Either the schema does not pin the value, or the
+   test does not assert it from the body.
 2. **A test through this seam proves the schema, not the handler.** To hold a handler to a computed
-   value, assert on what the handler passed to `send`, not on what arrived. Everything an assertion on
-   the wire body can tell you about a pinned field, it would tell you about an empty handler too.
-
-The general form, and it is the same sentence this slice kept rediscovering elsewhere: **a green
-signal is evidence only for the work it actually did.** Serialisation is not validation, and a
-response body is a claim about the schema until something independent proves it is also a claim about
-the code.
-
-Two directories in §10 were **not** in `CLAUDE.md` §5's ownership table: `tests/architecture/`
-(QS-10, QS-12) and `tests/performance/` (QS-14). Both assert properties of the design rather than of
-a slice, and neither needs to read `src/` to be written — the assertions come from arc42 §5 and from
-ADR-0008. The architect proposed both to the test-engineer, on the same reasoning as the other
-outside-in directories, and **the human ruled that way at Gate B on 2026-09-04**. §5 now lists them,
-and `.claude/hooks/guard-paths.mjs` guards them: the ruling is enforced by path like every other
-ownership rule, with four cases in `tools/test/guard-paths.test.mjs` proving it fires in both
-directions.
+   value, assert on what it passed to `send`. Everything an assertion on the wire body can tell you
+   about a pinned field, it would tell you about an empty handler too.
 
 ## 8.6 Error handling and API semantics
 
@@ -603,12 +465,11 @@ TC-4 fixes REST; A-7 keeps reference data out of the API. Five operations.
 | Cancel | `POST /appointments/{id}/cancellation` | `200`, idempotent |
 | Availability | `GET /availability?dealershipId&serviceTypeId&from&to` | `200`, **advisory** |
 
-`PATCH` for a move because ADR-0003's mechanism *is* "modify this resource in place"; the verb and
-the `UPDATE` say the same thing. Cancellation is a sub-resource rather than `DELETE` because the
-appointment remains readable at its URL afterwards, with `status: cancelled` — which `DELETE` would
-misdescribe. The availability response carries an explicit advisory flag and says so in its OpenAPI
-description, because staleness is a property of the domain interface and not an implementation detail
-(§3.1, §4.1).
+`PATCH` for a move because ADR-0003's mechanism *is* "modify this resource in place" — the verb and the
+`UPDATE` say the same thing. Cancellation is a sub-resource rather than `DELETE` because the appointment
+remains readable at its URL afterwards with `status: cancelled`, which `DELETE` would misdescribe. The
+availability response carries an explicit advisory flag and says so in its OpenAPI description, because
+staleness is a property of the domain interface rather than an implementation detail (§3.1, §4.1).
 
 ### Status codes
 
@@ -629,15 +490,14 @@ it to Gate B; it is decided here.
 
 Three deliberate choices in that table:
 
-- **Ownership failure is a `422`, not a `403`.** ADR-0002 is explicit: it is validation, not
-  authorisation. No deliberate ambiguity about whether the vehicle exists, and no audit event.
-- **Two distinct `409`s, and only one of them touches the conflict metric.** `no-capacity` is
-  contention; `appointment-not-confirmed` is a state conflict. `booking_conflicts_total` counts
-  `23P01`, so it cannot see the second (§8.4).
+- **Ownership failure is a `422`, not a `403`** — validation, not authorisation (ADR-0002). No
+  deliberate ambiguity about whether the vehicle exists, and no audit event.
+- **Two distinct `409`s, and only one touches the conflict metric.** `no-capacity` is contention;
+  `appointment-not-confirmed` is a state conflict, and `booking_conflicts_total` counts `23P01` so it
+  cannot see the second (§8.4).
 - **Out-of-hours is a `400` although `422` would sit more naturally beside the reference failures.**
-  ADR-0001 fixed the code, ADR-0001 is a Gate A ruling, and OC-4 means the architect may not revisit
-  it. The inconsistency is real and is recorded here rather than quietly harmonised; changing it means
-  superseding the ADR.
+  ADR-0001 fixed the code as a Gate A ruling. The inconsistency is real and recorded rather than
+  quietly harmonised; changing it means superseding the ADR.
 
 ### Outcomes, not exceptions
 
