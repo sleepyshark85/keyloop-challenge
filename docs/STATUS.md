@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `9a37b72 docs(arc42): cite the origin, not the pointer` |
+| Last commit | `e750c79 chore(02): step 1 design recorded, three escalations queued, step 2 dispatched in parallel` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process |
-| Agent runs recorded | 73 |
+| Agent runs recorded | 76 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -95,6 +95,8 @@
 | [0013](adr/0013-outside-in-tests-exercise-the-built-artifact.md) | Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost | accepted | — |
 | [0014](adr/0014-an-instant-is-renderable-by-construction.md) | An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | accepted | — |
 | [0015](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) | An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | accepted | — |
+| [0016](adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | proposed | — |
+| [0017](adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | proposed | — |
 
 ## Agent runs
 
@@ -161,6 +163,9 @@
 | 2026-09-05 06:03 | architect | 7m42 | 156 / 8,338 / 6,159,757 | `derived` |
 | 2026-09-05 06:08 | architect | 12m50 | 232 / 9,551 / 11,127,069 | `derived` |
 | 2026-09-05 06:15 | architect | 20m00 | 330 / 17,971 / 19,192,822 | `derived` |
+| 2026-09-05 07:29 | architect | 24m39 | 222 / 62,473 / 17,002,900 | `derived` |
+| 2026-09-05 07:41 | implementer | 9m55 | 108 / 13,934 / 5,543,347 | `derived` |
+| 2026-09-05 07:44 | test-engineer | 13m41 | 134 / 22,779 / 6,020,012 | `derived` |
 | 2026-09-05 07:56 | architect | 51m05 | 322 / 64,843 / 30,066,861 | `derived` |
 | 2026-09-05 11:05 | architect | 47m58 | 484 / 61,811 / 76,137,187 | `derived` |
 | 2026-09-05 11:45 | architect | 10m40 | 140 / 18,179 / 5,320,894 | `derived` |
@@ -173,7 +178,7 @@
 | 2026-09-05 12:14 | architect | 40m06 | 262 / 22,175 / 12,916,581 | `derived` |
 | 2026-09-05 14:57 | architect | 22m10 | 182 / 75,824 / 11,488,798 | `derived` |
 | 2026-09-05 15:10 | architect | 6m52 | 112 / 4,073 / 3,660,512 | `derived` |
-| | **total** | **4393m23** | **18,872 / 1,647,466 / 1,469,368,346** | |
+| | **total** | **4441m38** | **19,336 / 1,746,652 / 1,497,934,605** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

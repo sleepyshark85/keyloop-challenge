@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **94** |
-| Severity | 10 blocking · 52 major · 32 minor |
+| Findings recorded | **107** |
+| Severity | 10 blocking · 58 major · 39 minor |
 | Verdicts | 5 narrowed · 35 accepted · 1 escalated · 5 deferred |
-| Raised by | reviewer 24 · orchestrator 21 · test-engineer 19 · architect 16 · implementer 13 · human 1 |
-| Awaiting a ruling | **48** |
-| Mean escape distance | 1.80 step(s) |
+| Raised by | test-engineer 27 · reviewer 24 · orchestrator 21 · implementer 18 · architect 16 · human 1 |
+| Awaiting a ruling | **61** |
+| Mean escape distance | 1.70 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -631,6 +631,19 @@ rather than narrated.*
 | **O-26** | MAJOR | 0 *(+0)* | orchestrator | The test guarding the O-17 fix was flaky about one run in three, in test:tools, in CI | **open** |
 | **O-27** | MINOR | 0 *(+0)* | orchestrator | METHODOLOGY §12 claimed CLAUDE.md is generated from METHODOLOGY, while METHODOLOGY cites CLAUDE.md as normative | **open** |
 | **O-28** | MINOR | 0 *(+0)* | architect | arc42 §1.4 attributed seven reserved decisions to CLAUDE.md §3, which reserved four | **open** |
+| **I-02-6** | MAJOR | 2 *(+1)* | implementer | The constraint name that AC-3, AC-4 and arc42 QS-1/QS-2 all assert on is minted in src/persistence and reaches no observer the test-engineer is permitted to use | **open** |
+| **I-02-3** | MINOR | 2 *(+1)* | implementer | Design §2.5 claims the composition order 'gets a mutation score instead' of the compiler it lost at D-01-1; Stryker cannot generate that mutant | **open** |
+| **I-02-5** | MAJOR | 2 *(+1)* | implementer | The union of literals is right but the runtime 500 is the wrong mechanism, and its own fallback exits the taxonomy | **open** |
+| **I-02-7** | MAJOR | 2 *(+1)* | implementer | There is no 201/200 response schema, no AppointmentView field list and no ReadOutcome union, so the contract test and the implementation will diverge on field names | **open** |
+| **I-02-8** | MINOR | 2 *(+1)* | implementer | The empty-candidate-set case is annotated as a white lie rather than decided, and the implementer is the one who writes the arm | **open** |
+| **T-02-1** | MAJOR | 2 *(+1)* | test-engineer | §2.6's 'prune that WHOLE resource' makes AC-4 fail even with the retry loop the escalation exists to argue for | **open** |
+| **T-02-2** | MAJOR | 2 *(+1)* | test-engineer | §4.2's appointment-table-access marker is defined by a token rather than a concept and already false-positives twice on the tree at HEAD | **open** |
+| **T-02-3** | MAJOR | 2 *(+1)* | test-engineer | The 201/200 success body is never specified, and AC-1 and AC-2 both assert on it | **open** |
+| **T-02-4** | MINOR | 2 *(+1)* | test-engineer | §5.1 says the reference-data-invalid arm is unreachable over HTTP; it is reachable, and AC-12 is therefore fully satisfiable | **open** |
+| **T-02-6** | MINOR | 2 *(+1)* | test-engineer | The C1 claim holds, with three exceptions the design should carry so red-proof's classification is not surprised | **open** |
+| **T-02-5** | MINOR | 2 *(+1)* | test-engineer | AC-2's 404 is a C1 trap: the route already returns 404 at the red commit, so a status-only assertion passes vacuously | **open** |
+| **T-02-7** | MINOR | 2 *(+1)* | test-engineer | The empty-candidate mapping blames a valid service type for a dealership that has no bays at all | **open** |
+| **T-02-8** | MINOR | 2 *(+1)* | test-engineer | The slice's Definition of Done requires recording ADR-0009's seed, which does not exist until slice 04 | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -683,6 +696,71 @@ rather than narrated.*
 
 - *scenario:* Found only because the orchestrator's CLAUDE.md §1/§3 pointer change made nine arc42 citations circular and the architect had to visit each one. §1.4 claimed 'the HTTP framework, the query layer, the migration tool, the module decomposition, candidate ordering, the retry mechanism and the attempt cap's value are all reserved to the architect by CLAUDE.md §3.' §3 named the FIRST FOUR. Candidate ordering, the retry mechanism and the cap's value were reserved by ADR-0004, which says its value is a Gate B parameter and its existence fixed there, and that candidate ordering is an architecture decision for Gate B rather than a Gate A ruling. Verified by the orchestrator against §3's text before it became a pointer. THE LOOP WAS HIDING A WRONG CITATION - a citation nobody follows is a citation nobody checks, and this one had been wrong since it was written. Now split, with ADR-0004 linked. TWO RELATED FINDINGS from the same pass. TC-1, TC-6 and TC-8 cited CLAUDE.md §3 for the STACK, and the brief names no language, no database and no test framework - it asks for 'a list of your chosen technologies with justifications' and 'your strategy for observability'. So the OBLIGATION to have an observability story is brief-imposed and OpenTelemetry with pino is the human's choice; TC-1 and TC-6 have no brief basis at all and their only origin is the human at phase 0. They now say so, and §2's preamble gained 'the human' as a category because it had none. That makes an honest shape visible: several §2.2 rows constrain THE ARCHITECT rather than the project. And TC-8's other citation, METHODOLOGY §9, was a near-loop too - §9 says the application-plane OTel/pino contract IS arc42 §8, deferring to arc42 rather than imposing on it, so it could not be the origin either.
 - *file:* `docs/arc42/01-introduction-goals.md`
+
+**I-02-6** — The constraint name that AC-3, AC-4 and arc42 QS-1/QS-2 all assert on is minted in src/persistence and reaches no observer the test-engineer is permitted to use
+
+- *scenario:* VERIFIED INDEPENDENTLY BY THE ORCHESTRATOR, all four legs. arc42 §10 QS-1 requires 'the violated constraint reported by PostgreSQL is named no_bay_overlap' and QS-2 the same for no_technician_overlap. Design §2.1 carries `constraint` on PgOutcome precisely because 'a test that can only see bay cannot tell no_bay_overlap from a mapping that guessed'. But: BookDeps at design line 360 is `{ readonly newId: () => string }` and nothing else; ADR-0016 Option D explicitly declines to put constraint on BookOutcome; the problem schema at lines 415-418 has resource, reference, opensAt, closesAt and no constraint; and outside-in-tests-do-not-import-src forbids tests/concurrency/ from importing pgError.ts. So the name dies in src/application and the red commit must assert on something that does not exist. The implementer rejected two of the three available routes with reasons: putting it on the wire leaks a database identifier and reverses ADR-0016 Option D; having the test reproduce the conflict with its own SQL insert LOOKS like it works and is the dangerous one, because the test picks the probe row's bay and can make either constraint appear at will - QS-1 and QS-2's sharpest assertion becomes vacuous while staying green. Remedy: BookDeps gains a logger, the refusal path logs { constraint, resource, attempts } at warn, and tests/support/service.ts already spawns the built artifact so pino's stdout is readable by an outside-in test with no src/ import. One field on one interface, one line in one function, no ADR conflict. BLOCKS STEP 3 - the red commit encodes it either way.
+- *file:* `docs/slices/02-design.md`
+
+**I-02-3** — Design §2.5 claims the composition order 'gets a mutation score instead' of the compiler it lost at D-01-1; Stryker cannot generate that mutant
+
+- *scenario:* VERIFIED BY THE ORCHESTRATOR against node_modules/@stryker-mutator/instrumenter: the mutator directory holds exactly 17 mutators - arithmetic-operator, array-declaration, arrow-function, assignment-operator, block-statement, boolean-literal, conditional-expression, empty-expression, equality-operator, logical-operator, method-expression, object-literal, optional-chaining, regex, string-literal, unary-operator, update-operator. NONE reorders, moves or swaps statements; block-statement removes a block's contents rather than moving them. So the mutant modelling 'someone called withinOpeningHours before appointmentInterval' cannot be generated, cannot survive and cannot be killed. What IS mutation-covered is the presence of each guard, not their order. Same narrowing §5.2 applied to partial application at 00a and ADR-0016 applied to itself. The implementer agreed the finding does not damage the remedy - a pure module is still worth its file - and committed to recovering the order with PRECEDENCE unit tests it owns: inputs failing two checks at once, asserting which verdict wins, one per adjacent pair. Exact narrowing proposed for §2.5 rather than deletion.
+- *file:* `docs/slices/02-design.md`
+
+**I-02-5** — The union of literals is right but the runtime 500 is the wrong mechanism, and its own fallback exits the taxonomy
+
+- *scenario:* Re-measured on the pinned Fastify 5.12.1. BETTER than recorded: with a conforming setErrorHandler an off-list type on a 409 is routed through the handler and returns a well-formed 500 /problems/internal in application/problem+json - loud, inside the taxonomy, client misinformed rather than broken. WORSE, and not carried by the design: with NO conforming error handler, or when the handler's OWN body fails the same schema, the response is 500 {statusCode:500, code:'FST_ERR_FAILED_ERROR_SERIALIZATION', message:"... '#/properties/type' does not match schema definition"} in application/json. That is not a §8.6 row, it leaks an internal JSON-Schema pointer, and AC-12's 'every row reachable, no two collide' is silently false at exactly the moment it matters. The fallback is second-order and there is no third-order rescue. Remedy, judged separately from the finding: keep Type.Union, add ProblemType = (typeof PROBLEM_TYPES)[number] with one total builder as the sole constructor - measured TS2345 on an off-list URI - and constrain setErrorHandler to use that same builder, making the 500 unreachable from src/. Same argument ADR-0016 makes for ContendedResource: you cannot construct the refusal without the evidence.
+- *file:* `docs/slices/02-design.md`
+
+**I-02-7** — There is no 201/200 response schema, no AppointmentView field list and no ReadOutcome union, so the contract test and the implementation will diverge on field names
+
+- *scenario:* §2.7 specifies the request body and the problem schema in full and neither success response. AppointmentView is named in BookOutcome and never defined; DA-02-2 fixes the rendering of two fields and no others. ReadOutcome is not defined at all, so §2.7's status table covers only BookOutcome and the 'one exhaustive switch' claim does not reach the GET route. AC-1 requires the 201 body to name the allocated bay and technician and the contract test asserts on it, so the test-engineer and the implementer will guess bayId vs bay, whether status is present, whether createdAt is exposed - independently, and discover the mismatch at step 5. Precisely the ambiguity §6 step 2 exists to catch, which is the argument for fixing it now at the cost of a paragraph.
+- *file:* `docs/slices/02-design.md`
+
+**I-02-8** — The empty-candidate-set case is annotated as a white lie rather than decided, and the implementer is the one who writes the arm
+
+- *scenario:* §2.6 maps a dealership with no qualified technician to unknown-reference: service-type and calls it 'the one place this design tells a white lie'. Two distinct failures - this service type id does not exist (AC-9) and this dealership cannot perform it - then produce a byte-identical 422 with reference: 'service-type'. QS-11 survives on a literal reading since it is about rows having distinct status/type rather than causes being distinguishable, but AC-12 says the taxonomy is TOTAL and this is the one place it is total by conflation. The implementer ACCEPTS the constraint that forces it - §2.6 is right that there is no ContendedResource to construct here and fabricating one is what ADR-0016 forbids - and proposes an eighth BookOutcome member with a 422 /problems/service-not-offered row, §8.6 being inside this slice's declared scope. Explicitly states it will implement as designed if ruled against, since §6 says preference is not a blocker, and raises it only so the lie does not enter the code under its name with a design comment behind it.
+- *file:* `docs/slices/02-design.md`
+
+**T-02-1** — §2.6's 'prune that WHOLE resource' makes AC-4 fail even with the retry loop the escalation exists to argue for
+
+- *scenario:* VERIFIED BY THE ORCHESTRATOR at design lines 78 and 383: 'prune the whole' and '23P01 => classify -> resource; prune that WHOLE resource; continue'. Trace AC-4 (20 bays, 1 technician, winner holds B0,T0): attempt (B0,T0) -> both constraints violated -> reported no_bay_overlap by index order -> resource 'bay' -> prune the WHOLE bay resource -> bay list empty -> refuse with resource: 'bay'. AC-4 FAILS. Only PER-VALUE pruning delivers it: prune B0, attempt (B1,T0), technician-only violation, prune T0, technician list empties, refuse with resource: 'technician'. §0's own AC-3 prose ('pruning walks the technician list') already describes per-value, so three statements in the design disagree. The test-engineer explicitly did NOT ask for a design change - only for the wording to be pinned - because the entire escalation is about AC-4 and the remedy as written does not produce AC-4. Cheapest possible §6(a) now; a full loopback at step 5.
+- *file:* `docs/slices/02-design.md`
+
+**T-02-2** — §4.2's appointment-table-access marker is defined by a token rather than a concept and already false-positives twice on the tree at HEAD
+
+- *scenario:* VERIFIED BY THE ORCHESTRATOR: /\bappointment\b/ over src/**/*.ts at HEAD reports src/domain/interval.ts and src/persistence/schema.ts - two false positives before the slice starts - and schema.ts's Kysely Database interface MUST declare `appointment: AppointmentTable`, so the marker cannot be satisfied. The concept form the test-engineer proposed, (selectFrom\|insertInto\|updateTable\|deleteFrom)\s*\(\s*['\"`]appointment['\"`] plus sql templates naming it, reports ZERO on the same tree and fires on a planted db.selectFrom('appointment') in src/application. Stronger AND satisfiable. This is E-02-2's defect one layer down, in one of the three mechanisms the design offers as its answer to §2.1 - so that mechanism fails on arrival, which is the fourth time this project has shipped a marker defined by the spelling its author had in mind.
+- *file:* `docs/slices/02-design.md`
+
+**T-02-3** — The 201/200 success body is never specified, and AC-1 and AC-2 both assert on it
+
+- *scenario:* RAISED INDEPENDENTLY BY BOTH ROLES - the test-engineer as T-02-3 and the implementer as I-02-7, from opposite sides of the same gap, which is the strongest signal step 2 produced. §2.7 specifies the request body and the problem schema in full and neither success response. AppointmentView is named in BookOutcome and never defined; ReadOutcome does not exist, so the 'one exhaustive switch' claim does not reach the GET route. AC-1 requires the 201 body to name the allocated bay and technician; AC-2 requires GET to return the same appointment. Neither role can write its half without the field names, and guessing them means they disagree at step 5 - the exact cost §6 step 2 exists to avoid. Measurement 8 makes it unsafe to leave to the implementer: a Type.Literal response field is SILENTLY SUBSTITUTED rather than rejected.
+- *file:* `docs/slices/02-design.md`
+
+**T-02-4** — §5.1 says the reference-data-invalid arm is unreachable over HTTP; it is reachable, and AC-12 is therefore fully satisfiable
+
+- *scenario:* Measured against the built dist/domain/openingHours.js: time_zone 'Not/AZone' yields {kind:'unknown-zone'} and closes_at 'nonsense' yields {kind:'malformed-hours'}. The test-engineer controls the fixtures, so it can seed a deliberately broken dealership and reach 500 /problems/internal END TO END over HTTP. True of the FK rows 4-5 but not of the arm as a whole. All seven of §8.6's in-scope rows are reachable and AC-12 is satisfiable as literally written, with /problems/appointment-not-confirmed the one named exclusion (slice 06). Good news rather than a defect, and corrected so the reviewer does not expect a defended-but-unexercised arm at step 5.
+- *file:* `docs/slices/02-design.md`
+
+**T-02-6** — The C1 claim holds, with three exceptions the design should carry so red-proof's classification is not surprised
+
+- *scenario:* Verified rather than accepted, from a clean dist/. HTTP families fail as assertions inside the test body (service starts, /health 200, both routes 404); AC-13/14/15/17 are value assertions. THREE EXCEPTIONS. AC-16 reds as a CAUGHT RangeError rather than a value mismatch, because withinOpeningHours throws today - which is the defect AC-16 names ('and does not throw') - so it will be capture-then-assert. AC-18 IS GREEN TODAY: it is the declared negative control, which is supposed to be green before and after, and its evidence is the named mutant (delete step 4 entirely) that the DoD already requires - not a §2.4 breach, but it must be stated rather than found. AC-19 is green at parser level, so written as a parser assertion it would be VACUOUS; AC-19 says 'given reference data', so it will be written end to end - seed closes_at '24:00:00', book a 23:00 job, expect 201 - which is red at the red commit and is what actually retires slice 01's unreachable-branch finding by making the arm live.
+- *file:* `docs/slices/02-design.md`
+
+**T-02-5** — AC-2's 404 is a C1 trap: the route already returns 404 at the red commit, so a status-only assertion passes vacuously
+
+- *scenario:* Measured against the built service on a real container: GET /appointments/<uuid> returns Fastify's default 404 with application/json and {"message":"Route GET:... not found"}. An AC-2 test asserting only the status code is green at the red commit and proves nothing. The test-engineer will assert content-type application/problem+json and type /problems/appointment-not-found so it is red for AC-2's reason. Raised as its own finding rather than handled silently, because a vacuously-green assertion inside an otherwise-red commit is exactly what C1 exists to catch and the next slice will meet the same trap on its own not-found route.
+- *file:* `docs/slices/02-design.md`
+
+**T-02-7** — The empty-candidate mapping blames a valid service type for a dealership that has no bays at all
+
+- *scenario:* §2.6 step 4 maps an empty candidate set to unknown-reference: service-type. Defensible for 'no qualified technician here'; for a dealership with ZERO BAYS it blames a service type that is perfectly valid, and it contradicts §2.7's own ruling that broken reference data is the SYSTEM's fault and maps to 500 /problems/internal. It also makes AC-9's service-type row non-discriminating unless a positive control is added. Remedy proposed: separate the two empty cases - no qualified technician => unknown-reference: service-type; no bays at all => reference-data-invalid => 500. Converges with the implementer's I-02-8 from a different direction: both roles want this ruled rather than annotated as a white lie.
+- *file:* `docs/slices/02-design.md`
+
+**T-02-8** — The slice's Definition of Done requires recording ADR-0009's seed, which does not exist until slice 04
+
+- *scenario:* The DoD requires the concurrency tests to 'record ADR-0009's seed in the failure message so a failing interleaving is re-runnable rather than a flake'. The design explicitly leaves ADR-0009's seeded shuffle to slice 04, so there is no seed. The test-engineer will record the fixture namespace and the derived ids (uuidFor, already deterministic and offline-recomputable, which is what the clause is actually for) and note that the seed clause becomes live at slice 04. Flagged because slice:check reads the DoD, and the slice file is the orchestrator's to fix.
+- *file:* `docs/slices/02-book-and-read-an-appointment.md`
 
 </details>
 
