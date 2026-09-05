@@ -228,6 +228,12 @@ describe('POST /appointments — the request schema (AC-6, AC-8)', () => {
     ['a startsAt with NO offset', { ...VALID_BODY, startsAt: '2026-09-08T09:00:00' }],
     ['a missing vehicleId', { dealershipId: VALID_BODY.dealershipId, customerId: VALID_BODY.customerId, serviceTypeId: VALID_BODY.serviceTypeId, startsAt: VALID_BODY.startsAt }],
     ['a non-uuid dealershipId', { ...VALID_BODY, dealershipId: 'nope' }],
+    // All four id members carry the pattern, and each needs its own case: three of them were
+    // unasserted until the mutation run said so, and a member whose pattern is dropped reaches
+    // `bookAppointment` as arbitrary text and comes back a 422 instead of a 400.
+    ['a non-uuid customerId', { ...VALID_BODY, customerId: 'nope' }],
+    ['a non-uuid vehicleId', { ...VALID_BODY, vehicleId: 'nope' }],
+    ['a non-uuid serviceTypeId', { ...VALID_BODY, serviceTypeId: 'nope' }],
   ])('AC-8 — %s is 400 /problems/malformed-request, before the handler runs', async (_label, payload) => {
     let handlerRan = false;
     const response = await post(
@@ -312,6 +318,38 @@ describe('GET /appointments/:id — AC-2', () => {
   });
 });
 
+describe('a 500 the route KNOWS about is not an unhandled fault', () => {
+  /**
+   * `no-verdict` and `reference-data-invalid` render the same document as an escaped exception,
+   * so from the body alone the three are indistinguishable — which is what the two `case` labels
+   * surviving mutation said. The difference that matters is operational: a known outcome must not
+   * be logged as `request.failed`, or the one line an operator greps for a genuine fault fires on
+   * every deadlock and every mis-seeded dealership too.
+   */
+  it.each([
+    ['no-verdict', { kind: 'no-verdict' } as BookOutcome],
+    ['reference-data-invalid', { kind: 'reference-data-invalid', detail: 'unknown-zone' } as BookOutcome],
+  ])('%s answers 500 without reaching the error handler', async (_label, outcome) => {
+    const lines: string[] = [];
+    const capturing = pino({ level: 'error' }, { write: (line: string): void => void lines.push(line) });
+    const app = buildServer({
+      logger: capturing,
+      checkHealth: async (): Promise<HealthOutcome> => ({ kind: 'ok' }),
+      bookAppointment: async () => outcome,
+      readAppointment: async () => ({ kind: 'not-found' }),
+    });
+    apps.push(app);
+
+    const response = await post(app, VALID_BODY);
+    expect(response.statusCode).toBe(500);
+    expect(response.json().type).toBe('/problems/internal');
+    expect(
+      lines.join('\n'),
+      'a known outcome must not be reported as an unhandled error',
+    ).not.toContain('request.failed');
+  });
+});
+
 describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is kept', () => {
   it('an escaped exception is 500 /problems/internal, and the cause goes to the LOG', async () => {
     const lines: string[] = [];
@@ -334,8 +372,17 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
     // The client is told nothing it could act on — no SQLSTATE, no column name, no stack.
     expect(response.body).not.toContain('42703');
     expect(response.body).not.toContain('bya_id');
-    // But the operator is. A 500 whose cause is nowhere is the failure this row exists to avoid.
+    // But the operator is. A 500 whose cause is nowhere is the failure this row exists to avoid,
+    // and the line is asserted by its event name and its message as well as by the cause — the
+    // three are what make it greppable, and all three survived mutation until this was written.
     expect(lines.join('\n')).toContain('42703');
+    expect(lines.join('\n')).toContain('"event":"request.failed"');
+    expect(lines.join('\n')).toContain('unhandled error');
+    // The catch-all's own title and detail are contract text too, exactly as the routed rows' are.
+    expect(response.json().title).toBe('The request could not be completed');
+    expect(response.json().detail).toBe(
+      'the service could not complete this request; the failure has been logged',
+    );
   });
 
   it('renders through the SAME builder the routes use, so the taxonomy cannot escape itself', async () => {
@@ -429,6 +476,80 @@ describe('every row carries a title and a detail a client can read', () => {
     const response = await post(serverAnswering({}), { ...VALID_BODY, startsAt: 'nope' });
     expect(response.json().title).toBe('The request could not be understood');
     expect(String(response.json().detail)).toMatch(/startsAt/);
+  });
+});
+
+describe('the response schemas ENFORCE rather than decorate (measurement 8, re-measured here)', () => {
+  /**
+   * Design §8 row 8 measured three response-schema forms on one field: `Type.Literal` SUBSTITUTES
+   * silently, `Type.String({enum})` passes the wrong value through, and a UNION OF LITERALS is the
+   * only one that both enforces and does not substitute. That measurement was taken on `type`;
+   * these cases take it on the two other union-valued fields the taxonomy has, because a schema
+   * that is only asserted where it is already right is decoration.
+   *
+   * Re-measured on this repository's pinned Fastify while writing them: a union of two literals
+   * refuses a third value with `500 FST_ERR_FAILED_ERROR_SERIALIZATION`, and an EMPTY union lets
+   * it through as if no schema were there. That difference is what these assert.
+   */
+  it('a `resource` outside {bay, technician} never reaches the client as a 409', async () => {
+    // The failure mode is deliberately ugly and that is I-02-5's whole point: the schema enforces
+    // by FAILING TO SERIALISE, which is why `/problems/internal` — the row that must never fail —
+    // carries no schema at all. What must not happen is a 409 carrying an invented resource,
+    // because ADR-0009 prunes on it and slice 09's metric is labelled by it.
+    const response = await post(
+      serverAnswering({
+        book: { kind: 'no-capacity', resource: 'lift', attempts: 1 } as unknown as BookOutcome,
+      }),
+      VALID_BODY,
+    );
+    expect(response.statusCode).not.toBe(409);
+    expect(response.body).not.toContain('lift');
+  });
+
+  it('a `status` outside {confirmed, cancelled} never reaches the client as a 201', async () => {
+    const response = await post(
+      serverAnswering({
+        book: {
+          kind: 'confirmed',
+          appointment: { ...VIEW, status: 'pencilled-in' },
+        } as unknown as BookOutcome,
+      }),
+      VALID_BODY,
+    );
+    expect(response.statusCode).not.toBe(201);
+    expect(response.body).not.toContain('pencilled-in');
+  });
+
+  it('a member the schema does not declare is STRIPPED, on the view and on a problem', async () => {
+    // `additionalProperties: false`. Without it an internal field added to `AppointmentView` — a
+    // retry count, a lock key, an id from another table — reaches every client silently, and the
+    // first anyone knows is when it becomes part of the contract by use.
+    const confirmed = await post(
+      serverAnswering({
+        book: {
+          kind: 'confirmed',
+          appointment: { ...VIEW, internalAttempts: 7 },
+        } as unknown as BookOutcome,
+      }),
+      VALID_BODY,
+    );
+    expect(confirmed.statusCode).toBe(201);
+    expect(Object.keys(confirmed.json() as object)).not.toContain('internalAttempts');
+
+    const refused = await post(
+      serverAnswering({
+        book: { kind: 'no-capacity', resource: 'bay', attempts: 7, leaked: 'x' } as unknown as BookOutcome,
+      }),
+      VALID_BODY,
+    );
+    expect(refused.statusCode).toBe(409);
+    expect(Object.keys(refused.json() as object).sort()).toEqual([
+      'detail',
+      'resource',
+      'status',
+      'title',
+      'type',
+    ]);
   });
 });
 

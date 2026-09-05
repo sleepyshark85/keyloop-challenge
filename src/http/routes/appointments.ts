@@ -28,7 +28,7 @@
 import { Type } from '@sinclair/typebox';
 import type { Static } from '@sinclair/typebox';
 import type { FastifyInstance } from 'fastify';
-import { PROBLEM_CONTENT_TYPE, ProblemSchema, problem, sendProblem } from '../problem.js';
+import { ProblemSchema, problem, sendProblem } from '../problem.js';
 import type { Problem } from '../problem.js';
 import type { BookCommand, BookOutcome } from '../../application/bookAppointment.js';
 import type { ReadOutcome } from '../../application/readAppointment.js';
@@ -185,7 +185,7 @@ export function registerAppointmentRoutes(
           // the client's, so they render identically; they stay separate in `BookOutcome` so this
           // switch still names them apart and the operator's log line can. T-02-9 grew the
           // outcome union by one and §8.6's client contract by nothing.
-          return await sendInternal(reply);
+          return await sendProblem(reply, INTERNAL);
 
         default: {
           const unhandled: never = outcome;
@@ -254,18 +254,13 @@ function outsideOpeningHours(verdict: OutsideOpeningHoursVerdict): Problem {
 }
 
 /**
- * The last-resort renderer, and it must not be able to fail. No schema on `500`, and the content
- * type set here rather than by a serialiser that could itself throw.
+ * The last-resort body, built once through the same constructor every other row uses.
+ *
+ * It tells the client nothing it could act on, deliberately: both outcomes that reach it are the
+ * SYSTEM's fault, and the SQLSTATE, the constraint name and the dealership id go to the log where
+ * the person who can act on them will look. `server.ts` renders the identical document for an
+ * escaped exception, so §8.6's `500 | Anything else` row reads the same however it is reached.
  */
-async function sendInternal(reply: {
-  code: (status: number) => { type: (t: string) => { send: (b: unknown) => unknown } };
-}): Promise<void> {
-  await reply
-    .code(500)
-    .type(PROBLEM_CONTENT_TYPE)
-    .send(
-      problem('/problems/internal', 500, 'The request could not be completed', {
-        detail: 'the service could not complete this request; the failure has been logged',
-      }),
-    );
-}
+const INTERNAL = problem('/problems/internal', 500, 'The request could not be completed', {
+  detail: 'the service could not complete this request; the failure has been logged',
+});

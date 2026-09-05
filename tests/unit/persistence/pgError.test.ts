@@ -92,6 +92,25 @@ describe('classify — 23503 foreign_key_violation', () => {
   it('a 23503 with no constraint name is `other`', () => {
     expect(classify(pgError('23503')).kind).toBe('other');
   });
+
+  it('a 23503 naming an EXCLUSION constraint is bad-reference, never a conflict', () => {
+    // The SQLSTATE decides the arm; the constraint name only decides the resource. Without this
+    // case the two tests are joined by an `&&` that no input separates, so a mutant weakening it
+    // to `||` — or dropping the SQLSTATE test entirely — would mint `resource: 'bay'` from a
+    // FOREIGN-KEY violation. That is a capacity refusal built from a verdict that was not about
+    // capacity, which is precisely what ADR-0016 exists to make impossible.
+    expect(classify(pgError('23503', 'no_bay_overlap'))).toEqual({
+      kind: 'bad-reference',
+      constraint: 'no_bay_overlap',
+    });
+  });
+
+  it('a 23503 whose constraint is not a string is `other`, not a bad-reference naming a number', () => {
+    // `fieldsOf` drops a non-string `constraint`. Without that drop, ADR-0009 would prune on a
+    // value that is not a constraint name and `err.constraint` would reach the conflict log — and
+    // slice 09's metric — as a number.
+    expect(classify({ code: '23503', constraint: 7 }).kind).toBe('other');
+  });
 });
 
 describe('classify — 40P01 deadlock_detected (T-02-9, ADR-0018)', () => {
