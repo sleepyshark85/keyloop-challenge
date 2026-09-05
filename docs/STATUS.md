@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `b2ae0ab chore(02): pin ADR-0019, and log the two (b) rulings` |
+| Last commit | `a91b8b7 docs(arc42): slice 02 as-built` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E |
-| Agent runs recorded | 86 |
+| Agent runs recorded | 87 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -202,7 +202,8 @@
 | 2026-09-05 21:18 | test-engineer | 2m05 | 60 / 2,065 / 1,244,743 | `derived` |
 | 2026-09-05 21:48 | reviewer | 24m04 | 296 / 13,938 / 23,681,391 | `derived` |
 | 2026-09-05 22:05 | architect | 13m16 | 150 / 12,454 / 8,174,449 | `derived` |
-| | **total** | **4718m58** | **21,814 / 1,928,255 / 1,727,432,200** | |
+| 2026-09-05 22:29 | architect | 14m27 | 202 / 6,211 / 12,722,777 | `derived` |
+| | **total** | **4733m26** | **22,016 / 1,934,466 / 1,740,154,977** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

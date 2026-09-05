@@ -1,7 +1,7 @@
 ---
 id: "02"
 title: Book an appointment, read it back, and give every failure one status and one type
-status: ready
+status: done
 depends_on: ["01"]
 absorbs: ["03", "12", "13"]
 arc42: ["§5.2", "§6.1", "§8.6", "§10.2"]
