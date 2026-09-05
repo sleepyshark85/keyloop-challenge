@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **91** |
-| Severity | 10 blocking · 51 major · 30 minor |
+| Findings recorded | **93** |
+| Severity | 10 blocking · 52 major · 31 minor |
 | Verdicts | 5 narrowed · 35 accepted · 1 escalated · 5 deferred |
-| Raised by | reviewer 24 · test-engineer 19 · orchestrator 19 · architect 15 · implementer 13 · human 1 |
-| Awaiting a ruling | **45** |
-| Mean escape distance | 1.86 step(s) |
+| Raised by | reviewer 24 · orchestrator 21 · test-engineer 19 · architect 15 · implementer 13 · human 1 |
+| Awaiting a ruling | **47** |
+| Mean escape distance | 1.82 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -628,6 +628,8 @@ rather than narrated.*
 | **O-23** | MINOR | 0 *(+0)* | orchestrator | Commit 118cdc6's message states word figures that are wrong | **open** |
 | **O-24** | MAJOR | 0 *(+0)* | orchestrator | ADR-0009 had no Chosen option line at all, so the guard pinned an empty string and protected nothing | **open** |
 | **O-25** | MAJOR | 0 *(+0)* | orchestrator | Every agent definition instructed its editor to regenerate from METHODOLOGY, and no generator existed | **open** |
+| **O-26** | MAJOR | 0 *(+0)* | orchestrator | The test guarding the O-17 fix was flaky about one run in three, in test:tools, in CI | **open** |
+| **O-27** | MINOR | 0 *(+0)* | orchestrator | METHODOLOGY §12 claimed CLAUDE.md is generated from METHODOLOGY, while METHODOLOGY cites CLAUDE.md as normative | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -665,6 +667,16 @@ rather than narrated.*
 
 - *scenario:* All five agent files carried: 'Derived from docs/METHODOLOGY.md §2 (roles), §7 (tests), §8 (commits). Do not edit directly: change the methodology first, then regenerate.' VERIFIED: nothing under tools/ referenced .claude/agents, no npm script mentioned them, and no generator existed anywhere in the repository. The header instructed every future editor to follow a process that did not exist - the SIXTH instance in this project of a mechanism stated and never run, and it was sitting in the files that define how the team works. IT HAD ALREADY DRIFTED, measured from git: ac04f1e changed docs/METHODOLOGY.md alone to say slice PRs open as a draft at step 1, and test-engineer.md has never contained the word 'draft'. 084a34b added the adjudication discipline to METHODOLOGY and CLAUDE.md; it reached architect.md only because someone typed it there in a later commit. THE HEADER WAS ALSO OVER-BROAD, which is why the generator's scope is narrow. Of 26 sections across the five agent files exactly ONE - ## Committing - is byte-identical between roles. The other 25 are role-specific craft: what the reviewer checks, how the test-engineer proves a red, the shape of each role's report. Generating those would mean either bloating METHODOLOGY with five roles' worth of instructions or flattening them to what the documents happen to share. So three things are generated and the header now names them - the model: field, the role-constraints block and the committing block - and says the rest is authored. A generated block that claims less than it does is worth more than a header that claims more. The human ruled BUILD THE GENERATOR rather than delete the claim. tools/agents/generate.mjs, agents:check in CI and in test:tools, 15 cases in tools/test/agents-build.test.mjs. The drift that actually happened is now a test case: a METHODOLOGY-only rule change fails --check. Three mutants killed, including making a missing generated block a silent no-op - the shape that would have reproduced the original defect exactly.
 - *file:* `.claude/agents/architect.md`
+
+**O-26** — The test guarding the O-17 fix was flaky about one run in three, in test:tools, in CI
+
+- *scenario:* Found by the architect while condensing METHODOLOGY, outside its scope, and reported rather than ignored. Measured by the orchestrator at 38fcd54: 3 failures in 8 runs (33/35, 34/35, 35/35 ...). Cause: the O-17 cases built TWO temporary repositories and recorded a CI run in repo B using a commit sha taken from repo A. A git commit id hashes the timestamp, so the two repos share an id only when both `git commit` calls land in the same clock second - the test passed on a race. Failure reads 'cannot relate the run's head_sha to HEAD', which is the UNVERIFIED arm doing exactly its job on a sha that genuinely is unrelated. FIXED by building ONE repository per case and letting an event be a function of that repository's own context, so a case that needs a non-HEAD commit asks for shas[1] rather than borrowing from a second tree. 10 consecutive runs green. Both O-17 mutants still killed. Worth recording beyond the fix: a flaky test in test:tools would have produced random CI failures on unrelated commits, and the reflex on a random red is to re-run rather than to investigate - which is how a guard stops being believed.
+- *file:* `tools/test/slice-check.test.mjs`
+
+**O-27** — METHODOLOGY §12 claimed CLAUDE.md is generated from METHODOLOGY, while METHODOLOGY cites CLAUDE.md as normative
+
+- *scenario:* Found by the architect. §12's table listed eight files as derived from named METHODOLOGY sections, including 'CLAUDE.md \| Operative rules only \| From §1, §5-§8, §10'. Two documents each claiming to be the other's source, and an agent reading both had no way to know which wins - worse than either wording alone. Compounded by the file header still reading 'Machine-facing files are derived from this', the same overclaim §12 warns against and the same shape as O-25's non-existent generator. §12 now states exactly what tools/agents/generate.mjs does - three things - and everything else as hand-maintained and related by citation. Related: METHODOLOGY's copy of the event vocabulary had already drifted from tools/team-log/schema.mjs, and the architect caught itself ADDING finding.raised to the copy rather than to the schema, which is the drift happening in real time during the pass that removed it.
+- *file:* `docs/METHODOLOGY.md`
 
 </details>
 

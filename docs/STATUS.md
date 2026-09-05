@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `4290e48 fix(docs): the guard protecting the condensation was wrong three ways` |
+| Last commit | `5475f21 docs(methodology): cite CLAUDE.md rather than restate it` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process |
-| Agent runs recorded | 71 |
+| Agent runs recorded | 72 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -171,7 +171,8 @@
 | 2026-09-05 12:09 | architect | 34m12 | 184 / 18,251 / 7,393,653 | `derived` |
 | 2026-09-05 12:13 | architect | 38m10 | 526 / 30,658 / 60,240,776 | `derived` |
 | 2026-09-05 12:14 | architect | 40m06 | 262 / 22,175 / 12,916,581 | `derived` |
-| | **total** | **4364m22** | **18,578 / 1,567,569 / 1,454,219,036** | |
+| 2026-09-05 14:57 | architect | 22m10 | 182 / 75,824 / 11,488,798 | `derived` |
+| | **total** | **4386m32** | **18,760 / 1,643,393 / 1,465,707,834** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

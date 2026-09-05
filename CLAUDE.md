@@ -10,12 +10,11 @@ of working around it.
 
 ## 1. What we are building
 
-A service-appointment scheduler for automotive dealerships. A customer requests an appointment
-for a vehicle, service type, dealership and desired time. The system confirms only if **both** a
-service bay **and** a technician qualified for that service type are free for the entire duration,
-then persists an Appointment linking customer, vehicle, technician and bay.
+A service-appointment scheduler for automotive dealerships. Backend only; the client layer is stubbed
+with an OpenAPI contract and a cURL harness.
 
-Backend only. The client layer is stubbed with an OpenAPI contract and a cURL harness.
+**Requirements: [`docs/arc42/01-introduction-goals.md`](docs/arc42/01-introduction-goals.md) §1.1**,
+which quotes the brief and traces every requirement to it. Read it before designing anything.
 
 ## 2. Standing invariants — NON-NEGOTIABLE
 
@@ -62,11 +61,10 @@ CI, before any implementation exists. A test that has never failed is not eviden
 
 ## 3. Stack
 
-Decided: TypeScript, Node, PostgreSQL, Vitest, Testcontainers, `fast-check` (property tests),
-Stryker (mutation testing), `dependency-cruiser` (layering), OpenTelemetry + `pino` (observability).
-
-Deliberately left to the architect at Gate B: HTTP framework, query layer / ORM, migration tool,
-module decomposition. Record the choice as an ADR with alternatives considered.
+**Constraints: [`docs/arc42/02-constraints.md`](docs/arc42/02-constraints.md) §2**, as TC-1 onward,
+each with the reason it is not an open decision. What Gate B left to the architect — HTTP framework,
+query layer, migration tool, module decomposition — is recorded there and in the ADRs that settled
+it. Record any new choice as an ADR with alternatives considered.
 
 ## 4. Source of truth
 
@@ -101,11 +99,10 @@ tests/integration/
 ```
 
 Rationale: unit tests are a design tool and must be freely writable during refactor, so the
-implementer owns them. `tests/architecture/` and `tests/performance/` were unowned until Gate B and
-were ruled to the test-engineer on the same reasoning as the other outside-in directories: QS-10
-asserts the layering the implementer must not be able to relax, and QS-14's budget is an acceptance
-threshold rather than an optimisation target. The outside-in directories define *done* and must be
-written by someone who has not seen the implementation.
+implementer owns them. The outside-in directories define *done* and must be written by someone who
+has not seen the implementation — including `tests/architecture/` and `tests/performance/`, because
+QS-10 asserts the layering the implementer must not be able to relax and QS-14's budget is an
+acceptance threshold rather than an optimisation target.
 
 If the implementer believes an acceptance test is wrong, it **raises a DCR**. It does not edit the
 test. That escalation is a signal — it usually means the slice's acceptance criteria were ambiguous.
@@ -144,12 +141,10 @@ To rule **(c)** the architect **must name the acceptance criterion, §10 quality
 standing invariant that would fail**. If it cannot name one, the outcome is (b). Preference is not
 a blocker.
 
-§2 was added to that list on 2026-09-04, after slice 00a. A design had worked around §2.4 — the red
-observed in CI — and substituted an evidence chain for it. No acceptance criterion and no quality
-scenario failed, because the end state was green either way, so by the letter of this rule the most
-serious class of defect available was the one class it could not name. The narrow test exists to stop
-(c) being reached for on preference, and it still does: a §2 breach is nameable, citable and
-NON-NEGOTIABLE, which is the opposite of a preference.
+§2 is on that list because a design once worked around §2.4 — the red observed in CI — and
+substituted an evidence chain for it. Nothing else could be named: the end state was green either
+way, so the most serious class of defect available was the one class the rule could not reach. A §2
+breach is nameable, citable and NON-NEGOTIABLE, which is the opposite of a preference.
 
 **Max 2 loopbacks per slice.** A third auto-escalates: a slice needing three design changes is a
 slicing problem, not a design problem.

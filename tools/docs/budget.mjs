@@ -84,6 +84,40 @@ export const BUDGETS = {
   sliceDesignMerged: 1200,
   slice: 800,
   sliceTombstone: 400,
+
+  // The two process documents, added after the human asked why they were exempt.
+  //
+  // CLAUDE.md is deliberately generous relative to its size: it is 1,439 words of almost
+  // pure operative rule, it is loaded into every agent's context on every run, and it is
+  // the document that has demonstrably worked — §6's adjudication discipline, the (c)
+  // naming test, the test-ownership paths. Every word that is not a rule dilutes the
+  // rules, so the pressure here should be against NARRATIVE creeping in, not against the
+  // rules themselves. The budget exists to catch the former.
+  //
+  // METHODOLOGY is the opposite case: 5,307 words, much of it restating CLAUDE.md, with a
+  // unique contribution — the role model, the phase model, the reasoning behind the
+  // process — that is smaller than the document.
+  claude: 1500,
+  // 2,500 was a guess, made from this file on the estimate that METHODOLOGY's unique
+  // contribution "is smaller than the document". That was true before the pass and is
+  // spent after it. The architect removed every restatement of a CLAUDE.md rule and three
+  // cross-artifact duplications, landing at 3,999, then spent a full compression pass over
+  // the remainder and recovered 54 WORDS. That measurement is the argument: what is left
+  // is arguments, not padding, and each further 100 words is one argument deleted.
+  //
+  // What the remainder holds, enumerated rather than asserted: the role, phase and
+  // principle models (454); seven near-misses that shaped the process — the index is not a
+  // file, defects had no home, `narrowed`, rule-and-amend-in-one-pass, prompts never
+  // written for two phases, the generator that did not exist, diagram validators CI cannot
+  // run (~600); and three evidence tables with no other home — the log coverage/trust
+  // table, the process metrics, the PR-thread contract (597). Reaching 2,500 means
+  // deleting the coverage table, which is the document admitting four of its own event
+  // types are unverifiable, and is among the most assessment-relevant artifacts here.
+  //
+  // Corrected by the same rule as arc42 §8: a number set by estimate loses to a number set
+  // by enumeration. Correcting a guess with a measurement is not the same act as moving a
+  // budget to fit a document that will not comply.
+  methodology: 3800,
 };
 
 /** Authored prose only — see the header for why each exclusion is narrow. */
@@ -123,6 +157,8 @@ export function countWords(raw, { file = '' } = {}) {
 }
 
 function budgetFor(file, fm) {
+  if (file === 'CLAUDE.md') return BUDGETS.claude;
+  if (file.endsWith('METHODOLOGY.md')) return BUDGETS.methodology;
   if (file.startsWith('adr/')) return fm.contested ? BUDGETS.adrContested : BUDGETS.adr;
   if (file.startsWith('slices/')) {
     if (fm.folded_into) return BUDGETS.sliceTombstone;
@@ -173,6 +209,11 @@ export function survey({ arc42 = ARC42, adr = ADR, slices = SLICES } = {}) {
   read(arc42, 'arc42');
   read(adr, 'adr');
   read(slices, 'slices');
+  for (const [path, key] of [[resolve('CLAUDE.md'), 'CLAUDE.md'], [resolve('docs/METHODOLOGY.md'), 'docs/METHODOLOGY.md']]) {
+    if (!existsSync(path)) continue;
+    const raw = readFileSync(path, 'utf8');
+    rows.push({ file: key, words: countWords(raw, { file: key }), budget: budgetFor(key, {}), contested: false });
+  }
   for (const r of rows) r.over = r.words - r.budget;
   return rows.sort((a, b) => b.over - a.over);
 }
