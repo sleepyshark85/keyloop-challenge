@@ -15,12 +15,12 @@
 
 | | |
 |---|---|
-| Last commit | `ce41a0d docs(02): the retry loop is in scope — E-02-1 ruled` |
+| Last commit | `34b057b test(02): the booking path, the taxonomy and the two ratified domain remedies (red)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process |
-| Agent runs recorded | 79 |
+| Agent runs recorded | 80 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
-| Open DCRs | none |
+| Open DCRs | **1** — a slice is blocked |
 
 ## What happens next
 
@@ -185,7 +185,8 @@
 | 2026-09-05 17:21 | architect | 2m50 | 52 / 2,765 / 1,087,283 | `derived` |
 | 2026-09-05 17:25 | architect | 7m15 | 96 / 5,687 / 2,574,902 | `derived` |
 | 2026-09-05 17:31 | architect | 12m40 | 138 / 13,940 / 4,524,932 | `derived` |
-| | **total** | **4464m23** | **19,622 / 1,769,044 / 1,506,121,722** | |
+| 2026-09-05 18:35 | test-engineer | 63m22 | 412 / 65,432 / 47,783,901 | `derived` |
+| | **total** | **4527m45** | **20,034 / 1,834,476 / 1,553,905,623** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
