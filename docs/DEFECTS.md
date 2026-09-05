@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **115** |
-| Severity | 10 blocking · 62 major · 43 minor |
-| Verdicts | 5 narrowed · 48 accepted · 1 escalated · 5 deferred |
-| Raised by | test-engineer 28 · reviewer 28 · orchestrator 23 · implementer 18 · architect 17 · human 1 |
-| Awaiting a ruling | **56** |
-| Mean escape distance | 1.62 step(s) |
+| Findings recorded | **116** |
+| Severity | 10 blocking · 62 major · 44 minor |
+| Verdicts | 5 narrowed · 48 accepted · 1 escalated · 7 deferred |
+| Raised by | test-engineer 28 · reviewer 28 · orchestrator 23 · implementer 18 · architect 18 · human 1 |
+| Awaiting a ruling | **55** |
+| Mean escape distance | 1.61 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -649,9 +649,10 @@ rather than narrated.*
 | **F-02-9** | MAJOR | 3 *(+0)* | architect | Every write path to the appointment table must take ADR-0018's two advisory locks in the same order, and slices 06 and 07 inherit that obligation | **open** |
 | **T-02-10** | MINOR | 4 *(+1)* | test-engineer | A same-shaped assertion at line 121 is satisfiable but fragile, and is raised rather than quietly repaired | **open** |
 | **R-02-1** | MAJOR | 5 *(+0)* | reviewer | slice:check reported the arc42 declaration satisfied over a hand edit to §10 it never opened | **open** |
-| **R-02-2** | MINOR | 5 *(+0)* | reviewer | ADR-0018's 'the lock prevents nothing' control exists only in the ADR's prose, though design §4.5 named the file it belongs in | **open** |
-| **R-02-3** | MINOR | 5 *(+0)* | reviewer | The GET route's response schema is not load-bearing under test while the POST's is, so 'the response schemas are asserted to ENFORCE' is half true | **open** |
+| **R-02-2** | MINOR | 5 *(+0)* | reviewer | ADR-0018's 'the lock prevents nothing' control exists only in the ADR's prose, though design §4.5 named the file it belongs in | deferred |
+| **R-02-3** | MINOR | 5 *(+0)* | reviewer | The GET route's response schema is not load-bearing under test while the POST's is, so 'the response schemas are asserted to ENFORCE' is half true | deferred |
 | **R-02-4** | MINOR | 5 *(+0)* | reviewer | I-02-7 (MAJOR) is recorded raised and never ruled, although its remedy shipped and its twin T-02-3 is ruled accepted | **open** |
+| **F-02-11** | MINOR | 5 *(+1)* | architect | A mutation survivor's accounting must carry the REASON it is equivalent, because two diagnoses call for opposite remedies | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -812,16 +813,23 @@ rather than narrated.*
 
 - *scenario:* §4.5 says the lock-drop control belongs beside §4.4's in tests/integration/exclusion-constraint-adjudicates.test.ts, 'one added case in an existing file'. That file has one it() and its race() issues raw INSERTs with no advisory lock, so the suite covers cells (b) and (c) and not (a). MINOR deliberately: the reviewer RAN cell (a) itself on postgres:16-alpine and it holds - locks on with constraints dropped gives 20 overlapping rows - and cells (b)+(c), both in the suite, already carry the §2.1 claim between them. Nothing behaves wrongly; a ruled design instruction was dropped without a record.
 - *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
+- *deferred* by architect — (b) DEFERRED IMPROVEMENT, absorbed by slice 05 under ADR-0019. NOT (c), and checked rather than assumed: three of ADR-0018's four cells are standing tests today - constraint alone gives one row and neither gives twenty, both in exclusion-constraint-adjudicates.test.ts, and under the locks each of the nineteen refusals is a 23P01 PostgreSQL named, in both concurrency files. §2.1 is asserted three ways, so no AC, QS or §2 clause fails and (c) is unavailable. ON WHETHER THIS IS 'A MECHANISM STATED AND NEVER RUN' - the architect says it is not, and the distinction is load-bearing. It was run TWICE with matching numbers, by the architect at T-02-9 and independently by the reviewer. What is missing is a run that REPEATS, and the sharper cost is that the reviewer's control script is a scratchpad file that dies with the slice - so ADR-0019 carries the four-cell matrix and the measurement outlives the scratchpad. (a) WAS CONSIDERED AND REJECTED ON THE CONSUMER RATHER THAN THE COST. The wording defect is real and the architect's own: §4.4 said 'adopted in full' and got built, §4.5 said 'belongs beside' and did not, and that difference tracks the outcome exactly. What defeats (a) is that the evidence's consumer is not this gate - ADR-0018 is proposed and a merge does not rule it, ADR-0011 having been proposed since slice 00 - while slice 05 reopens that very file to show the WHERE status <> 'cancelled' predicate frees a cancelled slot. The fourth cell lands beside a case that must be written anyway and well before the register is ruled. The regression it would guard - someone drops the constraint believing the locks cover it - ALREADY fails both concurrency tests with twenty confirmed. What is deferred is the READING, not the guard.
 
 **R-02-3** — The GET route's response schema is not load-bearing under test while the POST's is, so 'the response schemas are asserted to ENFORCE' is half true
 
 - *scenario:* Mutant appointments.ts:203:19, ObjectLiteral '{}' over the whole response map for GET, SURVIVES; its sibling at 126:46 on the POST route is KILLED. Delete the GET route's response map and no test notices. Behaviour is identical today so it is not a defect - but slice 05 renders `cancelled` at this URL, and the design's argument for the union-of-literals is precisely that the response schema enforces.
 - *file:* `src/http/routes/appointments.ts`
+- *deferred* by architect — (b), absorbed by slice 05. DEFERRING MAKES THE TEST STRONGER RATHER THAN MERELY LATER: AppointmentView.status has one producible member today, so a test that kills the mutant must manufacture 'pencilled-in' through a cast no production path can make; at slice 05 the second member is produced for real. The architect's text over-claimed and §2.6 now says so - the union-of-literals enforcement is asserted on the POST path only, and the GET path is the one the argument is about. What the GET schema earns today is fast-json-stringify stripping and ADR-0005's document; its enforcement leg has no reachable subject. Remedy named and owned: the twin of the existing 201 case at 200, in tests/unit/http/, the implementer's, at slice 05.
 
 **R-02-4** — I-02-7 (MAJOR) is recorded raised and never ruled, although its remedy shipped and its twin T-02-3 is ruled accepted
 
 - *scenario:* I-02-7 is the only step-2 finding in slice 02 with no finding.ruled event. T-02-3's own ruling text says 'Raised independently by both roles (also I-02-7)', and the remedy is in the tree - AppointmentView, ReadOutcome and both response schemas. check.mjs computes open MAJOR/BLOCKING from exactly this, and the orchestrator's stated gate bar is 'no open MAJOR or BLOCKING', so an unruled finding blocks a merge it has no business blocking. Same family as O-29: the orchestrator logged the findings and not the rulings that answered them.
 - *file:* `docs/team-log/events.jsonl`
+
+**F-02-11** — A mutation survivor's accounting must carry the REASON it is equivalent, because two diagnoses call for opposite remedies
+
+- *scenario:* The implementer recorded openingHours.ts:256's survivor as 'the ordering arm'. The reviewer measured that the survivor is at column 32, closesSeconds === null => false, and survives because that arm is LOGICALLY IMPLIED by !(opensSeconds < closesSeconds) - when closesSeconds is null, opensSeconds < null coerces to < 0 and is false for every non-negative seconds-of-day. Right conclusion, wrong reason. The architect ruled NO CODE CHANGE: the arm is redundant rather than untested, deleting the explicit null check would leave the guard resting on n < null coercing to n < 0 - the least legible rule in that expression - and a test for it could not fail. Recorded as equivalent BY IMPLICATION. The standing obligation: 'no test covers it' and 'the code is redundant' call for opposite remedies, so a survivor accounting that names the wrong one is worse than one that names none.
+- *file:* `docs/slices/02-design.md`
 
 </details>
 

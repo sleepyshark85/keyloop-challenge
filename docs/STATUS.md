@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `a6c558b docs: regenerate §9 and §11 for ADR-0018` |
+| Last commit | `1156f8d docs(02): R-02-2 and R-02-3 ruled (b) — ADR-0019, and three corrections to my own text` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process |
-| Agent runs recorded | 85 |
+| Agent runs recorded | 86 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -106,6 +106,7 @@
 | [0016](adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | proposed | — |
 | [0017](adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | proposed | — |
 | [0018](adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | proposed | — |
+| [0019](adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | Defer a control only to the slice that makes it cheaper or stronger | proposed | — |
 
 ## Agent runs
 
@@ -196,7 +197,8 @@
 | 2026-09-05 21:15 | architect | 11m36 | 148 / 5,680 / 7,149,519 | `derived` |
 | 2026-09-05 21:18 | test-engineer | 2m05 | 60 / 2,065 / 1,244,743 | `derived` |
 | 2026-09-05 21:48 | reviewer | 24m04 | 296 / 13,938 / 23,681,391 | `derived` |
-| | **total** | **4705m43** | **21,664 / 1,915,801 / 1,719,257,751** | |
+| 2026-09-05 22:05 | architect | 13m16 | 150 / 12,454 / 8,174,449 | `derived` |
+| | **total** | **4718m58** | **21,814 / 1,928,255 / 1,727,432,200** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

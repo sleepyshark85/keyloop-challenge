@@ -252,5 +252,14 @@
    "Option H \u2014 Two class-scoped advisory locks per attempt"
   ],
   "decision": "Chosen option: H. Each attempt is its own transaction and takes two advisory locks before the"
+ },
+ "0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md": {
+  "options": [
+   "A \u2014 build both in slice 02, at step 5, after the review has reported.",
+   "B \u2014 defer both into slice 05 under a stated criterion, booked as debt.",
+   "C \u2014 defer with no criterion, as a backlog note.",
+   "D \u2014 no action: this record's numbers and the compiler are the evidence."
+  ],
+  "decision": "Chosen option: B, and the criterion is the decision rather than the destination: a control is"
  }
 }
