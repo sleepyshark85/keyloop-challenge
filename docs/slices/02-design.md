@@ -15,21 +15,19 @@ Nothing here re-derives ADR-0014 or ADR-0015. Both are accepted and immutable; �
 
 ## 0. Rulings and escalations, up front
 
-Three things need the human, and none of them is mine to settle. They are listed first so the
-orchestrator can queue them without reading the rest, and so nobody spends a cycle discovering them at
-step 5.
+Three things needed the human, and none of them was mine to settle. **E-02-1 and E-02-2 were both
+ruled on 2026-09-06** and are recorded here as ruled; E-02-3's routing stands. They are listed first so
+the orchestrator can queue them without reading the rest, and so nobody spends a cycle discovering them
+at step 5.
 
-### E-02-1 — AC-4 cannot be satisfied without ADR-0004's retry loop, which the slice puts out of scope · **§6 (d) escalate**
+### E-02-1 — AC-4 cannot be satisfied without ADR-0004's retry loop · **ruled 2026-09-06: the loop is in scope**
 
-The slice file says both of these:
+**The minimal prune-and-retry loop is in this slice** (`s-02-ruling-E-02-1`); the slice file's *Out of
+scope* now names only ADR-0009's seeded ordering and cap. Why it is load-bearing rather than an
+optimisation — §2.6 is built on it and step 3 asserts against it:
 
-> **AC-4** — As AC-3 with bays plentiful and exactly one qualified technician free; the constraint
-> reported is `no_technician_overlap`.
-
-> **Out of scope** — Retrying across remaining candidates on conflict (ADR-0004) — slice 04.
-
-**They contradict each other, and the contradiction is measurable rather than arguable.** Measured
-against `postgres:16-alpine`, on this repository's own migrations:
+AC-4 requires a doubly-violating insert to report `no_technician_overlap`. Measured against
+`postgres:16-alpine`, on this repository's own migrations:
 
 | Case | Reported constraint |
 |---|---|
@@ -72,7 +70,7 @@ resource, systematically, not the scarce one. So the defect is not confined to A
 **AC-11** requires the `409` to carry `resource` set to *the contended resource*, and it would carry
 the wrong one whenever both constraints are violable. `booking_conflicts_total{resource}` inherits the
 same lie at slice 09 (QS-13). That is client-visible and metric-visible, not a fixture artefact, and it
-is the part of E-02-1 that should weigh most with the human.
+is the argument the ruling turned on — P1, P2 and deferring AC-4 all leave AC-11 wrong.
 
 **The retry loop removes the ambiguity entirely, and this is the interesting part.** With
 prune-by-constraint, the constraint reported at *refusal* is the one whose candidate list emptied, not
@@ -92,9 +90,7 @@ them: AC-5 says *"a single `INSERT` per attempt"*, which presupposes attempts; A
 **every candidate** is refused"*, which is ADR-0004's exhaustion condition verbatim. And arc42 §6.1 —
 the section AC-3 and AC-4 are drawn from — already draws prune-and-refuse as the booking path.
 
-**Recommendation, and what I have designed to.** The numbered acceptance criterion governs the prose
-bullet: AC-4 is the definition of done, the "Out of scope" bullet is a statement about where the
-*improvement claim* lands. So §2.6 designs the minimal loop — **attempt, classify, drop the failing
+**What is in, and what stays out.** §2.6 designs the minimal loop — **attempt, classify, drop the failing
 resource *value* from its list, attempt the next candidate, refuse when a list empties** — and leaves
 in slice 04 the three things that are genuinely ADR-0009's and that QS-3 measures: the **seeded
 shuffle**, the **16-attempt cap**, and QS-3 itself.
@@ -109,10 +105,6 @@ rather than only the pair just tried. §0's own AC-3 and AC-4 traces above alrea
 pruning (*"pruning walks the technician list"*, *"prune B_i → retry (B_k, T1)"*), so three statements
 in this design disagreed and one of them was the one an implementer would build from.
 
-**If the human rules the other way**, the deletion is small and bounded and is named here so it does
-not have to be rediscovered: delete the `while` in `bookAppointment.ts`, delete `pruneCandidates`,
-refuse on the first `23P01` — and AC-4 must then be reworded or dropped, because no implementation
-satisfies it. I have not made that call and am not treating the human's absence as licence to.
 
 ### E-02-2 — QS-12's `wall-clock-and-zone` marker becomes unsatisfiable at this slice · **ruled 2026-09-06**
 
@@ -530,6 +522,12 @@ cross-product, which is what makes the loop terminate in `|bays| + |technicians|
 than `|bays| × |technicians|`. Emptying the entire list on one failure would be neither ADR-0009's
 rule nor a correct one: it refuses while capacity plainly remains, and it is what made AC-4 fail on
 the first attempt under this design's earlier wording.
+
+**The refusal's resource is a value PostgreSQL produced, and the loop does not weaken that — §4.1 and
+ADR-0016 stand.** A classification prunes only its own list, so the list that empties is the one the
+last classification named: one refusal exit, reached holding a freshly minted `ContendedResource`
+rather than a chosen one. Slice 04's 16-attempt cap adds a **second** exit — both lists non-empty, no
+emptied list to name — and that is where ADR-0016's claim needs re-measuring, in slice 04 and not here.
 
 ### The constraint name needs an observer, and did not have one — I-02-6
 
@@ -1007,7 +1005,7 @@ The slice declares `[QS-1, QS-2, QS-11, QS-9, QS-12]`. All five apply. Notes onl
 changes what the scenario means.
 
 - **QS-1 / QS-2** (AC-3, AC-4) — become executable end to end for the first time. Both must assert
-  over the **table**, not the responses. Their determinism depends on E-02-1, and the constraint name
+  over the **table**, not the responses. Their determinism comes from §2.6's loop (E-02-1), and the constraint name
   they require is observed through §2.6's `booking.conflict` log line (I-02-6). On the failure message:
   there is no seed to record in this slice — see F-02-7 — so it carries the candidate order and the
   fixture ids instead. **§4.4's DDL-drop control belongs to this pair**: it is what makes QS-1 evidence
@@ -1026,8 +1024,8 @@ changes what the scenario means.
   layers. If any of them needs a rule relaxed, that is a DCR and not an edit to
   `.dependency-cruiser.js`.
 
-Not applicable and worth saying so: **QS-3** (no spurious refusal) is slice 04's even though §0
-recommends admitting the loop — the loop makes QS-3 *pass*, and slice 04's job is the ordering, the
+Not applicable and worth saying so: **QS-3** (no spurious refusal) is slice 04's even though the loop
+lands here — the loop makes QS-3 *pass*, and slice 04's job is the ordering, the
 cap, and the scenario that pins them. **QS-13** (telemetry) is slice 09's; this slice adds no spans,
 and an empty OTel bootstrap now would be the junk drawer §5.2 warns about.
 
@@ -1145,7 +1143,7 @@ partial-application claim was.
 **§6.1** — the sequence gains the `23503` classification step (§5.3) and the precedence measurement
 (F-02-3): `23P01` is raised at index insertion and beats the FK's after-row trigger. An as-built note
 that slice 02 builds ADR-0004's loop without ADR-0009's seeded shuffle or attempt cap, both of which
-remain slice 04's, subject to E-02-1. **Added at step 2:** pruning is per resource **value** (T-02-1),
+remain slice 04's (E-02-1). **Added at step 2:** pruning is per resource **value** (T-02-1),
 and the `booking.conflict` log line is where the constraint name is observable until QS-13's span
 carries `db.constraint` at slice 09 (I-02-6).
 
@@ -1178,8 +1176,8 @@ therefore appear in §11.1's generated register as debt until ruled.
   three failures that share `appointment_vehicle_owned_by_customer` are separated by a classification
   read **after** the insert is refused, never by a pre-flight check. §5.3.
 
-**No ADR is proposed for the retry loop.** ADR-0004 already decided it; E-02-1 is a scope conflict
-between two statements in a human-authored slice file, and the remedy is a ruling, not a new decision
+**No ADR is proposed for the retry loop.** ADR-0004 already decided it; E-02-1 was a scope conflict
+between two statements in a human-authored slice file, and the remedy was a ruling, not a new decision
 record.
 
 ---
@@ -1248,5 +1246,5 @@ a loopback on a design corrected before its own red commit would punish the step
 - **E-02-2 no longer blocks anything.** It was ruled on 2026-09-06 and arc42 §10.2 carries the
   concept, so the QS-12 assertions are unblocked with the rest: both markers are specified above and
   the test-engineer implements them from that specification.
-- **E-02-1 changes only AC-4's determinism**, not the shape of anything. The concurrency tests can be
-  written now; if the human rules against the loop, AC-4 is what changes, and §0 names the deletion.
+- **E-02-1 is ruled and nothing is queued behind it.** The loop is in scope, §2.6 is its
+  specification, and AC-4's determinism comes from there.
