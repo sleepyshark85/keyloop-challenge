@@ -27,7 +27,7 @@ points at the argument as well as the remedy, and it is carried by the **absorbi
 when the human accepts or rejects the ADR; an *agreed and unbuilt* row leaves it when its slice reaches
 `done`, a `slice:check` verdict. Only a human ruling moves an ADR out of `proposed` — a merge does not.
 What the rows do not say is what is live in `main` while a remedy is outstanding: that is behaviour,
-recorded in §8.3 for the midnight-ending interval and under *What slice 01 did not make true* for both.
+and it is recorded where the behaviour is described.
 
 ### The cost of the literal AC-6 ruling — slice 01
 
@@ -37,7 +37,7 @@ the standing price of that ratified decision. **None is an argument for revisiti
 | id | The cost |
 |---|---|
 | **D-01-1** | The composition order is written out by a use case in `src/application` rather than made uncallable in any other sequence by branded types. Still correct, and correct because someone wrote it correctly |
-| **D-01-2** | Both inter-module handoffs take a bare `number`, so minutes passed where milliseconds are expected compiles and yields a plausible interval rather than a crash. The brands catch that *inside* a module and never between them, which is the boundary they were introduced for. **Already cashed in**: ADR-0014 must place `8_640_000_000_000_000` in two domain files with no mechanism to share it, so one concept has two homes and only review and a property test hold them equal |
+| **D-01-2** | Both inter-module handoffs take a bare `number`, so minutes passed where milliseconds are expected compiles and yields a plausible interval rather than a crash. The brands catch that *inside* a module and never between them, which is the boundary they were introduced for. **Cashed in**: ADR-0014 places `8_640_000_000_000_000` in two domain files with no mechanism to share it, so one concept has two homes and only review and a property test hold them equal |
 | **D-01-3** | `malformed-interval` is an extra branch and verdict variant, existing only because the `Interval` type cannot cross the boundary carrying *"ordered, and from the same interval"*. Fail-closed and directly testable, so a branch to cover rather than a risk to carry |
 | **D-01-4** | The three-file split has lost one of its two justifications — the three types no longer compose — and now rests on ambiguity containment alone. *"The scan requires it"* is thinner than *"the types require it"*: a real weakening, not a fatal one, and the reason a later slice should not simply inline `interval.ts` |
 
@@ -58,15 +58,10 @@ The first three are gaps, not licences: a spelling not listed is a finding to ra
 `outside-in-tests-do-not-import-src` (QS-10) has the matching hole one level up, described in §8.5:
 relative `../src/` references are caught, computed forms are not, and the residue is review.
 
-### What slice 01 did not make true
+### What the domain tests still do not evidence
 
 QS-9 and QS-12 are enforced by committed tests, which is not the same as fully evidenced:
 
-- **`occupancyInterval` has no production call site.** A-4's seam exists and is named; nothing depends
-  on it until the booking path lands at slice 02.
-- **QS-12's corpus is nearly empty** — `src/**/*.ts` is twelve files, three of them the domain itself,
-  so a marker matching in exactly one file is a weaker claim now than once routes and repositories
-  exist.
 - **QS-9 examines one zone and one year**, `Europe/London` in 2026. A southern-hemisphere transition, a
   non-whole-hour offset and a zone whose rules changed mid-year are untested; the rule is zone-generic
   by construction, not by evidence.
@@ -74,9 +69,19 @@ QS-9 and QS-12 are enforced by committed tests, which is not the same as fully e
   because there is no module specifier to record, but a Node build with small-icu would change
   `withinOpeningHours`'s answers without changing a line of `src/`. TC-10's version pin is what stands
   there, and it is not aimed at this.
-- **`instant()` does not bound its input** and **an interval ending at local midnight is refused** —
-  ADR-0014 and ADR-0015 are **accepted and unimplemented**, so both cases are live in the merged code
-  (§8.3). The agreed remedy for both is slice 02, AC-13 to AC-19.
+- **QS-12's corpus is small.** `src/**/*.ts` is twenty-one files, three of them the domain, so a marker
+  matching in exactly one file is a stronger claim than it was at slice 01 and still not a strong one.
+
+### The cost of ADR-0018's locks — slice 02
+
+Two advisory locks now precede every `INSERT` on the booking path (§6.1). They are what makes the
+`409` reachable at all, and they are not free.
+
+| id | The cost |
+|---|---|
+| **R-02-2** | **ADR-0016's argument is weaker after ADR-0018 than before it, and the ADR says so in its own Consequences.** Inside a per-resource lock a reintroduced check-then-act would be *correct*, not merely harmless — so the reading that bounded the damage, *"the exclusion constraint makes a check redundant"*, no longer bounds it. What survives is the brand (a `ContendedResource` mintable only by SQLSTATE classification), the `appointment-table-access` marker, and the two drop-one controls of §6.1. An argument getting weaker, not a mechanism failing — and the most consequential entry slice 02 added here |
+| **F-02-9** | **Every write path to `appointment` must take both locks, in the bay-then-technician order.** Inherited by **slice 06**'s reschedule `UPDATE` and **slice 07**; one that skips them reintroduces the deadlock against a concurrent booking, and because a `40P01` is deliberately not retried it surfaces as a `500` rather than as a latency blip. Nothing structural enforces it — `lockResources` lives in the only module permitted to name the table, which makes skipping it visible in review, not impossible |
+| **F-02-8** | `hashtext` is an **undocumented internal function**. ADR-0018 needs only a deterministic `int4` per id, so an application-side hash would serve identically; the swap is cheap and unowned |
 
 ## 11.2 Known risks
 
@@ -85,9 +90,10 @@ Ordered by how much they would cost to be wrong about, not by likelihood.
 ### R-1 · The write-throughput ceiling bought with goal 1
 
 §1.2 ranks integrity first and performance last with the cost stated, and this is the cost. Two limits
-are commonly confused. **Per contended key**, conflicting inserts serialise (§6.1), but only one can
-ever succeed, so what it caps is how fast losers are told *no* — order of a thousand refusals per
-second on one slot, and non-conflicting inserts do not interact at all. **In aggregate**, every insert
+are commonly confused. **Per contended key**, conflicting inserts serialise — since ADR-0018 on the advisory lock in front of
+the constraint rather than on the constraint itself, at three round trips per attempt instead of one
+(§6.1) — but only one can ever succeed, so what it caps is how fast losers are told *no*, and
+non-conflicting inserts do not interact at all. **In aggregate**, every insert
 maintains two partial GiST indexes, materially more expensive than a btree: low thousands of inserts
 per second on modest hardware. Against §1.1's load profile that is two orders of magnitude of headroom
 in aggregate and about five on the contended path.
@@ -123,8 +129,9 @@ back into code and would have to be argued against `CLAUDE.md` §2.1.
 | R-7b | `src/http` may import `src/domain`, and the rule is not "types only", so policy in a route handler would pass `dependency-cruiser` | QS-12 catches the three ambiguities that matter; the rest is review |
 | R-7c | `src/platform` is importable-by-all and imports nothing, exactly the shape of a junk drawer | The leaf rule stops it acquiring behaviour, not contents |
 | R-7d | Down migrations are exercised by no test (ADR-0007); the corpus was reversed once by hand on 2026-09-04 — a dated measurement, not a guarantee | The deployment is a fresh container; rollback in anger is not a story this system has |
-| R-7e | The retry loop must not be wrapped in a transaction (§6), and nothing structural enforces it | QS-3 fails immediately if it is — `25P02` on the second attempt |
+| R-7e | **The transaction boundary must be exactly one attempt wide**, and nothing structural enforces it. Wider and the second attempt fails `25P02` instead of retrying; narrower and ADR-0018's `pg_advisory_xact_lock` has no transaction to scope to | QS-3 fails immediately on the first; the second does not compile, because both calls take the same handle |
 | R-7f | Docker is required for everything but the `nodb` project (TC-9, §7.2) | A consequence of `CLAUDE.md` §2.2 being right about where the invariant lives |
+| R-7h | The RFC 3339 request pattern is a regex, so `2026-02-30T10:00:00Z` is accepted and `Date.parse` yields 2 March | Fixing it needs a leap-year calculation in `src/http`, which is the second calendar implementation slice 01 ruled against. **OQ-02-1** carries the trade |
 | R-7g | Case 0's constraint-set assertion filters `contype <> 'p'`. Clean on PostgreSQL 16.15 and 17.11, but **18 surfaces `NOT NULL` as `contype = 'n'`** — twelve rows on `appointment`. The fix is an allowlist, `contype IN ('c','f','u','x')` | Cannot fail today: the image is pinned and `postgres-harness.test.ts` asserts `^16\.`. **The direction of the failure is the finding** — a denylist breaks with a dozen names nobody added, so a version bump reads as *"the assertion is too strict"* and invites loosening the one thing that makes §8.1's seven-and-only-seven enforceable |
 
 ### R-8 · Three things CI is *said* to enforce and does not
@@ -145,8 +152,7 @@ record validates against the schema.
 
 ### R-12 · The mutation gate's failure mode is silence, and it is held by a workaround
 
-`CLAUDE.md` §10 makes the mutation score part of *Done* and `tools/slice/check.mjs` gates on 0.75. The
-tool producing that number has a demonstrated mode in which it reports survivors it never tested, and
+The tool producing the score §8.5 describes has a demonstrated mode in which it reports survivors it never tested, and
 §8.5 carries the measurement, the workaround and the re-measurement recipe. **The residual risk is that
 it was caught by a low score, which is luck**: a broken runner producing 0.81 against a 0.75 threshold
 would cover exactly the right changed files and satisfy every check `slice:check` makes, and nothing

@@ -25,7 +25,7 @@ same start, at the same instant. There is exactly one free bay.
 
 ![Two racing bookings and where PostgreSQL rejects the second](../diagrams/concurrent-booking.svg)
 
-*Source: [`diagrams/concurrent-booking.html`](../diagrams/concurrent-booking.html) · regenerate the SVG with `npm run diagram:export`*
+*Source: [`diagrams/concurrent-booking.html`](../diagrams/concurrent-booking.html) · regenerate the SVG with `npm run diagram:export`. It predates ADR-0018 and does not draw the locks; presentation diagrams are refreshed once, in phase 6*
 
 ```
 R1                                  R2                        PostgreSQL
@@ -40,15 +40,22 @@ POST /appointments                  POST /appointments
   │   ◀── {B1}, {T1}                  │   ◀── {B1}, {T1}          ← BOTH see B1 free.
   │                                   │                            Advisory. Nothing is
   │                                   │                            concluded from it.
-  ├ span: appointment.insert          ├ span: appointment.insert
+  ├ BEGIN                             ├ BEGIN
+  ├ pg_advisory_xact_lock(1,B1),      ├ pg_advisory_xact_lock(1,B1)
+  │    (2,T1) ── granted ─────────────┼──────────────────────▶ ADR-0018: the locks read
+  │                                   │   ── WAITS on R1 ───▶  no table and decide
+  ├ span: appointment.insert          │                        nothing
   │   INSERT … B1, T1, [09:00,10:00) ─┼──────────────────────▶ exclusion check
   │                                   │                        ┌ no_bay_overlap: no
   │                                   │                        │ conflicting row
-  │                                   │                        └ COMMIT ✓
+  ├ COMMIT ── locks released ─────────┼──────────────────────▶ └ COMMIT ✓
   │   ◀── appointment a-1             │
-  │                                   │   INSERT … B1, T1 ────▶ exclusion check
-  │                                   │                        ┌ conflicts with a-1
-  │                                   │                        └ ERROR 23P01
+  │                                   ├ lock granted
+  │                                   ├ span: appointment.insert
+  │                                   │   INSERT … B1, T1 ──▶  exclusion check
+  │                                   │                        ┌ conflicts with a-1,
+  │                                   │                        │ which is COMMITTED
+  │                                   │                        └ ERROR 23P01,
   │                                   │                          constraint =
   │                                   │                          "no_bay_overlap"
   │                                   │   ◀── 23P01
@@ -56,7 +63,7 @@ POST /appointments                  POST /appointments
   │                                   │   → {conflict, resource:'bay'}
   │                                   ├ booking_conflicts_total{resource="bay",
   │                                   │                         outcome="absorbed"}++
-  │                                   ├ prune bay B1 (ADR-0009)
+  │                                   ├ prune bay B1 — that bay, not all bays
   │                                   ├ candidate set now empty
   │                                   ├ booking_conflicts_total{…,outcome="refused"}++
   ▼                                   ▼
@@ -67,14 +74,31 @@ POST /appointments                  POST /appointments
 
 **Where the race is actually decided.** Not in `withinOpeningHours`, which reads no booking. Not in
 the candidate query, whose answer both requests believe and which is *wrong for one of them* the
-moment it is returned. It is decided inside PostgreSQL's exclusion-constraint check, at the `INSERT`.
+moment it is returned. Not in the advisory lock, which reads no table. It is decided inside
+PostgreSQL's exclusion-constraint check, at the `INSERT`. There is no window, because there is no
+check to have a window after.
 
-If the two statements are closer together than that diagram suggests — R2's `INSERT` arriving while
-R1's is still uncommitted — R2 **blocks** on R1's in-progress row rather than being told anything, and
-resumes when R1 ends: `23P01` if R1 committed, success if R1 rolled back. That blocking *is* the
-serialisation point, it is the only one in the system, and it is where §11.2's write-throughput
-ceiling comes from. It is also why no interleaving exists in which both succeed. There is no window,
-because there is no check to have a window after.
+**Why the lock is there, and why it is not part of that.** Without it, simultaneous inserters do not
+queue: `check_exclusion_constraint` inserts the index tuple and *then* scans, so each waits on the
+others' in-progress tuples and they cycle. Measured, 20 racers on one bay over 20 trials —
+**285 of 400 losers returned `40P01` (deadlock), 95 returned `23P01`, and exactly one row survived
+every trial.** The invariant was never in question; the *status* was, because a deadlock carries no
+constraint and therefore no verdict to render as `409`. Retry does not rescue it — an aborted racer
+re-inserts its index tuple, so the in-flight population never falls to one and every measured
+configuration livelocked. ADR-0018 puts one `pg_advisory_xact_lock` per bay and per technician in
+front of each attempt instead, so at most one inserter is ever in flight against a given resource and
+every loser conflicts with a **committed** row.
+
+**The lock decides nothing, and that is measured both ways** — drop the constraints and keep the lock
+and 20 overlapping rows are written; drop the lock and keep the constraints and there is still
+exactly one row, with 108 deadlocks. *Correctness is entirely the constraint's; liveness is entirely
+the lock's.* Both controls run in `tests/integration/exclusion-constraint-adjudicates.test.ts`.
+
+**The serialisation point moved but did not multiply.** It is now the advisory lock, immediately in
+front of the constraint's own, and it is still the only one in the system and still where §11.2's
+write-throughput ceiling comes from — at three round trips per attempt rather than one. It also makes
+the reported constraint deterministic: a loser now conflicts with a committed row rather than with
+whichever in-progress tuple it happened to meet.
 
 **Where `23P01` is caught and mapped**, in one place per stage:
 
@@ -84,6 +108,11 @@ because there is no check to have a window after.
 | classified | `src/persistence/pgError.ts` — the **only** site (`sql-only-in-persistence`, §5.3) | `{ kind:'conflict', resource:'bay'\|'technician' }` |
 | acted on | `src/application/bookAppointment.ts` | prune, count, retry or refuse (ADR-0004, ADR-0009) |
 | rendered | `src/http` | `409` + `application/problem+json`, naming the contended resource (§1.3, §8.6) |
+
+A `40P01` is classified `no-verdict` and is **not retried**: under ADR-0018's locks a deadlock can
+only mean some write path skipped them, so it is an internal fault and renders `500`. Retrying it
+would turn the fault into a latency blip nobody investigates. §11.2 carries that obligation, which
+slices 06 and 07 inherit.
 
 ## 6.2 A booking that retries, and succeeds
 

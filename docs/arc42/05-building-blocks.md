@@ -41,44 +41,53 @@ Pure functions and types. **It imports nothing at all** — no other module, no 
 builtin — and `dependency-cruiser`'s `domain-is-pure` rule enforces that absolutely, with no
 allowlist. IANA-zone conversion uses the `Intl` global, which needs no import.
 
-The purity is not aesthetic. GC-1 requires that the opening-hours rule *"must never acquire knowledge
-of what is booked"*, because a validation rule that reads other bookings is an availability check and
-reintroduces check-then-act. A module that cannot import a database client cannot consult one, so the
-prohibition is a build failure rather than a promise.
+The purity is not aesthetic: GC-1 requires the opening-hours rule never to learn what is booked, and
+a module that cannot import a database client cannot consult one.
 
 | Module | Owns | The §1.4 ambiguity it absorbs |
 |---|---|---|
-| `interval.ts` *(built)* | The `Instant` and `Interval` types, `instant(epochMillis)`, `appointmentInterval(startsAt, durationMillis)`, and **`occupancyInterval(interval)` — "the interval the constraint sees"** | **A-4.** `occupancyInterval` is the identity today, which is the statement that there is no buffer. A buffer changes this function and the constraint's range expression, nothing else |
+| `interval.ts` *(built)* | The `Instant` and `Interval` types, `instant(epochMillis)`, `appointmentInterval(startsAt, durationMillis)`, and **`occupancyInterval(interval)` — "the interval the constraint sees"**. `instant()` refuses anything outside ±8 640 000 000 000 000 ms, so an `Instant` is renderable by construction (ADR-0014) | **A-4.** `occupancyInterval` is the identity today, which is the statement that there is no buffer. A buffer changes this function and the constraint's range expression, nothing else |
 | `duration.ts` *(built)* | The `DurationMinutes` type, `serviceDuration(serviceType)`, `durationMillis(duration)` — the only place minutes become milliseconds | **A-1.** If duration varies by vehicle this function gains a parameter; the interval arithmetic above it takes a number and does not change |
-| `openingHours.ts` *(built)* | `withinOpeningHours(startsAtMillis, endsAtMillis, ianaZone, weekly)`, returning the `OpeningHoursVerdict` union rather than a boolean | **ADR-0001 / GC-1.** The only place that reasons in wall-clock time (A-8). Breaks, holidays and one-off closures land here |
+| `openingHours.ts` *(built)* | `withinOpeningHours(startsAtMillis, endsAtMillis, ianaZone, weekly)`, returning the `OpeningHoursVerdict` union rather than a boolean. It carries the same epoch bound (ADR-0014) and normalises an end rendering as local `00:00:00` on the next date to 86 400 seconds-of-day (ADR-0015) | **ADR-0001 / GC-1.** The only place that reasons in wall-clock time (A-8). Breaks, holidays and one-off closures land here |
 | `candidates.ts` *(slice 04)* | `orderCandidates(set, seed)`, `nextCandidate(set)`, `prune(set, resource, id)` | **A-10 / ADR-0009.** Ordering, pruning and the attempt cap's arithmetic. Pure and seeded, so a failing interleaving is reproducible |
 | `appointment.ts` *(slice 05)* | The status model: `confirmed`/`cancelled`, and which transitions are legal | **ADR-0003.** Cancellation is terminal and idempotent; only a confirmed appointment may be moved |
 
-The three built signatures take **primitives, not domain types**, which is the consequence of the
-literal AC-6 ruling recorded below rather than a simplification.
-
-`occupancyInterval` deserves its name. A-4 is §1.4's *"assumption most likely to be wrong in a real
-dealership"*, and what it moves is not the customer-facing appointment but the span the exclusion
-constraint compares. Keeping those two ideas distinct while they happen to be equal is the difference
-between a one-function change and an archaeology exercise.
+`occupancyInterval` deserves its name: what A-4 moves is not the customer-facing appointment but the
+span the exclusion constraint compares. Keeping the two distinct while they happen to be equal is the
+difference between a one-function change and an archaeology exercise.
 
 ### `src/application` — the use cases
 
-`bookAppointment`, `rescheduleAppointment`, `cancelAppointment`, `readAppointment`,
+`bookAppointment`, `readAppointment`, `rescheduleAppointment`, `cancelAppointment`,
 `queryAvailability`. This layer owns the ADR-0004 retry loop, the span boundaries of §8.4, and
 nothing else. It has no business rules of its own: every decision it makes is either delegated to
-`domain` or adjudicated by the database.
+`domain` or adjudicated by the database. `deriveInterval.ts` is §6.2 steps 3–4's composition order as
+a pure function — no handle, no clock — so what the literal AC-6 ruling took from the type system
+(D-01-1) is held by a module Stryker can mutate without a container.
 
 Use cases return **discriminated unions, not exceptions**:
 
 ```ts
 export type BookOutcome =
-  | { kind: 'confirmed'; appointment: Appointment }
-  | { kind: 'outside-opening-hours'; opens: string; closes: string }
-  | { kind: 'unknown-reference'; reference: 'dealership' | 'vehicle' | 'customer' | 'service-type' }
-  | { kind: 'vehicle-not-owned-by-customer' }
-  | { kind: 'no-capacity'; resource: 'bay' | 'technician'; attempts: number };
+  | { kind: 'confirmed'; appointment: AppointmentView }
+  | { kind: 'malformed-instant' }
+  | { kind: 'outside-opening-hours'; verdict: OpeningHoursVerdict }
+  | { kind: 'unknown-reference'; reference: 'dealership' | 'service-type' | 'customer' | 'vehicle' }
+  | { kind: 'vehicle-not-owned' }
+  | { kind: 'no-capacity'; resource: ContendedResource; attempts: number }
+  | { kind: 'no-verdict' }                                    // 40P01 — ADR-0018
+  | { kind: 'reference-data-invalid'; detail: string };
 ```
+
+`resource` is `ContendedResource`, a brand mintable only by `pgError.classify`, so a capacity refusal
+cannot be constructed without a value PostgreSQL produced (ADR-0016). The last two members are the
+system's fault rather than the client's and render as one §8.6 row; they stay apart so the `switch`
+and the operator's log line can name them apart.
+
+**One attempt is one transaction: ADR-0018's two advisory-lock acquisitions, then one `INSERT`.**
+`db.transaction()` sits inside the loop body and nowhere outside it (§6.1). Pruning is **per resource
+value** — a `no_bay_overlap` drops that bay and leaves the others — which bounds the loop at
+`|bays| + |technicians| − 1` attempts rather than their product.
 
 so §8.6's status mapping is an exhaustive `switch` the compiler checks: a new outcome cannot be added
 without the HTTP layer failing to compile, which is the cheapest way to stop a domain failure silently
@@ -87,10 +96,9 @@ rendering as a `500`.
 **This layer depends on `src/persistence` concretely. There is no repository port**, and that is a
 decision rather than an omission ([ADR-0008](../adr/0008-module-decomposition.md)): a port that can be
 implemented in memory is a port whose implementation cannot hold this system's invariant, and offering
-the socket invites the substitution `CLAUDE.md` §2.2 bans. The cost is that **a use case cannot be
-unit-tested against a substitute repository**. It can still be unit-tested against a replaced
-*transport* — `checkHealth` is, with no container — because removing the port forecloses substituting
-the repository, not the driver beneath it. §8.5 draws the line that keeps §2.2 intact.
+the socket invites the substitution `CLAUDE.md` §2.2 bans. The cost — a use case cannot be unit-tested
+against a substitute repository, only against a replaced transport — is §8.5's line, and it is what
+keeps §2.2 intact.
 
 ### `src/persistence` — SQL, and the only place SQLSTATE is read
 
@@ -101,10 +109,16 @@ outcome:
 ```ts
 // src/persistence/pgError.ts — the single site
 export type PgOutcome =
-  | { kind: 'conflict'; resource: 'bay' | 'technician' }   // 23P01, from err.constraint
-  | { kind: 'bad-reference'; constraint: string }          // 23503
+  | { kind: 'conflict'; resource: ContendedResource; constraint: string }  // 23P01
+  | { kind: 'bad-reference'; constraint: string }                          // 23503
+  | { kind: 'no-verdict' }                                                 // 40P01, ADR-0018
   | { kind: 'other'; cause: unknown };
 ```
+
+`classify` is **total over `unknown`, and duck-typed** rather than narrowed by `instanceof`: it is
+handed whatever a `catch` caught, and narrowing on a driver class would make classification depend on
+which copy of `pg` constructed the error. Its constraint-name map has no default arm, so an
+unrecognised `23P01` name is `other` and becomes a `500` (§11.2 R-3).
 
 A second translation site is the classic way a `409` comes to mean two different things and the way
 `err.constraint` gets dropped on one path — breaking both the `booking_conflicts_total{resource}` label
@@ -115,7 +129,7 @@ and ADR-0009's pruning. `sql-only-in-persistence` makes adding one a CI failure.
 | `db.ts` | The Kysely instance and the `pg` pool |
 | `schema.ts` | The `Database` interface, derived from the migrations |
 | `pgError.ts` | SQLSTATE → `PgOutcome`, and the constraint-name → resource mapping |
-| `appointmentRepository.ts` | The guarded `INSERT` (booking), the guarded atomic `UPDATE` (move, ADR-0003), the status `UPDATE` (cancel) |
+| `appointmentRepository.ts` | The **only** module permitted to name the table: `lockResources` (ADR-0018's two `pg_advisory_xact_lock` acquisitions, one statement, bay class then technician class), the unguarded `INSERT` and read-by-id (booking), the atomic `UPDATE` (move, ADR-0003), the status `UPDATE` (cancel). Nothing here catches — the error goes up to the one classifier |
 | `candidateRepository.ts` | The **advisory** free-bay and free-qualified-technician read (A-3, A-9) |
 | `referenceRepository.ts` | Dealership, its IANA zone and weekly opening hours; service type and its duration |
 | `migrations/*.sql` | The schema, including the two exclusion constraints verbatim (§8.2) |
@@ -125,7 +139,9 @@ and ADR-0009's pruning. `sql-only-in-persistence` makes adding one a CI failure.
 Fastify, TypeBox schemas, RFC 9457 `application/problem+json`, and the OpenAPI emitter (ADR-0005).
 It maps a use-case outcome to a status code and nothing more. It **may not import
 `src/persistence`**: a route that queries directly would bypass the span boundaries and the retry
-policy that make the booking path what it is.
+policy that make the booking path what it is. `problem.ts` holds the whole taxonomy as one closed
+`as const` set with a single constructor over it, so a `type` outside §8.6 is a compile error at the
+call site rather than a serialisation failure at the client.
 
 ### `src/platform` — the leaf
 
@@ -143,24 +159,29 @@ to see every layer, and the only place a dependency is chosen rather than receiv
 
 | Module | Contents |
 |---|---|
-| `src/domain` | `interval.ts`, `duration.ts`, `openingHours.ts` — three files, **zero import statements between them** |
-| `src/application` | `checkHealth.ts`, declaring `HealthOutcome` *here* and not in `src/http`, so the route's `switch` is exhaustiveness-checked and the use case stays callable without a server |
-| `src/persistence` | `db.ts` (the `Db` alias and the pool), `health.ts` (`pingDatabase`, returning a boolean rather than rethrowing a driver error, so the outcome union stays the only vocabulary above it), `schema.ts`, `migrations/` |
-| `src/http` | `server.ts`, `routes/health.ts`. `buildServer` takes already-bound use cases, never a handle |
+| `src/domain` | `interval.ts`, `duration.ts`, `openingHours.ts` — three files, **zero import statements between them**. `candidates.ts` is slice 04's and `appointment.ts` slice 05's |
+| `src/application` | `bookAppointment.ts` (the loop, `BookOutcome`, and `AppointmentView` — the one body shape the `201` and the `200` share), `deriveInterval.ts`, `readAppointment.ts`, `checkHealth.ts`. Each outcome union is declared *here* and not in `src/http`, so every route `switch` is exhaustiveness-checked and every use case stays callable without a server |
+| `src/persistence` | `db.ts` (the `Db` alias and the pool), `appointmentRepository.ts`, `candidateRepository.ts` and `referenceRepository.ts` (both reference-data reads only — neither can see `appointment`), `pgError.ts`, `health.ts` (`pingDatabase`, returning a boolean rather than rethrowing a driver error), `schema.ts`, `migrations/` |
+| `src/http` | `server.ts`, `problem.ts`, `routes/appointments.ts`, `routes/health.ts`. `buildServer` takes already-bound use cases, never a handle |
 | `src/platform` | `config.ts`, `logger.ts`. Telemetry is slice 09's; an empty OTel bootstrap now would be the junk drawer above |
 | `src/main.ts` | Composition root, signals, listen |
 
 `GET /health` was the skeleton's route precisely because it crosses every module: one that
 short-circuits the layering proves nothing about it.
 
+**The booking path names no table outside `appointmentRepository.ts`**, asserted by set equality
+rather than described (§10.2 QS-12). Check-then-act is absent because there is nowhere else that
+could read: `candidateRepository.ts` answers *which bays and technicians this dealership has for this
+service type* from reference data, and cannot consult a booking.
+
 **The ruleset forecloses every shape that *names* the database handle, and partial application is the
 shape taken rather than the shape left.** `sql-only-in-persistence` forbids naming `Kysely` outside
-persistence and `http-must-not-reach-persistence` forbids naming `Db`, and `tsPreCompilationDeps: true`
-catches `import type` too — but a generic parameter evades both by declining to name the handle at all:
+persistence, `http-must-not-reach-persistence` forbids naming `Db`, and `tsPreCompilationDeps: true`
+catches `import type` too — but a generic parameter evades all three by declining to name the handle:
 `interface GenericDeps<TDb> { db: TDb }` compiles and cruises clean. Partial application costs nothing
 to prefer, because the generic alternative buys the edge a value it cannot type, cannot use and must
-not touch. Stating this precisely matters: *"no other shape compiles"* would be a claim the tooling
-does not support, and the next person to find the escape hatch would conclude the rule was decorative.
+not touch. *"No other shape compiles"* would be a claim the tooling does not support, and the next
+person to find the escape hatch would conclude the rule was decorative.
 
 ### What literal AC-6 changed in the domain's signatures
 

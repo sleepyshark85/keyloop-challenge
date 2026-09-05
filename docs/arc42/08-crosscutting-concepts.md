@@ -426,30 +426,44 @@ with both clean is `coverageAnalysis` worth revisiting. §11.2 R-12 carries the 
 ### The response-schema seam is a serialiser, not an assertion
 
 **A TypeBox `response` schema does not validate what a handler produced. It reshapes it on the way
-out**, through `fast-json-stringify`, with four distinct behaviours. Measured on this repository's
-pinned Fastify:
+out**, through `fast-json-stringify`. Six behaviours, measured on this repository's pinned Fastify:
 
 | The handler sends | On the wire | Behaviour |
 |---|---|---|
 | an undeclared property | dropped | **stripped** |
-| a required property missing | `500 Internal Server Error` | **enforced** — the only case that fails loudly |
+| a required property missing | `500 Internal Server Error` | **enforced**, loudly |
 | a wrongly-typed value (`"42"` for a number) | `42` | **coerced**, silently |
 | a wrong value for a `Type.Literal` | **the schema's constant** | **substituted**, silently |
+| a wrong value for a `Type.Union` of literals | `500` | **enforced**, and never substituted |
+| a wrong value for `Type.String({ enum })` | the wrong value | **passed through**, unvalidated |
 
-The fourth is the dangerous one and it is a property of every route this system will have: a handler
-emitting `{status:'', checks:{database:''}}` produces a byte-identical
+Substitution is the dangerous one, and it is a property of every route this system will have: a
+handler emitting `{status:'', checks:{database:''}}` produces a byte-identical
 `200 {"status":"ok","checks":{"database":"up"}}`, which is why four mutants of the health route
 survived a suite that looked thorough. **Nothing proves substitution, and nothing can, from the wire.**
-Two consequences bind every later slice:
+Three consequences bind every later slice:
 
-1. **Where a value is computed, the schema must not pin it.** §8.6's taxonomy gives each status code a
-   `type` URI; as a `Type.Literal` per code, a handler's computed URI is silently rewritten to the
-   constant, and a contract test asserting on the body reads that constant back and passes — **QS-11's
-   own test unable to fail for the reason it names.** Either the schema does not pin the value, or the
-   test does not assert it from the body.
-2. **A test through this seam proves the schema, not the handler.** To hold a handler to a computed
+1. **Pin a computed enum-valued field as a `Type.Union` of literals.** It is the only one of the three
+   pinning forms that both enforces and does not substitute. Under `Type.Literal` a handler's computed
+   value is silently rewritten to the constant and a contract test asserting on the body reads that
+   constant back and passes — **QS-11's own test unable to fail for the reason it names**; under
+   `Type.String({ enum })` the wrong value reaches the client instead. §8.6's `type` URIs and the
+   appointment's `status` are both unions for that reason.
+2. **The backstop can become the defect, so it is not the only guard.** A body that fails a response
+   schema renders `FST_ERR_FAILED_ERROR_SERIALIZATION` as `application/json` — wrong status, no
+   `type`, not `problem+json`. So the taxonomy is also closed at compile time by a single constructor,
+   and the `500` carries no response schema at all (§8.6).
+3. **A test through this seam proves the schema, not the handler.** To hold a handler to a computed
    value, assert on what it passed to `send`. Everything an assertion on the wire body can tell you
    about a pinned field, it would tell you about an empty handler too.
+
+**On the request side the same seam strips rather than rejects.** Fastify's default ajv options set
+`removeAdditional: true`, so a body carrying an undeclared property is accepted with the property
+removed, not refused. `additionalProperties: false` on a request schema is therefore load-bearing for
+**ADR-0005's emitted OpenAPI document** — where it is the published statement of what the operation
+takes — and not a runtime rejection. Where a request must be *refused* for what it carries, something
+other than the schema has to refuse it. AC-6 holds regardless, and by a second, independent route:
+there is no parameter anywhere on the booking path that could receive a client-supplied end.
 
 ## 8.6 Error handling and API semantics
 
@@ -486,9 +500,9 @@ it to Gate B; it is decided here.
 | `409` | `/problems/appointment-not-confirmed` | Moving a cancelled appointment (ADR-0003) | Appointment status |
 | `422` | `/problems/unknown-reference` | Unknown dealership, service type, customer or vehicle. Carries `reference` | Reference read, then `23503` |
 | `422` | `/problems/vehicle-not-owned` | The vehicle is not the named customer's | Composite FK, `23503` (A-6, GC-2) |
-| `500` | `/problems/internal` | Anything else | — |
+| `500` | `/problems/internal` | Reference data the client cannot see or correct, and anything else | The use case, or the fallback handler |
 
-Three deliberate choices in that table:
+Four deliberate choices in that table:
 
 - **Ownership failure is a `422`, not a `403`** — validation, not authorisation (ADR-0002). No
   deliberate ambiguity about whether the vehicle exists, and no audit event.
@@ -498,6 +512,26 @@ Three deliberate choices in that table:
 - **Out-of-hours is a `400` although `422` would sit more naturally beside the reference failures.**
   ADR-0001 fixed the code as a Gate A ruling. The inconsistency is real and recorded rather than
   quietly harmonised; changing it means superseding the ADR.
+- **The `500` row is reachable, and it is not only a fallback.** Four reference-data faults route to
+  it — a dealership whose `time_zone` does not resolve, one whose `opens_at` does not parse, one with
+  no service bays, and a candidate refused by a composite foreign key — as does a `40P01` under
+  ADR-0018's locks. A `4xx` would tell a service advisor to correct something they did not send and
+  cannot see, so the body says nothing actionable and the detail goes to the log. QS-11 reaches it
+  end-to-end through a seeded unresolvable zone rather than treating it as unprovable.
+
+Two members of `BookOutcome` render as that one row — `no-verdict` and `reference-data-invalid`.
+They stay apart in the union so the `switch` and the operator's log line distinguish them; the client
+contract does not grow. Symmetrically, a dealership with **no technician qualified for the requested
+service type** is `422 /problems/unknown-reference` with `reference=service-type`: the request names a
+(dealership, service type) pair and that pair does not resolve, which is the only sense in which this
+API knows service types at all. It is not contention and there is nothing to retry.
+
+**The taxonomy is a closed set with one constructor.** The `type` URIs are a single `as const` array,
+`ProblemSchema` is built from it, and the constructor takes that union — so a URI outside the table is
+a compile error at the call site, and §8.5's response-schema union is the runtime backstop behind it.
+The `500` alone carries no response schema, for the reason §8.5 gives. The media type is set per
+response rather than globally, because a `200` that arrived as `problem+json` is a worse failure than a
+`400` that arrived as `application/json`.
 
 ### Outcomes, not exceptions
 
