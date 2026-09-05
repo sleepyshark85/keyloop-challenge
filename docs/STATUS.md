@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `7b6aeee docs(arc42): condense seven sections under the human's concision ruling` |
+| Last commit | `4290e48 fix(docs): the guard protecting the condensation was wrong three ways` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process |
 | Agent runs recorded | 71 |
 | ADRs accepted | 13 |

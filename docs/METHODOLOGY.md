@@ -334,6 +334,19 @@ the test-engineer (`test(acceptance): … (red)`); **every implementer commit gr
 the code it drives); `main` receives only green merges. Conventional Commits referencing the slice.
 Past ~150 changed lines it should have been two commits.
 
+<!-- agents:committing -->
+**Commit by explicit pathspec: `git commit --only <paths> -F <message-file>`.** Never a bare
+`git commit`, never `git add -A`, never `git commit -a`.
+
+The git index is shared by every agent in this worktree, and roles run concurrently whenever their
+files are disjoint — but the index is not a file. A bare commit takes the index as it finds it, so
+another role's staged work lands in your commit under your name. That happened at slice 00 and would
+have recorded an authority violation in git history, which is what criterion C2 is measured from.
+
+`guard-paths.mjs` cannot help here: it denies you a `Write` outside your paths and cannot deny you a
+`git add` of the same path. Pathspec-pinning is the only thing that closes it.
+<!-- /agents:committing -->
+
 **Every role commits by explicit pathspec — `git commit --only <paths>`, never a bare `git commit`
 or `git add -A`.** The git index is shared by every agent in the worktree, and roles run
 concurrently when their *files* are disjoint. At slice 00 the architect's `git add` and the
