@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `0a9ff13 feat(docs): word budgets, and two guards for the §4 override` |
+| Last commit | `6c9fbf1 docs(slices): the tombstones told Gate D's ruling three times` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process |
 | Agent runs recorded | 62 |
 | ADRs accepted | 13 |
