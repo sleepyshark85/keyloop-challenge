@@ -1,4 +1,4 @@
-# Prompt · slice 01 · implementer · invocation 3
+# Prompt · slice 02 · implementer · invocation 1
 
 Captured at invocation by `.claude/hooks/capture-prompt.mjs`, per METHODOLOGY.md §9.
 This file is the prompt **as sent** — written before the agent ran, not reconstructed after.
