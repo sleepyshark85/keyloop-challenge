@@ -83,6 +83,7 @@ without taking anyone's word for it.
 - [**ADR-0016**](adr/0016-a-capacity-refusal-requires-a-database-verdict.md) — A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification *(proposed)*
 - [**ADR-0017**](adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) — Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them *(proposed)*
 - [**ADR-0018**](adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) — Lock the bay and the technician before each insert, and treat a deadlock as an internal fault *(proposed)*
+- [**ADR-0019**](adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) — Defer a control only to the slice that makes it cheaper or stronger *(proposed)*
 
 ---
 

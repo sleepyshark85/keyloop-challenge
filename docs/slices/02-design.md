@@ -262,9 +262,12 @@ because `BookCommand` has no member for an end and `appointmentInterval` has no 
 AC-6 rests on the structural leg and the schema leg is defence in depth. A survivor that tells you
 which of two mechanisms is load-bearing is a survivor doing its job, and it should reach the reviewer
 as evidence rather than as an apology. Two limits, so it is not over-claimed: the reading is scoped to
-**AC-6**, and `additionalProperties: false` remains load-bearing for the request contract and for
-ADR-0005's emitted OpenAPI at slice 10 — a surviving mutant is not a licence to weaken the code that
-survived it; and it holds only while nothing downstream reads the raw body, so a later slice that logs
+**AC-6**, and `additionalProperties: false` stays — a surviving mutant is not a licence to weaken
+the code that survived it. **What it is load-bearing *for* is narrower than this paragraph first
+said, and the reviewer's correction is right (§13):** Fastify's `removeAdditional: true` strips
+rather than rejects, so at runtime the request schema's clause changes only whether an extra
+property reaches a handler with nowhere to put it — which is why the AC-6 test asserts `201` and
+not `400`. It is load-bearing for ADR-0005's emitted document; and it holds only while nothing downstream reads the raw body, so a later slice that logs
 or generically maps it puts the schema leg back on the critical path. What AC-6 therefore asserts is a
 behaviour the system satisfies **by construction** rather than by validation, which is the stronger
 position — and its acceptance test is still able to fail, the moment someone adds an end to
@@ -545,7 +548,9 @@ so the appointment stays readable) — and because a single `Type.Literal('confi
 schema would **silently substitute** the constant for whatever the handler computed, which is
 measurement 8 and would make slice 05's own test unable to fail. The schema is
 `Type.Union([Type.Literal('confirmed'), Type.Literal('cancelled')])`, which is the only one of the
-three forms measured that both enforces and does not substitute.
+three forms measured that both enforces and does not substitute. **The enforcement is asserted on
+the `POST` path only, and the argument above is about the `GET` one** — R-02-3, ruled (b) in §13 and
+absorbed by slice 05, where `cancelled` becomes producible and the assertion stops needing a cast.
 
 Discriminated union, no exceptions, per arc42 §5.2 and §8.6 — so §5.2's status mapping is one
 exhaustive `switch` the compiler checks, and a seventh outcome cannot be added without `src/http`
@@ -780,7 +785,9 @@ unknown id is AC-2's `404`.
 carrying an extra `endsAt` returns `201` with the property **stripped**, because Fastify's default
 ajv options set `removeAdditional: true`. So a supplied end never reaches the handler — and there is
 no `endsAt` parameter anywhere on the path to receive it, since `appointmentInterval` takes only a
-start and a duration. Two independent reasons, one of which is structural.
+start and a duration. Two independent reasons, one of which is structural — and only the structural
+one is observable, because stripping a property nothing reads changes no byte the client sees
+(§13).
 
 **AC-8 needs `setErrorHandler`, and it works.** Measured: a body failing the `startsAt` pattern
 returns `400` with `content-type: application/problem+json; charset=utf-8`, the handler never runs,
@@ -944,11 +951,15 @@ What survives, and it is not nothing:
   locks kept ⇒ **20 overlapping rows**. Correctness is entirely the constraint's; liveness is
   entirely the lock's, and the pair is what turns that sentence from a claim into a reading.
 
-The lock-drop control belongs beside §4.4's in
-`tests/integration/exclusion-constraint-adjudicates.test.ts`, under QS-1 and QS-2 as §4.4's already
-does. It is one added case in an existing file, **not a new acceptance criterion** — I considered
-adding one and rejected it, because a new AC needs a new red and this slice's file already says that
-a second red commit means it was two slices.
+**The lock-drop control was named here and never built — R-02-2, and this wording is why.** It
+belongs beside §4.4's in `tests/integration/exclusion-constraint-adjudicates.test.ts`, under QS-1
+and QS-2 as §4.4's already does; it is one added case in an existing file and **not a new acceptance
+criterion**, because a new AC needs a new red and this slice's file already says that a second red
+commit means it was two slices. §4.4 stated its control imperatively and it was built. This sentence
+stated its own descriptively, after the red commit, in a ruling section, naming no owner and no
+step — and it was dropped without a record. **Ruled (b) in §13**, absorbed by slice 05 under
+[ADR-0019](../adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md),
+which also carries the four-cell matrix and names the three cells the suite asserts today.
 
 ---
 
@@ -1191,6 +1202,12 @@ the disagreement recorded in §12.
   I did **not** take that inside a DCR commit: it would bury the one entry it was meant to add. It is
   a tooling commit of its own, and the guard should fail on an unbaselined ADR rather than skip it.
   **Route to the tooling owner.**
+- **F-02-11** *(step 5, R-02-2)* — **an instruction stated in prose creates no work item.** §4.4's
+  control was written imperatively and was built; §4.5's was written descriptively and was dropped,
+  and nothing noticed until review. §0's list is what the orchestrator queues from, and §4.5's
+  instruction was never in it. Same family as R-02-4 (O-29), third instance in this slice: work that
+  was ruled but never queued. **Remedy: a ruling that creates work carries a numbered item in §0,
+  not a sentence in a paragraph. Route to the orchestrator.**
 
 ### The acceptance-criterion wording I want changed — R-02-1
 
@@ -1212,8 +1229,10 @@ restriction on what may precede the insert, not a permission slip.
 
 ## 10. Proposed arc42 edits — for step 7, as-built rather than as-designed
 
-Within the declared scope `["§5.2", "§6.1", "§8.6"]`. These are proposals; arc42 is corrected at step
-7 to what actually merged, not now.
+Within the declared scope `["§5.2", "§6.1", "§8.6", "§10.2"]` — **§10.2 was added at step 5 under
+R-02-1**, over the marker split that `dd9bd44` had already hand-edited into §10 at step 2. That text
+is therefore as-built already, and step 7 verifies the merged wording rather than making a new edit.
+These are proposals; arc42 is corrected at step 7 to what actually merged, not now.
 
 **§5.2** — five new module rows under `src/http`, `src/application` and `src/persistence`. An
 *As built at slice 02* block recording: that `candidateRepository` reads **reference data only** in
@@ -1255,14 +1274,16 @@ capacity refusal requires a verdict, and a deadlock is the absence of one.
 **Outside the declared scope — flagged for the orchestrator to route, not taken:** §8.2 (F-02-9's
 lock obligation, beside the existing slice-06 obligation), §11 (F-02-8, F-02-9, and §4.5's admission
 that ADR-0018 weakens ADR-0016's argument), §10 (E-02-2,
-QS-12's marker — **blocking on step 3**), §8.5 (E-02-3, two measured rows and reversed guidance),
+QS-12's marker — **blocking on step 3**), §8.5 (E-02-3, two measured rows and reversed guidance, plus R-02-3's reading that a request
+schema's `additionalProperties: false` strips rather than rejects, so this API is lenient about
+unknown request properties and stays so under Fastify's defaults),
 §11 (F-02-1, F-02-2, F-02-4, F-02-5, and the D-01-2 duplication cashing in for the second time).
 
 ---
 
 ## 11. ADRs
 
-Three genuinely new decisions. All `status: proposed`: they are the architect's recommendation and the
+Four genuinely new decisions, the fourth added at step 5. All `status: proposed`: they are the architect's recommendation and the
 human's to rule at this slice's gate, which is the pattern ADR-0011 through ADR-0015 established. Both
 therefore appear in §11.1's generated register as debt until ruled.
 
@@ -1275,6 +1296,10 @@ therefore appear in §11.1's generated register as debt until ruled.
   class-scoped advisory locks per attempt, and a deadlock is an internal fault rather than a
   refusal. T-02-9, §4.5. **Decided by me under the 2026-09-06 amendment**, unlike the other two,
   which are recommendations awaiting the human. It is provisional until the gate all the same.
+- **[ADR-0019](../adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md)**
+  — a control is deferred only to a slice that makes it cheaper or stronger; a deferral that cannot
+  name one is an omission. The (b) rulings on R-02-2 and R-02-3 are mine; the **criterion** that
+  permits them is the human's to rule, which is why it is a record and not a note. §13.
 
 **No ADR is proposed for the retry loop.** ADR-0004 already decided it; E-02-1 was a scope conflict
 between two statements in a human-authored slice file, and the remedy was a ruling, not a new decision
@@ -1340,3 +1365,94 @@ and the governor counts design changes, not an unsatisfiable assertion and not m
 slice stands at **1 of 2**; one more design change auto-escalates, and the honest reading of that is
 that a slice carrying 19 acceptance criteria, a whole taxonomy and two absorbed slices was always
 going to spend one.
+
+---
+
+## 13. What step 5 produced — the reviewer's findings, ruled
+
+The reviewer returned one MAJOR and three MINOR, having re-run Stryker independently to a
+byte-identical survivor set and re-measured ADR-0018's three cells itself rather than accepting
+them. **R-02-1 and R-02-4 are the orchestrator's** and are ruled and closed there. The two below are
+mine: **both (b), neither holds the gate, both absorbed by slice 05** under
+[ADR-0019](../adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md).
+
+For the orchestrator, one line: `05-cancellation.md` gains
+`deferred_from: ["R-02-2:0019", "R-02-3:0019"]`, which is what puts both rows in §11.1's generated
+register and what makes them refusable at that slice's Definition of Ready.
+
+### R-02-2 — the lock-drop control is not in the suite · **(b)**
+
+**It cannot be (c), and I checked rather than assumed.** (c) obliges me to name an acceptance
+criterion, a `QS-*` or a §2 clause that the work would fail, and none does: three of the four cells
+of ADR-0018's matrix are standing tests today — constraint alone ⇒ one row, and neither ⇒ twenty,
+both in `exclusion-constraint-adjudicates.test.ts`; and under the locks every one of the nineteen
+refusals is a `23P01` the database named, in both `tests/concurrency/` files. §2.1 is asserted three
+ways. The missing cell's unique content is one hypothesis: *the lock could replace the constraint.*
+
+**It is not "a mechanism stated and never run", and the distinction is not a quibble.** It was run
+twice — by me while ruling T-02-9, and by the reviewer independently on `postgres:16-alpine` against
+these migrations — with matching results. What is missing is a run that **repeats**, and the sharper
+cost is that the reviewer's control script is a scratchpad file that dies with the slice. ADR-0019
+carries the numbers for that reason: a measurement nobody can re-read is not evidence.
+
+**I considered (a) and rejected it, and the reason is not cost.** The wording defect is real and it
+is mine — §4.4 said *"adopted in full"* and got built, §4.5 said *"belongs beside"* and did not, and
+the difference in phrasing tracks the difference in outcome exactly. What defeats (a) is the
+consumer. (a) resumes step 5 with the remedy applied, on the premise that the evidence is needed
+now; it is not. ADR-0018 is `status: proposed`, and a merge does not rule it — ADR-0011 has been
+`proposed` since slice 00. Slice 05 reopens this very file to show that the constraint's
+`WHERE status <> 'cancelled'` predicate frees a cancelled slot, so the fourth cell lands beside a
+case that must be written anyway, and it lands well before the register is ruled.
+
+**Does it hold the gate? No.** The regression it would guard — someone drops the constraint
+believing ADR-0018's locks cover it — fails both concurrency tests today, twenty confirmed against
+an expected one. What is deferred is the reading, not the guard.
+
+### R-02-3 — the GET route's response schema is not asserted · **(b)**
+
+**Deferring makes this test stronger rather than merely later.** `AppointmentView.status` is a
+two-member union of which `readAppointment` can produce only `confirmed`, so a test that kills the
+`ObjectLiteral "{}"` mutant today must manufacture `'pencilled-in'` through a cast the production
+path cannot make. At slice 05 the second member is produced for real and the assertion becomes one
+about behaviour instead of about a cast.
+
+**My text over-claims and this is the correction.** §2.6 argues for the union of literals *because
+slice 05 renders `cancelled` at that URL*, and that argument is asserted on the **POST** path only —
+`tests/unit/http/appointments.test.ts`'s *"a `status` outside {confirmed, cancelled} never reaches
+the client as a `201`"*. The GET path, which is the one the argument is about, carries the same
+schema with nothing asserting it. What that schema does earn today is `fast-json-stringify`'s
+stripping and ADR-0005's emitted document; its enforcement leg has no reachable subject, because the
+compiler already forecloses every value the handler could send. **The remedy is that case's twin at
+`200`** — `tests/unit/http/` is the implementer's, slice 05.
+
+### The two corrections the reviewer made, and what follows from each
+
+**`openingHours.ts:256` — the reviewer is right, and no code changes.** The survivor is column 32,
+`closesSeconds === null → false`, and it survives because `!(opensSeconds < closesSeconds)` already
+covers it: `opensSeconds < null` coerces to `< 0`, false for every seconds-of-day. The arm is
+**redundant, not untested**, and the implementer's note said untested. The reviewer's point is the
+substance — the two diagnoses call for opposite remedies, a test or a deletion — and **neither is
+taken.** Deleting the explicit null check would leave the guard resting on `n < null` coercing to
+`n < 0`, the least legible rule in that expression and the one a future reader would have to
+re-derive before trusting the parse contract; writing a test for it would be writing a test that
+cannot fail. It stays, recorded as equivalent **by implication** rather than by unreachability. What
+follows is only that the survivor accounting must carry the reason, because *"no test covers it"*
+sends the next person to write the test that cannot fail. F-02-11.
+
+**AC-6 — the refinement is accepted, and the over-claim is mine.** Corrected in §0 and §2.7:
+`additionalProperties: false` on the request body is not load-bearing at runtime, because Fastify
+strips rather than rejects and nothing downstream reads the raw body. It is load-bearing for
+ADR-0005's emitted document, and it becomes load-bearing at runtime the moment a later slice logs or
+generically maps that body — which §0's second limit already said and which is now the only limit
+doing work. The client-facing consequence, stated once: **this API is lenient about unknown request
+properties and stays so under Fastify's defaults.** That is an §8.5 fact and routes with E-02-3 at
+step 7, not now.
+
+### The loopback ledger, unchanged
+
+Both rulings are (b): the work merges as-is and no design returns to step 1. The slice stands at
+**1 of 2**.
+
+**One obligation this section adds to step 7.** This file is 12,180 words against an in-flight budget
+of 3,000 and a merged budget of 1,200. Nothing here is exempt from that; the condensation is step 7's
+and is the largest single item in `docs:budget`'s report.
