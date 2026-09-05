@@ -121,15 +121,24 @@ describe('QS-2 / AC-4 — exactly one booking survives twenty simultaneous reque
       ).toBe(`24 bays seeded, 1 used`);
 
       // ── 2. OVER THE RESPONSES.
-      // T-02-9, raised at step 3 with its measurement. Under N SIMULTANEOUS inserts against one
-      // exclusion range PostgreSQL refuses the losers with EITHER `23P01` OR `40P01`
-      // (deadlock_detected), all-or-nothing per race, in roughly one race in three at every N
-      // from 2 to 20 — `check_exclusion_constraint` inserts the index tuple and THEN scans, so
-      // simultaneous inserters wait on each other's in-progress tuples and form a cycle.
-      // Exactly one row survives either way, so §2.1 is untouched; but design §2.6 classifies
-      // `40P01` as `other`, which is a rethrow and a `500`. If the split below reads
-      // "1 confirmed / 0 refused" with nineteen 500s, that is this finding and not a defect in
-      // the booking path — see the step-3 report.
+      // T-02-9, raised at step 3 with its measurement: under N SIMULTANEOUS inserts against one
+      // exclusion range PostgreSQL refused the losers with `40P01` (deadlock_detected) rather
+      // than `23P01` — `check_exclusion_constraint` inserts the index tuple and THEN scans, so
+      // simultaneous inserters wait on each other's in-progress tuples and form a cycle. Exactly
+      // one row survived either way, so §2.1 was never in question; the losers' STATUS was.
+      //
+      // ADR-0018 ruled it: two class-scoped advisory locks, bay then technician, before every
+      // insert, and a `40P01` that still arrives is `no-verdict` ⇒ `500 /problems/internal`,
+      // never a `409`. Measured there across 56 locked races at N = 20 and N = 40 — 0 deadlocks,
+      // every racer a verdict. So the split below is no longer a finding waiting to happen: a
+      // racer answered with anything other than 201 or 409 means a write path reached
+      // `appointment` without those locks, which is F-02-9's obligation broken. That is a defect
+      // in the booking path and must not be read here as expected noise.
+      //
+      // ONE strict equality, not a count each (I-02-9): every other assertion in this file
+      // filters `refused` and so passes VACUOUSLY on an empty list. This is the only assertion
+      // that fails when the nineteen losers come back with the wrong status, which is why both
+      // counts are named inside it.
       const confirmed = answers.filter((a) => a.status === 201);
       const refused = answers.filter((a) => a.status === 409);
       expect(
@@ -137,7 +146,7 @@ describe('QS-2 / AC-4 — exactly one booking survives twenty simultaneous reque
         `the ${String(RACERS)} racers must split 1 / ${String(RACERS - 1)}.\n` +
           answers.map((a, i) => `  [${String(i)}] ${describeAnswer(a)}`).join('\n') +
           `\n${fixture}`,
-      ).toBe(`1 / ${String(RACERS - 1)}`);
+      ).toBe(`1 confirmed / ${String(RACERS - 1)} refused`);
 
       expect(
         refused.map((a) => member(a, 'type')).filter((t) => t !== '/problems/no-capacity'),
