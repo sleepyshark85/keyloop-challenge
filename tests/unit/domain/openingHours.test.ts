@@ -416,6 +416,16 @@ describe('withinOpeningHours — step 1 bounds both endpoints (ADR-0014, AC-16)'
     });
   });
 
+  it('exactly -MAX as the START is not rejected either — both endpoints carry the same `>`', () => {
+    // The positive case below pins the END's comparison; this one pins the START's. Without it a
+    // `>` -> `>=` mutant on the first of the two `Math.abs` tests survives, because no case
+    // passes the exact bound as a start. The verdict itself is not the claim — only that the
+    // interval was not refused by step 1.
+    expect(withinOpeningHours(-MAX, -MAX + 1_000, ZONE, weekly).kind).not.toBe(
+      'malformed-interval',
+    );
+  });
+
   it('exactly ±MAX is NOT rejected by the bound: the comparison is `>`, not `>=`', () => {
     // The interval is one second at the extreme positive instant, which renders. If the bound
     // were exclusive this would be `malformed-interval` and AC-14's two endpoints would be
@@ -439,6 +449,18 @@ describe('withinOpeningHours — step 1 bounds both endpoints (ADR-0014, AC-16)'
  * lists four, and each one below says which case is the only thing standing between it and a
  * survivor.
  */
+describe('withinOpeningHours — step 6 reads BOTH ends of the window', () => {
+  it('a malformed CLOSING time is malformed-hours, not only a malformed opening one', () => {
+    // Both halves of `opensSeconds === null || closesSeconds === null` need a case, or one of
+    // them is an alternative no input distinguishes.
+    const start = Date.parse('2026-09-08T09:00:00.000Z');
+    expect(withinOpeningHours(start, start + 3_600_000, ZONE, weekOpen('09:00:00', 'not-a-time'))).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 2,
+    });
+  });
+});
+
 describe('withinOpeningHours — step 4 normalises an end at local midnight (ADR-0015)', () => {
   // 23:00 BST on Tuesday 2026-09-08, ending 00:00 local on 2026-09-09.
   const ELEVEN_PM = Date.parse('2026-09-08T22:00:00Z');

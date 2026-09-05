@@ -298,6 +298,16 @@ describe('bookAppointment — the conflict line is the observer AC-3 and AC-4 re
 
     const conflicts = lines.filter((l) => l.record['event'] === 'booking.conflict');
     expect(conflicts).toHaveLength(2);
+    // The whole first record, so a dropped field is a failure here rather than at slice 09 when
+    // QS-13's span is built from the same three facts.
+    expect(conflicts[0]?.record).toEqual({
+      event: 'booking.conflict',
+      constraint: 'no_bay_overlap',
+      resource: 'bay',
+      attempt: 1,
+      bayId: 'bay-0',
+      technicianId: 'tech-0',
+    });
     expect(conflicts.map((l) => l.record['constraint'])).toEqual([
       'no_bay_overlap',
       'no_technician_overlap',
@@ -365,11 +375,17 @@ describe('bookAppointment — 40P01 is not a refusal and is not retried (T-02-9,
     await bookAppointment(db, deps, COMMAND);
     expect(lines).toHaveLength(1);
     expect(lines[0]?.level).toBe('error');
-    expect(lines[0]?.record).toMatchObject({
+    // The WHOLE record, not a subset: a deadlock is the one failure here that someone must act
+    // on, and the pair it deadlocked over is the only thing that says which write path skipped
+    // ADR-0018's locks (F-02-9). A field quietly dropped from this object is a 500 nobody can
+    // diagnose, and `toMatchObject` cannot see that.
+    expect(lines[0]?.record).toEqual({
       event: 'booking.deadlock',
       bayId: 'bay-0',
       technicianId: 'tech-0',
+      attempt: 1,
     });
+    expect(lines[0]?.message).toBe('booking.deadlock');
   });
 });
 
@@ -419,7 +435,13 @@ describe('bookAppointment — the reference taxonomy', () => {
     const outcome = await bookAppointment(db, deps, COMMAND);
     expect(outcome).toEqual({ kind: 'reference-data-invalid', detail: 'no-service-bays' });
     expect(lines[0]?.level).toBe('error');
-    expect(lines[0]?.record).toMatchObject({ dealershipId: DEALERSHIP });
+    // The dealership id is the whole operational value of this line: the client is told nothing
+    // it could act on, so the id is the only thing that says WHICH dealership is mis-seeded.
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      dealershipId: DEALERSHIP,
+    });
+    expect(lines[0]?.message).toBe('dealership has no service bays');
   });
 
   it('a 23503 on the ownership FK is disambiguated AFTER the refusal (ADR-0017)', async () => {
@@ -466,6 +488,14 @@ describe('bookAppointment — the reference taxonomy', () => {
       detail: 'appointment_technician_qualified',
     });
     expect(lines[0]?.level).toBe('error');
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      constraint: 'appointment_technician_qualified',
+      dealershipId: DEALERSHIP,
+      bayId: 'bay-0',
+      technicianId: 'tech-0',
+    });
+    expect(lines[0]?.message).toBe('a candidate was refused by a composite foreign key');
   });
 
   it('an unclassifiable error is RETHROWN, never turned into a refusal', async () => {
@@ -505,16 +535,28 @@ describe('bookAppointment — the derivation outcomes reach the edge unchanged',
       detail: 'unknown-zone',
     });
     expect(lines[0]?.level).toBe('error');
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      dealershipId: DEALERSHIP,
+      verdict: 'unknown-zone',
+    });
+    expect(lines[0]?.message).toBe('dealership reference data cannot be read');
   });
 
   it('a non-positive service type duration is reference-data-invalid, not a client error', async () => {
     // The column carries `CHECK (duration_minutes > 0)` and the client never sends a duration,
     // so a 4xx would blame the wrong party.
     const { db } = scriptedDb(bookingScript({ durationMinutes: 0, attempts: [] }));
-    expect(await bookAppointment(db, collectingDeps().deps, COMMAND)).toEqual({
+    const { deps, lines } = collectingDeps();
+    expect(await bookAppointment(db, deps, COMMAND)).toEqual({
       kind: 'reference-data-invalid',
       detail: 'service-type-duration',
     });
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      serviceTypeId: SERVICE_TYPE,
+    });
+    expect(lines[0]?.message).toBe('service type duration is not a positive integer');
   });
 });
 

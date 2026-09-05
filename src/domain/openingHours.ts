@@ -145,32 +145,32 @@ function renderLocal(epochMillis: number, formatter: Intl.DateTimeFormat): Local
  * TEST, not epoch arithmetic** — a DST transition changes how many milliseconds a local day
  * holds, and this function's entire subject is DST.
  *
- * Month and year rollover are delegated to `Date.UTC`, exactly as §4.1 delegates the day of week
- * to `Intl` rather than hand-rolling a calendar: a second calendar implementation inside the one
- * module that must not be subtly wrong is the risk this design rejects. `Date.UTC` is used only
- * as an arithmetic-free date successor here; no instant, zone or wall clock is derived from it.
+ * Month and year rollover are delegated to the engine's own UTC calendar, exactly as §4.1
+ * delegates the day of week to `Intl` rather than hand-rolling one: a second calendar
+ * implementation inside the one module that must not be subtly wrong is the risk this design
+ * rejects. It is used only as an arithmetic-free date successor; no instant, zone or wall clock
+ * is derived from it, and `getUTC*` is zone-free by construction.
  *
- * Returns `''` — a value no rendering can equal — for anything it cannot advance. Two residues,
- * named rather than promised away, and both fail CLOSED (the interval stays `spans-local-days`,
- * which is a refusal):
+ * IT IS TOTAL WITH NO GUARD CLAUSES, and that is deliberate rather than careless. An input this
+ * cannot advance yields `NaN` components and a string like `0NaN-0NaN-0NaN`, which no rendering
+ * can equal — so the successor test simply says "no" and the interval stays `spans-local-days`,
+ * which is a refusal. A `if (malformed) return ''` arm would say exactly the same thing through a
+ * branch nothing can reach, and an unreachable branch is a surviving mutant wearing a guard's
+ * clothes.
  *
- *  - a date beyond `Date`'s own range, which `Math.abs(...) <= MAX_RENDERABLE_EPOCH_MILLIS` at
- *    step 1 already makes unreachable from a bounded interval;
- *  - a BC date. `Intl` with no `era` renders year 271822 BC as `"271822"`, so the successor
- *    computed here counts the wrong way. The comparison is still total and still refuses.
+ * One residue, named rather than promised away: a BC date. `Intl` with no `era` renders year
+ * 271822 BC as `"271822"`, so the successor computed here counts the wrong way and such an
+ * interval is refused rather than normalised. It fails CLOSED, which is this module's posture.
  */
 function nextLocalDate(localDate: string): string {
-  const match = /^(\d+)-(\d{2})-(\d{2})$/.exec(localDate);
-  if (match === null) return '';
+  const [year, month, day] = localDate.split('-');
 
   // `setUTCFullYear` rather than `Date.UTC`, which maps years 0-99 onto 1900-1999.
   const next = new Date(0);
-  next.setUTCFullYear(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + 1);
-  const year = next.getUTCFullYear();
-  if (!Number.isFinite(year)) return '';
+  next.setUTCFullYear(Number(year), Number(month) - 1, Number(day) + 1);
 
   const pad = (value: number, width: number): string => String(value).padStart(width, '0');
-  return `${pad(year, 4)}-${pad(next.getUTCMonth() + 1, 2)}-${pad(next.getUTCDate(), 2)}`;
+  return `${pad(next.getUTCFullYear(), 4)}-${pad(next.getUTCMonth() + 1, 2)}-${pad(next.getUTCDate(), 2)}`;
 }
 
 // ───────────────────────────────────────────────────── §4.2: the decision procedure ──

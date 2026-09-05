@@ -143,6 +143,21 @@ describe('insertAppointment', () => {
     await expect(insertAppointment(db, NEW_APPOINTMENT)).rejects.toBe(refusal);
   });
 
+  it('is EXACTLY this statement — the columns written and the columns returned', async () => {
+    // Same reason as the select above, and one more: `returning` is where the 201 body comes
+    // from. A dropped column there is a member missing from `AppointmentView`, which the response
+    // schema then strips rather than rejects.
+    const { db, recorded } = scriptedDb([{ rows: [RETURNED_ROW] }]);
+    await insertAppointment(db, NEW_APPOINTMENT);
+    expect(recorded[0]?.sql).toBe(
+      'insert into "appointment" ("id", "dealership_id", "customer_id", "vehicle_id", ' +
+        '"service_type_id", "technician_id", "bay_id", "starts_at", "ends_at") ' +
+        'values ($1, $2, $3, $4, $5, $6, $7, $8, $9) ' +
+        'returning "id", "dealership_id", "customer_id", "vehicle_id", "service_type_id", ' +
+        '"technician_id", "bay_id", "starts_at", "ends_at", "status"',
+    );
+  });
+
   it('maps the returned row to camelCase, leaving the instants as Date', async () => {
     // DA-02-2 puts the ISO-8601 rendering in the use case, not here: a mapper that rendered
     // would be a second place the wire format is decided, and nobody reads a mapper.
@@ -195,5 +210,19 @@ describe('findAppointmentById', () => {
     await findAppointmentById(db, IDS.appointment);
     expect(recorded).toHaveLength(1);
     expect(recorded[0]?.parameters).toEqual([IDS.appointment]);
+  });
+
+  it('selects EXACTLY the ten columns the view needs — the whole statement, not a substring', async () => {
+    // Pinning the whole text rather than probing it: a column name is what the `AppointmentView`
+    // is built from, and a mapper reading `row.bay_id` from a select that never asked for it
+    // yields `undefined` and a 201 naming no bay. That is AC-1's "allocated" failing quietly, and
+    // no partial assertion over the SQL catches it.
+    const { db, recorded } = scriptedDb([{ rows: [] }]);
+    await findAppointmentById(db, IDS.appointment);
+    expect(recorded[0]?.sql).toBe(
+      'select "id", "dealership_id", "customer_id", "vehicle_id", "service_type_id", ' +
+        '"technician_id", "bay_id", "starts_at", "ends_at", "status" ' +
+        'from "appointment" where "id" = $1',
+    );
   });
 });

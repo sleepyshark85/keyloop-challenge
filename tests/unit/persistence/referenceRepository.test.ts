@@ -68,10 +68,12 @@ describe('findDealership', () => {
     expect(recorded).toHaveLength(1);
   });
 
-  it('ignores a day_of_week outside 0-6 rather than writing past the tuple', async () => {
-    // The column carries `CHECK (day_of_week BETWEEN 0 AND 6)`, but this row has crossed a
-    // driver and a query builder. Without the guard the eighth slot appears and `weekly` stops
-    // being the seven-slot tuple `openingHours.ts` indexes into.
+  it('a day_of_week outside 0-6 cannot widen the tuple — `toWeekly` reads seven named slots', async () => {
+    // The column carries `CHECK (day_of_week BETWEEN 0 AND 6)`, so this row cannot exist; the
+    // claim being pinned is that if it somehow did, `weekly` would still be the seven-slot tuple
+    // `openingHours.ts` indexes into. There is deliberately no bound test in the loop — it would
+    // be a second guard over the same fact whose effect nothing could observe, which the mutation
+    // run named as a survivor and which is dead code either way.
     const { db } = scriptedDb([
       { rows: [{ id: DEALERSHIP, time_zone: 'Europe/London' }] },
       { rows: [{ day_of_week: 7, opens_at: '09:00:00', closes_at: '17:00:00' }] },
@@ -117,6 +119,16 @@ describe('findServiceType', () => {
   it('returns null for an unknown service type (AC-9)', async () => {
     const { db } = scriptedDb([{ rows: [] }]);
     expect(await findServiceType(db, 'any')).toBeNull();
+  });
+
+  it('asks for the duration column by name, from service_type, by id', async () => {
+    // A `select *` here would work and would also stop this file from noticing a renamed column
+    // until an integration test failed with 42703 several layers away.
+    const { db, recorded } = scriptedDb([{ rows: [] }]);
+    await findServiceType(db, 'a-service-type');
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.sql).toBe('select "duration_minutes" from "service_type" where "id" = $1');
+    expect(recorded[0]?.parameters).toEqual(['a-service-type']);
   });
 
   it('does not re-assert the duration rule — `serviceDuration` owns that', async () => {

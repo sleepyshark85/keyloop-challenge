@@ -349,6 +349,89 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
   });
 });
 
+describe('every row carries a title and a detail a client can read', () => {
+  /**
+   * The `title` and `detail` of each row are client-visible contract text, and until the mutation
+   * run said so nothing asserted any of them: every string literal in the route survived. A row
+   * whose title became `""` still passed every status and `type` assertion in this file, which is
+   * the same shape of false green as a substituted literal — the response looks right where the
+   * test looks.
+   */
+  it.each([
+    [
+      'malformed-instant',
+      { kind: 'malformed-instant' } as BookOutcome,
+      'The request could not be understood',
+      'startsAt is not a usable instant',
+    ],
+    [
+      'outside-opening-hours',
+      { kind: 'outside-opening-hours', verdict: { kind: 'closed-day', dayOfWeek: 0 } } as BookOutcome,
+      "The requested interval is outside the dealership's opening hours",
+      'closed-day',
+    ],
+    [
+      'unknown-reference',
+      { kind: 'unknown-reference', reference: 'vehicle' } as BookOutcome,
+      'A named reference does not exist',
+      'no vehicle matches the id in this request',
+    ],
+    [
+      'vehicle-not-owned',
+      { kind: 'vehicle-not-owned' } as BookOutcome,
+      "The vehicle is not this customer's",
+      'the named vehicle does not belong to the named customer',
+    ],
+    [
+      'no-capacity',
+      { kind: 'no-capacity', resource: 'technician', attempts: 3 } as unknown as BookOutcome,
+      'No bay and technician are both free',
+      'every candidate technician was already occupied for this interval',
+    ],
+    [
+      'no-verdict',
+      { kind: 'no-verdict' } as BookOutcome,
+      'The request could not be completed',
+      'the service could not complete this request; the failure has been logged',
+    ],
+  ])('%s', async (_label, outcome, title, detail) => {
+    const response = await post(serverAnswering({ book: outcome }), VALID_BODY);
+    expect(response.json().title).toBe(title);
+    expect(response.json().detail).toBe(detail);
+  });
+
+  it("the outside-hours detail NAMES the verdict, so two different refusals do not read alike", async () => {
+    // `closed-day`, `outside-window` and `spans-local-days` are three different things to fix and
+    // they share one `type`. A constant detail would make them indistinguishable to a client.
+    const spans = await post(
+      serverAnswering({
+        book: {
+          kind: 'outside-opening-hours',
+          verdict: { kind: 'spans-local-days', startsOn: '2026-09-08', endsOn: '2026-09-09' },
+        },
+      }),
+      VALID_BODY,
+    );
+    expect(spans.json().detail).toBe('spans-local-days');
+    expect(spans.json().opensAt, 'only outside-window carries the window').toBeUndefined();
+  });
+
+  it('the GET 404 carries its own title and detail', async () => {
+    const app = serverAnswering({ read: { kind: 'not-found' } });
+    const response = await app.inject({ method: 'GET', url: `/appointments/${APPOINTMENT_ID}` });
+    expect(response.json().title).toBe('No such appointment');
+    expect(response.json().detail).toBe('no appointment exists with that id');
+  });
+
+  it('the validation 400 carries the framework\'s own message as the detail', async () => {
+    // `detail: error.message` rather than a constant: a client that is told only "the request
+    // could not be understood" cannot find which member was wrong, and the schema already knows.
+    const response = await post(serverAnswering({}), { ...VALID_BODY, startsAt: 'nope' });
+    expect(response.json().title).toBe('The request could not be understood');
+    expect(String(response.json().detail)).toMatch(/startsAt/);
+  });
+});
+
 describe('problem() and PROBLEM_TYPES', () => {
   it('is exactly §8.6\'s seven in-scope rows', () => {
     // `/problems/appointment-not-confirmed` is slice 06's and its absence is deliberate: it needs

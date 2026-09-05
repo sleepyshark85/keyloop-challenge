@@ -70,12 +70,13 @@ export async function findDealership(
     .where('dealership_id', '=', id)
     .execute();
 
-  const slots: (DayHours | null)[] = [null, null, null, null, null, null, null];
+  // A `day_of_week` outside 0-6 is not re-checked here, and that is a decision rather than an
+  // omission: `toWeekly` reads seven named positions, so a row claiming day 7 lands in a slot
+  // nothing ever looks at. Adding a bound test would be a second guard over the same fact whose
+  // effect no test could observe — dead code, and a surviving mutant wearing a guard's clothes.
+  // The column's own `CHECK (day_of_week BETWEEN 0 AND 6)` is what rules it out at the source.
+  const slots: (DayHours | null)[] = [];
   for (const row of rows) {
-    // A `day_of_week` outside 0-6 cannot exist — the column carries `CHECK (day_of_week BETWEEN
-    // 0 AND 6)` — but this row has crossed a driver and a query builder, so the bound is
-    // re-asserted rather than trusted, exactly as `serviceDuration` re-asserts `> 0`.
-    if (row.day_of_week < 0 || row.day_of_week > 6) continue;
     slots[row.day_of_week] = { opensAt: row.opens_at, closesAt: row.closes_at };
   }
 

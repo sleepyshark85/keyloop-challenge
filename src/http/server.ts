@@ -48,29 +48,30 @@ export interface ServerDeps extends HealthRouteDeps, AppointmentRouteDeps {
   readonly logger: FastifyBaseLogger;
 }
 
-/** Fastify sets `validation` on a schema failure and nothing else does. */
-function isValidationError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const candidate = error as Partial<FastifyError>;
-  return candidate.validation !== undefined || candidate.code === 'FST_ERR_VALIDATION';
-}
-
-/** The message a validation failure carries, without assuming the error is shaped like one. */
-function detailOf(error: unknown): string {
-  return error instanceof Error ? error.message : 'the request body or path was not valid';
+/**
+ * Fastify populates `validation` on a schema failure and on nothing else, so ONE test decides
+ * which of the two arms below runs.
+ *
+ * It was two — `validation !== undefined || code === 'FST_ERR_VALIDATION'` — and the second half
+ * was removed after the mutation run: no input reaches it, because Fastify sets both together, so
+ * it was an unkillable alternative rather than a belt to the braces. A condition no test can
+ * distinguish is not a safety margin.
+ */
+function isValidationError(error: FastifyError): boolean {
+  return error.validation !== undefined;
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ loggerInstance: deps.logger });
 
-  app.setErrorHandler(async (error, request, reply) => {
+  app.setErrorHandler<FastifyError>(async (error, request, reply) => {
     if (isValidationError(error)) {
       await reply
         .code(400)
         .type(PROBLEM_CONTENT_TYPE)
         .send(
           problem('/problems/malformed-request', 400, 'The request could not be understood', {
-            detail: detailOf(error),
+            detail: error.message,
           }),
         );
       return;
