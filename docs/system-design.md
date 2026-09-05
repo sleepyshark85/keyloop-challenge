@@ -53,7 +53,7 @@ plan that reads as though it never was. §11 and §13 discuss the material delta
 | **8** | [Cross-cutting concepts](arc42/08-crosscutting-concepts.md) | Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API writes, and `opening_hours` is the only one that exists becaus… |
 | **9** | [Architecture decisions](arc42/09-architecture-decisions.md) | Decisions live as individual MADR files under `docs/adr/`. |
 | **10** | [Quality requirements](arc42/10-quality-requirements.md) | The §1.2 ranking, refined into the scenarios below it. |
-| **11** | [Risks and technical debt](arc42/11-risks-technical-debt.md) | Generated: every ADR with `status: proposed` and every deferred-improvement slice is, by construction, a debt item traceable to the decision that created it. |
+| **11** | [Risks and technical debt](arc42/11-risks-technical-debt.md) | Generated from **every ADR with `status: proposed`**, so an open decision is a debt item by construction and traceable to the decision that created it. |
 | **12** | [Glossary](arc42/12-glossary.md) | Domain terms only. Process vocabulary lives in `docs/METHODOLOGY.md`. |
 | **13** | [AI collaboration](arc42/13-ai-collaboration.md) | Sourced from artifacts, never from memory: the ADR set, PR threads, `docs/team-log/events.jsonl`, the prompt library under `docs/team-log/prompts/`, and git… |
 
@@ -77,9 +77,9 @@ without taking anyone's word for it.
 - [**ADR-0010**](adr/0010-github-actions-and-check-run-collection.md) — Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow *(accepted)*
 - [**ADR-0011**](adr/0011-health-is-an-operational-probe.md) — Treat /health as an operational probe outside the API contract, not as a sixth operation *(proposed)*
 - [**ADR-0012**](adr/0012-seed-fixtures-are-a-test-owned-loader.md) — Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset *(proposed)*
-- [**ADR-0013**](adr/0013-outside-in-tests-exercise-the-built-artifact.md) — Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost *(proposed)*
-- [**ADR-0014**](adr/0014-an-instant-is-renderable-by-construction.md) — An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary *(proposed)*
-- [**ADR-0015**](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) — An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days *(proposed)*
+- [**ADR-0013**](adr/0013-outside-in-tests-exercise-the-built-artifact.md) — Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost *(accepted)*
+- [**ADR-0014**](adr/0014-an-instant-is-renderable-by-construction.md) — An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary *(accepted)*
+- [**ADR-0015**](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) — An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days *(accepted)*
 
 ---
 
