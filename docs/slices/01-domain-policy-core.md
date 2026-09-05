@@ -3,7 +3,7 @@ id: "01"
 title: The domain policy core — duration, occupancy interval, and opening hours
 status: ready
 depends_on: ["00"]
-arc42: ["§5.2", "§8.3", "§12"]
+arc42: ["§5.2", "§8.3", "§10.2", "§12"]
 adr: [1]
 quality_scenarios: [QS-9, QS-12]
 loopbacks: 0

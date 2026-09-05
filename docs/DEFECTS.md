@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **65** |
-| Severity | 10 blocking · 37 major · 18 minor |
-| Verdicts | 5 narrowed · 32 accepted · 1 escalated · 5 deferred |
-| Raised by | test-engineer 19 · reviewer 17 · implementer 13 · architect 8 · orchestrator 7 · human 1 |
-| Awaiting a ruling | **22** |
-| Mean escape distance | 1.55 step(s) |
+| Findings recorded | **74** |
+| Severity | 10 blocking · 40 major · 24 minor |
+| Verdicts | 5 narrowed · 34 accepted · 1 escalated · 5 deferred |
+| Raised by | reviewer 24 · test-engineer 19 · implementer 13 · orchestrator 9 · architect 8 · human 1 |
+| Awaiting a ruling | **29** |
+| Mean escape distance | 1.45 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -454,6 +454,15 @@ rather than narrated.*
 | **T-01-1** | MAJOR | 2 *(+1)* | test-engineer | The design's 'AC-5 and AC-6 are jointly unsatisfiable' is overstated — a third path exists, so the reading is the human's and not a foregone conclusion | accepted |
 | **T-01-2** | BLOCKING | 2 *(+1)* | test-engineer | Design section 8.3's reason 2 is false as measured: a db-project container failure destroys the nodb project's results in the same npm test invocation, so this slice's red can still arrive as a crash | accepted |
 | **T-01-3** | MINOR | 3 *(+0)* | test-engineer | ADR-0013's src-reference scan excludes tests/architecture/, so the directory it lives in is the one directory it cannot check | deferred |
+| **R-01-1** | MAJOR | 5 *(+1)* | reviewer | withinOpeningHours is documented as total but throws an uncaught RangeError, because step 1's Number.isInteger guard does not bound the value to the range new Date() can render | **open** |
+| **R-01-2** | MAJOR | 5 *(+0)* | reviewer | ADR-0013's narrowed consequence is not delivered: the src-reference scan matches only relative ../src/ climbs and skips tests/architecture/ entirely | **open** |
+| **R-01-3** | MAJOR | 5 *(+0)* | reviewer | The literal AC-6 ruling that reshaped this entire slice is enforced by no mechanism at all | accepted |
+| **R-01-4** | MINOR | 5 *(+0)* | reviewer | A dealership with closes_at 24:00:00 can never take the appointment that ends at midnight, so the capability section 3.2 argues at length for is not delivered | **open** |
+| **R-01-5** | MINOR | 5 *(+0)* | reviewer | Two of the eleven coverage assertions use the >= 1 floor design section 5.3 explicitly rules out, and both are tautologies | **open** |
+| **R-01-6** | MINOR | 5 *(+0)* | reviewer | DURATION_LITERAL detects one spelling of duration arithmetic and the planted control plants that same spelling, so the discrimination claim is proved only against what the scanner already looks for | **open** |
+| **R-01-7** | MINOR | 5 *(+0)* | reviewer | The slice declares arc42 scope 5.2, 8.3 and 12 but the branch changed docs/arc42/10-quality-requirements.md | accepted |
+| **O-14** | MINOR | 5 *(+5)* | orchestrator | slice:check's arc42 gate tests that the declaration is NON-EMPTY, never that it matches what the branch changed | **open** |
+| **O-15** | MINOR | 5 *(+0)* | orchestrator | The test-engineer's justification for SPANS_LOCAL_DAYS_FLOOR = 100 asserts what a rejected floor WOULD have done instead of measuring it, and the assertion is false | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -497,6 +506,53 @@ rather than narrated.*
 - *scenario:* The scan looks for a computed dynamic-import specifier whose string parts resolve under src/ rather than dist/. Implemented as a raw-text scan it cannot distinguish a violation from this file's own fixture-content strings, or layering.test.ts's, which legitimately mention src/ paths as data. Scanning tests/architecture/ produced two false positives against pre-existing correct code, so the test-engineer narrowed the scope to the other seven outside-in directories and documented the measurement in the file. Flagged rather than buried, in its own words. The residual hole is narrow but real: a future tests/architecture/ file could computed-import src/ and this scan would not see it, and ADR-0013's consequences were narrowed on the strength of this scan existing.
 - *file:* `tests/architecture/ambiguity-containment.test.ts`
 - *deferred* by orchestrator — Deferred to step 5 for the reviewer, not resolved here. The judgement is sound and it is a mechanism the design explicitly left to the test-engineer, so it is within its authority; the two false positives are measured rather than asserted. But ADR-0013's consequences were narrowed from 'review alone closes this hole' to 'a source scan closes it' on the strength of a scan that turns out not to cover the directory it lives in, and the person who should weigh whether the narrowing still holds is the one who did not write either artifact. Carried to step 5 with the ADR, which is still status proposed and reaches the human at Gate E.
+
+**R-01-1** — withinOpeningHours is documented as total but throws an uncaught RangeError, because step 1's Number.isInteger guard does not bound the value to the range new Date() can render
+
+- *scenario:* withinOpeningHours(8_640_000_000_000_000, 8_640_000_000_000_001, 'Europe/London', weekly) throws RangeError: Invalid time value. Both are integers and end is greater than start, so step 1 admits them. Reachable through the documented composition because instant(8_640_000_000_000_001) returns a valid Instant. Confirmed independently by the orchestrator: the call throws and instant() hands the value through. It contradicts design section 4.2 step 1's own stated reason for the check — that everything after it would otherwise be handed a value new Date cannot render — and section 2.2's everything downstream is total. No caller exists today so nothing shipped is wrong, but the slice adding the HTTP parse inherits a function documented total that is not, and a startsAt of 1e16 becomes a 500 rather than a 400.
+- *file:* `src/domain/openingHours.ts`
+
+**R-01-2** — ADR-0013's narrowed consequence is not delivered: the src-reference scan matches only relative ../src/ climbs and skips tests/architecture/ entirely
+
+- *scenario:* A future tests/property file doing const ROOT = fileURLToPath(new URL('../../', import.meta.url)) then await import(pathToFileURL(join(ROOT,'src/domain/openingHours.ts')).href) is matched by neither the scan — measured, no match — nor dependency-cruiser, which cannot see a computed import. Both report green while the independence ADR-0013 rests on is spent. The root-anchored form is the broader half and affects all seven scanned directories, not only the excluded one, and it is the idiom the scan's own host file uses at line 26. Supersedes T-01-3: the reviewer reproduced the two false positives and agrees the exclusion was the right engineering call; what does not hold is the ADR's narrowing from 'review alone closes this' to 'a source scan closes it'.
+- *file:* `tests/architecture/ambiguity-containment.test.ts`
+
+**R-01-3** — The literal AC-6 ruling that reshaped this entire slice is enforced by no mechanism at all
+
+- *scenario:* domain-is-pure is from ^src/domain/ to pathNot ^src/domain/, which permits intra-domain imports by construction; layering.test.ts plants its domain-is-pure violation as an import of ../platform/config.js, outside the domain, so the intra-domain form is never exercised; and the containment scan reads markers, not imports. Confirmed independently by the orchestrator: adding import { durationMillis } from './duration.js' to src/domain/interval.ts leaves lint:arch reporting no layering violations across 54 modules and the containment suite passing 16 of 16. Every gate stays green on a file that violates the human's ruling. The ruling bought malformed-interval, property P7, the unbranded parameters and debt entries D-01-1 to D-01-4; today it holds by the implementer's discipline alone. AC-6 as WRITTEN passes, since it asserts depcruise is clean and it is. AC-6 as RULED is unguarded.
+- *file:* `.dependency-cruiser.js`
+- *accepted* by human — AC-6 SECOND CLAUSE — the architect escalated it rather than absorbing it into its (b), and the human ruled it UNMET. `to: { pathNot: "^src/domain/" }` IS an allowlist: a standing exemption for exactly the class of import the literal AC-6 ruling forbade, written into the one file AC-6 names. So the slice does not satisfy its own DoD as it stands and does not merge as-is; the architect's (b) on R-01-3 stands as the DCR ruling, but the human's gate call requires the remedy now rather than as a backlog item. Remedy as the architect specified it, in two parts and both required: `to: {}` in .dependency-cruiser.js (the architect's file), and a PLANTED INTRA-DOMAIN CONTROL in tests/architecture/layering.test.ts (the test-engineer's, and per the architect not optional — a rule whose firing nobody has observed is the same defect wearing the fix's clothes). Decided this way because the remedy is small and measured, and because the alternative leaves the human's own ruling enforced by implementer discipline rather than by tooling — the exact failure shape, a mechanism that reports success over work it never did, that this project has spent two slices eliminating and that §2.3 says architecture conformance must not depend on. The orchestrator verified the remedy before putting it to the human: with `to: {}` and a planted intra-domain import, depcruise reports `domain-is-pure: src/domain/interval.ts -> src/domain/duration.ts`; with `to: {}` and a clean tree, no violations over 54 modules with every root covered. The mutant is named: revert to `pathNot: "^src/domain/"` and the planted control must fail.
+
+**R-01-4** — A dealership with closes_at 24:00:00 can never take the appointment that ends at midnight, so the capability section 3.2 argues at length for is not delivered
+
+- *scenario:* weekOpen('09:00:00','24:00:00') with a 60-minute job starting 23:00 local Monday 2026-06-15 returns kind spans-local-days, startsOn 2026-06-15, endsOn 2026-06-16; one second shorter returns within. Step 4 renders the half-open interval's EXCLUSIVE endpoint, and [23:00, 24:00) occupies no instant on Tuesday. Measured further: swept over a whole local day at one-second granularity, closesAt 24:00:00 and 23:59:59 give identical verdicts on every input, because end.secondsOfDay is always at most 86399 so the 86_400 normalisation cannot change any comparison. The implementation follows design section 4.2 step 4 exactly, so this is the design's to answer rather than the implementer's. Note it was the implementer's own real-PostgreSQL measurement of DA-2 that argued 24:00:00 must be supported.
+- *file:* `src/domain/openingHours.ts`
+
+**R-01-5** — Two of the eleven coverage assertions use the >= 1 floor design section 5.3 explicitly rules out, and both are tautologies
+
+- *scenario:* coverage.spansLocalDays is incremented immediately after expect(...).toBe('spans-local-days') over 300 deterministic runs, and coverage.malformedInterval likewise over 400. Both are at least 300 whenever the preceding tests pass, whatever the generator does. The file's own comment records a measured healthy minimum of 196 and does not use it. Regressing durationMinutesArb to fc.integer({min:1,max:2}) collapses P1's spans-local-days contribution from about 200 to about 2 — a 2-minute job crosses local midnight with probability about 2/1440 — and the guard still passes on P6's deterministic 300. The other nine floors were verified correctly sized by the reviewer across three distinct generator breakages.
+- *file:* `tests/property/opening-hours-dst.test.ts`
+
+**R-01-6** — DURATION_LITERAL detects one spelling of duration arithmetic and the planted control plants that same spelling, so the discrimination claim is proved only against what the scanner already looks for
+
+- *scenario:* Measured: minutes * 60 * 1000, minutes * 1000 * 60, minutes * 6e4, a local const MINUTE_MS = 60 * 1000, and const secs = minutes * 60 followed by secs * 1000 are all NOT flagged. A future src/application/bookAppointment.ts computing const endsAt = startsAt + minutes * 60 * 1000 violates AC-5, breaks QS-12's containment, and the scan reports green. The word-boundary fix itself holds — 600000 is correctly not flagged. Design section 7.2 specifies exactly this marker so it is an honest proxy, but it is not among section 9.2's recorded 'not made true' limitations and should be.
+- *file:* `tests/architecture/ambiguity-containment.test.ts`
+
+**R-01-7** — The slice declares arc42 scope 5.2, 8.3 and 12 but the branch changed docs/arc42/10-quality-requirements.md
+
+- *scenario:* QS-9's wording moved under the human's O-13 ruling, while 5.2, 8.3 and 12 have not moved at all, which is correct because that is step 7. The section 9 and section 11 diffs are inside generated markers written by npm run docs:build and are not hand edits. slice:check's arc42-scope gate tests for the field's presence rather than for the diff matching it, so an undeclared arc42 edit merges unnoticed. Benign here, and the declaration is the only thing that would catch one that is not.
+- *file:* `docs/slices/01-domain-policy-core.md`
+- *accepted* by orchestrator — Correct, and the declaration half is fixed here: docs/slices/01-domain-policy-core.md now declares arc42 ['§5.2','§8.3','§10.2','§12'] — §10.2 added because the branch hand-edited QS-9's wording in docs/arc42/10-quality-requirements.md line 60 under the human's O-13 ruling, and the slice did not say it could. The other two arc42 files the branch touches, §9 and §11, changed only inside the markers npm run docs:build writes, so they are generated output rather than undeclared architecture edits and are deliberately NOT added — adding them would make the declaration a record of what the build regenerated instead of a statement of intent. The slice file is the orchestrator's, so this is not routed to an agent.
+
+**O-14** — slice:check's arc42 gate tests that the declaration is NON-EMPTY, never that it matches what the branch changed
+
+- *scenario:* tools/slice/check.mjs:96-98 reads slice.arc42 and passes on arc.length. R-01-7 is the case: the declaration omitted §10.2 while the branch edited it, and every ready-check stayed green. The same gate passes a slice declaring ['§1'] that rewrites §5 and §9. This is the recurring shape — a mechanism reporting success over work it never did — in the tool whose whole purpose is that a slice does not reach done because an agent says so. The mechanism: derive the changed arc42 sections from git diff --name-only <base>...HEAD -- docs/arc42/, ignore files whose diff falls entirely inside docs:build generated markers, and FAIL when a changed section is undeclared. It must report UNVERIFIED, not PASS, when no merge base is resolvable, per this tool's own three-verdict contract. NOT done inside slice 01: it is orchestrator tooling rather than slice work, the same shape the human ruled for T-01-2, and slice 01 is at its gate. Recommended before slice 02's step 3, where the same tooling-prep window exists.
+- *file:* `tools/slice/check.mjs`
+
+**O-15** — The test-engineer's justification for SPANS_LOCAL_DAYS_FLOOR = 100 asserts what a rejected floor WOULD have done instead of measuring it, and the assertion is false
+
+- *scenario:* The report states VERDICT_FLOOR = 50 'would have passed under the very regression it was added to catch'. Its own measured broken range is 15-36, entirely below 50. Measured by the orchestrator: the file uses FIXED SEEDS (SEED..SEED+8), so under the committed configuration the regressed count is deterministically 22 — set SPANS_LOCAL_DAYS_FLOOR = 50 with the regression applied and it FAILS 8 runs out of 8, identical value every time. So 50 would have caught it, not passed it. NO CODE CHANGE FOLLOWS: 100 is still the better constant, for the reason the report gives one sentence earlier and did measure — 50 is only 1.4x the broken maximum across seed space, which is too thin a margin against generator drift. It is the JUSTIFICATION that overreached, not the choice. Recorded because this is the project's signature defect wearing its own uniform: a claim about what a mechanism would do, asserted rather than run, inside the report whose entire subject is that failure mode — and because the same report correctly caught the reviewer's own unmeasured 'about 2' estimate two paragraphs earlier. The operational rule stands and applies to the rule's own enforcers: for a discrimination claim, name the mutant AND run it.
+- *file:* `docs/team-log/prompts/s01-test-engineer-3.report.md`
 
 </details>
 
