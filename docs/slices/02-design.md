@@ -114,7 +114,7 @@ not have to be rediscovered: delete the `while` in `bookAppointment.ts`, delete 
 refuse on the first `23P01` — and AC-4 must then be reworded or dropped, because no implementation
 satisfies it. I have not made that call and am not treating the human's absence as licence to.
 
-### E-02-2 — QS-12's `wall-clock-and-zone` marker becomes unsatisfiable at this slice · **route to the human; blocking on step 3**
+### E-02-2 — QS-12's `wall-clock-and-zone` marker becomes unsatisfiable at this slice · **ruled 2026-09-06**
 
 `tests/architecture/ambiguity-containment.test.ts`, as merged at slice 01, defines:
 
@@ -165,31 +165,46 @@ evidence**, which is the standard this project applied to `domain-is-pure` at sl
 *concept*, the test-engineer implements it with the four mechanisms. Split in two, because it is
 currently two concepts wearing one name:
 
-- **`wall-clock-reasoning`** — deriving a wall clock or a calendar field from an instant, by any
-  route: `Intl.DateTimeFormat`, `formatToParts`, `hourCycle`, `timeZone` as an option key, **and the
-  ambient-zone forms the current marker misses** — `toLocaleString`, `toLocaleDateString`,
-  `toLocaleTimeString`, and `Date.prototype.getHours` / `getMinutes` / `getDay` / `getDate` /
-  `getMonth` / `getFullYear` and their `set` counterparts. Permitted in `src/domain/openingHours.ts`
-  and nowhere else. **The `getUTC*` family is deliberately excluded**: it is zone-*free* by
-  construction and is the correct way to read an instant outside the domain. This is the concept QS-12
-  actually names and the one GC-1 and ADR-0001 are about.
+- **`wall-clock-reasoning`** — deriving a wall clock or calendar field from an instant, by any route.
+  Permitted in `src/domain/openingHours.ts` and nowhere else. The concept, not the spelling, is the
+  marker; the forms below enumerate it and are open (arc42 §10.2, GC-1, ADR-0001).
+
+  | | Forms |
+  |---|---|
+  | explicit formatting | `Intl.DateTimeFormat`, `formatToParts`, `hourCycle`, `timeZone` as an option key |
+  | ambient-zone rendering | `toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`, `toString`, `toDateString`, `toTimeString` |
+  | ambient-zone field reads | `Date.prototype.getHours` / `getMinutes` / `getSeconds` / `getMilliseconds` / `getDay` / `getDate` / `getMonth` / `getFullYear`, their `set` counterparts, and **`getTimezoneOffset`** |
+  | **out, deliberately** | the `getUTC*` family — zone-*free* by construction, and the correct way to read an instant outside the domain |
+  | **out, deliberately** | ambient-zone **construction**: `new Date(y, m, d, …)`, a zone-less `Date.parse('2026-03-28T09:00')` |
+
+  Of the three ambient forms added after step 2's routing, `getTimezoneOffset` is the one that matters:
+  it is the cheapest hand-rolled route to a local rendering, so a list stopping before it leaves the
+  obvious escape open — R-01-6 exactly, a marker enumerating the spellings its author thought of. The
+  `get*` completions matter for a second reason: a list stopping at `getFullYear` invites the reading
+  that its omissions are *deliberate*, the way `getUTC*`'s genuinely is, and an accidental gap that
+  looks intentional is worse than an obvious one.
+
+  **Ambient-zone construction is excluded by drawing the boundary, not by missing it.** It is the same
+  bug class, but it builds an instant **from** a wall clock rather than deriving one from an instant,
+  so it falls outside the concept as worded. Widening the concept to reach it would also catch
+  legitimate fixture construction, and `tests/` is outside the scan. The residue is booked, not
+  dangling: at step 7 it becomes a **deliberate** row in arc42 §11's irreducible-for-a-text-scan table,
+  beside `duration-arithmetic`'s. §11 is not in this slice's declared arc42 scope, so the row is
+  written when the scope is.
 - **`zone-transport`** — the identifier `time_zone` or `ianaZone`. Permitted in a short, *named* list:
   `src/persistence/schema.ts`, `src/persistence/referenceRepository.ts`,
   `src/application/deriveInterval.ts`, `src/domain/openingHours.ts`. Carrying an opaque string is not
   reasoning about a zone.
 
 **QS-12's response measure survives the split, and that is the test of whether the split is honest.**
-The measure is *"one source file plus one migration"* for a change to the ambiguity. The transport
-files hold a string they never interpret: if ADR-0001's rule grows breaks, holidays or a second zone
-per dealership, `schema.ts` and `referenceRepository.ts` **do not change** — only `openingHours.ts`
-does. A split that moved real reasoning into the permitted list would break that measure; this one
-does not.
+The transport files hold a string they never interpret: if ADR-0001's rule grows breaks, holidays or a
+second zone per dealership, only `openingHours.ts` changes — still *"one source file plus one
+migration"*. A split that moved real reasoning into the permitted list would break that measure.
 
-**But §10 is not in this slice's declared arc42 scope** (`["§5.2", "§6.1", "§8.6"]`) and a quality
-scenario is arguably the human's under `CLAUDE.md` §6's authority table. So this is **flagged, not
-taken.** It needs routing **before step 3**: the test-engineer owns that file, and if the red commit
-is written against the marker as it stands it encodes a scenario no implementation can satisfy, which
-is the most expensive possible place to discover this.
+**Ruled 2026-09-06** (`s-02-ruling-E-02-2`): QS-12 reads by concept, not by spelling; the split above
+stands as specified. arc42 §10.2 now says so in the scenario's own words. §10 was outside this slice's
+declared arc42 scope (`["§5.2", "§6.1", "§8.6"]`), which is why it was flagged rather than taken — the
+routing, not the design, was the part that needed the human.
 
 ### E-02-3 — arc42 §8.5's serialiser table is incomplete, and the missing rows change its guidance · **route**
 
@@ -1230,11 +1245,8 @@ a loopback on a design corrected before its own red commit would punish the step
 
 - **Nothing from these rulings.** T-02-1, T-02-3/I-02-7, T-02-4, I-02-3, I-02-5, I-02-6 and
   I-02-8/T-02-7 are all settled above and step 3 can be written against this document.
-- **E-02-2 still blocks the QS-12 half of step 3, and only that half.** The two markers are specified
-  here and the test-engineer can implement them; what is queued is the **arc42 §10 wording**, which is
-  the human's. A red commit that asserts QS-12 against the *scenario as written* would encode
-  something no implementation can satisfy, so the QS-12 assertions wait. Every other outside-in test
-  in the slice — acceptance, contract, concurrency, the two domain remedies, and
-  `appointment-table-access` — is unblocked.
+- **E-02-2 no longer blocks anything.** It was ruled on 2026-09-06 and arc42 §10.2 carries the
+  concept, so the QS-12 assertions are unblocked with the rest: both markers are specified above and
+  the test-engineer implements them from that specification.
 - **E-02-1 changes only AC-4's determinism**, not the shape of anything. The concurrency tests can be
   written now; if the human rules against the loop, AC-4 is what changes, and §0 names the deletion.
