@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **85** |
-| Severity | 10 blocking · 47 major · 28 minor |
+| Findings recorded | **86** |
+| Severity | 10 blocking · 48 major · 28 minor |
 | Verdicts | 5 narrowed · 35 accepted · 1 escalated · 5 deferred |
-| Raised by | reviewer 24 · test-engineer 19 · architect 15 · implementer 13 · orchestrator 13 · human 1 |
-| Awaiting a ruling | **39** |
-| Mean escape distance | 1.96 step(s) |
+| Raised by | reviewer 24 · test-engineer 19 · architect 15 · orchestrator 14 · implementer 13 · human 1 |
+| Awaiting a ruling | **40** |
+| Mean escape distance | 1.97 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -622,6 +622,7 @@ rather than narrated.*
 | ref | sev | step | raised by | claim | verdict |
 |---|---|---|---|---|---|
 | **O-18** | MINOR | 0 *(+0)* | orchestrator | A process ruling made during phase 5 has nowhere to be scoped: phase 5 is rejected and the ruling is not slice work | **open** |
+| **O-20** | MAJOR | 2 *(+2)* | orchestrator | Four slice-02 agent runs were logged and filed as slice 01, and the architect adjudicated eleven objections without the reports, because the scope marker was stale and nothing checks that | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -629,6 +630,11 @@ rather than narrated.*
 
 - *scenario:* PHASES excludes '5' on the stated grounds that slice work uses `slice`, which is right for slice work. The light-gate and fold-12-13 rulings are neither: they are cross-slice PROCESS decisions that change how every remaining slice is gated and how the backlog is shaped, made while phase 5 is in progress. Both were attached to slice 02 because that is where they first bite, which is defensible but misattributes a process decision to a unit of work - the board and the defect register will read them as slice 02's. Gate A through D had `phase` available and used it. NOT fixed here: it is a schema change during a cost-reduction ruling, which is the wrong moment, and scoping to the first affected slice loses nothing that cannot be recovered from the span_id. For the retro.
 - *file:* `tools/team-log/schema.mjs`
+
+**O-20** — Four slice-02 agent runs were logged and filed as slice 01, and the architect adjudicated eleven objections without the reports, because the scope marker was stale and nothing checks that
+
+- *scenario:* docs/team-log/.scope is a GITIGNORED file the orchestrator must remember to update at each slice boundary. It was not updated when slice 02 started: it still read {"slice":"01"} while the branch read slice/02-book-and-read-an-appointment. Both hooks read that marker and trusted it, so FOUR runs - the step-1 design (s-01-architect-10), both step-2 AGREE reports (s-01-implementer-3, s-01-test-engineer-4) and the step-2 adjudication (s-01-architect-11) - were recorded with slice: '01', and their prompts and reports were written as s01-architect-4*, s01-implementer-3* and s01-test-engineer-4*. THE CONSEQUENCE WAS NOT COSMETIC. The architect went looking for docs/team-log/prompts/s02-test-engineer-1.report.md and s02-implementer-1.report.md, found nothing anywhere in the tree, and said so - then ruled ELEVEN OBJECTIONS from the orchestrator's relay plus its own re-measurements rather than from what the two roles actually wrote. It flagged that its rulings had not seen the source documents. The step-2 round this project ran was its strongest so far and the adjudicator could not read it. NOTHING REPORTED A PROBLEM. Both hooks warn when the marker is ABSENT or UNPARSEABLE and never when it is WRONG - the marker was present and parsed cleanly, so the guard was satisfied. A check that can only see a fact MISSING cannot see it being FALSE. That is the same shape as depcruise exiting 0 having cruised nothing, vitest writing 0 tests after an aborted globalSetup, and Stryker reporting survivors it never activated - the fourth family member found in this project and the first one authored by the orchestrator's own procedure rather than by a tool. COST MEASUREMENT DAMAGE, stated precisely. The 9.5h / 8.30 Mtok reported for slice 01 was computed BEFORE these four runs landed and is unaffected. But the log now reads slice 01 as 19 runs / 11.1h / 10.69 Mtok and slice 02 as zero; the four misattributed runs are 1.7h and 2.39 Mtok. Any future reading of either slice's cost would have been wrong in both directions, and C6 - 'the budget is real' - is measured from exactly this accumulator.
+- *file:* `.claude/hooks/scope.mjs`
 
 </details>
 

@@ -22,7 +22,7 @@
     "test:nodb": "vitest run --project nodb",
     "pretest:db": "npm run build",
     "test:db": "vitest run --project db",
-    "test:tools": "node tools/test/log-check.test.mjs && node tools/test/guard-paths.test.mjs && node tools/test/docs-build.test.mjs && node tools/test/capture-prompt.test.mjs && node tools/test/report-capture.test.mjs && node tools/test/red-proof.test.mjs && node tools/test/lint-arch.test.mjs && node tools/test/collect-ci.test.mjs && node tools/test/defects.test.mjs && node tools/test/slice-check.test.mjs && node tools/test/status.test.mjs && node tools/test/token-capture.test.mjs && node tools/test/audit.test.mjs && node tools/test/run-tests.test.mjs",
+    "test:tools": "node tools/test/scope.test.mjs && node tools/test/log-check.test.mjs && node tools/test/guard-paths.test.mjs && node tools/test/docs-build.test.mjs && node tools/test/capture-prompt.test.mjs && node tools/test/report-capture.test.mjs && node tools/test/red-proof.test.mjs && node tools/test/lint-arch.test.mjs && node tools/test/collect-ci.test.mjs && node tools/test/defects.test.mjs && node tools/test/slice-check.test.mjs && node tools/test/status.test.mjs && node tools/test/token-capture.test.mjs && node tools/test/audit.test.mjs && node tools/test/run-tests.test.mjs",
     "slice:check": "node tools/slice/check.mjs",
     "docs:build": "node tools/docs/build.mjs",
     "docs:check": "node tools/docs/build.mjs --check",

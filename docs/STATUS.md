@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `6b6d1ed fix(tooling): the gates that read a record which exists rather than one that applies` |
+| Last commit | `2c6f3dc docs(arc42): reconcile §11.1 to the register's second source` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process |
-| Agent runs recorded | 61 |
+| Agent runs recorded | 62 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -157,7 +157,8 @@
 | 2026-09-05 06:03 | architect | 7m42 | 156 / 8,338 / 6,159,757 | `derived` |
 | 2026-09-05 06:08 | architect | 12m50 | 232 / 9,551 / 11,127,069 | `derived` |
 | 2026-09-05 06:15 | architect | 20m00 | 330 / 17,971 / 19,192,822 | `derived` |
-| | **total** | **4038m01** | **16,004 / 1,278,788 / 1,237,195,344** | |
+| 2026-09-05 07:56 | architect | 51m05 | 322 / 64,843 / 30,066,861 | `derived` |
+| | **total** | **4089m06** | **16,326 / 1,343,631 / 1,267,262,205** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

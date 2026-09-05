@@ -17,6 +17,7 @@
  */
 import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { resolveScope } from './scope.mjs';
 
 const ROLES = new Set(['architect', 'test-engineer', 'implementer', 'reviewer', 'scribe']);
 
@@ -45,16 +46,10 @@ const note = (msg) => {
 
 try {
   // ---- scope --------------------------------------------------------------
-  // Same marker log-agent-finish reads, so a prompt file and its agent.finish
-  // record always agree about which slice they belong to.
-  let scope = { phase: '0' };
-  const markerPath = join(cwd, 'docs/team-log/.scope');
-  if (existsSync(markerPath)) {
-    try { scope = JSON.parse(readFileSync(markerPath, 'utf8')); }
-    catch { note('unparseable scope marker; defaulted to phase 0'); }
-  } else {
-    note(`no scope marker when ${role} was invoked; defaulted to phase 0`);
-  }
+  // The same resolver log-agent-finish uses, so a prompt file and its agent.finish
+  // record cannot disagree about which slice they belong to — which they did, silently,
+  // for four runs at slice 02. See .claude/hooks/scope.mjs.
+  const scope = resolveScope(cwd, (m) => note(`${m} (${role} invoked)`));
   const tag = scope.slice ? `s${scope.slice}` : `p${scope.phase ?? '0'}`;
 
   const dir = join(cwd, 'docs/team-log/prompts');
