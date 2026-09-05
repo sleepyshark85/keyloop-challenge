@@ -290,7 +290,31 @@ function weekWithOnlyThisDayOpen(weekday: number, slot: { opensSeconds: number; 
  * `appointmentInterval` always produces a well-formed interval from a valid instant and a
  * positive duration) — so a coverage claim about "every verdict kind produced" is
  * necessarily a claim about the file's generative surface as a whole, not any one property.
+ *
+ * ────────────────────────────────────────────────────────────────────────────────────────
+ * ONLY GENERATED VERDICTS ARE COUNTED. R-01-5, and this is the whole of the fix.
+ *
+ * The step-3 version incremented these counters from THREE call sites: P1's generated
+ * composition, and P6 and P7's DETERMINISTIC assertions. P6 asserts `spans-local-days` on
+ * every one of its 300 runs and P7 asserts `malformed-interval` on every one of its 400, so
+ * both counters carried a floor-proof pedestal: `spansLocalDays >= 300` and
+ * `malformedInterval >= 400` held whatever the generator did. The reviewer measured the
+ * consequence — regress `durationMinutesArb` to `fc.integer({ min: 1, max: 2 })` and P1's
+ * contribution collapses from ~219 to ~2 (a 2-minute job crosses local midnight with
+ * probability ~2/1440) while the guard still passed on P6's 300. A floor above a pedestal
+ * is not a floor; it is the `>= 1` tautology design §5.3 rules out by name, wearing a bigger
+ * number.
+ *
+ * So `record(kind, GENERATED)` counts; `record(kind, DETERMINISTIC)` only adds to
+ * `verdictKinds`. The numeric floors are then sized against P1's generated contribution
+ * alone, exactly the way the other nine are, and the named regression breaks them.
+ *
+ * `malformedInterval` therefore counts ZERO by construction, and that is asserted rather
+ * than floored — see MALFORMED_SHAPE_FLOOR for the coverage claim that replaces it.
  */
+const GENERATED = true;
+const DETERMINISTIC = false;
+
 const coverage = {
   gmt: 0,
   bst: 0,
@@ -304,6 +328,15 @@ const coverage = {
   outsideWindow: 0,
   spansLocalDays: 0,
   malformedInterval: 0,
+  /**
+   * P7's four `malformedArb` strata, classified from the sample itself. This is the
+   * coverage claim `malformedInterval >= 1` was pretending to be: `malformed-interval` is
+   * unreachable from the composed surface, so no floor on the VERDICT can discriminate any
+   * generator at all — only a floor on the SHAPES fed to it can. Dropping any one of the
+   * four arbitraries from P7's `fc.oneof` takes its counter to exactly 0, and none of the
+   * four can arise incidentally from another (the classification below is a partition).
+   */
+  malformedShapes: { reversed: 0, nonFiniteStart: 0, nonFiniteEnd: 0, nonInteger: 0 },
 };
 
 function recordInstantCoverage(epochMillis: number): void {
@@ -317,13 +350,35 @@ function recordInstantCoverage(epochMillis: number): void {
   if (dAutumn > 0 && dAutumn < 3_600_000) coverage.autumnAfter++;
 }
 
-function recordVerdictCoverage(kind: string): void {
+function recordVerdictCoverage(kind: string, generated: boolean): void {
+  // The KIND SET records both, because it is a claim about what the file as a whole
+  // produced and `malformed-interval` has no generated source. The COUNTERS record only
+  // generated verdicts, because they are floors on a generator (see above).
   coverage.verdictKinds.add(kind);
+  if (!generated) return;
   if (kind === 'within') coverage.within++;
   else if (kind === 'closed-day') coverage.closedDay++;
   else if (kind === 'outside-window') coverage.outsideWindow++;
   else if (kind === 'spans-local-days') coverage.spansLocalDays++;
   else if (kind === 'malformed-interval') coverage.malformedInterval++;
+}
+
+/**
+ * Classify a P7 sample into exactly one of `malformedArb`'s four strata, from the value
+ * rather than from which arbitrary produced it — a classifier that trusted the generator to
+ * label itself would be the same reflexivity R-01-6 found in the marker scan.
+ *
+ * The four are disjoint by construction: `reversedOrEqualArb` yields two finite integers;
+ * `nonFiniteFirstArb` a non-finite start; `nonFiniteSecondArb` a finite integer start and a
+ * non-finite end; `nonIntegerFirstArb` a finite non-integer start. §5.3 asserts the four
+ * counters sum to P7's run count, so a stratum that stopped being reachable cannot hide
+ * inside another's tally.
+ */
+function recordMalformedShape([startsAt, endsAt]: readonly [number, number]): void {
+  if (!Number.isFinite(startsAt)) coverage.malformedShapes.nonFiniteStart++;
+  else if (!Number.isFinite(endsAt)) coverage.malformedShapes.nonFiniteEnd++;
+  else if (!Number.isInteger(startsAt)) coverage.malformedShapes.nonInteger++;
+  else coverage.malformedShapes.reversed++;
 }
 
 // Fixed seeds: determinism in CI costs nothing here, because the coverage assertions above
@@ -416,7 +471,7 @@ describe('P1 (AC-2, QS-9) — the oracle and the domain agree on `within`, for e
 
         const weekly = toWeekly(weeklySlots);
         const verdict = withinOpeningHours(iv.startsAt, iv.endsAt, ZONE, weekly);
-        recordVerdictCoverage(verdict.kind);
+        recordVerdictCoverage(verdict.kind, GENERATED);
 
         const oracleStart = localOracle(iv.startsAt);
         const oracleEnd = localOracle(iv.endsAt);
@@ -591,7 +646,7 @@ describe('P6 (§8.3) — an interval crossing local midnight is spans-local-days
         const crossingEnd = crossingStart + durationMinutes * 60_000;
         const crossingVerdict = withinOpeningHours(crossingStart, crossingEnd, ZONE, weekly);
         expect(crossingVerdict.kind).toBe('spans-local-days');
-        recordVerdictCoverage(crossingVerdict.kind);
+        recordVerdictCoverage(crossingVerdict.kind, DETERMINISTIC);
 
         const earlierStart = crossingStart - 3_600_000; // 22:30, same local day
         const earlierEnd = earlierStart + durationMinutes * 60_000;
@@ -604,6 +659,13 @@ describe('P6 (§8.3) — an interval crossing local midnight is spans-local-days
 });
 
 // ─────────────────────────────────────────────────────────────────────────────── P7 ──
+
+/**
+ * Named because §5.3 asserts that the four `malformedArb` strata PARTITION this many
+ * samples. A literal in both places is a drift waiting to happen, and the partition
+ * assertion is the thing that stops a stratum going quiet inside another's tally.
+ */
+const P7_RUNS = 400;
 
 describe('P7 (§2.3, literal AC-6) — a reversed or non-finite endpoint pair yields malformed-interval', () => {
   const weekly = toWeekly(fullOpenWeek);
@@ -637,9 +699,10 @@ describe('P7 (§2.3, literal AC-6) — a reversed or non-finite endpoint pair yi
       fc.property(malformedArb, ([startsAtMillis, endsAtMillis]) => {
         const verdict = withinOpeningHours(startsAtMillis, endsAtMillis, ZONE, weekly);
         expect(verdict.kind).toBe('malformed-interval');
-        recordVerdictCoverage(verdict.kind);
+        recordVerdictCoverage(verdict.kind, DETERMINISTIC);
+        recordMalformedShape([startsAtMillis, endsAtMillis]);
       }),
-      { numRuns: 400, seed: SEED + 6 },
+      { numRuns: P7_RUNS, seed: SEED + 6 },
     );
   });
 
@@ -698,10 +761,51 @@ describe('occupancyInterval — the identity today (A-4, design §2.2/§9.2)', (
  * below the healthy minimum on 200 trials each — i.e. it fails reliably when S1 contributes
  * nothing, and passes reliably when it does. VERDICT_FLOOR = 50 and OFFSET_FLOOR = 150 use
  * the same reasoning against their own measured ranges above.
+ *
+ * ────────────────────────────────────────────────────────────────────────────────────────
+ * R-01-5 — the two floors that were NOT sized this way, and now are.
+ *
+ * `spansLocalDays >= 1` and `malformedInterval >= 1` were tautologies: P6 and P7 increment
+ * those two counters from DETERMINISTIC assertions, 300 and 400 times, so both held at >= 300
+ * regardless of the generator. The counters now record generated verdicts only (see the
+ * accumulator's comment), and the two floors are sized against measured healthy-versus-broken
+ * ranges like the other nine. Both mutants were run.
+ *
+ *   SPANS_LOCAL_DAYS_FLOOR — mutant: `durationMinutesArb` regressed to
+ *   `fc.integer({ min: 1, max: 2 })`, the reviewer's named regression (a 2-minute job crosses
+ *   local midnight with probability ~2/1440). 100 trials each, P1 at N=1800:
+ *
+ *       healthy  min 197  max 268          broken  min 15  max 36
+ *
+ *   100 is 2.8x the broken maximum and about half the healthy minimum, which is the
+ *   NEAR_TRANSITION_FLOOR shape. VERDICT_FLOOR (50) was rejected for this counter: it is only
+ *   1.4x the broken maximum, so it would pass under the very regression it has to catch —
+ *   which is the whole finding, at a larger number.
+ *
+ *   MALFORMED_SHAPE_FLOOR — and this one required changing WHAT is floored, because no
+ *   sizing of the old counter could work. Measured: `malformed-interval` is produced by P7
+ *   and by nothing else — P1's composed surface yields it exactly 0 times in 100 trials,
+ *   necessarily, because `appointmentInterval` on a valid instant and a positive duration is
+ *   well-formed by construction (P7's second case asserts precisely that). So the generated
+ *   count is a CONSTANT ZERO and no floor on it discriminates any generator; the tautology
+ *   was structural, not a number chosen too low. What can discriminate is the shape mix P7
+ *   feeds in, so the floor moved onto `malformedArb`'s four strata. Mutants: each of
+ *   `reversedOrEqualArb`, `nonFiniteFirstArb`, `nonFiniteSecondArb` and `nonIntegerFirstArb`
+ *   dropped from the `fc.oneof`, in turn. 100 healthy trials, 5 per drop:
+ *
+ *       healthy  min 74 (reversed) / 81 / 82 / 78   max 125
+ *       broken   the dropped stratum's counter is exactly 0, every trial, and the other
+ *                three rise to ~133 rather than absorbing it
+ *
+ *   40 is about half the healthy minimum and unreachable when a stratum is gone. The
+ *   partition assertion below is the other half: the four must sum to P7_RUNS, so a stratum
+ *   cannot go quiet by being misclassified into a sibling.
  */
 const NEAR_TRANSITION_FLOOR = 40;
 const VERDICT_FLOOR = 50;
 const OFFSET_FLOOR = 150;
+const SPANS_LOCAL_DAYS_FLOOR = 100;
+const MALFORMED_SHAPE_FLOOR = 40;
 
 describe('§5.3 — the generator is shown to have reached what P1-P7 claim, not merely to exist', () => {
   it('both UTC offsets, all four near-transition windows, and every verdict kind were actually produced', () => {
@@ -730,14 +834,56 @@ describe('§5.3 — the generator is shown to have reached what P1-P7 claim, not
     expect(coverage.outsideWindow, '`outside-window` verdicts produced').toBeGreaterThanOrEqual(
       VERDICT_FLOOR,
     );
-    expect(coverage.spansLocalDays, '`spans-local-days` verdicts produced').toBeGreaterThanOrEqual(1);
-    expect(coverage.malformedInterval, '`malformed-interval` verdicts produced').toBeGreaterThanOrEqual(
-      1,
+    expect(
+      coverage.spansLocalDays,
+      '`spans-local-days` verdicts produced BY THE GENERATOR — P6 asserts this kind 300 ' +
+        'times deterministically and no longer counts towards the floor. Regress ' +
+        '`durationMinutesArb` to fc.integer({ min: 1, max: 2 }) and this drops to 15-36.',
+    ).toBeGreaterThanOrEqual(SPANS_LOCAL_DAYS_FLOOR);
+
+    // `malformed-interval` is UNREACHABLE from the composed surface, and that is asserted
+    // rather than assumed: it is what makes a floor on the generated count impossible and
+    // the shape floors below necessary. It is also P7's second case ("a well-formed pair
+    // never yields malformed-interval") restated over 1800 independent samples.
+    expect(
+      coverage.malformedInterval,
+      'the P1 composition must never produce malformed-interval; if it can, the shape ' +
+        'floors below are measuring the wrong thing',
+    ).toBe(0);
+  });
+
+  it("P7's four malformed strata each reached the implementation, and they partition its samples", () => {
+    const shapes = coverage.malformedShapes;
+
+    expect(shapes.reversed, 'reversed or equal endpoints, both finite integers').toBeGreaterThanOrEqual(
+      MALFORMED_SHAPE_FLOOR,
+    );
+    expect(shapes.nonFiniteStart, 'NaN or +/-Infinity as the START').toBeGreaterThanOrEqual(
+      MALFORMED_SHAPE_FLOOR,
+    );
+    expect(shapes.nonFiniteEnd, 'NaN or +/-Infinity as the END').toBeGreaterThanOrEqual(
+      MALFORMED_SHAPE_FLOOR,
+    );
+    expect(shapes.nonInteger, 'a finite non-integer START').toBeGreaterThanOrEqual(
+      MALFORMED_SHAPE_FLOOR,
     );
 
+    // Drop one arbitrary from P7's `fc.oneof` and its counter goes to 0 while the others
+    // rise — so without this, three floors of 40 would still be met by a three-stratum
+    // generator producing 133 of each. The sum is what makes each floor a claim about ITS
+    // OWN stratum rather than about the total.
+    expect(
+      shapes.reversed + shapes.nonFiniteStart + shapes.nonFiniteEnd + shapes.nonInteger,
+      'the four strata must partition every sample P7 ran',
+    ).toBe(P7_RUNS);
+  });
+
+  it('every OpeningHoursVerdict kind was produced somewhere in the file', () => {
     expect(
       [...coverage.verdictKinds].sort(),
-      'every OpeningHoursVerdict kind must have been produced at least once',
+      'every OpeningHoursVerdict kind must have been produced at least once. This set ' +
+        'records deterministic verdicts too, because `malformed-interval` has no generated ' +
+        'source — see the accumulator comment.',
     ).toEqual(['closed-day', 'malformed-interval', 'outside-window', 'spans-local-days', 'within']);
   });
 });
