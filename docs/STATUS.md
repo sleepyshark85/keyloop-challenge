@@ -15,12 +15,12 @@
 
 | | |
 |---|---|
-| Last commit | `fae2aff test(02): the response schemas are asserted to ENFORCE, and classify's two tests are separated` |
+| Last commit | `e6e4bec test(02): the split assertion compares two renderings of one fact (I-02-9)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process |
-| Agent runs recorded | 82 |
+| Agent runs recorded | 84 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
-| Open DCRs | **1** — a slice is blocked |
+| Open DCRs | none |
 
 ## What happens next
 
@@ -193,7 +193,9 @@
 | 2026-09-05 18:35 | test-engineer | 63m22 | 412 / 65,432 / 47,783,901 | `derived` |
 | 2026-09-05 19:14 | architect | 35m55 | 472 / 34,003 / 37,601,913 | `derived` |
 | 2026-09-05 21:02 | implementer | 104m17 | 654 / 25,639 / 95,674,562 | `derived` |
-| | **total** | **4667m58** | **21,160 / 1,894,118 / 1,687,182,098** | |
+| 2026-09-05 21:15 | architect | 11m36 | 148 / 5,680 / 7,149,519 | `derived` |
+| 2026-09-05 21:18 | test-engineer | 2m05 | 60 / 2,065 / 1,244,743 | `derived` |
+| | **total** | **4681m39** | **21,368 / 1,901,863 / 1,695,576,360** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

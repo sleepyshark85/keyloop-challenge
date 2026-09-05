@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **110** |
-| Severity | 10 blocking · 61 major · 39 minor |
+| Findings recorded | **111** |
+| Severity | 10 blocking · 61 major · 40 minor |
 | Verdicts | 5 narrowed · 47 accepted · 1 escalated · 5 deferred |
-| Raised by | test-engineer 27 · reviewer 24 · orchestrator 23 · implementer 18 · architect 17 · human 1 |
-| Awaiting a ruling | **52** |
+| Raised by | test-engineer 28 · reviewer 24 · orchestrator 23 · implementer 18 · architect 17 · human 1 |
+| Awaiting a ruling | **53** |
 | Mean escape distance | 1.68 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -647,6 +647,7 @@ rather than narrated.*
 | **O-29** | MAJOR | 2 *(+0)* | orchestrator | The architect's eleven step-2 rulings were never logged as events, so the gate view of what it ruled would have shown nothing | **open** |
 | **F-02-10** | MAJOR | 3 *(+3)* | orchestrator | The ADR guard reported that every option survives while an ADR it had never opened sat on disk unpinned — and it could not have read that ADR's options anyway, because they are in the table form the concision ruling encourages | **open** |
 | **F-02-9** | MAJOR | 3 *(+0)* | architect | Every write path to the appointment table must take ADR-0018's two advisory locks in the same order, and slices 06 and 07 inherit that obligation | **open** |
+| **T-02-10** | MINOR | 4 *(+1)* | test-engineer | A same-shaped assertion at line 121 is satisfiable but fragile, and is raised rather than quietly repaired | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -791,6 +792,11 @@ rather than narrated.*
 
 - *scenario:* ADR-0018 makes bay-then-technician a total order by construction, using disjoint lock classes, so no sort has to be kept sorted. But the guarantee holds only while EVERY writer takes both locks in that order. Slice 06's reschedule UPDATE and slice 07's contention scenarios are writers; one that skips the locks reintroduces the deadlock and, per ADR-0018, a 500 rather than a 409. Routed rather than solved here: the enforcing mechanism belongs with the slice that adds the second writer, and inventing one now against a write path that does not exist is the shape this project keeps catching. Recorded so slice 06 inherits an obligation rather than rediscovering a deadlock.
 - *file:* `docs/adr/0018-lock-the-bay-and-the-technician-before-each-insert.md`
+
+**T-02-10** — A same-shaped assertion at line 121 is satisfiable but fragile, and is raised rather than quietly repaired
+
+- *scenario:* `${scenario.bayIds.length} bays seeded, ${distinctBays.size} used` compared against the literal '24 bays seeded, 1 used'. Both sides carry the words, so unlike I-02-9 it is satisfiable and passes. The fragility: the left side DERIVES the seeded count while the right side PINS it, so changing the fixture's bay count fails the assertion on the seeded number rather than on the thing it is about - bays being plentiful. Arguably correct as written, since the literal pins the fixture the case was designed for. RAISED, NOT REPAIRED, and the orchestrator asked for exactly that: the value of I-02-9 is that it was found and named, and a silent repair alongside a named one teaches the opposite lesson. The test-engineer also swept every `.toBe(` in tests/{acceptance,contract,property,concurrency,integration} and reports those three lines are the complete set of this shape - a bounded claim rather than an impression.
+- *file:* `tests/concurrency/no-technician-overlap.test.ts`
 
 </details>
 
