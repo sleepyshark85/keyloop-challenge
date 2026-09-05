@@ -15,8 +15,8 @@
 
 | | |
 |---|---|
-| Last commit | `2c6f3dc docs(arc42): reconcile §11.1 to the register's second source` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process |
+| Last commit | `0a9ff13 feat(docs): word budgets, and two guards for the §4 override` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process |
 | Agent runs recorded | 62 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
@@ -71,6 +71,10 @@
 **Gate process** · 2026-09-05 · fold-12-and-13-into-02
 
 > Ruled 2026-09-05 alongside the light-gate decision. Backlog slices 12 and 13 - the R-01-1 instant bound and the R-01-4 midnight-ending interval - fold into slice 02 rather than running as two separate loops. Both are small domain fixes whose remedies are already NAMED EXACTLY by the architect and now RATIFIED as ADR-0014 and ADR-0015, so the design step they would each consume has effectively already happened; running two full seven-step loops to apply two ratified decisions is the slicing problem §6's loopback governor warns about, seen from the other end. The 06/07 seam is again NOT touched, per Gate C. Backlog goes from 10 remaining to 8. Explicitly accepted as a cost: slice 02 grows from AC-1..AC-12 to carry both remedies and their negative controls, and a bigger slice is a bigger unit to review - which is precisely why 02 keeps the FULL human gate under the ruling above. Scoped to slice 02 rather than to phase 5 because the schema deliberately rejects phase 5 - slice work uses `slice` - and a cross-slice PROCESS ruling made during phase 5 has no other home. Slice 02 is where both rulings first take effect. Recorded as O-18.
+
+**Gate process** · 2026-09-05 · concise-docs-one-home-per-fact-and-shorten-accepted-adrs
+
+> Ruled 2026-09-05 on measured figures, not impression: arc42 31.8k words, ADRs 35.4k, slices 69k - about 136k words, with an average ADR of 2,080 against a normal MADR's 400-800, and 'Considered options' plus 'Pros and cons of the options' spending 11.5k words on one job. DECIDED: ONE HOME PER FACT. The ADR carries the decision, its options table and its consequences; arc42 says what the system IS, present tense, no history; a slice design carries only that slice's delta; narrative and measurement live in the event log and on the PR. The duplication being removed is ACROSS artifacts rather than inside them - R-01-4's dead-branch-versus-live-defect argument was told five times. SECOND RULING, overriding §4. Accepted ADRs MAY be shortened, provided the meaning does not change. §4 says an accepted ADR is immutable and must be superseded rather than edited; the human overrode that for length only. The override holds on §4's own terms: its stated purpose is that 'the history of how thinking changed is the point', and that history is in git and in this log rather than in the file being frozen. What immutability uniquely protects is that a reader citing ADR-0006 later gets the same DECISION, which a meaning-preserving condensation does not touch. The orchestrator's earlier §4-derived exemption for the thirteen accepted ADRs is therefore withdrawn and they are back in scope. THIRD RULING: the slice designs are in scope too, and are to be shortened AGGRESSIVELY. Measured: four design files hold 54,605 of the 69k words in docs/slices/ - 00a 17,459, 00 15,294, 01 11,573, 02 10,279 - while every slice file itself is between 156 and 1,416. A merged slice's design has already been reconciled into arc42 by step 7, which is what step 7 IS, so keeping the working prose afterwards is the cross-artifact duplication this ruling is about in its purest form.
 
 ## Decisions on record
 
