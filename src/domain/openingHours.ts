@@ -49,6 +49,17 @@ export type OpeningHoursVerdict =
   // type used to (§2.3).
   | { readonly kind: 'malformed-interval' };
 
+/**
+ * ADR-0014, applied here as well as in `instant()` — and this is a consequence of the literal
+ * AC-6 ruling rather than belt-and-braces. This module may not import `Interval`, so "my caller
+ * used `instant()`" is uncheckable from inside it; without the bound, step 3 hands an
+ * unrenderable value to `formatToParts` and a PURE FUNCTION THROWS `RangeError`.
+ *
+ * The literal is written twice on purpose (D-01-2, ADR-0014's "Bad, or deferred", arc42 §11):
+ * `domain-is-pure` has no allowlist, so there is no module either file may import it from.
+ */
+const MAX_RENDERABLE_EPOCH_MILLIS = 8_640_000_000_000_000;
+
 // ─────────────────────────────────────────────────────────────── §3.2: parsing `time` ──
 
 /**
@@ -128,6 +139,40 @@ function renderLocal(epochMillis: number, formatter: Intl.DateTimeFormat): Local
   };
 }
 
+/**
+ * The local calendar date immediately following `localDate`, as the same `YYYY-MM-DD` string
+ * `renderLocal` produces. ADR-0015: **"immediately following" is a CALENDAR-DATE SUCCESSOR
+ * TEST, not epoch arithmetic** — a DST transition changes how many milliseconds a local day
+ * holds, and this function's entire subject is DST.
+ *
+ * Month and year rollover are delegated to the engine's own UTC calendar, exactly as §4.1
+ * delegates the day of week to `Intl` rather than hand-rolling one: a second calendar
+ * implementation inside the one module that must not be subtly wrong is the risk this design
+ * rejects. It is used only as an arithmetic-free date successor; no instant, zone or wall clock
+ * is derived from it, and `getUTC*` is zone-free by construction.
+ *
+ * IT IS TOTAL WITH NO GUARD CLAUSES, and that is deliberate rather than careless. An input this
+ * cannot advance yields `NaN` components and a string like `0NaN-0NaN-0NaN`, which no rendering
+ * can equal — so the successor test simply says "no" and the interval stays `spans-local-days`,
+ * which is a refusal. A `if (malformed) return ''` arm would say exactly the same thing through a
+ * branch nothing can reach, and an unreachable branch is a surviving mutant wearing a guard's
+ * clothes.
+ *
+ * One residue, named rather than promised away: a BC date. `Intl` with no `era` renders year
+ * 271822 BC as `"271822"`, so the successor computed here counts the wrong way and such an
+ * interval is refused rather than normalised. It fails CLOSED, which is this module's posture.
+ */
+function nextLocalDate(localDate: string): string {
+  const [year, month, day] = localDate.split('-');
+
+  // `setUTCFullYear` rather than `Date.UTC`, which maps years 0-99 onto 1900-1999.
+  const next = new Date(0);
+  next.setUTCFullYear(Number(year), Number(month) - 1, Number(day) + 1);
+
+  const pad = (value: number, width: number): string => String(value).padStart(width, '0');
+  return `${pad(next.getUTCFullYear(), 4)}-${pad(next.getUTCMonth() + 1, 2)}-${pad(next.getUTCDate(), 2)}`;
+}
+
 // ───────────────────────────────────────────────────── §4.2: the decision procedure ──
 
 /**
@@ -149,9 +194,14 @@ export function withinOpeningHours(
   // 1. Pure arithmetic, first: everything after this would otherwise be handed a value
   // `new Date(...)` cannot render, and a pure function must not throw. Exists only because
   // of the literal AC-6 ruling — the `Interval` type used to make this unrepresentable.
+  //
+  // The RENDERABLE BOUND (ADR-0014, AC-16) is part of this step and returns the EXISTING
+  // `malformed-interval`: ADR-0014 is explicit that no new verdict variant is introduced.
   if (
     !Number.isInteger(startsAtMillis) ||
     !Number.isInteger(endsAtMillis) ||
+    Math.abs(startsAtMillis) > MAX_RENDERABLE_EPOCH_MILLIS ||
+    Math.abs(endsAtMillis) > MAX_RENDERABLE_EPOCH_MILLIS ||
     !(endsAtMillis > startsAtMillis)
   ) {
     return { kind: 'malformed-interval' };
@@ -172,7 +222,25 @@ export function withinOpeningHours(
 
   // 4. Both endpoints must fall within one day's opening hours — no weekly schedule can
   // contain an interval crossing local midnight.
-  if (start.localDate !== end.localDate) {
+  //
+  // ADR-0015, before the `startsOn !== endsOn` comparison: an end rendering as EXACTLY
+  // `00:00:00` AND on the local date IMMEDIATELY FOLLOWING the start's is the CLOSE of the
+  // start's day, not the opening of the next one, so it is `secondsOfDay = 86400` on the
+  // start's day. Step 7 then compares 86400 <= 86400 for a dealership closing at '24:00:00'
+  // (within, AC-17) and 86400 <= 61200 for one closing at 17:00 (outside-window, and for the
+  // right reason). Nothing downstream changes.
+  //
+  // BOTH CLAUSES ARE LOAD-BEARING and each is killed by a different case:
+  //   - drop `secondsOfDay === 0` and a 23:00-01:00 crossing normalises to midnight and is
+  //     accepted — AC-18 catches it;
+  //   - drop the successor test and a 49-hour interval ending at local midnight two days later
+  //     normalises into the start's day and is silently accepted — AC-18 cannot see that,
+  //     because AC-18's end IS on the immediately following day. P-M2 catches it.
+  const endsAtLocalMidnight =
+    end.secondsOfDay === 0 && end.localDate === nextLocalDate(start.localDate);
+  const endSecondsOfDay = endsAtLocalMidnight ? 86_400 : end.secondsOfDay;
+
+  if (!endsAtLocalMidnight && start.localDate !== end.localDate) {
     return { kind: 'spans-local-days', startsOn: start.localDate, endsOn: end.localDate };
   }
 
@@ -190,7 +258,8 @@ export function withinOpeningHours(
   }
 
   // 7. Inclusive on closesAt: a job ending exactly at closing time is within opening hours.
-  if (opensSeconds <= start.secondsOfDay && end.secondsOfDay <= closesSeconds) {
+  // `endSecondsOfDay` is step 4's normalisation, not `end.secondsOfDay` — see ADR-0015.
+  if (opensSeconds <= start.secondsOfDay && endSecondsOfDay <= closesSeconds) {
     return { kind: 'within' };
   }
 

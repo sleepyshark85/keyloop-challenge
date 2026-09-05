@@ -51,7 +51,7 @@ rule are `CLAUDE.md` §6.
 |---|---|---|---|
 | **Human** | Scope, acceptance criteria, quality goals, all trade-offs; overrides anyone | — | — |
 | **Orchestrator** | Sequencing, slicing, who convenes. Sole writer of board and event log | Decide architecture; write code | — |
-| **Architect** | Interfaces, layering, data model, patterns, open tech choices; adjudicates DCRs | Change scope or AC; write code or tests | Opus |
+| **Architect** | Interfaces, layering, data model, patterns, open tech choices; adjudicates DCRs; rules mid-slice on scope, AC and QS, provisionally until the gate | Write code or tests; overturn a gate ruling | Opus |
 | **Test-engineer** | How *done* is asserted: acceptance, contract, property, concurrency tests | Write unit tests; see the implementation first | Sonnet |
 | **Implementer** | Internal design within the architect's constraints | Edit acceptance/contract/property tests; edit arc42 | Sonnet |
 | **Reviewer** | Whether a diff conforms; may block a merge | Change the design — may only raise a DCR | Opus |

@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import type { FastifyInstance, RouteOptions } from 'fastify';
 import { registerHealthRoute } from '../../../src/http/routes/health.js';
 import { buildServer } from '../../../src/http/server.js';
+import { pino } from 'pino';
 import { createLogger } from '../../../src/platform/logger.js';
 import type { HealthOutcome } from '../../../src/application/checkHealth.js';
 
@@ -28,9 +29,24 @@ import type { HealthOutcome } from '../../../src/application/checkHealth.js';
 const silentLogger = createLogger({ logLevel: 'silent' });
 
 const apps: FastifyInstance[] = [];
+
+/**
+ * Slice 02 added two more bound use cases to `ServerDeps`. `/health` is unaffected by both, so
+ * they are stubs that THROW rather than plausible fakes: if a health request ever reached one,
+ * this file should fail loudly instead of quietly asserting over a booking path it does not test.
+ */
+const unusedBookingDeps = {
+  bookAppointment: (): never => {
+    throw new Error('GET /health must not book an appointment');
+  },
+  readAppointment: (): never => {
+    throw new Error('GET /health must not read an appointment');
+  },
+};
+
 function serverReporting(outcome: HealthOutcome | (() => Promise<HealthOutcome>)): FastifyInstance {
   const checkHealth = typeof outcome === 'function' ? outcome : async (): Promise<HealthOutcome> => outcome;
-  const app = buildServer({ logger: silentLogger, checkHealth });
+  const app = buildServer({ logger: silentLogger, checkHealth, ...unusedBookingDeps });
   apps.push(app);
   return app;
 }
@@ -112,7 +128,7 @@ describe('GET /health', () => {
 describe('buildServer', () => {
   it('logs through the injected logger rather than discarding it', () => {
     const logger = createLogger({ logLevel: 'warn' });
-    const app = buildServer({ logger, checkHealth: async () => ({ kind: 'ok' }) });
+    const app = buildServer({ logger, checkHealth: async () => ({ kind: 'ok' }), ...unusedBookingDeps });
     apps.push(app);
 
     // `app.log` is typed FastifyBaseLogger, which declares neither `level` nor
@@ -152,11 +168,45 @@ describe('an outcome the route does not know', () => {
   });
 
   it('says what it could not interpret, so the cause is in the log', async () => {
-    const app = serverReporting({ kind: 'sideways' } as unknown as HealthOutcome);
+    // REWRITTEN AT SLICE 02, and the change is the point rather than an accommodation.
+    //
+    // Until this slice an escaped exception reached Fastify's default handler, which put the
+    // message in the RESPONSE BODY. `server.ts` now has a `setErrorHandler`, and §8.6's
+    // `500 | Anything else` row renders a problem document that deliberately tells the client
+    // nothing it could act on — a `never`-branch message is an internal detail and putting it
+    // on the wire is how implementation shape leaks to whoever can reach the endpoint.
+    //
+    // The claim this case makes is unchanged: an operator can still find out what happened. It
+    // has simply moved to where the criterion always said it was — the log.
+    const lines: string[] = [];
+    const capturing = pino(
+      { level: 'error' },
+      { write: (line: string): void => void lines.push(line) },
+    );
+    const app = buildServer({
+      logger: capturing,
+      checkHealth: async () => ({ kind: 'sideways' }) as unknown as HealthOutcome,
+      ...unusedBookingDeps,
+    });
+    apps.push(app);
 
     const response = await app.inject({ method: 'GET', url: '/health' });
 
-    expect(response.json().message).toMatch(/unhandled health outcome.*sideways/);
+    expect(response.statusCode).toBe(500);
+    expect(
+      response.headers['content-type'],
+      'the catch-all must still be RFC 9457 — it is the row §8.6 claims totality for',
+    ).toMatch(/application\/problem\+json/);
+    expect(response.json().type).toBe('/problems/internal');
+    expect(
+      response.body,
+      'the client is told nothing it could act on, and nothing about the implementation',
+    ).not.toContain('sideways');
+
+    expect(
+      lines.join('\n'),
+      'nothing reached the log, so the cause of a 500 is now unrecoverable',
+    ).toMatch(/unhandled health outcome.*sideways/);
   });
 });
 

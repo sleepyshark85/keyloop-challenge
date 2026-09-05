@@ -164,6 +164,37 @@ function sameLocalDate(a: LocalRendering, b: LocalRendering): boolean {
 }
 
 /**
+ * ADR-0015, added at slice 02 step 3 — the oracle's statement of the rule the domain now
+ * follows. Returns the end's seconds-of-day AS MEASURED ON THE START'S LOCAL DAY, or `null`
+ * when the two renderings genuinely fall on different local days.
+ *
+ * WHY THIS FILE CHANGED. P1 below is the only assertion in the QS-9 suite that computes
+ * `within` from the local renderings itself, and it did so with `sameLocalDate` alone — which
+ * is the PRE-ADR-0015 rule. `docs/adr/0015-*.md` is accepted: an end rendering as exactly
+ * `00:00:00` on the local date immediately after the start's ends on the START's day, at
+ * `secondsOfDay = 86400`. Leaving the old rule here would have made a correct implementation
+ * of an accepted ADR fail a test the implementer is forbidden to edit — a DCR manufactured by
+ * the test-engineer, over a case P1's own generator can produce (its stratum 3 walks 2026 at
+ * minute granularity, and `daySlotArb` closes at 86400 roughly half the time).
+ *
+ * THE SUCCESSOR TEST IS A LOCAL-CALENDAR-DATE COMPARISON, NEVER EPOCH ARITHMETIC. A DST
+ * transition changes the number of milliseconds in a local day, so `+ 86_400_000` would be
+ * wrong on exactly the two days this file exists to examine. `Date.UTC` over the three date
+ * PARTS is calendar arithmetic on a calendar date and carries no zone at all.
+ *
+ * The generative counterpart of the case this admits lives in
+ * `tests/property/local-midnight.test.ts` (P-M1, P-M2, P-M3): this edit keeps the oracle
+ * honest, and that file is where the new behaviour is asserted.
+ */
+function endSecondsOnStartDay(start: LocalRendering, end: LocalRendering): number | null {
+  if (sameLocalDate(start, end)) return end.secondsOfDay;
+  const startDay = Date.UTC(start.year, start.month, start.date);
+  const endDay = Date.UTC(end.year, end.month, end.date);
+  const immediatelyFollowing = endDay - startDay === 86_400_000;
+  return end.secondsOfDay === 0 && immediatelyFollowing ? 86_400 : null;
+}
+
+/**
  * The reverse direction — local calendar date -> epoch instant for LOCAL MIDNIGHT — used only
  * to build test fixtures, never to verify anything. Safe because local midnight is never
  * within an hour of either 2026 transition instant (both happen at 01:00 local); see the
@@ -479,11 +510,14 @@ describe('P1 (AC-2, QS-9) — the oracle and the domain agree on `within`, for e
         // in bounds; the cast is only to satisfy `noUncheckedIndexedAccess` on a non-literal
         // index into a fixed-length tuple.
         const slot = weeklySlots[oracleStart.dayOfWeek] as DaySlot;
+        // ADR-0015: the end's seconds-of-day is measured on the START's local day, which is
+        // `null` when the interval genuinely spans two of them. See `endSecondsOnStartDay`.
+        const endSeconds = endSecondsOnStartDay(oracleStart, oracleEnd);
         const expectedWithin =
-          sameLocalDate(oracleStart, oracleEnd) &&
+          endSeconds !== null &&
           slot !== null &&
           slot.opensSeconds <= oracleStart.secondsOfDay &&
-          oracleEnd.secondsOfDay <= slot.closesSeconds;
+          endSeconds <= slot.closesSeconds;
 
         expect(verdict.kind === 'within').toBe(expectedWithin);
       }),

@@ -384,3 +384,162 @@ describe('withinOpeningHours — the seconds-of-day arithmetic is hours*3600 + m
     expect(withinOpeningHours(atClose, atClose + 1000, ZONE, weekly).kind).toBe('outside-window');
   });
 });
+
+/**
+ * ADR-0014 step 1 (AC-16) — an endpoint outside the renderable bound is `malformed-interval`,
+ * and the function does not throw.
+ *
+ * Without the bound, step 3 hands `new Date(1e18)` to `formatToParts` and a pure function
+ * raises `RangeError`. The property test asserts the same thing generatively; these name the
+ * two mutants the arithmetic is exposed to and assert the SIGN symmetry the property's
+ * `-(MAX + 1)` case is the only other cover for.
+ */
+describe('withinOpeningHours — step 1 bounds both endpoints (ADR-0014, AC-16)', () => {
+  const MAX = 8_640_000_000_000_000;
+  const weekly = weekOpen('00:00:00', '24:00:00');
+
+  it('a start beyond the positive bound is malformed-interval, and does not throw', () => {
+    expect(withinOpeningHours(MAX + 1, MAX + 2, ZONE, weekly)).toEqual({
+      kind: 'malformed-interval',
+    });
+  });
+
+  it('an END beyond the positive bound is malformed-interval, from an ordinary start', () => {
+    expect(withinOpeningHours(1_760_000_000_000, MAX + 1, ZONE, weekly)).toEqual({
+      kind: 'malformed-interval',
+    });
+  });
+
+  it('a start beyond the NEGATIVE bound is malformed-interval (kills `delete Math.abs`)', () => {
+    expect(withinOpeningHours(-(MAX + 1), 0, ZONE, weekly)).toEqual({
+      kind: 'malformed-interval',
+    });
+  });
+
+  it('exactly -MAX as the START is not rejected either — both endpoints carry the same `>`', () => {
+    // The positive case below pins the END's comparison; this one pins the START's. Without it a
+    // `>` -> `>=` mutant on the first of the two `Math.abs` tests survives, because no case
+    // passes the exact bound as a start. The verdict itself is not the claim — only that the
+    // interval was not refused by step 1.
+    expect(withinOpeningHours(-MAX, -MAX + 1_000, ZONE, weekly).kind).not.toBe(
+      'malformed-interval',
+    );
+  });
+
+  it('exactly ±MAX is NOT rejected by the bound: the comparison is `>`, not `>=`', () => {
+    // The interval is one second at the extreme positive instant, which renders. If the bound
+    // were exclusive this would be `malformed-interval` and AC-14's two endpoints would be
+    // unreachable through this function.
+    expect(withinOpeningHours(MAX - 1_000, MAX, ZONE, weekly).kind).not.toBe(
+      'malformed-interval',
+    );
+  });
+
+  it('an ordinary in-hours interval is still `within`, so the bound is not a blanket rejection', () => {
+    const start = Date.parse('2026-09-08T09:00:00.000Z');
+    expect(withinOpeningHours(start, start + 3_600_000, ZONE, weekly).kind).toBe('within');
+  });
+});
+
+/**
+ * ADR-0015 — an interval ending at local midnight ends on the day it started (AC-17 to AC-19).
+ *
+ * The property suite generates this over every day of 2026 including both DST transitions.
+ * These are the boundary cases, and they exist to name the mutants: the design's own table
+ * lists four, and each one below says which case is the only thing standing between it and a
+ * survivor.
+ */
+describe('withinOpeningHours — step 6 reads BOTH ends of the window', () => {
+  it('a malformed CLOSING time is malformed-hours, not only a malformed opening one', () => {
+    // Both halves of `opensSeconds === null || closesSeconds === null` need a case, or one of
+    // them is an alternative no input distinguishes.
+    const start = Date.parse('2026-09-08T09:00:00.000Z');
+    expect(withinOpeningHours(start, start + 3_600_000, ZONE, weekOpen('09:00:00', 'not-a-time'))).toEqual({
+      kind: 'malformed-hours',
+      dayOfWeek: 2,
+    });
+  });
+});
+
+describe('withinOpeningHours — step 4 normalises an end at local midnight (ADR-0015)', () => {
+  // 23:00 BST on Tuesday 2026-09-08, ending 00:00 local on 2026-09-09.
+  const ELEVEN_PM = Date.parse('2026-09-08T22:00:00Z');
+  const LOCAL_MIDNIGHT = Date.parse('2026-09-08T23:00:00Z');
+
+  it("AC-17 — 23:00-24:00 local at a dealership open until '24:00:00' is within", () => {
+    // Kills `delete the whole step-4 normalisation`: without it the end renders on the next
+    // local date and the verdict is `spans-local-days`.
+    expect(
+      withinOpeningHours(ELEVEN_PM, LOCAL_MIDNIGHT, ZONE, weekOpen('09:00:00', '24:00:00')).kind,
+    ).toBe('within');
+  });
+
+  it('AC-19 — the same interval at a dealership closing at 17:00 is outside-window, not within', () => {
+    // The normalisation must not become a blanket acceptance: 86400 <= 61200 is false, so the
+    // verdict is `outside-window` and it is reached for the right reason.
+    expect(
+      withinOpeningHours(ELEVEN_PM, LOCAL_MIDNIGHT, ZONE, weekOpen('09:00:00', '17:00:00')),
+    ).toEqual({
+      kind: 'outside-window',
+      dayOfWeek: 2,
+      opensAt: '09:00:00',
+      closesAt: '17:00:00',
+    });
+  });
+
+  it('AC-18 — 23:00 to 01:00 the next local day is still spans-local-days', () => {
+    // Kills `delete the 00:00:00 clause`: 01:00 local is not midnight, and a dealership open
+    // 00:00-24:00 removes every other reason to refuse it.
+    const oneAm = Date.parse('2026-09-09T00:00:00Z');
+    expect(withinOpeningHours(ELEVEN_PM, oneAm, ZONE, weekOpen('00:00:00', '24:00:00'))).toEqual({
+      kind: 'spans-local-days',
+      startsOn: '2026-09-08',
+      endsOn: '2026-09-09',
+    });
+  });
+
+  it('P-M2 — a 49-hour interval ending at local midnight two days later is still spans-local-days', () => {
+    // Kills `delete the "immediately following" clause, keeping the 00:00:00 test`. AC-17
+    // cannot catch that mutant: AC-17's end IS on the immediately following day, so both
+    // readings agree there. This is the case where they disagree.
+    const monday = Date.parse('2026-09-07T22:00:00Z'); // 23:00 BST, Monday 7 September
+    const thursdayMidnight = Date.parse('2026-09-09T23:00:00Z'); // 00:00 local, 10 September
+    expect(
+      withinOpeningHours(monday, thursdayMidnight, ZONE, weekOpen('00:00:00', '24:00:00')).kind,
+    ).toBe('spans-local-days');
+  });
+
+  it('the successor test rolls over a month boundary', () => {
+    // 30 September -> 1 October. `nextLocalDate` delegates rollover to the engine rather than
+    // hand-rolling a calendar; this is the case a "+1 to the day" implementation gets wrong.
+    const start = Date.parse('2026-09-30T22:00:00Z'); // 23:00 BST on the 30th
+    const end = Date.parse('2026-09-30T23:00:00Z'); // 00:00 local on 1 October
+    expect(withinOpeningHours(start, end, ZONE, weekOpen('09:00:00', '24:00:00')).kind).toBe(
+      'within',
+    );
+  });
+
+  it('the successor test rolls over a YEAR boundary', () => {
+    // 31 December 2026 -> 1 January 2027, and GMT rather than BST, so the local rendering and
+    // the UTC one agree here and the case is about the calendar alone.
+    const start = Date.parse('2026-12-31T23:00:00Z');
+    const end = Date.parse('2027-01-01T00:00:00Z');
+    expect(withinOpeningHours(start, end, ZONE, weekOpen('09:00:00', '24:00:00')).kind).toBe(
+      'within',
+    );
+  });
+
+  it('an end at local midnight is charged to the START\'s day of week, not the next one', () => {
+    // Tuesday 2026-09-08 open until 24:00; Wednesday closed. If step 4 charged the interval to
+    // the end's day this would be `closed-day`, and the whole normalisation would be cosmetic.
+    const tuesdayOnly = onlyDayOpen(2, '09:00:00', '24:00:00');
+    expect(withinOpeningHours(ELEVEN_PM, LOCAL_MIDNIGHT, ZONE, tuesdayOnly).kind).toBe('within');
+  });
+
+  it('an ordinary same-day interval is unaffected by the normalisation', () => {
+    const start = Date.parse('2026-09-08T09:00:00Z');
+    expect(withinOpeningHours(start, start + 3_600_000, ZONE, weekOpen('09:00:00', '18:00:00')).kind).toBe(
+      'within',
+    );
+  });
+});

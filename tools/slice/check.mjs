@@ -137,18 +137,37 @@ if (!onlyDone) {
     // human gate — they are the architect reconciling arc42 to what merged, not slice
     // work, and the slice's declaration has no business governing them. R-01-7 was
     // about undeclared edits made DURING a slice, and that is exactly what this reads.
-    const log = g(['log', '--format=%H %s', '--', '.']) ?? '';
-    const shas = log.split('\n').filter(Boolean)
+    // GATE-RELATIVE, NOT MESSAGE-RELATIVE — R-02-1.
+    //
+    // This selected the slice's commits by Conventional Commit scope, exempting anything
+    // not scoped `(NN)` on the stated ground that step 7's `docs(arc42)` commits are
+    // post-gate and the slice's declaration has no business governing them. The exemption
+    // was deliberate and tested. The assumption underneath it — that `docs(arc42)` appears
+    // only after the gate — is what slice 02 broke: `dd9bd44` hand-edited §10's QS-12
+    // wording at STEP 2, scoped `docs(arc42)`, and this check reported "0 hand-edited, all
+    // within §5.2 §6.1 §8.6" over a file it never opened. The edit was legitimate — it
+    // implements the human's E-02-2 ruling — but the gate line was not evidence.
+    //
+    // A commit message cannot separate a mid-slice `docs(arc42)` from a post-gate one. The
+    // BRANCH can: while the slice is in flight everything on its branch is its work,
+    // whatever the subject line says, and step 7 runs on `main` after the merge, so its
+    // commits are not on the branch to be caught. Once merged there is no branch left, and
+    // scope is the only selector that still resolves — so it stays as the fallback, and the
+    // detail line says which was used, because the two answer subtly different questions.
+    const base = g(['merge-base', 'origin/main', 'HEAD']) ?? g(['merge-base', 'main', 'HEAD']);
+    const headSha = g(['rev-parse', 'HEAD']);
+    const onBranch = Boolean(base && headSha && base !== headSha);
+    const scoped = (g(['log', '--format=%H %s', '--', '.']) ?? '').split('\n').filter(Boolean)
       .filter((l) => new RegExp(`^\\S+ [a-z]+\\(0*${String(id).replace(/^0+/, '')}\\)!?:`).test(l))
       .map((l) => l.split(' ')[0]);
-    // N/A rather than UNVERIFIED: a slice with no commits of its own has not edited
-    // arc42 undeclared, and it cannot — there is nothing to correspond to. UNVERIFIED
-    // would block Done on a slice that the Done checks already block for having no red
-    // commit and no CI run, which is noise standing in front of the real reason.
-    if (!shas.length) return [NA, `no commits scoped (${id}) yet — nothing has been edited to declare`];
+    const shas = onBranch
+      ? (g(['rev-list', `${base}..HEAD`]) ?? '').split('\n').filter(Boolean)
+      : scoped;
+    const selector = onBranch ? 'on this branch' : `scoped (${id})`;
+    if (!shas.length) return [NA, `no commits ${selector} yet — nothing has been edited to declare`];
     const files = [...new Set(shas.flatMap((s) =>
       (g(['show', '--name-only', '--format=', s, '--', 'docs/arc42/']) ?? '').split('\n').filter(Boolean)))];
-    if (!files.length) return [PASS, `no arc42 file changed by the ${shas.length} commit(s) scoped (${id})`];
+    if (!files.length) return [PASS, `no arc42 file changed by the ${shas.length} commit(s) ${selector}`];
 
     const declared = new Set(arc.map((s) => String(s).replace(/^§/, '')));
 
@@ -200,7 +219,7 @@ if (!onlyDone) {
     const gen = files.length - handEdited.length;
     return undeclared.length
       ? [FAIL, `hand-edited but not declared: ${undeclared.join(', ')} — declared ${arc.join(' ')}`]
-      : [PASS, `${files.length} arc42 file(s) changed by commits scoped (${id}): `
+      : [PASS, `${files.length} arc42 file(s) changed by commits ${selector}: `
           + `${handEdited.length} hand-edited, all within ${arc.join(' ')}`
           + `${gen ? `; ${gen} generated-block only` : ''}`];
   };
@@ -414,7 +433,20 @@ if (!onlyReady) {
     && ['MAJOR', 'BLOCKING'].includes(e.severity) && !closed.has(e.ref));
   const light = String(slice.gate ?? 'full') === 'light';
 
-  check('done', 'human approved',
+
+  // WHO approved is part of the verdict, not a detail of it.
+  //
+  // Under the human's 2026-09-06 delegation the orchestrator may take the gate while they
+  // are away, and slice 02 was gated that way. A line reading "PASS  human approved" over
+  // an orchestrator decision is precisely the misreport this check exists to prevent, one
+  // level up — so the label names the actor, and a delegated gate is visibly not a human
+  // one at a glance rather than eleven words into the rationale.
+  const gateActor = gateE?.actor ?? (light ? 'light gate' : null);
+  const approvedBy = gateActor === 'human' ? 'human approved'
+    : gateActor === 'light gate' ? 'gate approved (light)'
+    : gateActor ? `gate approved (${gateActor})`
+    : 'human approved';
+  check('done', approvedBy,
     gateE ? (isApproval(gateE.decision) ? PASS : FAIL)
       : light ? (openSerious.length ? FAIL : PASS)
       : FAIL,
@@ -431,6 +463,23 @@ if (!onlyReady) {
     `${loops} of max 2${loops > 2 ? ' — should have been split, not ground through' : ''}`);
 }
 
+/**
+ * RULED IN THE HUMAN'S ABSENCE.
+ *
+ * The human delegated mid-slice authority to the architect on 2026-09-06 — scope,
+ * acceptance criteria and quality goals included — with nothing escalating between steps 1
+ * and 5. CLAUDE.md §6 promises in return that the gate is SHOWN what moved rather than
+ * asked to notice, and a promise in a constitution with no mechanism behind it is the
+ * defect this project has catalogued six times. This is the mechanism.
+ *
+ * It lists EVERY architect ruling in the slice, not only those that touched a criterion.
+ * Filtering by keyword would be a guess about what a rationale says, and the asymmetry is
+ * stark: over-listing costs the human seconds of reading, while under-listing hides the
+ * exact class of change they gave up seeing in advance.
+ */
+const architectRulings = events.filter((e) =>
+  e.actor === 'architect' && ['finding.ruled', 'dcr.resolved'].includes(e.event));
+
 // ------------------------------------------------------------------ report --
 const C = { PASS: '\x1b[32m', FAIL: '\x1b[31m', UNVERIFIED: '\x1b[33m', 'N/A': '\x1b[2m' };
 const R = '\x1b[0m';
@@ -441,6 +490,16 @@ let phase = '';
 for (const r of results) {
   if (r.phase !== phase) { phase = r.phase; console.log(dim(`\n  ${phase === 'ready' ? 'DEFINITION OF READY' : 'DEFINITION OF DONE'}`)); }
   console.log(`  ${C[r.verdict]}${r.verdict.padEnd(10)}${R} ${r.name.padEnd(34)} ${dim(r.detail)}`);
+}
+
+if (architectRulings.length) {
+  console.log(dim(`\n  RULED BY THE ARCHITECT IN YOUR ABSENCE (${architectRulings.length}) — CLAUDE.md §6`));
+  for (const r of architectRulings) {
+    const what = r.ref ?? r.ruling ?? r.span_id ?? '—';
+    const verdict = r.verdict ?? (r.ruling ? `(${r.ruling})` : '');
+    const why = (r.rationale ?? r.message ?? '').replace(/\s+/g, ' ').slice(0, 132);
+    console.log(`  ${String(what).padEnd(12)} ${String(verdict).padEnd(10)} ${dim(why)}`);
+  }
 }
 
 const failed = results.filter((r) => r.verdict === FAIL);

@@ -79,6 +79,22 @@ export function optionsIn(text) {
   for (const line of lines) {
     const heading = line.match(/^##+\s+(.*)$/);
     if (heading) inConsidered = /^considered options\b/i.test(norm(heading[1]));
+
+    // A TABLE ROW IS AN OPTION TOO, and missing that was self-inflicted: the concision
+    // ruling's own remedy is to fold `Considered options` and `Pros and cons` into a
+    // table, so the encouraged form was the one this could not read. ADR-0018 landed with
+    // eight options as `| **A** | … | … |` and pinned ZERO, while the guard reported that
+    // every considered option survives — O-24's empty-pin failure, reached by a new route.
+    //
+    // The letter lives in the first cell and the description in the second, so the label
+    // is built from both: `A — 40P01 ⇒ other ⇒ 500 …`. Rows whose first cell is not a bare
+    // option letter are ordinary table content and are left alone.
+    if (inConsidered && /^\s*\|/.test(line)) {
+      const cells = line.split('|').map((c) => norm(c)).filter((c, i, a) => i > 0 && i < a.length - 1);
+      const letter = cells[0]?.match(/^([A-Z]|[0-9]{1,2})$/i)?.[1];
+      if (letter && cells[1]) { found.add(norm(`Option ${letter} — ${cells[1]}`).slice(0, 90)); continue; }
+    }
+
     const item = line.match(/^\s*[-*]\s+(\S.*)$/) || line.match(/^##+\s+(\S.*)$/);
     if (!item) continue;
     const label = norm(item[1]);
@@ -125,6 +141,26 @@ const covers = (current, label) => {
 
 export function check(adrDir, baseline) {
   const problems = [];
+
+  // AN ADR THE BASELINE HAS NEVER SEEN IS INVISIBLE TO IT — F-02-10.
+  //
+  // This iterated the baseline and nothing else, so a NEW ADR was not unpinned-and-
+  // reported, it was simply absent from the loop. ADR-0018 landed with a (c) ruling and
+  // the guard printed "17 ADR(s) checked: every considered option and chosen option
+  // survives" — green, over a decision record it had never opened. The failure is the
+  // family this project keeps finding: a check that can only see what it was told about
+  // reports the absence of a problem it is incapable of having.
+  //
+  // It is a FAILURE rather than a warning because the window is exactly when it matters:
+  // a new ADR is `proposed`, so it will be edited before ratification, which is when a
+  // dropped option is most likely and least visible. Remedy is a targeted pin, not
+  // `--rebaseline` — that rewrites all existing pins too, discarding the pre-condensation
+  // evidence for every other ADR to register one new file.
+  const known = new Set(Object.keys(baseline));
+  for (const f of readdirSync(adrDir).filter((x) => /^\d{4}-.*\.md$/.test(x))) {
+    if (!known.has(f)) problems.push({ file: f, kind: 'unpinned', detail: 'on disk, absent from the baseline' });
+  }
+
   for (const [file, want] of Object.entries(baseline)) {
     const path = join(adrDir, file);
     if (!existsSync(path)) { problems.push({ file, kind: 'missing', detail: 'file is gone' }); continue; }
@@ -166,6 +202,9 @@ if (!problems.length) {
 }
 
 for (const p of problems) console.log(`  ${p.file}\n    ${p.kind}: ${p.detail}`);
+if (problems.some((p) => p.kind === 'unpinned')) {
+  console.log('\n  Pin a new ADR by adding its entry; do NOT run --rebaseline, which rewrites every existing pin.');
+}
 console.error(
   `\n${problems.length} ADR(s) lost content a condensation may not remove. Shortening may merge `
   + 'sections and cut prose; it may not drop a considered option or alter the chosen one — a '

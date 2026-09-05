@@ -17,7 +17,9 @@
  * repeatedly, and a process that leaks a pool on signal turns one unrelated test failure
  * into a hung suite.
  */
+import { bookAppointment } from './application/bookAppointment.js';
 import { checkHealth } from './application/checkHealth.js';
+import { readAppointment } from './application/readAppointment.js';
 import { buildServer } from './http/server.js';
 import { closeDb, createDb } from './persistence/db.js';
 import { ConfigError, loadConfig } from './platform/config.js';
@@ -40,7 +42,17 @@ function loadConfigOrExit(): ReturnType<typeof loadConfig> {
 const config = loadConfigOrExit();
 const logger = createLogger(config);
 const db = createDb(config, { logger });
-const app = buildServer({ logger, checkHealth: async () => checkHealth(db) });
+// PARTIAL APPLICATION, per 00a's shape: `buildServer` receives already-bound use cases and never
+// the handle, because `http-must-not-reach-persistence` forbids the edge from even NAMING the
+// handle's type. `crypto` is a Node global, so injecting `newId` gives `src/application` no
+// import and leaves `no-dev-dep-in-src` and the layering rules untouched (DA-02-1).
+const bookDeps = { newId: (): string => crypto.randomUUID(), logger };
+const app = buildServer({
+  logger,
+  checkHealth: async () => checkHealth(db),
+  bookAppointment: async (command) => bookAppointment(db, bookDeps, command),
+  readAppointment: async (id) => readAppointment(db, id),
+});
 
 let shuttingDown = false;
 async function shutdown(signal: NodeJS.Signals): Promise<void> {

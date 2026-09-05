@@ -100,3 +100,81 @@ export function unconnectableDb(): Db {
   };
   return build(new StubDriver(answering([]), explode));
 }
+
+/**
+ * Slice 02 — a `Db` whose driver answers a SCRIPT of results, recording the compiled SQL.
+ *
+ * It exists for one reason: the repositories in this slice make decisions ABOUT rows — a day
+ * with no `opening_hours` row is a closed day, two `exists` flags choose between three ownership
+ * verdicts, a `23P01` picks the next candidate — and those decisions are code, not persistence
+ * invariants. `CLAUDE.md` §2.2 is not bent: every claim about what PostgreSQL DOES lives in
+ * `tests/integration/` and `tests/concurrency/` against a real container, written by the
+ * test-engineer. What is asserted here is the SQL that would be sent and what the caller does
+ * with what comes back.
+ *
+ * The production compiler, adapter and introspector are kept — only the driver is replaced — so
+ * `recorded[i].sql` is the text postgres would actually receive.
+ */
+export interface ScriptedStep {
+  /** Rows this query resolves with. */
+  readonly rows?: readonly unknown[];
+  /** Or the error it rejects with — a `pg`-shaped one, for the SQLSTATE paths. */
+  readonly error?: unknown;
+}
+
+function scripted(steps: readonly ScriptedStep[], recorded: CompiledQuery[]): DatabaseConnection {
+  let index = 0;
+  return {
+    async executeQuery<R>(compiledQuery: CompiledQuery): Promise<QueryResult<R>> {
+      recorded.push(compiledQuery);
+      const step = steps[index];
+      index += 1;
+      if (step === undefined) {
+        // Deliberately loud. A repository issuing MORE queries than the script anticipated is
+        // exactly the defect these tests exist to catch — AC-5 is a claim about how many
+        // statements a booking attempt makes.
+        throw new Error(
+          `unscripted query #${String(index)}: ${compiledQuery.sql}`,
+        );
+      }
+      if (step.error !== undefined) throw step.error;
+      return { rows: (step.rows ?? []) as R[] };
+    },
+    async *streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> {
+      throw new Error('nothing under test streams');
+    },
+  };
+}
+
+/**
+ * A database that answers `steps` in order.
+ *
+ * `recorded` accumulates every compiled query the caller issued. `begin`, `commit` and `rollback`
+ * are NOT among them: kysely raises those through the driver's own hooks rather than as queries,
+ * so they are collected separately in `events`. That separation is what lets a test assert
+ * AC-5's shape directly — "one transaction containing exactly one INSERT, preceded only by the
+ * two advisory-lock acquisitions" is a claim about both lists at once.
+ */
+export function scriptedDb(steps: readonly ScriptedStep[]): {
+  db: Db;
+  recorded: CompiledQuery[];
+  events: string[];
+} {
+  const recorded: CompiledQuery[] = [];
+  const events: string[] = [];
+  const connection = scripted(steps, recorded);
+
+  class RecordingDriver extends StubDriver {
+    override async beginTransaction(): Promise<void> {
+      events.push('begin');
+    }
+    override async commitTransaction(): Promise<void> {
+      events.push('commit');
+    }
+    override async rollbackTransaction(): Promise<void> {
+      events.push('rollback');
+    }
+  }
+
+  return { db: build(new RecordingDriver(connection)), recorded, events };
+}

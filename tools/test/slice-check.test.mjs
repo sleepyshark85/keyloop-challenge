@@ -68,7 +68,7 @@ const mutationRun = (over) => ({
  */
 const git = (dir, args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
 
-const build = (events, { commits = [], slice = SLICE } = {}) => {
+const build = (events, { commits = [], slice = SLICE, branch = null } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'slice-check-'));
   mkdirSync(join(dir, 'docs/team-log'), { recursive: true });
   mkdirSync(join(dir, 'docs/slices'), { recursive: true });
@@ -81,6 +81,9 @@ const build = (events, { commits = [], slice = SLICE } = {}) => {
   git(dir, ['config', 'user.name', 'fixture']);
   git(dir, ['add', '-A']);
   git(dir, ['commit', '-qm', 'chore: fixture root']);
+  // A branch makes the arc42 check gate-relative rather than message-relative; without
+  // one, HEAD is the merge-base and the scope fallback applies (see R-02-1).
+  if (branch) git(dir, ['checkout', '-q', '-b', branch]);
 
   // Extra commits, each { subject, files: { path: contents } }, so a case can plant a
   // scoped commit that touches a declared or undeclared arc42 section.
@@ -242,15 +245,15 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
 const gateEv = (over) => ({ ts: '2026-01-02T00:00:00Z', slice: '77', event: 'gate.decided',
   source: 'reported', gate: 'E', decision: 'approved', rationale: 'because', ...over });
 {
-  ok('"approved" passes', row(run([ciRun(), gateEv({})]), 'human approved').startsWith('PASS'));
+  ok('"approved" passes', row(run([ciRun(), gateEv({})]), 'approved').startsWith('PASS'));
   ok('"approved-and-merged" passes — the spelling slice 01 actually used',
-    row(run([ciRun(), gateEv({ decision: 'approved-and-merged' })]), 'human approved').startsWith('PASS'),
-    row(run([ciRun(), gateEv({ decision: 'approved-and-merged' })]), 'human approved'));
+    row(run([ciRun(), gateEv({ decision: 'approved-and-merged' })]), 'approved').startsWith('PASS'),
+    row(run([ciRun(), gateEv({ decision: 'approved-and-merged' })]), 'approved'));
   ok('"changes-requested" FAILS — a decision that is not an approval is not a near-miss',
-    row(run([ciRun(), gateEv({ decision: 'changes-requested' })]), 'human approved').startsWith('FAIL'));
+    row(run([ciRun(), gateEv({ decision: 'changes-requested' })]), 'approved').startsWith('FAIL'));
   ok('a PROCESS ruling is not read as this slice’s Gate E',
-    row(run([ciRun(), gateEv({ gate: 'process', decision: 'approved-light-gate' })]), 'human approved').startsWith('FAIL'),
-    row(run([ciRun(), gateEv({ gate: 'process', decision: 'approved-light-gate' })]), 'human approved'));
+    row(run([ciRun(), gateEv({ gate: 'process', decision: 'approved-light-gate' })]), 'approved').startsWith('FAIL'),
+    row(run([ciRun(), gateEv({ gate: 'process', decision: 'approved-light-gate' })]), 'approved'));
 }
 
 // --- the light gate, and the reversion that is its whole safety --------------
@@ -260,15 +263,15 @@ const raised = (over) => ({ ts: '2026-01-01T02:00:00Z', slice: '77', event: 'fin
   claim: 'c', scenario: 's', ...over });
 {
   ok('a light-gate slice auto-approves with no open MAJOR',
-    row(run([ciRun()], { slice: LIGHT }), 'human approved').startsWith('PASS'),
-    row(run([ciRun()], { slice: LIGHT }), 'human approved'));
+    row(run([ciRun()], { slice: LIGHT }), 'approved').startsWith('PASS'),
+    row(run([ciRun()], { slice: LIGHT }), 'approved'));
 
   const openMajor = run([ciRun(), raised({})], { slice: LIGHT });
   ok('an OPEN MAJOR revokes the light gate and demands a human',
-    row(openMajor, 'human approved').startsWith('FAIL') && row(openMajor, 'human approved').includes('REVOKED'),
-    row(openMajor, 'human approved'));
+    row(openMajor, 'approved').startsWith('FAIL') && row(openMajor, 'approved').includes('REVOKED'),
+    row(openMajor, 'approved'));
   ok('...and the revocation names which finding did it',
-    row(openMajor, 'human approved').includes('R-77-1'), row(openMajor, 'human approved'));
+    row(openMajor, 'approved').includes('R-77-1'), row(openMajor, 'approved'));
 
   // The distinction that makes the light gate usable at all: slice 01 raised three
   // MAJORs and closed all three. A slice that finds and fixes serious things is the
@@ -276,15 +279,15 @@ const raised = (over) => ({ ts: '2026-01-01T02:00:00Z', slice: '77', event: 'fin
   const ruled = { ts: '2026-01-01T03:00:00Z', slice: '77', event: 'finding.ruled', source: 'reported',
     actor: 'architect', ref: 'R-77-1', verdict: 'accepted', rationale: 'fixed' };
   ok('a RULED MAJOR does not revoke it — raised-and-closed is not open',
-    row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'human approved').startsWith('PASS'),
-    row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'human approved'));
+    row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'approved').startsWith('PASS'),
+    row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'approved'));
 
   ok('a MINOR never revokes it',
-    row(run([ciRun(), raised({ severity: 'MINOR', ref: 'R-77-2' })], { slice: LIGHT }), 'human approved').startsWith('PASS'));
+    row(run([ciRun(), raised({ severity: 'MINOR', ref: 'R-77-2' })], { slice: LIGHT }), 'approved').startsWith('PASS'));
 
   ok('a full-gate slice does NOT auto-approve',
-    row(run([ciRun()]), 'human approved').startsWith('FAIL'),
-    row(run([ciRun()]), 'human approved'));
+    row(run([ciRun()]), 'approved').startsWith('FAIL'),
+    row(run([ciRun()]), 'approved'));
 }
 
 // --- O-14: the arc42 declaration is checked against what the slice edited ----
@@ -301,9 +304,29 @@ const MARKED = '# 9\n\n<!-- generated:adr-index -->\nold\n<!-- /generated:adr-in
   ok('a hand edit to a DECLARED section passes (§1 is declared by the fixture)',
     row(declared, 'arc42 edits').startsWith('PASS'), row(declared, 'arc42 edits'));
 
+  // POST-GATE, NOT DIFFERENTLY-SPELLED — R-02-1.
+  //
+  // This case used to assert that a commit not scoped to the slice is not the slice's
+  // edit, on the ground that step 7's `docs(arc42)` commits are post-gate. That is true
+  // of WHERE they run, not of how they are spelled, and slice 02 broke the assumption:
+  // `dd9bd44` hand-edited §10 at STEP 2 under a `docs(arc42)` subject, and the check
+  // reported "0 hand-edited" over a file it never opened.
+  //
+  // The distinction that actually holds is the branch. On a branch, every commit is the
+  // slice's work whatever its subject says — so this now asserts the opposite of what it
+  // did, and the fixture builds a branch to say so.
+  const onBranchUnscoped = build([ciRun()], { branch: 'slice/77-fixture', commits: [
+    { subject: 'docs(arc42): a mid-slice hand edit wearing a post-gate subject',
+      files: { 'docs/arc42/05-building-blocks.md': '# 5\nedited\n' } }] }).out;
+  ok('a docs(arc42) commit ON THE BRANCH is caught — a subject line cannot make it post-gate',
+    row(onBranchUnscoped, 'arc42 edits').startsWith('FAIL')
+      && row(onBranchUnscoped, 'arc42 edits').includes('05'),
+    row(onBranchUnscoped, 'arc42 edits'));
+
   const unscoped = build([ciRun()], { commits: [
-    { subject: 'docs(arc42): as-built, not slice work', files: { 'docs/arc42/05-building-blocks.md': '# 5\nedited\n' } }] }).out;
-  ok('a commit NOT scoped to the slice is not the slice’s edit — step 7 is post-gate',
+    { subject: 'docs(arc42): as-built, run on main after the gate',
+      files: { 'docs/arc42/05-building-blocks.md': '# 5\nedited\n' } }] }).out;
+  ok('the same commit on main is NOT the slice\'s edit — step 7 runs there, post-gate',
     row(unscoped, 'arc42 edits').startsWith('N/A') || row(unscoped, 'arc42 edits').startsWith('PASS'),
     row(unscoped, 'arc42 edits'));
 

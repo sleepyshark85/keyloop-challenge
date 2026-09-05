@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `9a37b72 docs(arc42): cite the origin, not the pointer` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process |
-| Agent runs recorded | 73 |
+| Last commit | `b2ae0ab chore(02): pin ADR-0019, and log the two (b) rulings` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E |
+| Agent runs recorded | 86 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -76,6 +76,18 @@
 
 > Ruled 2026-09-05 on measured figures, not impression: arc42 31.8k words, ADRs 35.4k, slices 69k - about 136k words, with an average ADR of 2,080 against a normal MADR's 400-800, and 'Considered options' plus 'Pros and cons of the options' spending 11.5k words on one job. DECIDED: ONE HOME PER FACT. The ADR carries the decision, its options table and its consequences; arc42 says what the system IS, present tense, no history; a slice design carries only that slice's delta; narrative and measurement live in the event log and on the PR. The duplication being removed is ACROSS artifacts rather than inside them - R-01-4's dead-branch-versus-live-defect argument was told five times. SECOND RULING, overriding §4. Accepted ADRs MAY be shortened, provided the meaning does not change. §4 says an accepted ADR is immutable and must be superseded rather than edited; the human overrode that for length only. The override holds on §4's own terms: its stated purpose is that 'the history of how thinking changed is the point', and that history is in git and in this log rather than in the file being frozen. What immutability uniquely protects is that a reader citing ADR-0006 later gets the same DECISION, which a meaning-preserving condensation does not touch. The orchestrator's earlier §4-derived exemption for the thirteen accepted ADRs is therefore withdrawn and they are back in scope. THIRD RULING: the slice designs are in scope too, and are to be shortened AGGRESSIVELY. Measured: four design files hold 54,605 of the 69k words in docs/slices/ - 00a 17,459, 00 15,294, 01 11,573, 02 10,279 - while every slice file itself is between 156 and 1,416. A merged slice's design has already been reconciled into arc42 by step 7, which is what step 7 IS, so keeping the working prose afterwards is the cross-artifact duplication this ruling is about in its purest form.
 
+**Gate process** · 2026-09-05 · full-delegation-of-mid-slice-authority-to-the-architect
+
+> Ruled 2026-09-06. NOTHING ESCALATES TO THE HUMAN BETWEEN STEPS 1 AND 5. The architect decides mid-slice on scope, acceptance criteria and quality goals as well as architecture; the human reviews at step 6 and may overturn anything. Driven by measured cost: five human decisions mid-slice across two slices, each serialising the whole team, against §8's statement that human review attention is the scarce resource. THE ORCHESTRATOR RECOMMENDED AGAINST THIS and the dissent is recorded per §6, because a ruling whose counter-argument is lost cannot be reviewed later. It proposed a narrower line - the architect interprets a criterion, the human is kept only for a change that WEAKENS or deletes one - on the evidence of the AC-6 case at slice 01: the architect wanted to amend arc42 §5.2 to fit its design, the test-engineer objected, and the human ruled the criterion LITERALLY, against the architect's preference, reshaping the module signatures and booking four items of debt. Under full delegation that call would have gone the other way and the human would have met it at the gate with the slice already built around it. The human weighed that and ruled full delegation anyway, on the ground that a per-question judgement about which class a decision falls into is itself a cost - three of the five escalations arrived partly as 'is this mine or theirs?'. THE COUNTERWEIGHT THE HUMAN KEEPS. CLAUDE.md §6 now obliges the gate to be SHOWN what moved rather than asked to notice: slice:check prints every architect ruling in the slice before the gate line. It lists ALL of them rather than filtering to those touching a criterion, because filtering by keyword would be a guess about what a rationale says and the asymmetry is stark - over-listing costs seconds of reading, under-listing hides the exact class of change the human gave up seeing in advance. PROPAGATION. CLAUDE.md §6 Authority and §11 amended; DCR outcome (d) is no longer 'Escalate - human decides' but 'Defer to the gate - architect rules; the gate reviews'. METHODOLOGY §2's role table changed in ONE place and the architect's definition regenerated itself through tools/agents/generate.mjs - the generator built earlier today paying for itself within the hour. CLAUDE.md is 1,537 against a 1,500 budget and STAYS OVER: the overage is a rule the human just added, and a budget that cannot absorb a new rule would pressure the deletion of an old one, which is the wrong incentive for a constitution.
+
+**Gate process** · 2026-09-05 · gate-authority-delegated-to-the-orchestrator-while-the-human-is-away
+
+> Ruled 2026-09-06: 'Continue without me... If you feel the result is good enough, just ignore my absence for step 6 and go for the merge and next slices.' Step 6 is therefore exercised by the ORCHESTRATOR under delegated authority until the human returns, including the merge and starting the next slice. THE RECORD MUST NOT CLAIM WHAT DID NOT HAPPEN. Every gate taken under this delegation is logged with actor: orchestrator and decision approved-under-delegated-authority - never actor: human. A gate the human did not see must not read later as one they did. That distinction is the whole value of the delegation being recorded at all, and slice:check's 'human approved' predicate reads the decision string, so the two are visibly different at the gate rather than only in the rationale. THE BAR IS MECHANICAL, NOT A FEELING, because 'if you feel the result is good enough' is exactly the kind of licence that decays into merging what is nearly ready. A slice merges under this delegation only when: npm run slice:check <id> is all green with nothing UNVERIFIED; CI is green on a run covering the slice's own last commit; the mutation score clears §10's threshold on changed files; no MAJOR or BLOCKING finding is open; the reviewer has run and its findings are ruled; and the orchestrator has independently re-run the discrimination claims rather than accepting agent reports. If any of those is short, the slice PARKS and waits rather than merging. ONE CONFLICT NAMED RATHER THAN GLOSSED. The orchestrator routes the work and would now also gate it, which is the same shape it objected to yesterday when arguing the architect should not rule on its own design's requirements. The mitigations are that a merge is revertible, that every architect ruling made in the human's absence is listed by slice:check at the gate, and that this entry names the conflict so the human can weigh it on return. Anything the orchestrator would be overruling its own recorded objection to is parked, not merged.
+
+**Gate E** · 2026-09-05 · approved-under-delegated-authority
+
+> GATE E TAKEN BY THE ORCHESTRATOR, NOT THE HUMAN, under the delegation of 2026-09-06. The decision string says so deliberately: a gate the human did not see must never read later as one they did. THE MECHANICAL BAR, item by item. slice:check 02 - Ready all PASS including the arc42 declaration now checked gate-relatively; Done PASS on test-first (red 18:34, green after), tests green on run 33994990813 covering b2ae0ab, the slice's own last commit, mutation 0.9595, layering clean at 81 modules, loopbacks 1 of max 2. Nothing UNVERIFIED. No open MAJOR or BLOCKING. The reviewer ran and all four of its findings are ruled or resolved. WHAT THE ORCHESTRATOR RE-RAN RATHER THAN ACCEPTED: C1 from the uploaded CI artifact (27 failing assertions, 24 AssertionError and 3 fast-check counterexamples, zero non-assertion, zero under tests/unit); the mutation report by R-12's own recipe, testsCompleted == 0 on ZERO mutants, which is the check that distinguishes a real score from a runner that activated nothing; the I-02-9 unsatisfiable assertion in both concurrency files; and the R-02-1 fix against its own mutant. The REVIEWER independently re-ran Stryker (byte-identical survivor set) and re-measured ADR-0018's three cells on postgres:16-alpine, finding the ADR honest. TWO THINGS LEFT DELIBERATELY FOR THE HUMAN. ADR-0018 and ADR-0019 stay `proposed` and are NOT ratified under this delegation: ADR-0018 is the decision whose own Consequences record that ADR-0016's argument is weaker after it than before, and that is the human's to weigh. And AC-5's wording changed mid-slice - the first acceptance criterion altered under the delegation - which slice:check lists at the gate along with the other 17 architect rulings. THE CONFLICT, NAMED AGAIN RATHER THAN GLOSSED: the orchestrator routed this work and has now gated it. Mitigations are that the merge is revertible, that every ruling made in the human's absence is listed, and that the two decisions with the widest blast radius were left unratified. Nothing was merged that the orchestrator had recorded an objection to.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -95,6 +107,10 @@
 | [0013](adr/0013-outside-in-tests-exercise-the-built-artifact.md) | Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost | accepted | — |
 | [0014](adr/0014-an-instant-is-renderable-by-construction.md) | An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | accepted | — |
 | [0015](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) | An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | accepted | — |
+| [0016](adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | proposed | — |
+| [0017](adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | proposed | — |
+| [0018](adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | proposed | — |
+| [0019](adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | Defer a control only to the slice that makes it cheaper or stronger | proposed | — |
 
 ## Agent runs
 
@@ -161,6 +177,9 @@
 | 2026-09-05 06:03 | architect | 7m42 | 156 / 8,338 / 6,159,757 | `derived` |
 | 2026-09-05 06:08 | architect | 12m50 | 232 / 9,551 / 11,127,069 | `derived` |
 | 2026-09-05 06:15 | architect | 20m00 | 330 / 17,971 / 19,192,822 | `derived` |
+| 2026-09-05 07:29 | architect | 24m39 | 222 / 62,473 / 17,002,900 | `derived` |
+| 2026-09-05 07:41 | implementer | 9m55 | 108 / 13,934 / 5,543,347 | `derived` |
+| 2026-09-05 07:44 | test-engineer | 13m41 | 134 / 22,779 / 6,020,012 | `derived` |
 | 2026-09-05 07:56 | architect | 51m05 | 322 / 64,843 / 30,066,861 | `derived` |
 | 2026-09-05 11:05 | architect | 47m58 | 484 / 61,811 / 76,137,187 | `derived` |
 | 2026-09-05 11:45 | architect | 10m40 | 140 / 18,179 / 5,320,894 | `derived` |
@@ -173,7 +192,17 @@
 | 2026-09-05 12:14 | architect | 40m06 | 262 / 22,175 / 12,916,581 | `derived` |
 | 2026-09-05 14:57 | architect | 22m10 | 182 / 75,824 / 11,488,798 | `derived` |
 | 2026-09-05 15:10 | architect | 6m52 | 112 / 4,073 / 3,660,512 | `derived` |
-| | **total** | **4393m23** | **18,872 / 1,647,466 / 1,469,368,346** | |
+| 2026-09-05 17:21 | architect | 2m50 | 52 / 2,765 / 1,087,283 | `derived` |
+| 2026-09-05 17:25 | architect | 7m15 | 96 / 5,687 / 2,574,902 | `derived` |
+| 2026-09-05 17:31 | architect | 12m40 | 138 / 13,940 / 4,524,932 | `derived` |
+| 2026-09-05 18:35 | test-engineer | 63m22 | 412 / 65,432 / 47,783,901 | `derived` |
+| 2026-09-05 19:14 | architect | 35m55 | 472 / 34,003 / 37,601,913 | `derived` |
+| 2026-09-05 21:02 | implementer | 104m17 | 654 / 25,639 / 95,674,562 | `derived` |
+| 2026-09-05 21:15 | architect | 11m36 | 148 / 5,680 / 7,149,519 | `derived` |
+| 2026-09-05 21:18 | test-engineer | 2m05 | 60 / 2,065 / 1,244,743 | `derived` |
+| 2026-09-05 21:48 | reviewer | 24m04 | 296 / 13,938 / 23,681,391 | `derived` |
+| 2026-09-05 22:05 | architect | 13m16 | 150 / 12,454 / 8,174,449 | `derived` |
+| | **total** | **4718m58** | **21,814 / 1,928,255 / 1,727,432,200** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

@@ -4,7 +4,7 @@ title: Book an appointment, read it back, and give every failure one status and 
 status: ready
 depends_on: ["01"]
 absorbs: ["03", "12", "13"]
-arc42: ["§5.2", "§6.1", "§8.6"]
+arc42: ["§5.2", "§6.1", "§8.6", "§10.2"]
 adr: [1, 2, 4, 5, 6, 8, 14, 15]
 quality_scenarios: [QS-1, QS-2, QS-11, QS-9, QS-12]
 loopbacks: 0
@@ -51,7 +51,9 @@ contended one from an unknown vehicle without parsing prose.
 - **AC-4** — As AC-3 with bays plentiful and exactly one qualified technician free; the constraint
   reported is `no_technician_overlap`. *(QS-2)*
 - **AC-5** — Given the source tree, when it is inspected, then no code path reads availability and
-  then decides whether to insert. The booking path is a single `INSERT` per attempt.
+  then decides whether to insert. Each booking attempt is one transaction containing exactly one
+  `INSERT` into `appointment`, preceded only by ADR-0018's two advisory-lock acquisitions — which
+  read no table and decide nothing.
 - **AC-6** — Given a request carrying an explicit end time, when it is booked, then the supplied end
   is ignored and the interval is derived from the service type's duration (A-1).
 
@@ -103,16 +105,17 @@ contended one from an unknown vehicle without parsing prose.
 - `tests/concurrency/no-bay-overlap.test.ts` and `tests/concurrency/no-technician-overlap.test.ts`.
 - `tests/contract/error-taxonomy.test.ts`, the problem+json serialiser, and the
   outcome-not-exception mapping of §8.6.
-- Enough candidate selection to allocate *a* free bay and technician — the ordering policy and the
-  retry loop are slice 04.
+- **The minimal prune-and-retry loop (ADR-0004), brought into scope by the human's ruling of
+  2026-09-06.** Attempt, classify the `23P01`, prune *that candidate value*, retry; a list that empties
+  is the refusal, and the resource named is the list that emptied. Candidate *ordering* stays slice
+  04's; this is the loop only.
 - The two ratified domain fixes: the epoch bound in `src/domain/interval.ts`'s `instant()` **and** in
   `src/domain/openingHours.ts` step 1 (ADR-0014), and step 4's midnight normalisation (ADR-0015).
 
 ## Out of scope
 
-- Retrying across remaining candidates on conflict (ADR-0004) — slice 04. Here a `23P01` on the
-  chosen candidate is a `409`, which is correct but pessimistic, and slice 04's QS-3 is what proves
-  it improved.
+- **ADR-0009's candidate *ordering* and attempt cap** — the seeded shuffle and the cap of 16 remain
+  slice 04's, with QS-3. Only the minimal loop is here.
 - `appointment-not-confirmed` (`409` on moving a cancelled appointment) — it needs rescheduling, so
   it lands with slice 06 and extends the taxonomy test.
 - Asserting the emitted OpenAPI document matches the committed one — slice 09, where the document
