@@ -434,7 +434,19 @@ if (!onlyReady) {
   const light = String(slice.gate ?? 'full') === 'light';
 
 
-  check('done', 'human approved',
+  // WHO approved is part of the verdict, not a detail of it.
+  //
+  // Under the human's 2026-09-06 delegation the orchestrator may take the gate while they
+  // are away, and slice 02 was gated that way. A line reading "PASS  human approved" over
+  // an orchestrator decision is precisely the misreport this check exists to prevent, one
+  // level up — so the label names the actor, and a delegated gate is visibly not a human
+  // one at a glance rather than eleven words into the rationale.
+  const gateActor = gateE?.actor ?? (light ? 'light gate' : null);
+  const approvedBy = gateActor === 'human' ? 'human approved'
+    : gateActor === 'light gate' ? 'gate approved (light)'
+    : gateActor ? `gate approved (${gateActor})`
+    : 'human approved';
+  check('done', approvedBy,
     gateE ? (isApproval(gateE.decision) ? PASS : FAIL)
       : light ? (openSerious.length ? FAIL : PASS)
       : FAIL,

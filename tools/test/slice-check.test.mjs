@@ -245,15 +245,15 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
 const gateEv = (over) => ({ ts: '2026-01-02T00:00:00Z', slice: '77', event: 'gate.decided',
   source: 'reported', gate: 'E', decision: 'approved', rationale: 'because', ...over });
 {
-  ok('"approved" passes', row(run([ciRun(), gateEv({})]), 'human approved').startsWith('PASS'));
+  ok('"approved" passes', row(run([ciRun(), gateEv({})]), 'approved').startsWith('PASS'));
   ok('"approved-and-merged" passes — the spelling slice 01 actually used',
-    row(run([ciRun(), gateEv({ decision: 'approved-and-merged' })]), 'human approved').startsWith('PASS'),
-    row(run([ciRun(), gateEv({ decision: 'approved-and-merged' })]), 'human approved'));
+    row(run([ciRun(), gateEv({ decision: 'approved-and-merged' })]), 'approved').startsWith('PASS'),
+    row(run([ciRun(), gateEv({ decision: 'approved-and-merged' })]), 'approved'));
   ok('"changes-requested" FAILS — a decision that is not an approval is not a near-miss',
-    row(run([ciRun(), gateEv({ decision: 'changes-requested' })]), 'human approved').startsWith('FAIL'));
+    row(run([ciRun(), gateEv({ decision: 'changes-requested' })]), 'approved').startsWith('FAIL'));
   ok('a PROCESS ruling is not read as this slice’s Gate E',
-    row(run([ciRun(), gateEv({ gate: 'process', decision: 'approved-light-gate' })]), 'human approved').startsWith('FAIL'),
-    row(run([ciRun(), gateEv({ gate: 'process', decision: 'approved-light-gate' })]), 'human approved'));
+    row(run([ciRun(), gateEv({ gate: 'process', decision: 'approved-light-gate' })]), 'approved').startsWith('FAIL'),
+    row(run([ciRun(), gateEv({ gate: 'process', decision: 'approved-light-gate' })]), 'approved'));
 }
 
 // --- the light gate, and the reversion that is its whole safety --------------
@@ -263,15 +263,15 @@ const raised = (over) => ({ ts: '2026-01-01T02:00:00Z', slice: '77', event: 'fin
   claim: 'c', scenario: 's', ...over });
 {
   ok('a light-gate slice auto-approves with no open MAJOR',
-    row(run([ciRun()], { slice: LIGHT }), 'human approved').startsWith('PASS'),
-    row(run([ciRun()], { slice: LIGHT }), 'human approved'));
+    row(run([ciRun()], { slice: LIGHT }), 'approved').startsWith('PASS'),
+    row(run([ciRun()], { slice: LIGHT }), 'approved'));
 
   const openMajor = run([ciRun(), raised({})], { slice: LIGHT });
   ok('an OPEN MAJOR revokes the light gate and demands a human',
-    row(openMajor, 'human approved').startsWith('FAIL') && row(openMajor, 'human approved').includes('REVOKED'),
-    row(openMajor, 'human approved'));
+    row(openMajor, 'approved').startsWith('FAIL') && row(openMajor, 'approved').includes('REVOKED'),
+    row(openMajor, 'approved'));
   ok('...and the revocation names which finding did it',
-    row(openMajor, 'human approved').includes('R-77-1'), row(openMajor, 'human approved'));
+    row(openMajor, 'approved').includes('R-77-1'), row(openMajor, 'approved'));
 
   // The distinction that makes the light gate usable at all: slice 01 raised three
   // MAJORs and closed all three. A slice that finds and fixes serious things is the
@@ -279,15 +279,15 @@ const raised = (over) => ({ ts: '2026-01-01T02:00:00Z', slice: '77', event: 'fin
   const ruled = { ts: '2026-01-01T03:00:00Z', slice: '77', event: 'finding.ruled', source: 'reported',
     actor: 'architect', ref: 'R-77-1', verdict: 'accepted', rationale: 'fixed' };
   ok('a RULED MAJOR does not revoke it — raised-and-closed is not open',
-    row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'human approved').startsWith('PASS'),
-    row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'human approved'));
+    row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'approved').startsWith('PASS'),
+    row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'approved'));
 
   ok('a MINOR never revokes it',
-    row(run([ciRun(), raised({ severity: 'MINOR', ref: 'R-77-2' })], { slice: LIGHT }), 'human approved').startsWith('PASS'));
+    row(run([ciRun(), raised({ severity: 'MINOR', ref: 'R-77-2' })], { slice: LIGHT }), 'approved').startsWith('PASS'));
 
   ok('a full-gate slice does NOT auto-approve',
-    row(run([ciRun()]), 'human approved').startsWith('FAIL'),
-    row(run([ciRun()]), 'human approved'));
+    row(run([ciRun()]), 'approved').startsWith('FAIL'),
+    row(run([ciRun()]), 'approved'));
 }
 
 // --- O-14: the arc42 declaration is checked against what the slice edited ----
