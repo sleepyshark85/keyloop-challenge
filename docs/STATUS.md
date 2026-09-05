@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `8bf9d39 test(01): ambiguity-containment.test.ts — duration-arithmetic as a concept, not a spelling (R-01-6)` |
+| Last commit | `91190cd chore(01): step-5 remedies logged, AC-6 verified, backlog slices 12 and 13 raised` |
 | Gates decided | A, B, C, E, E, E, D |
 | Agent runs recorded | 58 |
 | ADRs accepted | 10 |

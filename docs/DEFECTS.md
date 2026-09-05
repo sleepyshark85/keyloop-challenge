@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **74** |
-| Severity | 10 blocking · 40 major · 24 minor |
-| Verdicts | 5 narrowed · 34 accepted · 1 escalated · 5 deferred |
-| Raised by | reviewer 24 · test-engineer 19 · implementer 13 · orchestrator 9 · architect 8 · human 1 |
+| Findings recorded | **75** |
+| Severity | 10 blocking · 41 major · 24 minor |
+| Verdicts | 5 narrowed · 35 accepted · 1 escalated · 5 deferred |
+| Raised by | reviewer 24 · test-engineer 19 · implementer 13 · orchestrator 10 · architect 8 · human 1 |
 | Awaiting a ruling | **29** |
-| Mean escape distance | 1.45 step(s) |
+| Mean escape distance | 1.43 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -463,6 +463,7 @@ rather than narrated.*
 | **R-01-7** | MINOR | 5 *(+0)* | reviewer | The slice declares arc42 scope 5.2, 8.3 and 12 but the branch changed docs/arc42/10-quality-requirements.md | accepted |
 | **O-14** | MINOR | 5 *(+5)* | orchestrator | slice:check's arc42 gate tests that the declaration is NON-EMPTY, never that it matches what the branch changed | **open** |
 | **O-15** | MINOR | 5 *(+0)* | orchestrator | The test-engineer's justification for SPANS_LOCAL_DAYS_FLOOR = 100 asserts what a rejected floor WOULD have done instead of measuring it, and the assertion is false | **open** |
+| **O-16** | MAJOR | 5 *(+0)* | orchestrator | The orchestrator bypassed the validating write path and appended five schema-invalid records; no local command could have caught it | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -553,6 +554,12 @@ rather than narrated.*
 
 - *scenario:* The report states VERDICT_FLOOR = 50 'would have passed under the very regression it was added to catch'. Its own measured broken range is 15-36, entirely below 50. Measured by the orchestrator: the file uses FIXED SEEDS (SEED..SEED+8), so under the committed configuration the regressed count is deterministically 22 — set SPANS_LOCAL_DAYS_FLOOR = 50 with the regression applied and it FAILS 8 runs out of 8, identical value every time. So 50 would have caught it, not passed it. NO CODE CHANGE FOLLOWS: 100 is still the better constant, for the reason the report gives one sentence earlier and did measure — 50 is only 1.4x the broken maximum across seed space, which is too thin a margin against generator drift. It is the JUSTIFICATION that overreached, not the choice. Recorded because this is the project's signature defect wearing its own uniform: a claim about what a mechanism would do, asserted rather than run, inside the report whose entire subject is that failure mode — and because the same report correctly caught the reviewer's own unmeasured 'about 2' estimate two paragraphs earlier. The operational rule stands and applies to the rule's own enforcers: for a discrimination claim, name the mutant AND run it.
 - *file:* `docs/team-log/prompts/s01-test-engineer-3.report.md`
+
+**O-16** — The orchestrator bypassed the validating write path and appended five schema-invalid records; no local command could have caught it
+
+- *scenario:* tools/team-log/append.mjs is the orchestrator write path and validates before writing (it also refuses the derived tier outright). It was bypassed with a hand-rolled appendFileSync in five records, using event names the schema does not define - backlog.added and finding.resolved - when slice.ready and review.response already existed. Two failures, and the second is the one that matters. FIRST: §9 says the orchestrator alone writes the log, and the tool that enforces what it may write was skipped for convenience. SECOND, and worse: npm test, npm run test:tools and npm run lint:arch were ALL GREEN over the invalid log, because the schema validation existed only as ten lines inlined in .github/workflows/verify.yml. The guard was unrunnable where the mistake is made, so it cost a full push-and-wait round trip to learn a millisecond fact. The workflow's own comment had anticipated the move to a tools/ script but conditioned it on the script GROWING, which is the wrong trigger - it never grew, it was just in the wrong place.
+- *file:* `docs/team-log/events.jsonl`
+- *accepted* by human — HUMAN OVERRIDE, recorded per §6 Authority because it went AGAINST the orchestrator's stated recommendation. Three options were put. The orchestrator recommended repairing the five records in place - rewriting them into the vocabulary that already existed - and argued that extending the schema would widen it to fit the mistake, the same move rejected four times in this slice. The human ruled EXTEND THE SCHEMA, on the ground the orchestrator had itself named as the cost of its own option: §9's append-only rule is absolute, and an edit to the one file the constitution singles out is not something to trade for tidiness. The third option - leaving the records and relaxing the CI guard to a warning - was refused by both. So backlog.added and finding.resolved become real event types with required fields, and docs/team-log/events.jsonl is never touched. The overlap with slice.ready and review.response is real and is documented in schema.mjs rather than papered over: finding.resolved is the ORCHESTRATOR's record that a remedy landed and was verified, which none of review.response's four resolutions describes and which attributing to the reviewer would misreport.
 
 </details>
 

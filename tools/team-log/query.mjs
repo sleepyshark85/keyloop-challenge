@@ -90,6 +90,10 @@ const detail = (r) => {
       return `${r.severity} ${r.file}${r.line ? `:${r.line}` : ''} — ${r.claim}`;
     case 'review.response':
       return `${r.finding_ref} → ${r.resolution}`;
+    case 'finding.resolved':
+      return `${r.ref} resolved — ${r.message}`;
+    case 'backlog.added':
+      return `${(r.slices_added ?? []).join(', ')} from ${(r.refs ?? []).join(', ')} — ${r.message ?? ''}`;
     case 'dcr.raised':
       return `step ${r.step}: ${r.reason}`;
     case 'dcr.resolved':
