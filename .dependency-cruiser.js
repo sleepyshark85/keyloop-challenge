@@ -39,14 +39,31 @@ export default {
         'src/domain holds the scheduling policy and NOTHING else: interval derivation (A-1), ' +
         'the occupancy interval the constraint sees (A-4), the opening-hours rule (ADR-0001) ' +
         'and candidate ordering (ADR-0009). It may import nothing — no other src/ module, no ' +
-        'npm package, no node: builtin. Deliberately absolute, with no allowlist: the moment ' +
-        'an exception is granted this stops being a statement about the core and becomes a ' +
-        'list. IANA-zone conversion uses the Intl global, which needs no import. ' +
+        'npm package, no node: builtin, AND NOT ANOTHER src/domain MODULE. Deliberately ' +
+        'absolute, with no allowlist: the moment an exception is granted this stops being a ' +
+        'statement about the core and becomes a list. IANA-zone conversion uses the Intl ' +
+        'global, which needs no import. ' +
         'What this buys: the policy core CANNOT perform I/O, so it cannot consult the ' +
         'database — which turns GC-1 ("the opening-hours check must never acquire knowledge ' +
-        'of what is booked", ADR-0001) from a promise into a build failure.',
+        'of what is booked", ADR-0001) from a promise into a build failure. ' +
+        '// 2026-09-05, slice 01 step 5, R-01-3. `to` was `{ pathNot: "^src/domain/" }` and ' +
+        'is now `{}`. The human ruled AC-6 literal — a domain module imports nothing at all, ' +
+        'not even a sibling — and then ruled at slice 01\'s gate that `pathNot: "^src/domain/"` ' +
+        'IS an allowlist, which AC-6\'s second clause ("the domain-is-pure rule holds with no ' +
+        'allowlist") forbids by name. It was: a standing, unwritten exemption for exactly the ' +
+        'class of import the ruling had just forbidden, in the file AC-6 points at. The ' +
+        'carve-out was removed rather than paired with a second rule, because `to: {}` matches ' +
+        'every dependency and is therefore the literal reading — "imports nothing" — in the ' +
+        'rule\'s own text rather than only in today\'s tree. It is a deletion, not an addition: ' +
+        'one rule name still appears in the violation output. ' +
+        'Guarded by a planted intra-domain control in tests/architecture/layering.test.ts ' +
+        '(test-engineer\'s file). Measured before the change: with `to: {}` and a planted ' +
+        '`src/domain/interval.ts -> src/domain/duration.ts` import, the cruise reports ' +
+        '`domain-is-pure` by name over 54 modules; restore `pathNot: "^src/domain/"` with that ' +
+        'same import in place and the cruise is CLEAN at 91 dependencies. That is the mutant, ' +
+        'and a rule whose firing nobody has observed is not evidence (arc42 §5.3).',
       from: { path: '^src/domain/' },
-      to: { pathNot: '^src/domain/' },
+      to: {},
     },
 
     // ──────────────────────────────────────────────────── the dependency direction ──
