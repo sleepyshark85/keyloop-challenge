@@ -238,16 +238,35 @@ section assumed the tool would produce is not an output it offers.
 
 So the as-built record is deliberately split, and the split is the honest one:
 
-- **the fact** is `npm run lint:arch` — **40 modules cruised across `src` and `tests`, every root
-  covered, zero violations.** That number is generated, gated in CI, and is what QS-10 rests on;
+- **the fact** is `npm run lint:arch` — **every root covered, zero violations**, which it prints and
+  CI gates. *That* is what QS-10 rests on, and it is a verdict rather than a number: it stays true as
+  the tree grows, and it fails the build the day it stops being true;
 - **the picture** is the presentation diagram, refreshed **once** in phase 6 rather than redrawn per
   slice. `npm run graph:modules` remains the check against it — run it, eyeball it, and if it
   disagrees with §5.2's direction block, §5.2 is wrong;
 - **§5.2's block above is a claim**, labelled as one. It is checked by the ruleset, not by the render.
 
-Four of the five modules appear, because `src/domain` ships empty (§5.2). The step-1 prediction of
-"four modules" therefore held in substance and not literally — which is a small thing, recorded
-because the alternative is a reader concluding the graph is wrong.
+**The module count is not in that verdict, and this paragraph is where a stale number was found.**
+Until slice 01 this subsection asserted "40 modules cruised", written at 00a; at `f661988` the same
+command reports 54. Nothing regenerated the prose and nothing gates it, so it drifted silently for two
+slices and was caught by reading arc42 against the tree rather than by a check. The number is
+therefore no longer stated as the fact. If one is wanted, **run the command** — it prints the count,
+the roots and the coverage together:
+
+```
+npm run lint:arch          # e.g. "no layering violations. 54 module(s) cruised, every root covered: src, tests"
+```
+
+Said plainly, because the alternative is a mechanism claim nobody has run: `tools/docs/build.mjs`
+generates only §9's ADR index and §11's debt register, so **there is no generator that could keep a
+module count in this file current**, and adding one is tooling rather than architecture. What keeps
+this subsection true now is that it no longer contains a number to go stale.
+
+At 00a four of the five modules appeared, because `src/domain` shipped empty (§5.2) — the step-1
+prediction of "four modules" held in substance and not literally. **From slice 01 all five appear**:
+`src/domain` fills with `duration.ts`, `interval.ts` and `openingHours.ts`, and they appear as three
+sibling nodes inside the `src/domain` subgraph with **no edges between them**, which is the literal
+AC-6 ruling visible in the render.
 
 `.dependency-cruiser.js` carries thirteen rules. Six describe the layering above; the rest are the
 ones that do the real work:

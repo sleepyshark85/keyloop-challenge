@@ -141,13 +141,47 @@ reader's first `npm test` fails.
 runs two projects, and the split is by *what a test needs* rather than by what it is about:
 
 ```
-nodb   tests/unit/** · tests/architecture/**        no globalSetup
-db     everything that talks to PostgreSQL          globalSetup: tests/setup/postgres.ts
+nodb   tests/unit/** · tests/architecture/**              no globalSetup
+       tests/property/** EXCEPT *.db.test.ts
+db     everything that talks to PostgreSQL, plus          globalSetup: tests/setup/postgres.ts
+       tests/property/**/*.db.test.ts
 ```
 
 `npm run test:nodb` is the Docker-less command. Per-project `globalSetup` was the one mechanical
 unknown flagged for verification before 00a's red commit, and it was verified on the pinned
 `vitest@5.0.0` rather than assumed.
+
+**`tests/property/` splits by database need, from slice 01.** It used to sit entirely in `db`, which
+would have started a PostgreSQL container to exercise three pure functions that import nothing — and
+worse, would have let a Docker hiccup turn QS-9's red evidence into a `globalSetup` crash rather than
+an assertion failure. A property test that needs the database is named `*.db.test.ts`; everything else
+runs in `nodb`. Built under ADR-0013, which is `status: proposed` — §8.5 states the three clauses and
+that they are as-built rather than ratified.
+
+**`npm test` is not `vitest run`, and the difference is a NON-NEGOTIABLE.** It is
+[`tools/ci/run-tests.mjs`](../../tools/ci/run-tests.mjs), which runs the two projects as **separate**
+invocations and merges their JSON. A single `vitest run` over both initialises global setup before
+running anything, so a container failure aborts the whole invocation and discards the `nodb` project's
+results with it — measured, with `DOCKER_HOST` pointed at nothing: `npx vitest run` aborts in
+`TestProject._initializeGlobalSetup` and writes 0 test files and 0 tests, while
+`npx vitest run --project nodb` reports 94 passing. `red-proof` reads that single results file, takes
+its `failedFiles: []` branch, and reports *"the commit is marked red but no test-engineer-owned suite
+failed"* — so a red commit whose tests genuinely failed is judged never to have failed, because Docker
+hiccuped. That is `CLAUDE.md` §2.4 — *observed red in CI* — silently unsatisfied.
+
+Splitting the invocation alone opens a worse hole in the same place, and this is the part that is easy
+to get wrong: if two JSONs are merged and one project never ran, its absence merges as **zero
+failures**, indistinguishable from a project in which everything passed — invisible on every slice
+rather than conditional on Docker. So the wrapper's rule is that **a project that did not run is a
+loud, distinct failure and never an empty contribution**: a missing project report, or one
+contributing zero test files, exits `EXIT_DID_NOT_RUN = 2` with a named message, before `red-proof` is
+reached. `EXIT_TESTS_FAILED` is 1 and stays distinguishable from it. Deliberately rejected: making
+`globalSetup` fail soft, which would convert a missing container into skipped `db` tests — a green
+over nothing, which is worse than an abort.
+
+This was **not** foresight. It was raised as objection T-01-2 at slice 01 step 2 and **ruled (c), a
+design defect, naming `CLAUDE.md` §2.4** — the slice's first loopback. The stale invocation this
+paragraph replaces sat three lines from §7.4's own account of the last time §2.4 was worked around.
 
 **The split's justification at 00a no longer holds; the split does.** It was forced by a constraint
 the phase-2 text did not anticipate — *"neither the implementer nor the test-engineer had a container
@@ -161,8 +195,10 @@ its speed, for a contributor without a daemon, and because a container failure s
 abort `tests/unit/` and `tests/architecture/`. What changes is the operative meaning of a green
 commit. At 00a it was **locally green on everything that does not need a database, CI-green on
 everything that does** — read 00a's commit sequence with that in mind rather than as carelessness.
-**From slice 00 it recovers its plain sense: green means green, locally, before the push**, and
-`npx vitest run --project db` is the stated inner loop for any slice whose work is in the database.
+**From slice 00 it recovers its plain sense: green means green, locally, before the push.** The stated
+inner loop is `npm run test:db` for any slice whose work is in the database and `npm run test:nodb`
+for one whose work is not; **`npm test` before the push**, because only the wrapper distinguishes a
+project that passed from a project that never ran.
 
 ## 7.3 Configuration
 

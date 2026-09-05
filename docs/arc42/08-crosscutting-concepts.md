@@ -401,7 +401,7 @@ rule does not say.
 | Level | Owner | Runs against | What it is for |
 |---|---|---|---|
 | `tests/unit/` | implementer | `src/`, with the database's **driver** stubbed where a container is not needed | A design tool, freely rewritable during refactor. **This is where the Stryker mutation budget is spent** — scoped to `src/**` less `main.ts`, and see *What a unit test may substitute* below, which is narrower than "`src/domain` is the whole unit-testable surface" |
-| `tests/property/` | test-engineer | `src/domain` and real PostgreSQL | `fast-check` over interval arithmetic, candidate ordering, opening hours across DST — and QS-8, which is the only thing holding the availability query and the exclusion constraint in agreement |
+| `tests/property/` | test-engineer | the **built artifact** under `dist/`, and real PostgreSQL only where the property needs it | `fast-check` over interval arithmetic, candidate ordering, opening hours across DST — and QS-8, which is the only thing holding the availability query and the exclusion constraint in agreement. **Split by database need**, not by subject: see *How an outside-in test reaches a module with no boundary* below |
 | `tests/integration/` | shared; DB-invariant tests are the test-engineer's | Testcontainers PostgreSQL | Single-threaded persistence behaviour: self-overlapping reschedule, cancellation releasing a slot |
 | `tests/concurrency/` | test-engineer | Testcontainers PostgreSQL, several pooled connections | The invariant. Genuinely simultaneous statements; nothing here is simulatable |
 | `tests/contract/` | test-engineer | the running service | The emitted OpenAPI document, and the error taxonomy of §8.6 |
@@ -418,6 +418,47 @@ Two structural supports rather than conventions:
   helper that imports `src/` and hands it to a test that may not.
 - **Isolation is by data, not by truncation** (§7.2). Each test seeds its own dealership, so the
   suite parallelises and every test is implicitly asserting A-9's scoping.
+
+### How an outside-in test reaches a module with no boundary
+
+Every level in the table above except `tests/unit/` reaches the system the way a client does, and
+`outside-in-tests-do-not-import-src` enforces it. **`src/domain` has no boundary to reach it through.**
+QS-9 is a property over three pure functions with no HTTP route and no SQL; the rule forbids the
+property test from importing them; and widening the rule does not even work, because a literal dynamic
+`import()` of a module that does not exist yet fails `tsc`, which fails the `verify` job, which makes
+`red-proof` reject the red commit. Two phase-2 artifacts of this design contradicted each other, and
+the contradiction was structural rather than a matter of degree.
+
+**Three clauses resolve it. All three are built and in force at `f661988`; none is ratified.**
+[ADR-0013](../adr/0013-outside-in-tests-exercise-the-built-artifact.md) is `status: proposed` — the
+architect raised it at slice 01 step 1, it was revised twice before ratification, and the human merged
+slice 01 without ruling on it. A merge is not a ratification, so this subsection states what was built
+rather than what was decided, and §11 carries it as debt until a human rules.
+
+1. **An outside-in test reaches a pure module through the built artifact.** It loads
+   `dist/domain/*.js` — the output of `npm run build`, which `pretest` guarantees is current — never
+   `src/`. The dependency rule stands unwidened, and the test exercises the thing that ships rather
+   than the thing that compiles. It costs a dynamic `import()` and an `await` in each test file.
+2. **`tests/property/` splits by whether the property needs a database.** A property test that talks
+   to PostgreSQL is named `*.db.test.ts` and runs in the `db` project behind
+   `globalSetup: tests/setup/postgres.ts`; everything else runs in `nodb` with no container. QS-9's
+   `opening-hours-dst.test.ts` needs no database and runs in `nodb` — which also means a Docker
+   failure can no longer turn its red evidence into a `globalSetup` crash instead of an assertion
+   failure.
+3. **`npm test` runs the two projects as separate invocations, and a project that did not run is a
+   loud failure.** It is `tools/ci/run-tests.mjs`, not `vitest run`; a missing or empty project report
+   exits `EXIT_DID_NOT_RUN = 2` rather than merging as zero failures. This clause was **not** part of
+   the ADR as first written — it was added after objection T-01-2 was **ruled (c), a design defect,
+   naming `CLAUDE.md` §2.4**. §7.2 carries the measurement and the failure mode.
+
+**What the mechanisms do not catch, measured rather than assumed.** The source scan beside the rule
+catches **relative** `../src/` references — the form a test reaches for first — and catches neither
+root-anchored path construction (`join(ROOT, 'src', 'domain', …)`) nor any other computed form;
+`dependency-cruiser` catches no computed form at all. The hole is **narrowed, not closed**, and the
+residue is review. A text scan cannot separate *constructing a path to `src/`* from *importing from
+`src/`*, because at the level it reads the source those are the same characters — widening the pattern
+would false-positive on the scan's own host file, which constructs exactly such a path. §11 carries the
+residue, and this document does not promise a cleverer regex that will not arrive.
 
 ### What a unit test may substitute, and where the line actually falls
 
