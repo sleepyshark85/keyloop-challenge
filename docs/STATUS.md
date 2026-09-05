@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `91190cd chore(01): step-5 remedies logged, AC-6 verified, backlog slices 12 and 13 raised` |
+| Last commit | `3a0b4d8 fix(01): the event-log schema gains two event types, and its guard becomes runnable` |
 | Gates decided | A, B, C, E, E, E, D |
 | Agent runs recorded | 58 |
 | ADRs accepted | 10 |

@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **75** |
-| Severity | 10 blocking · 41 major · 24 minor |
+| Findings recorded | **76** |
+| Severity | 10 blocking · 42 major · 24 minor |
 | Verdicts | 5 narrowed · 35 accepted · 1 escalated · 5 deferred |
-| Raised by | reviewer 24 · test-engineer 19 · implementer 13 · orchestrator 10 · architect 8 · human 1 |
-| Awaiting a ruling | **29** |
-| Mean escape distance | 1.43 step(s) |
+| Raised by | reviewer 24 · test-engineer 19 · implementer 13 · orchestrator 11 · architect 8 · human 1 |
+| Awaiting a ruling | **30** |
+| Mean escape distance | 1.47 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -464,6 +464,7 @@ rather than narrated.*
 | **O-14** | MINOR | 5 *(+5)* | orchestrator | slice:check's arc42 gate tests that the declaration is NON-EMPTY, never that it matches what the branch changed | **open** |
 | **O-15** | MINOR | 5 *(+0)* | orchestrator | The test-engineer's justification for SPANS_LOCAL_DAYS_FLOOR = 100 asserts what a rejected floor WOULD have done instead of measuring it, and the assertion is false | **open** |
 | **O-16** | MAJOR | 5 *(+0)* | orchestrator | The orchestrator bypassed the validating write path and appended five schema-invalid records; no local command could have caught it | accepted |
+| **O-17** | MAJOR | 5 *(+5)* | orchestrator | The 'tests green' DoD gate never checks that the CI run it cites covers the commit being gated | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -560,6 +561,11 @@ rather than narrated.*
 - *scenario:* tools/team-log/append.mjs is the orchestrator write path and validates before writing (it also refuses the derived tier outright). It was bypassed with a hand-rolled appendFileSync in five records, using event names the schema does not define - backlog.added and finding.resolved - when slice.ready and review.response already existed. Two failures, and the second is the one that matters. FIRST: §9 says the orchestrator alone writes the log, and the tool that enforces what it may write was skipped for convenience. SECOND, and worse: npm test, npm run test:tools and npm run lint:arch were ALL GREEN over the invalid log, because the schema validation existed only as ten lines inlined in .github/workflows/verify.yml. The guard was unrunnable where the mistake is made, so it cost a full push-and-wait round trip to learn a millisecond fact. The workflow's own comment had anticipated the move to a tools/ script but conditioned it on the script GROWING, which is the wrong trigger - it never grew, it was just in the wrong place.
 - *file:* `docs/team-log/events.jsonl`
 - *accepted* by human — HUMAN OVERRIDE, recorded per §6 Authority because it went AGAINST the orchestrator's stated recommendation. Three options were put. The orchestrator recommended repairing the five records in place - rewriting them into the vocabulary that already existed - and argued that extending the schema would widen it to fit the mistake, the same move rejected four times in this slice. The human ruled EXTEND THE SCHEMA, on the ground the orchestrator had itself named as the cost of its own option: §9's append-only rule is absolute, and an edit to the one file the constitution singles out is not something to trade for tidiness. The third option - leaving the records and relaxing the CI guard to a warning - was refused by both. So backlog.added and finding.resolved become real event types with required fields, and docs/team-log/events.jsonl is never touched. The overlap with slice.ready and review.response is real and is documented in schema.mjs rather than papered over: finding.resolved is the ORCHESTRATOR's record that a remedy landed and was verified, which none of review.response's four resolutions describes and which attributing to the reviewer would misreport.
+
+**O-17** — The 'tests green' DoD gate never checks that the CI run it cites covers the commit being gated
+
+- *scenario:* check.mjs takes the LAST check.run event and reads its checks for /FAIL/. It never compares checks.head_sha to HEAD. Measured on this branch: after the AC-6 remedy landed in 9c266c2, e8d6e16, 234540c, 8bf9d39 and 91190cd, npm run slice:check 01 reported 'tests green' citing run 33913771072 at head_sha f2b11c4 - FIVE commits behind, and predating every part of the remedy the gate exists to approve. Worse, the CI run for the real HEAD had FAILED at that moment (33946000635, the log-schema job), and the gate still read green, because a failing run that has not been collected is indistinguishable from one that does not exist. It went green here only because the orchestrator then ran collect-ci.mjs by hand - discipline again, which is the thing this project keeps refusing to accept as a mechanism. Same family as O-6 (a CI run recorded out of order satisfying red-before-green) and O-14 (the arc42 gate testing a declaration's presence rather than its correspondence): the predicate reads a record that exists rather than a record that APPLIES. The mechanism: check.mjs derives HEAD via git rev-parse and reports UNVERIFIED - not PASS - when the newest check.run's head_sha is not an ancestor-or-equal of it, per this tool's own three-verdict contract. NOT done inside slice 01: orchestrator tooling rather than slice work, the shape the human ruled for T-01-2, and slice 01 is at its gate. Recommended alongside O-14 before slice 02's step 3.
+- *file:* `tools/slice/check.mjs`
 
 </details>
 
