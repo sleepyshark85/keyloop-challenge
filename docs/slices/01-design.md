@@ -758,7 +758,7 @@ fixture paths taken as absolute against the local working directory, and it repo
 
 | Marker | Matches | Permitted in |
 |---|---|---|
-| `duration-arithmetic` | the literal `60_000` or `60000` **matched on word boundaries**; an exported **definition** of `serviceDuration` or `durationMillis` | `src/domain/duration.ts` |
+| `duration-arithmetic` | **any conversion between minutes or seconds and milliseconds** — see §7.2.1 for the spelling set; an exported **definition** of `serviceDuration` or `durationMillis` | `src/domain/duration.ts` |
 | `occupancy-interval` | an exported **definition** of `appointmentInterval`, `occupancyInterval`, or the type `Interval` | `src/domain/interval.ts` |
 | `wall-clock-and-zone` | `Intl.DateTimeFormat` (any whitespace), or the identifiers `timeZone`, `ianaZone`, `time_zone` | `src/domain/openingHours.ts` |
 
@@ -778,8 +778,55 @@ not a refinement of it, and it is the second one this slice has produced in a me
 job is discrimination.
 
 `3600` and `60` in `openingHours.ts`'s seconds-of-day normalisation are **not** duration arithmetic —
-they are wall-clock normalisation, which is that file's own concern. The marker is `60_000`
-specifically, which is why §2.1 refuses to export the constant.
+they are wall-clock normalisation, which is that file's own concern.
+
+### 7.2.1 `duration-arithmetic` is defined by what it must catch, not by one spelling — R-01-6
+
+**This supersedes the marker's step-1 and step-2 definitions, and the defect is the architect's, not
+the test-engineer's.** Both earlier versions defined the marker as *"the literal `60_000` or `60000`,
+matched on word boundaries"* — a **spelling**, not a concept. `minutes * 60 * 1000`, `1000 * 60`,
+`minutes * 60_000.0`, `ms / 60000` and `secs * 1000` are all duration arithmetic and all went
+unflagged, and a planted control that uses the one spelling the pattern was written for proves only
+that the pattern matches itself. That is the same tautology as the `>= 1` floors, one level up, in a
+mechanism whose entire job is discrimination.
+
+**The definition. What the marker must catch:** *any conversion between minutes or seconds and
+milliseconds, anywhere under `src/` outside `duration.ts`.* The word-boundary requirement on the
+numeric literals stands — `600000`, an ordinary six-hundred-second timeout, must not match, and that
+correction was the test-engineer's and is not being undone.
+
+The spelling set the test-engineer implements against. It is enumerated because a scan needs
+something mechanical, and it is enumerated as **an open set with a stated concept above it** so that a
+spelling not listed here is a gap in the scan rather than a licence:
+
+| # | Form | Example |
+|---|---|---|
+| 1 | the millisecond-per-minute literal, word-bounded, in either separator style | `60_000`, `60000` |
+| 2 | the same value as a product of its factors, in either order, any spacing | `60 * 1000`, `1000 * 60`, `60*1_000` |
+| 3 | a three-term product that reaches it through seconds | `minutes * 60 * 1000`, `60 * 60 * 1000` |
+| 4 | either of the above as a **divisor** — the inverse conversion is the same concept | `ms / 60000`, `ms / (60 * 1000)` |
+| 5 | a decimal or numeric-separator variant of 1 | `60_000.0`, `60000.0` |
+| 6 | the millisecond-per-second literal used as a scale on a minutes or seconds quantity | `seconds * 1000`, `minutes * 1000` |
+
+Row 6 is the widest and will be the one that argues. It is in because a two-step conversion —
+`const secs = minutes * 60;` then `secs * 1000` — is exactly how this arithmetic escapes a scan that
+only knows the fused constant, and AC-5 is about the concept living in one file, not about one
+constant living in one file. If it false-positives on something that is genuinely not duration
+arithmetic, that is a finding to raise, not a licence to narrow the concept back to a spelling.
+
+**The control must plant a spelling the pattern was not written against.** §7.4's fixture 2 currently
+plants `const endsAt = startsAt + minutes * 60_000;` — row 1, the original spelling. Change it to a
+row-3 form, `const endsAt = startsAt + minutes * 60 * 1000;`, and add a second planted fixture using
+row 6, `const ms = seconds * 1000;`. **A control that shares its author's spelling assumption is not a
+control** — it is the pattern asserting its own reflexivity, and the negative control in §7.4 does not
+catch that because a reflexive pattern reports zero on a conforming tree just as a correct one does.
+
+The implementation, the regexes and the fixture files are the test-engineer's. The concept, the
+spelling set and the instruction that the control must differ from the pattern's authoring spelling
+are this design's, because the under-specification was this design's.
+
+`60_000` is still why §2.1 refuses to export the constant: a shared exported constant would move the
+arithmetic's *home* without moving the concept, and the marker is about the concept.
 
 ### 7.3 The corpus guard, which fails first
 
@@ -795,18 +842,21 @@ while `src/` went unexamined behind a green gate. Named files close that.
 
 ### 7.4 The planted-violation control — for a discrimination claim, name the mutant
 
-The scanner runs over three fixture trees built in a temp directory, each containing exactly one
-planted violation, and each must be reported **by file and by marker**:
+The scanner runs over four fixture trees built in a temp directory, each containing exactly one
+planted violation, and each must be reported **by file and by marker**. Fixtures 2 and 2b both plant
+`duration-arithmetic` in spellings §7.2.1's pattern was **not** authored against, which is R-01-6's
+remedy: a control that shares its author's spelling assumption is not a control.
 
 | Fixture | Planted file | Content |
 |---|---|---|
 | 1 | `src/http/routes/appointments.ts` | `new Intl.DateTimeFormat('en-GB', { timeZone: tz })` |
-| 2 | `src/application/bookAppointment.ts` | `const endsAt = startsAt + minutes * 60_000;` |
+| 2 | `src/application/bookAppointment.ts` | `const endsAt = startsAt + minutes * 60 * 1000;` — **row 3 of §7.2.1, deliberately not the spelling the pattern was written against** |
+| 2b | `src/application/slotWindow.ts` | `const ms = seconds * 1000;` — row 6, the two-step escape |
 | 3 | `src/persistence/appointmentRepository.ts` | `export function appointmentInterval(...)` |
 
 Plus a **conforming negative control**: a fixture shaped like the real tree, with the three concepts in
 their three permitted files, reporting zero. Without the negative control, a scanner that reports
-everything passes all three positive cases.
+everything passes all four positive cases.
 
 ### 7.5 The positive assertions, which are also the anti-vacuity guard
 
@@ -1012,6 +1062,25 @@ inter-module handoffs take bare `number`: `appointmentInterval`'s `durationMilli
 The brands survive *inside* each module (§2.1, §2.2) and catch nothing between them — which is the
 boundary they were introduced for. This is the debt entry most likely to cash in, because a
 minutes-for-millis error produces a plausible-looking interval rather than a crash.
+
+**D-01-2 has cashed in, at step 5 of the slice that incurred it. It is no longer a prediction.** The
+first concrete instance is R-01-1, and it is not the minutes-for-millis error this entry expected — it
+is the same debt in its other form. `instant()` admits `8_640_000_000_000_001`, which
+`Number.isFinite` accepts and `new Date` cannot represent, so an `Instant` is not renderable by
+construction and `formatToParts` throws out of a function specified as pure. ADR-0014 puts the bound
+in **two** places: `instant()`, where an `Instant`'s constructor states what a usable instant is, and
+`withinOpeningHours` step 1, which takes bare `number` endpoints and therefore cannot receive an
+`Instant` to trust. The literal `8_640_000_000_000_000` has to appear in two domain files, and under
+literal AC-6 **there is no way to share it** — no module may export it to the other, no module may
+import it, and the concept "renderable instant" consequently has two homes and one meaning.
+
+That is exactly the shape this entry described, arriving through a different door: a guarantee that
+one type could have carried for the whole domain is instead re-stated at each boundary, and the two
+statements agree because a human wrote them to agree. If a later slice widens the bound in one file
+and not the other, no compiler and no `dependency-cruiser` rule will say so; only the property test
+and review will. So §11 stops predicting here and cites a case, and the case is deliberately the one
+where the debt is cheapest to see — a duplicated literal — rather than the one where it is most
+expensive, which is still ahead.
 
 **D-01-3 — one extra branch and one extra verdict variant.** `malformed-interval` exists only because
 the `Interval` type cannot cross the boundary and therefore cannot carry "ordered, and from the same

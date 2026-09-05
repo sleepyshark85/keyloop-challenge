@@ -26,6 +26,12 @@ ai-input: >
   REVISED IN PLACE 2026-09-05, before ratification, after the test-engineer measured that the second
   clause as first written did not do what it claimed. See "Revision before ratification" below. The
   human was told this is how it is being handled and can overrule it.
+
+  REVISED IN PLACE A SECOND TIME 2026-09-05 at slice 01 step 5, on the reviewer's finding R-01-2 and
+  the architect's ruling (b): the step-2 revision's own narrowing claim was overstated, and the
+  computed-import hole is narrowed rather than closed. Still `proposed`; still unratified; it reaches
+  the human at Gate E with both revisions visible, which is the point of revising rather than
+  superseding a decision nobody has yet taken.
 ---
 
 ## Revision before ratification — 2026-09-05
@@ -47,6 +53,40 @@ empty results file and `CLAUDE.md` §2.4's *"observed red in CI"* would not be m
 The project split was necessary and never sufficient. A third clause — the invocation split — is added
 below, and the *Bad, or deferred* list is narrowed where the test-engineer closed a hole it named.
 Nothing in the Decision was reversed; one clause was found to be doing less than it claimed.
+
+### Second revision — 2026-09-05, slice 01 step 5, finding R-01-2
+
+**The narrowing recorded above was itself overstated, and the overstatement is the architect's.** The
+step-2 revision narrowed the *computed dynamic import* hole on the strength of what the
+test-engineer's source scan was **for** rather than what it **matches**. The reviewer measured it; the
+architect agreed without qualification. What the mechanisms actually do:
+
+- the scan catches **relative** `../src/` references — the `SRC_REFERENCE` pattern — in the seven
+  outside-in directories, and that is a real narrowing, because the relative climb is the form a test
+  reaches for first;
+- it catches **neither** root-anchored path construction — `join(ROOT, 'src', 'domain', …)` — **nor
+  any other computed form**. The idiom it misses is the one the scan's own host file uses at line 26,
+  which is what makes this undeniable rather than arguable;
+- `dependency-cruiser` catches **no computed form at all**, which was already recorded and is
+  unchanged;
+- therefore the hole is **narrowed, not closed**, and the residue is **review**.
+
+**The residue is irreducible for a text scan, and is recorded as such rather than deferred to a better
+regex.** Widening the pattern to match `join(ROOT, 'src', …)` would false-positive on the scan's own
+host file and on any legitimate tool that constructs a path into `src/` — the same false positives the
+reviewer and the test-engineer already reproduced, one step earlier. A text scan cannot separate
+*constructing a path to `src/`* from *importing from `src/`*, because at the level it reads the source
+those are the same characters. So this ADR does not promise a cleverer pattern that will not arrive.
+It names the class of mechanism and the limit of that class. arc42 §11 carries the residue.
+
+Nothing in the Decision changes. One *Bad, or deferred* entry is corrected below from "no longer
+review is the only thing standing there" to what is true: review is what stands behind the relative
+form the scan catches, and it is the only thing standing behind every computed form.
+
+This is the third time in slice 01 the architect asserted what a mechanism was *for* instead of what
+it *matches* — §8.3 reason 2 and §6.2's build claim were the first two — and the count is recorded
+because a correction re-derived locally three times is one that is evidently not being carried between
+sections.
 
 ## Context and problem statement
 
@@ -198,11 +238,16 @@ like every other tool, and is checked against mutants rather than asserted to di
   by a runtime shape assertion. A signature change that a compiler would have caught now surfaces as a
   test failure instead.
 - **`dependency-cruiser` cannot see a computed dynamic import.** The same technique would let a future
-  test import `src/` invisibly. **Narrowed at the step-2 revision**: the test-engineer is adding a
-  source scan it owns, under `tests/architecture/`, that fails when an outside-in test file references
-  `src/` by any route — which catches the computed form the cruise cannot. So this is no longer
-  *"review is the only thing standing there"*; it is a second mechanism, owned by the role that would
-  be the one to breach it. arc42 §11 carries what remains.
+  test import `src/` invisibly. **Narrowed, not closed** — corrected at the second revision, 2026-09-05,
+  after the first attempt at this entry claimed more than the mechanism does. The test-engineer's
+  source scan under `tests/architecture/` fails when an outside-in test file references `src/` by a
+  **relative** path (`../src/`), which is the form such a test reaches for first and which the cruise
+  cannot see. It does **not** catch root-anchored construction — `join(ROOT, 'src', …)` — or any other
+  computed form, and `dependency-cruiser` catches none of them either. So *"review is the only thing
+  standing there"* is now false for the relative form and remains exactly true for every computed one,
+  and no better regex is promised: a text scan cannot distinguish constructing a path to `src/` from
+  importing from `src/`, so the residue is irreducible for this class of mechanism rather than
+  outstanding work. arc42 §11 carries it.
 - **A dependency on the build.** A stale `dist/` produces a green or a confusing red. `pretest` and
   `pretest:nodb` close the two paths that exist today; a third would need the same treatment.
 - ~~One mechanical unknown~~ — **measured before this ADR was accepted**, not left as a promise: a
