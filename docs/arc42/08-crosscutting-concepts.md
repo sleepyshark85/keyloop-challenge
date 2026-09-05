@@ -292,6 +292,65 @@ start and end fall on different days is therefore rejected too — no weekly sch
 Holidays, one-off closures and mid-day breaks are not modelled (§3.3), and land in this module when
 they are.
 
+### As built at slice 01 — the decision procedure, and the numbers behind it
+
+**The order of the checks is part of the design, not an implementation detail.** `withinOpeningHours`
+runs six steps in a fixed order, and the order is asserted, because a mutant that reorders them is
+otherwise unkillable:
+
+| # | Step | Verdict if it fails |
+|---|---|---|
+| 1 | both endpoints are integers and `end > start` | `malformed-interval` |
+| 2 | the zone constructs a formatter (an invalid IANA zone throws `RangeError`) | `unknown-zone` |
+| 3 | render both endpoints in that zone | — |
+| 4 | both renderings fall on the same local date | `spans-local-days` |
+| 5 | that local weekday has an `opening_hours` row | `closed-day` |
+| 6 | the row's `time` values parse, and `opens ≤ start` and `end ≤ closes` | `malformed-hours` / `outside-window` |
+
+Step 1 exists **only** because the literal AC-6 ruling took the `Interval` type out of this module's
+reach; the type used to make an unordered or non-finite pair unrepresentable (§5.2, and §11 D-01-3).
+Every step fails closed: a booking gate that cannot read its own configuration refuses rather than
+guesses.
+
+**Two rendering options are pinned, and both are correctness choices rather than style.** The locale
+is `'en-US'`, never `undefined` — a pure function must not vary with the host's default locale — and
+the hour is `hourCycle: 'h23'` rather than `hour12: false`, which has historically rendered midnight
+as `24`. The weekday comes from the formatter's `weekday: 'short'` part through an explicit
+seven-entry lookup, never hand-rolled calendar arithmetic: a second calendar implementation inside the
+one module that must not be subtly wrong is the risk this design exists to avoid.
+
+**The transitions, measured on this runtime rather than reasoned about** (Node 24, full ICU,
+`Europe/London` open 09:00–17:00 local). Spring forward is `2026-03-29T01:00:00Z`; fall back is
+`2026-10-25T01:00:00Z`.
+
+| Instant | Renders local | Verdict |
+|---|---|---|
+| `2026-03-28T08:30:00Z` | `Sat 28/03 08:30` (GMT) | **rejected** |
+| `2026-03-29T08:30:00Z` | `Sun 29/03 09:30` (BST) | **accepted** |
+| `2026-03-29T00:30:00Z` + 60 min | `00:30` → `02:30` local | AC-3: sixty *real* minutes, two wall-clock hours |
+| `2026-10-25T00:30:00Z` | `Sun 25/10 01:30` (BST) | same verdict as the row below |
+| `2026-10-25T01:30:00Z` | `Sun 25/10 01:30` (GMT) | same verdict as the row above |
+
+The first pair is AC-2's worked pair: the same UTC wall time, the same window, opposite verdicts. The
+last pair is the fall-back ambiguous hour — **two distinct instants render identically and the rule
+gives them the same verdict, and that is the correct answer**, not something to engineer around. The
+doors are either open at 01:30 local or they are not, and they are in the same state both times round.
+The ambiguity that makes fall back hard belongs to *local → instant*, and this rule never performs
+that conversion. The property test asserts the equality explicitly (QS-9, P5), because a silent green
+over the case a reviewer will look for proves nothing.
+
+**A consequence that reads like a bug and is not:** on 25 October a dealership open 00:00–06:00 local
+is open for **seven** absolute hours, and on 29 March for **five**. The rule produces that without
+knowing it, because it never counts hours.
+
+**One case the as-built rule gets wrong, recorded here rather than in a commit message.** An interval
+ending exactly at local midnight is rejected as `spans-local-days` — its end renders on the next local
+date. A job finishing at closing time on a dealership open until 00:00 is therefore refused. The time
+parser accepts `'24:00:00'` and normalises it to 86 400 seconds-of-day precisely to describe such a
+window, so the two halves disagree and the `'24:00:00'` arm is currently unreachable. Deferred as
+[ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) (`status:
+proposed`) with slice 13 raised against it; §11 carries it.
+
 ## 8.4 Observability
 
 `CLAUDE.md` §3 and TC-8 fix OpenTelemetry with `pino`. §1.2 goal 4 says what for: *the check-then-act

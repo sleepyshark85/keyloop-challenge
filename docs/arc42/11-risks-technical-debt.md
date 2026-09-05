@@ -23,12 +23,125 @@ debt, because it is generated from `status: proposed` and those were the *foundi
 awaiting ratification, not deferred improvements. **The human accepted all six at Gate B on
 2026-09-04**, so the register emptied on its own.
 
-The single entry above is the first genuine one: **ADR-0011** was raised by the architect at slice
-00a step 1 and is `proposed` because it is the human's to rule at that slice's gate, not the
-architect's to close inline. It is debt in the narrow sense the register means — an open decision
-with a recommendation attached — and it leaves the register the moment it is accepted or rejected.
-Every other entry that appears here is a deferred improvement from a `(b)` DCR ruling under
-`CLAUDE.md` §6, which is what the register exists to make impossible to lose.
+**The register now holds five, and they are two different kinds of thing.** ADR-0011, ADR-0012 and
+ADR-0013 are **open decisions with a recommendation attached** — raised by the architect at a slice's
+step 1, `proposed` because they are the human's to rule at that slice's gate rather than the
+architect's to close inline. ADR-0014 and ADR-0015 are **deferred improvements from a `(b)` DCR
+ruling** under `CLAUDE.md` §6, which is what the register exists to make impossible to lose. Either
+kind leaves the register the moment it is accepted or rejected.
+
+**A merge is not a ratification, and slice 01 is the case that makes the distinction load-bearing.**
+Slice 01 merged at `f661988` carrying three `proposed` ADRs — 0013, 0014 and 0015 — and the human
+ruled on none of them at the gate. The code they describe is either built (0013's split test run and
+built-artifact seam) or deliberately not built (0014's bound, 0015's midnight normalisation), and in
+both cases the *decision* is still open. Nothing in the merge flips a status, and the architect's
+step-7 reconciliation does not flip one either: an ADR leaves `proposed` when a human rules, and by no
+other route. ADR-0013 was **revised twice before ratification** rather than superseded, which
+`CLAUDE.md` §4 permits because it forbids editing an *accepted* ADR; each revision carries its own
+*Revision before ratification* note, so the record does not depend on reading the slice file alongside
+it.
+
+### The cost of the literal AC-6 ruling — slice 01, and debt rather than defect
+
+The human ruled at slice 01's gate that AC-6 is literal: a `src/domain` module imports **nothing at
+all**, its siblings included (§5.2, *As built at slice 01*). The four entries below are the price of
+that ratified decision, recorded with it. **None of them is an argument for revisiting it**, and a
+later slice that finds one of them irritating should read this section before proposing a change.
+
+**D-01-1 — the composition order left the domain.** `serviceDuration → durationMillis →
+appointmentInterval → withinOpeningHours` used to be expressed by the types: the values were branded
+and only one function produced each, so the third could not be called without the first two. It is now
+expressed by a use case in `src/application`. The order is still correct; it is correct because
+someone wrote it correctly, not because the compiler refused the alternatives.
+
+**D-01-2 — unit confusion across domain boundaries is review-caught, not compiler-caught.** The two
+inter-module handoffs take a bare `number`: `appointmentInterval`'s `durationMillis`, and
+`withinOpeningHours`'s two endpoints. Passing minutes where milliseconds are expected now compiles.
+The brands survive *inside* each module and catch nothing between them, which is the boundary they
+were introduced for. This is the entry most likely to cash in, because a minutes-for-millis error
+produces a plausible-looking interval rather than a crash.
+
+> **It has already cashed in, at step 5 of the slice that incurred it, and not in the form this entry
+> expected.** `instant()` admits `8_640_000_000_000_001` and beyond: `Number.isInteger` accepts it and
+> `new Date` cannot represent it, so an `Instant` is not renderable by construction and
+> `formatToParts` throws out of a function this design specifies as pure.
+> [ADR-0014](../adr/0014-an-instant-is-renderable-by-construction.md) puts the bound in **two** places
+> — `instant()`, where the constructor states what a usable instant is, and `withinOpeningHours` step
+> 1, which takes bare numbers and therefore cannot receive an `Instant` to trust. The literal
+> `8_640_000_000_000_000` must appear in two domain files and **there is no mechanism to share it**:
+> no module may export it to the other and none may import it, so the concept "renderable instant"
+> has two homes and one meaning. If a later slice widens the bound in one file and not the other, no
+> compiler and no `dependency-cruiser` rule will say so — only the property test and review will. The
+> case is deliberately the one where the debt is cheapest to see. The expensive one is still ahead.
+
+**D-01-3 — one extra branch and one extra verdict variant.** `malformed-interval` exists only because
+the `Interval` type cannot cross the boundary and so cannot carry "ordered, and from the same
+interval". It is fail-closed and directly testable, so the cost is a branch to cover rather than a
+risk to carry — but it is a branch that would not exist under the other reading.
+
+**D-01-4 — the three-file split is weaker, and `interval.ts` is the file that feels it.** Before the
+ruling the split had two independent justifications: each file absorbs one §1.4 ambiguity (A-1, A-4,
+ADR-0001), **and** the three types composed, so the decomposition expressed a relationship the
+compiler enforced. The second is gone. What remains for `interval.ts` is the `Interval` type — which
+still has consumers outside the domain, where imports are permitted — plus `occupancyInterval` as
+A-4's named seam, plus `instant()`. A reader may now reasonably ask why those are not inlined where
+they are used, and the honest answer is A-4 and QS-12 rather than cohesion. **The split is no longer
+self-justifying and rests on the containment criterion alone.** That is a real weakening, not a fatal
+one — AC-5 and QS-12 *are* a containment criterion and all three files still hold a distinct
+ambiguity — but "the scan requires it" is thinner than "the types require it", and a later slice that
+finds `interval.ts` anaemic should read this entry before deleting it.
+
+### What slice 01's mechanisms do not catch — the residue, named rather than promised away
+
+Two scans merged in slice 01 with holes their authors measured rather than discovered. Both are
+recorded as **irreducible for a text scan**, so nothing here is a promise of a cleverer regex.
+
+**`duration-arithmetic` (QS-12, `tests/architecture/ambiguity-containment.test.ts`).** The marker is
+defined as a *concept* — any conversion between minutes or seconds and milliseconds outside
+`src/domain/duration.ts` — implemented against an enumerated, deliberately open spelling set. It does
+not catch:
+
+| Escape | Example | Status |
+|---|---|---|
+| exponent notation | `6e4`, `60 * 1e3` | gap |
+| a conversion routed through an imported named constant | `import { MS_PER_MINUTE } …` | gap |
+| any computed form | `Math.pow(10, 3)`, a value assembled at runtime | gap — the same class as the outside-in scan below |
+| a quantity whose name says neither minutes nor seconds | `elapsed * 1000` | **deliberate.** Scoping row 6 of the spelling set by the quantity's name is what keeps `kilobytes * 1000` out; widening it trades a gap for false positives on code that is not duration arithmetic at all |
+
+The first three are gaps in the scan, not licences: a spelling not listed is a finding to raise. The
+fourth is a design choice and is not a gap.
+
+**`outside-in-tests-do-not-import-src` (QS-10, and the source scan beside it).** Measured at slice 01
+step 5 and carried here by
+[ADR-0013](../adr/0013-outside-in-tests-exercise-the-built-artifact.md) at its own instruction. The
+scan catches **relative** `../src/` references — the form a test reaches for first — and catches
+neither root-anchored path construction (`join(ROOT, 'src', 'domain', …)`) nor any other computed
+form. `dependency-cruiser` catches no computed form at all. The hole is **narrowed, not closed**, and
+the residue is **review**. A text scan cannot separate *constructing a path to `src/`* from *importing
+from `src/`*, because at the level it reads the source those are the same characters — widening the
+pattern would false-positive on the scan's own host file, which constructs exactly such a path.
+
+### What slice 01 did not make true
+
+QS-9 and QS-12 are now enforced by committed tests, which is not the same as being fully evidenced.
+Recorded so a later reader does not over-read a green tick:
+
+- **`occupancyInterval` has no production call site.** It is exercised only by tests until the booking
+  path lands at slice 02. A-4's seam exists and is named; nothing yet depends on it.
+- **QS-12's corpus is nearly empty.** The scan reads `src/**/*.ts`, which is currently twelve files, three of them the domain itself. A
+  marker matching in exactly one file is a much weaker claim now than it will be once routes,
+  repositories and use cases exist.
+- **QS-9 examines one zone and one year.** `Europe/London`, 2026. A southern-hemisphere transition, a
+  zone with a non-whole-hour offset, and a zone whose rules changed mid-year are all untested, and the
+  rule is zone-generic only by construction, not by evidence.
+- **The `Intl` global is an ICU dependency the purity rule cannot see.** `domain-is-pure` is satisfied
+  because there is no module specifier to record, but the rendering depends on the runtime's ICU data.
+  A Node build with small-icu would change `withinOpeningHours`'s answers without changing a line of
+  `src/`. TC-10's version pin is what stands there, and it is not a mechanism aimed at this.
+- **`instant()` does not bound its input** — ADR-0014 is `proposed` and unimplemented, so the
+  unrenderable-instant case above is live in the merged code. Slice 12 is raised against it.
+- **An interval ending at local midnight is refused** — ADR-0015 is `proposed` and unimplemented.
+  Slice 13 is raised against it, and §8.3 records the behaviour.
 
 ## 11.2 Known risks
 

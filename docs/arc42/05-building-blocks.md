@@ -48,11 +48,15 @@ prohibition stops being a promise and becomes a build failure.
 
 | Module | Owns | The §1.4 ambiguity it absorbs |
 |---|---|---|
-| `interval.ts` | `appointmentInterval(startsAt, minutes)`, and **`occupancyInterval(interval)` — "the interval the constraint sees"** | **A-4.** Today `occupancyInterval` is the identity, which is the statement that there is no buffer. A buffer changes this function and the constraint's range expression, and nothing else |
-| `duration.ts` | `serviceDuration(serviceType)` | **A-1.** If duration varies by vehicle this function gains a parameter; the interval arithmetic above it does not change, because it takes a number |
-| `openingHours.ts` | `withinOpeningHours(interval, ianaZone, weeklyHours)` | **ADR-0001 / GC-1.** The only place in the system that reasons in wall-clock time (A-8). Breaks, holidays and one-off closures land here |
-| `candidates.ts` | `orderCandidates(set, seed)`, `nextCandidate(set)`, `prune(set, resource, id)` | **A-10 / ADR-0009.** Ordering, the pruning rule and the attempt cap's arithmetic. Pure and seeded, so a failing interleaving is reproducible |
-| `appointment.ts` | The status model: `confirmed`/`cancelled`, and which transitions are legal | **ADR-0003.** Cancellation is terminal and idempotent; only a confirmed appointment may be moved |
+| `interval.ts` *(built, 01)* | The `Instant` and `Interval` types, `instant(epochMillis)`, `appointmentInterval(startsAt, durationMillis)`, and **`occupancyInterval(interval)` — "the interval the constraint sees"** | **A-4.** Today `occupancyInterval` is the identity, which is the statement that there is no buffer. A buffer changes this function and the constraint's range expression, and nothing else |
+| `duration.ts` *(built, 01)* | The `DurationMinutes` type, `serviceDuration(serviceType)`, and `durationMillis(duration)` — the only place in the system where minutes become milliseconds | **A-1.** If duration varies by vehicle this function gains a parameter; the interval arithmetic above it does not change, because it takes a number |
+| `openingHours.ts` *(built, 01)* | `withinOpeningHours(startsAtMillis, endsAtMillis, ianaZone, weekly)`, returning the `OpeningHoursVerdict` union rather than a boolean | **ADR-0001 / GC-1.** The only place in the system that reasons in wall-clock time (A-8). Breaks, holidays and one-off closures land here |
+| `candidates.ts` *(not built; slice 04)* | `orderCandidates(set, seed)`, `nextCandidate(set)`, `prune(set, resource, id)` | **A-10 / ADR-0009.** Ordering, the pruning rule and the attempt cap's arithmetic. Pure and seeded, so a failing interleaving is reproducible |
+| `appointment.ts` *(not built; slice 05)* | The status model: `confirmed`/`cancelled`, and which transitions are legal | **ADR-0003.** Cancellation is terminal and idempotent; only a confirmed appointment may be moved |
+
+The three built signatures are as-built at slice 01 and take **primitives, not domain types**. That is
+not a simplification: it is the consequence of the human's ruling that AC-6 is literal, and *"As built
+at slice 01"* below is where it is argued rather than merely recorded.
 
 `occupancyInterval` deserves its name. A-4 is flagged in §1.4 as *"the assumption most likely to be
 wrong in a real dealership"*, and the thing it moves is not the customer-facing appointment but the
@@ -170,6 +174,47 @@ generic alternative buys the edge a value it cannot type, cannot use and must no
 The distinction matters beyond wording. "No other shape compiles" would have been a claim about the
 tooling that the tooling does not support, and the next person to need an escape hatch would have
 found one and concluded the rule was decorative.
+
+### As built at slice 01 — the domain fills, and nothing crosses inside it
+
+`src/domain` stopped being empty. Three files, 279 lines, **zero import statements between them**.
+
+**The ruling this section is the record of.** §5.2 above has said since phase 2 that the core
+*"imports nothing at all … with no allowlist"*. Slice 01's step-1 design read that as prohibiting
+imports *out of* the domain and proposed amending the line so `interval.ts` could import
+`duration.ts`. **The human ruled AC-6 literal: nothing at all includes each other.** The line is
+therefore ratified rather than corrected, and the proposal to amend it was withdrawn — the argument
+for it rested on a claim ("the two readings are jointly unsatisfiable") that was false.
+
+**What the ruling changed, in the code that merged.**
+
+| | As designed at step 1 | As built |
+|---|---|---|
+| `appointmentInterval` | `(startsAt: Instant, minutes: DurationMinutes)` — the brand crosses the module boundary | `(startsAt: Instant, durationMillis: number)` — a bare millisecond count; the caller converts first |
+| `withinOpeningHours` | `(interval: Interval, ianaZone, weekly)` | `(startsAtMillis: number, endsAtMillis: number, ianaZone: string, weekly: WeeklyOpeningHours)` — four bare parameters |
+| Its result | a boolean | `OpeningHoursVerdict`, a seven-variant discriminated union |
+| Ordered, non-`NaN` endpoints | guaranteed by the `Interval` type | asserted at runtime, first, as verdict `malformed-interval` |
+| The composition `serviceDuration → durationMillis → appointmentInterval → withinOpeningHours` | enforced by the brands: you could not call the third without having called the first two | written out by a use case in `src/application`; still correct, correct because someone wrote it correctly |
+
+`Instant` and `DurationMinutes` still exist and are still branded, and the brands still catch a bare
+number **inside** a module. They no longer catch anything **between** modules, which is the boundary
+they were introduced for — [§11](11-risks-technical-debt.md) carries that as D-01-2 and cites the case
+where it has already cashed in.
+
+**The `Interval` type has not become private.** It crosses out of the domain freely — `src/application`
+and `src/persistence` may import it, and the rule is one-directional. What the ruling forecloses is
+`openingHours.ts` naming it, which is why the endpoints arrive as numbers.
+
+**The rule now enforces the ruling, which it did not when the ruling was made.** `domain-is-pure` was
+written `from: '^src/domain/'`, `to: { pathNot: '^src/domain/' }` — a shape that permits intra-domain
+imports *by construction*, and therefore a standing exemption for exactly the class of import AC-6 had
+just forbidden. It is now `to: {}`: every dependency matches, so the rule reads "imports nothing" in
+its own text rather than only in today's tree. Measured, on the merged tree — plant
+`src/domain/interval.ts → src/domain/duration.ts` and the cruise reports `domain-is-pure` by name over
+54 modules; restore `pathNot` with the same import in place and the cruise is **clean** at 91
+dependencies. That mutant is planted as a control in `tests/architecture/layering.test.ts`, so §5.3's
+claim below — a ruleset that has never rejected anything is not evidence — now has two instances
+behind it rather than one, and the second is the one that would have been easiest to leave unguarded.
 
 ## 5.3 Module dependency graph
 
