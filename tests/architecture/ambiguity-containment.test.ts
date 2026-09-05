@@ -80,13 +80,92 @@ interface MarkerHit {
 }
 
 /**
- * Word-boundary matched, NOT a substring match. The step-1 draft specified a plain substring
- * test, and `600000` — an ordinary six-hundred-second timeout that could legitimately appear
- * anywhere in src/ — contains `60000`. `\b` treats `_` as a word character, so `\b60_000\b`
- * and `\b60000\b` each require the token to stand alone: neither matches inside `600000`
- * (measured below, in the word-boundary regression guard) nor inside a longer identifier.
+ * `duration-arithmetic` — DEFINED BY WHAT IT MUST CATCH, not by one spelling (design §7.2.1,
+ * R-01-6). The architect ruled the earlier definition its own defect: both the step-1 and
+ * step-2 versions said "the literal `60_000` or `60000`, matched on word boundaries", which is
+ * a SPELLING. `minutes * 60 * 1000`, `1000 * 60`, `ms / 60000` and `secs * 1000` are all the
+ * same concept and all went unflagged — and §7.4's planted control used the one spelling the
+ * pattern was written for, so it proved only that the pattern matches itself.
+ *
+ * The concept: ANY conversion between minutes or seconds and milliseconds, anywhere under
+ * `src/` outside `duration.ts`. §7.2.1's six-row spelling table, and which pattern covers it:
+ *
+ *   1  `60_000`, `60000`                       MS_PER_MINUTE_LITERAL
+ *   2  `60 * 1000`, `1000 * 60`, `60*1_000`    MS_PER_MINUTE_PRODUCT
+ *   3  `minutes * 60 * 1000`, `60 * 60 * 1000` MS_PER_MINUTE_PRODUCT — a three-term product
+ *                                              CONTAINS `60 * 1000`, so row 2 subsumes it
+ *   4  `ms / 60000`, `ms / (60 * 1000)`        rows 1 and 2 again — a divisor is the same
+ *                                              token in a different operator position, and
+ *                                              matching the token rather than the expression
+ *                                              is why the inverse needs no pattern of its own
+ *   5  `60_000.0`, `60000.0`                   MS_PER_MINUTE_LITERAL — `\b` sits between the
+ *                                              final `0` and the `.`, so the decimal variant
+ *                                              matches without a second alternative
+ *   6  `seconds * 1000`, `minutes * 1000`      MS_PER_SECOND_SCALE + isMinutesOrSecondsQuantity
+ *
+ * THE WORD-BOUNDARY CORRECTION STANDS AND IS NOT UNDONE. `600000` — an ordinary
+ * six-hundred-second timeout — must still not match. `\b` treats `_` as a word character, so
+ * `\b60_000\b` and `\b60000\b` each require the token to stand alone; neither matches inside
+ * `600000` (asserted below, in the word-boundary regression guard) nor inside a longer
+ * identifier. `\b1_?000\b` carries the same protection for row 2's thousand.
+ *
+ * ROW 6 IS THE WIDEST, and the design says so outright: a two-step conversion — `const secs =
+ * minutes * 60;` then `secs * 1000` — is exactly how this arithmetic escapes a scan that only
+ * knows the fused constant. But `x * 1000` is not duration arithmetic on its own (`kilobytes *
+ * 1000` is bytes), so the row is scoped by the QUANTITY being scaled: the identifier must
+ * contain a whole word-segment naming minutes or seconds. Segments, not substrings — `admin`
+ * and `minimumSpend` contain "min" and are not minutes, and a substring test would have made
+ * row 6 the false-positive machine its critics expect. Both are asserted below.
+ *
+ * If row 6 false-positives on something genuinely not duration arithmetic, §7.2.1 rules that
+ * is "a finding to raise, not a licence to narrow the concept back to a spelling", so the
+ * remedy would be a DCR and not a quiet edit here.
  */
-const DURATION_LITERAL = /\b(?:60_000|60000)\b/;
+const MS_PER_MINUTE_LITERAL = /\b(?:60_000|60000)\b/;
+const MS_PER_MINUTE_PRODUCT = /\b60\s*\*\s*1_?000\b|\b1_?000\s*\*\s*60\b/;
+
+/** Row 6, first half: an identifier multiplied by 1000, in either operand order. */
+const MS_PER_SECOND_SCALE_SOURCE =
+  '\\b([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\*\\s*1_?000\\b' +
+  '|\\b1_?000\\s*\\*\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\b';
+
+const MINUTE_OR_SECOND_WORDS = new Set([
+  'sec',
+  'secs',
+  'second',
+  'seconds',
+  'min',
+  'mins',
+  'minute',
+  'minutes',
+]);
+
+/**
+ * Row 6, second half: is this identifier naming a quantity of minutes or seconds?
+ *
+ * camelCase and snake_case are split into segments and each segment is matched WHOLE against
+ * the word list. `durationMinutes` -> [duration, minutes] yes; `totalSecs` -> [total, secs]
+ * yes; `MINUTES` -> [minutes] yes; `admin` -> [admin] no; `minimumSpend` -> [minimum, spend]
+ * no. A substring test would say yes to the last two, which is the difference between a wide
+ * rule and a broken one.
+ */
+function isMinutesOrSecondsQuantity(identifier: string): boolean {
+  return identifier
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[_$\s]+/)
+    .filter(Boolean)
+    .some((segment) => MINUTE_OR_SECOND_WORDS.has(segment.toLowerCase()));
+}
+
+function matchesDurationArithmetic(content: string): boolean {
+  if (MS_PER_MINUTE_LITERAL.test(content)) return true;
+  if (MS_PER_MINUTE_PRODUCT.test(content)) return true;
+  for (const match of content.matchAll(new RegExp(MS_PER_SECOND_SCALE_SOURCE, 'g'))) {
+    const identifier = match[1] ?? match[2];
+    if (identifier !== undefined && isMinutesOrSecondsQuantity(identifier)) return true;
+  }
+  return false;
+}
 
 /** Definitions, not call sites — `^\s*export\s+(function|const|type)\s+<name>\b`, per line. */
 function exportsDefinitionOf(content: string, kind: 'function' | 'const' | 'type', name: string): boolean {
@@ -98,7 +177,7 @@ const MARKER_TESTS: ReadonlyArray<{ name: Marker; test: (content: string) => boo
   {
     name: 'duration-arithmetic',
     test: (c) =>
-      DURATION_LITERAL.test(c) ||
+      matchesDurationArithmetic(c) ||
       exportsDefinitionOf(c, 'function', 'serviceDuration') ||
       exportsDefinitionOf(c, 'const', 'serviceDuration') ||
       exportsDefinitionOf(c, 'function', 'durationMillis') ||
@@ -209,12 +288,28 @@ const PLANTED_CASES: readonly PlantedCase[] = [
     contents: "export const format = (tz: string) => new Intl.DateTimeFormat('en-GB', { timeZone: tz });\n",
     marker: 'wall-clock-and-zone',
   },
+  // §7.4 fixtures 2 and 2b — R-01-6. BOTH plant a spelling §7.2.1's pattern was NOT authored
+  // against, and that is the entire point of them. The step-3 version planted
+  // `minutes * 60_000` — row 1, the literal the pattern was written for — so a green here
+  // proved only that the pattern matches itself. The negative control could not catch that
+  // either: a reflexive pattern reports zero on a conforming tree exactly as a correct one
+  // does. Restore either fixture to `minutes * 60_000` and this control stops being one.
   {
-    label: 'duration arithmetic outside duration.ts',
+    label: 'duration arithmetic outside duration.ts — row 3, the three-term product',
     file: 'src/application/bookAppointment.ts',
     contents: 'export function endOf(startsAt: number, minutes: number): number {\n' +
-      '  const endsAt = startsAt + minutes * 60_000;\n' +
+      '  const endsAt = startsAt + minutes * 60 * 1000;\n' +
       '  return endsAt;\n' +
+      '}\n',
+    marker: 'duration-arithmetic',
+  },
+  {
+    label: 'duration arithmetic outside duration.ts — row 6, the two-step escape',
+    file: 'src/application/slotWindow.ts',
+    contents: 'export function windowMillis(minutes: number): number {\n' +
+      '  const seconds = minutes * 60;\n' +
+      '  const ms = seconds * 1000;\n' +
+      '  return ms;\n' +
       '}\n',
     marker: 'duration-arithmetic',
   },
@@ -281,6 +376,16 @@ describe('§7.4 — the conforming negative control: a tree shaped like the real
     // guard below asserts on this fixture specifically; it is included here too so the
     // conforming control is not itself silently relying on an empty platform/config.ts.
     'src/platform/config.ts': 'export const requestTimeoutMillis = 600000;\n',
+    // ROW 6's BOUNDARY, in the negative control rather than in a one-off fixture, because
+    // this is the file that has to stay quiet for the wide row to be usable at all.
+    // `x * 1000` is not duration arithmetic; `kilobytes * 1000` is bytes. And the two
+    // identifiers that a SUBSTRING test for "min" would flag — `admin` and `minimumSpend` —
+    // are here because the segment classifier is the only thing standing between row 6 and a
+    // scan that fails on ordinary code.
+    'src/platform/units.ts':
+      'export const bytesIn = (kilobytes: number): number => kilobytes * 1000;\n' +
+      'export const seatsFor = (admin: number): number => admin * 1000;\n' +
+      'export const budgetFor = (minimumSpend: number): number => minimumSpend * 1000;\n',
   };
 
   it('reports each marker exactly once, and only in its permitted file', () => {
@@ -302,6 +407,22 @@ describe('§7.4 — the conforming negative control: a tree shaped like the real
     expect(hits, 'a call site was flagged as though it were a definition').toEqual([]);
   });
 
+  it('row 6 boundary: `kilobytes * 1000`, `admin * 1000` and `minimumSpend * 1000` are not duration arithmetic', () => {
+    // §7.2.1 row 6 is the widest row in the table and the architect expects it to be argued
+    // with. This is the argument, made as an assertion: the row is scoped to the QUANTITY
+    // being scaled, by whole word-segment, so a `* 1000` on bytes is untouched and the two
+    // identifiers a substring test for "min" would catch are untouched too.
+    const root = newFixture('row-six-boundary');
+    plant(root, CONFORMING);
+
+    const hits = scanForMarkers(root).filter((h) => h.file === 'src/platform/units.ts');
+    expect(
+      hits,
+      'row 6 flagged an ordinary `* 1000` scale — if this ever fires on real code it is a ' +
+        'finding to raise (§7.2.1), not a licence to narrow the concept back to a spelling',
+    ).toEqual([]);
+  });
+
   it('word-boundary regression guard: an ordinary 600000ms timeout is not duration arithmetic', () => {
     // The step-1 design specified a plain substring match on `60000`, which false-positives
     // on `600000` — an ordinary ten-minute timeout that could legitimately appear anywhere
@@ -312,6 +433,59 @@ describe('§7.4 — the conforming negative control: a tree shaped like the real
     const hits = scanForMarkers(root).filter((h) => h.file === 'src/platform/config.ts');
     expect(hits, '600000 was mistaken for the 60_000/60000 duration-arithmetic marker').toEqual([]);
   });
+});
+
+// ─────────────────────────────────── §7.2.1: the spelling table, row by row ──
+
+/**
+ * The concept is "any minutes/seconds <-> milliseconds conversion outside duration.ts", and
+ * §7.2.1 enumerates it as an OPEN set of spellings with the concept stated above it — so a
+ * spelling not listed is a gap in the scan rather than a licence. This table is that set,
+ * executable. Its negatives are the half that keeps the widest rows honest.
+ *
+ * §7.4's two planted fixtures already use rows 3 and 6; this covers the rest, and covers them
+ * one row at a time so a regression names the spelling it lost rather than "the control".
+ */
+const SPELLING_ROWS: ReadonlyArray<readonly [string, string, boolean]> = [
+  ['row 1 — the fused literal, underscore form', 'const ms = minutes * 60_000;', true],
+  ['row 1 — the fused literal, plain form', 'const ms = minutes * 60000;', true],
+  ['row 2 — the factors, sixty first', 'const ms = minutes * 60 * 1000;', true],
+  ['row 2 — the factors, thousand first', 'const ms = 1000 * 60 * minutes;', true],
+  ['row 2 — the factors, no spacing, separated thousand', 'const ms = 60*1_000;', true],
+  ['row 3 — three terms through seconds', 'const ms = hours * 60 * 60 * 1000;', true],
+  ['row 4 — the inverse, fused literal divisor', 'const minutes = ms / 60000;', true],
+  ['row 4 — the inverse, parenthesised factor divisor', 'const minutes = ms / (60 * 1000);', true],
+  ['row 5 — decimal variant of the fused literal', 'const ms = minutes * 60_000.0;', true],
+  ['row 6 — seconds scaled to milliseconds', 'const ms = seconds * 1000;', true],
+  ['row 6 — minutes scaled, thousand first', 'const ms = 1000 * durationMinutes;', true],
+  ['row 6 — snake_case quantity', 'const ms = elapsed_secs * 1000;', true],
+
+  // NEGATIVES. Each one is a spelling that LOOKS like a row above and is not the concept.
+  ['negative — a six-hundred-second timeout', 'const timeout = 600000;', false],
+  ['negative — 600_000, the same number separated', 'const timeout = 600_000;', false],
+  ['negative — a thousand scaling something that is not time', 'const bytes = kilobytes * 1000;', false],
+  ['negative — "min" as a substring, not a segment', 'const seats = admin * 1000;', false],
+  ['negative — "minimum" is not minutes', 'const budget = minimumSpend * 1000;', false],
+  ['negative — seconds-of-day normalisation (§7.2: that is wall-clock, not duration)', 'const s = h * 3600 + m * 60;', false],
+];
+
+describe('§7.2.1 — duration-arithmetic is a concept, and every spelling in the table is caught', () => {
+  it.each(SPELLING_ROWS.map((row) => [row[0], row[1], row[2]] as const))(
+    '%s',
+    (_label, line, shouldMatch) => {
+      const root = newFixture('spelling');
+      plant(root, { 'src/application/candidate.ts': `export function f(): void {\n  ${line}\n}\n` });
+
+      const hits = scanForMarkers(root).filter((h) => h.marker === 'duration-arithmetic');
+      expect(
+        hits.map((h) => h.file),
+        shouldMatch
+          ? `${line} is a minutes/seconds <-> milliseconds conversion and must be flagged ` +
+              'outside duration.ts'
+          : `${line} is not duration arithmetic and must not be flagged`,
+        ).toEqual(shouldMatch ? ['src/application/candidate.ts'] : []);
+    },
+  );
 });
 
 // ──────────────────────────────────── ADR-0013: no outside-in test computes a src/ import ──
