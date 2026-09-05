@@ -196,5 +196,34 @@ const nextBlock = (doc) => doc.split('## What happens next')[1]?.split('##')[0] 
   ok('an empty log still produces a resume point', doc.includes('Where we are'));
 }
 
+
+// --- a gate that closes nothing must not move the position ---------------------
+//
+// `gate: "process"` is the name for a cross-slice RULING — the light gate, the backlog
+// fold, the mid-slice delegation — invented at slice 02 because the schema rejects
+// `phase: "5"` and a process decision made during phase 5 had nowhere else to live.
+//
+// It regressed the resume point to PHASE 4, reporting Gate D open and undecided two slices
+// after Gate D was decided: `lastGate` picked the newest `process` ruling, no phase names
+// `process` as its closing gate, so the position fell through to the last event carrying a
+// `phase` field — which was from phase 4, because everything since was scoped to a slice.
+//
+// Third regression of this file's resume point, after O-8 and O-11, and the same shape
+// every time: a gate that does not close a phase read as one that does.
+{
+  const base = [gate('D', '4'), retro(), sliceDone('00'), sliceDone('01')];
+  const before = run(base);
+  const after = run([...base,
+    { ts: '2026-01-04T00:00:00Z', event: 'gate.decided', source: 'reported', actor: 'human',
+      gate: 'process', decision: 'light-gate-on-mechanical-slices', rationale: 'x', slice: '02' }]);
+  ok('a process ruling does not advance the phase', /phase\s*5/i.test(after),
+    (after.match(/phase[^\n]{0,24}/i) ?? ['no phase line'])[0]);
+  ok('...and does not move it backwards either — the regression that happened',
+    !/phase\s*4/i.test(after), (after.match(/phase[^\n]{0,24}/i) ?? [''])[0]);
+  ok('...and the position is unchanged by it',
+    (before.match(/phase\s*\d/i) ?? [''])[0] === (after.match(/phase\s*\d/i) ?? [''])[0],
+    `${(before.match(/phase\s*\d/i) ?? [''])[0]} vs ${(after.match(/phase\s*\d/i) ?? [''])[0]}`);
+}
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

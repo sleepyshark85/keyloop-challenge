@@ -11,11 +11,11 @@
 
 ## Where we are
 
-**Phase 4 — Pilot + retro**, which closes at Gate D.
+**Phase 5 — Slice loop**, which closes at Gate E (per slice).
 
 | | |
 |---|---|
-| Last commit | `a91b8b7 docs(arc42): slice 02 as-built` |
+| Last commit | `959cbc9 chore(02): slice 02 done — arc42 reconciled, and the register stops lying` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E |
 | Agent runs recorded | 87 |
 | ADRs accepted | 13 |
@@ -24,11 +24,11 @@
 
 ## What happens next
 
-- **Both pilot slices are done and the retro is written** — see [`team-log/phase-4-retro.md`](team-log/phase-4-retro.md).
-- Verdict: C1 PASS · C2 PASS on git, weakened on hooks · C3 PASS · C4 PASS · **C5 FAIL** · **C6 FAIL** · C7 PASS with three open defects · C8 the human's.
-- Two non-fatal criteria fail and neither is C1 nor C2, so the pre-registered decision rule reads: **tune the mechanisms and proceed to slice 01, no second pilot.**
-- **Gate D is open and undecided.** C6 is the one needing a ruling — its own wording says the response to a breach is to cut slices or reduce agent count, not to proceed and hope.
-- Open findings are in [`DEFECTS.md`](DEFECTS.md); the C2 and C7 clusters are what the retro says to tune first.
+- **Next: slice [`04`](slices/04-candidate-allocation-and-retry.md) — Candidate allocation and retry — no refusal while capacity remains**
+- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
+- It claims QS-3.
+- 6 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
+- **Gate E** on each, then `npm run slice:close`.
 
 ## Gate decisions
 

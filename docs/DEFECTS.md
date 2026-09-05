@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **117** |
-| Severity | 10 blocking · 63 major · 44 minor |
+| Findings recorded | **118** |
+| Severity | 10 blocking · 64 major · 44 minor |
 | Verdicts | 5 narrowed · 48 accepted · 1 escalated · 9 deferred |
-| Raised by | test-engineer 28 · reviewer 28 · orchestrator 24 · implementer 18 · architect 18 · human 1 |
-| Awaiting a ruling | **54** |
-| Mean escape distance | 1.64 step(s) |
+| Raised by | test-engineer 28 · reviewer 28 · orchestrator 25 · implementer 18 · architect 18 · human 1 |
+| Awaiting a ruling | **55** |
+| Mean escape distance | 1.69 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -654,6 +654,7 @@ rather than narrated.*
 | **R-02-4** | MINOR | 5 *(+0)* | reviewer | I-02-7 (MAJOR) is recorded raised and never ruled, although its remedy shipped and its twin T-02-3 is ruled accepted | **open** |
 | **F-02-11** | MINOR | 5 *(+1)* | architect | A mutation survivor's accounting must carry the REASON it is equivalent, because two diagnoses call for opposite remedies | **open** |
 | **O-30** | MAJOR | 5 *(+5)* | orchestrator | O-29 recurred three times inside the slice that found it, because a fix described inside a finding.raised record is invisible to every predicate that reads rulings | deferred |
+| **O-31** | MAJOR | 7 *(+7)* | orchestrator | The resume point silently regressed to phase 4, reporting Gate D open and undecided, two slices after Gate D was decided | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -838,6 +839,11 @@ rather than narrated.*
 - *scenario:* O-29 was raised at step 2: the orchestrator logs findings and not the rulings that answer them. It was fixed for the ARCHITECT's rulings - twelve logged retrospectively - and then recurred twice more for the orchestrator's own, in the same slice. At the gate, seven MAJOR findings read as open; SIX WERE FIXED, each with its fix written into the prose of the finding.raised record that reported it. A human reading the log would say the work was done; every mechanism that reads the log said it was open, and the orchestrator's own gate bar - 'no open MAJOR or BLOCKING' - blocked on it. THE SHAPE IS THE PROJECT'S OWN, TURNED INWARDS: prose that describes a mechanism is not the mechanism. A resolution narrated inside a raise is exactly as invisible as a ruling narrated inside a commit message, which is what O-29 was. The remedy is not discipline, which has now failed three times in three days: a finding.raised whose own text claims the fix is applied should be rejected by the write path, or resolution should be derivable rather than typed. tools/team-log/append.mjs already validates shape and is the natural home. NOT fixed here - it is orchestrator tooling, slice 02 is at its gate, and the same reasoning that deferred F-02-9 applies. For slice 04's prep window, alongside O-14's successor work.
 - *file:* `docs/team-log/events.jsonl`
 - *deferred* by orchestrator — DEFERRED to slice 04's tooling-prep window, with the reasoning stated so the human can disagree on waking - because the orchestrator is closing the finding that blocks its own delegated gate, and that deserves to be visible rather than efficient. The test applied: would this be deferred if the human were awake? Yes, and on precedent rather than convenience. O-14 and O-17 were findings against the orchestrator's own gates, raised AT slice 01's gate, deferred to slice 02's prep window with the same reasoning, and the human merged slice 01 with them open. O-30 is the same shape - it is about the orchestrator's logging discipline, it does not touch slice 02's correctness, and slice 02 is at its gate. F-02-9 was deferred one record earlier on the identical ground. What would make deferring dishonest is if O-30 hid a defect in the SLICE. It does not: every one of the six findings it obscured was genuinely fixed, verified individually before this ruling, and each now carries a resolution event. The defect is that the record required six retrospective writes to say what was already true. THE HUMAN MAY OVERTURN THIS. It is listed at the gate under CLAUDE.md §6 with every other ruling made in their absence, and the merge is revertible.
+
+**O-31** — The resume point silently regressed to phase 4, reporting Gate D open and undecided, two slices after Gate D was decided
+
+- *scenario:* Caught by the orchestrator reading STATUS.md after slice 02 closed. `gate: "process"` is the gate name invented at slice 02 for a cross-slice RULING - the light gate, the backlog fold, the mid-slice delegation - because the schema rejects phase: '5' and a process decision made during phase 5 had nowhere else to live (O-18). generate.mjs excluded only gate E from phase derivation, so lastGate picked the newest `process` ruling; no phase names `process` as its closing gate, so completedPhase came back null and the position fell through to the last event carrying a `phase` field - which was from PHASE 4, because everything since has been scoped to a slice. THE RESULT WAS A RESUME POINT TELLING A FRESH SESSION TO DECIDE A GATE THAT WAS DECIDED TWO DAYS AGO, in the file whose own header says to trust it over narration. THIRD REGRESSION OF THIS FILE'S RESUME POINT after O-8 and O-11, and the same shape every time: a gate that does not close a phase being read as one that does. O-11 was found by the human asking whether a fresh session would know where to start; this one was found the same way, by reading the output rather than the diff. Fixed: the set is renamed NON_PHASE_GATES for what it means rather than for the one case it started with, and carries both E and process with the reason for each. Three cases added to tools/test/status.test.mjs asserting the position does not move forwards, does not move BACKWARDS, and is unchanged by a process ruling; removing 'process' from the set fails all three.
+- *file:* `tools/status/generate.mjs`
 
 </details>
 

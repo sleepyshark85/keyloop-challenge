@@ -40,7 +40,26 @@ const PHASES = {
  * (finding O-8); recorded rather than only fixed, because the generator agreed
  * with itself right up until a gate was actually decided.
  */
-const PER_SLICE_GATES = new Set(['E']);
+const NON_PHASE_GATES = new Set([
+  // Gate E closes a slice, not a phase (O-8).
+  'E',
+  // And `process` closes nothing at all. It is the gate name for a cross-slice RULING —
+  // the light gate, the backlog fold, the mid-slice delegation — invented at slice 02
+  // because the schema rejects `phase: "5"` and a process decision made during phase 5 had
+  // nowhere else to live (O-18).
+  //
+  // Leaving it out of this set regressed the resume point to PHASE 4 with Gate D reported
+  // open and undecided, two slices after Gate D was decided. The mechanism: `lastGate`
+  // picked the newest `process` ruling, no phase names `process` as its closing gate, so
+  // `completedPhase` came back null and the position fell through to the last event
+  // carrying a `phase` field — which was from phase 4, because every event since has been
+  // scoped to a slice.
+  //
+  // Third time this file has misreported the resume point, after O-8 and O-11, and the
+  // same shape each time: a gate that does not close a phase being read as one that does.
+  // The set is now named for what it means rather than for the one case it started with.
+  'process',
+]);
 
 const events = loadLog().sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
 
@@ -50,7 +69,7 @@ const dcrsOpen = events.filter((e) => e.event === 'dcr.raised').length
   - events.filter((e) => e.event === 'dcr.resolved').length;
 
 // Position: the phase after the last gate decided, else the last phase touched.
-const lastGate = [...gates].reverse().find((e) => !PER_SLICE_GATES.has(e.gate));
+const lastGate = [...gates].reverse().find((e) => !NON_PHASE_GATES.has(e.gate));
 const lastPhaseTouched = [...events].reverse().find((e) => e.phase)?.phase;
 const completedPhase = lastGate
   ? Object.keys(PHASES).find((p) => PHASES[p][1]?.startsWith(lastGate.gate))
