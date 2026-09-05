@@ -51,7 +51,9 @@ contended one from an unknown vehicle without parsing prose.
 - **AC-4** — As AC-3 with bays plentiful and exactly one qualified technician free; the constraint
   reported is `no_technician_overlap`. *(QS-2)*
 - **AC-5** — Given the source tree, when it is inspected, then no code path reads availability and
-  then decides whether to insert. The booking path is a single `INSERT` per attempt.
+  then decides whether to insert. Each booking attempt is one transaction containing exactly one
+  `INSERT` into `appointment`, preceded only by ADR-0018's two advisory-lock acquisitions — which
+  read no table and decide nothing.
 - **AC-6** — Given a request carrying an explicit end time, when it is booked, then the supplied end
   is ignored and the interval is derived from the service type's duration (A-1).
 

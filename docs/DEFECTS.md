@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **108** |
-| Severity | 10 blocking · 59 major · 39 minor |
+| Findings recorded | **110** |
+| Severity | 10 blocking · 61 major · 39 minor |
 | Verdicts | 5 narrowed · 47 accepted · 1 escalated · 5 deferred |
-| Raised by | test-engineer 27 · reviewer 24 · orchestrator 22 · implementer 18 · architect 16 · human 1 |
-| Awaiting a ruling | **50** |
-| Mean escape distance | 1.69 step(s) |
+| Raised by | test-engineer 27 · reviewer 24 · orchestrator 23 · implementer 18 · architect 17 · human 1 |
+| Awaiting a ruling | **52** |
+| Mean escape distance | 1.68 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -645,6 +645,8 @@ rather than narrated.*
 | **T-02-7** | MINOR | 2 *(+1)* | test-engineer | The empty-candidate mapping blames a valid service type for a dealership that has no bays at all | accepted |
 | **T-02-8** | MINOR | 2 *(+1)* | test-engineer | The slice's Definition of Done requires recording ADR-0009's seed, which does not exist until slice 04 | accepted |
 | **O-29** | MAJOR | 2 *(+0)* | orchestrator | The architect's eleven step-2 rulings were never logged as events, so the gate view of what it ruled would have shown nothing | **open** |
+| **F-02-10** | MAJOR | 3 *(+3)* | orchestrator | The ADR guard reported that every option survives while an ADR it had never opened sat on disk unpinned — and it could not have read that ADR's options anyway, because they are in the table form the concision ruling encourages | **open** |
+| **F-02-9** | MAJOR | 3 *(+0)* | architect | Every write path to the appointment table must take ADR-0018's two advisory locks in the same order, and slices 06 and 07 inherit that obligation | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -779,6 +781,16 @@ rather than narrated.*
 
 - *scenario:* Found immediately by building the mechanism CLAUDE.md §6 now promises: slice:check reads architect finding.ruled and dcr.resolved records, and slice 02 had NONE. The architect's step-2 adjudication - eleven objections, two genuine disagreements - existed only in its report file and in commit 7591315's message. The orchestrator logged the FINDINGS raised by every role and never the RULINGS that answered them. Harmless until today and serious from today. Under the human's full-delegation ruling the gate's only view of what moved in its absence is that list, so an unlogged ruling is an invisible one - and the whole counterweight to the delegation is that the gate is shown rather than asked to notice. Twelve rulings logged retrospectively from the architect's report; the standing obligation is that every adjudication is logged as it is routed, not summarised in a commit message. Worth keeping for the retro: the mechanism found the gap by being built. Nothing about the previous state looked wrong - the rulings were recorded, in prose, in two places - and it took a consumer that reads them structurally to notice they were not data.
 - *file:* `docs/team-log/events.jsonl`
+
+**F-02-10** — The ADR guard reported that every option survives while an ADR it had never opened sat on disk unpinned — and it could not have read that ADR's options anyway, because they are in the table form the concision ruling encourages
+
+- *scenario:* Raised by the architect and reproduced by the orchestrator. TWO defects, both in the orchestrator's own tool, and the second is the worse one. (1) IT ITERATED THE BASELINE AND NOTHING ELSE. ADR-0018 landed with a (c) ruling and docs:adr-check printed '17 ADR(s) checked: every considered option and chosen option survives' - green, over a decision record it had never opened. A new ADR was not unpinned-and-reported; it was absent from the loop. A check that can only see what it was told about reports the absence of a problem it is incapable of having. Now both directions are checked and an unpinned ADR FAILS, because the window is exactly when it matters: a new ADR is proposed, so it will be edited before ratification, which is when a dropped option is most likely and least visible. (2) IT COULD NOT READ AN OPTIONS TABLE. ADR-0018 lists EIGHT options as `\| **A** \| ... \| ... \|`, and optionsIn matched only bullets and lines labelled 'Option X', so the first pin recorded ZERO OPTIONS - O-24's empty-pin failure reached by a new route. Self-inflicted: the concision ruling's own remedy is to fold Considered options and Pros and cons INTO A TABLE, so the encouraged form was the one the guard could not read. The orchestrator recommended tables and then built a guard blind to them. Fixed by building the label from the letter cell and the description cell; ADR-0018 now pins 8 options and deleting Option C - the livelock finding, the most valuable rejected option in the record - fails by name. The architect declined to fix it with --rebaseline and was right: that rewrites all 17 existing pins, discarding the pre-condensation evidence for every other ADR to register one new file. A targeted pin added 13 lines with ZERO churn, verified by git diff --numstat.
+- *file:* `tools/docs/adr-invariants.mjs`
+
+**F-02-9** — Every write path to the appointment table must take ADR-0018's two advisory locks in the same order, and slices 06 and 07 inherit that obligation
+
+- *scenario:* ADR-0018 makes bay-then-technician a total order by construction, using disjoint lock classes, so no sort has to be kept sorted. But the guarantee holds only while EVERY writer takes both locks in that order. Slice 06's reschedule UPDATE and slice 07's contention scenarios are writers; one that skips the locks reintroduces the deadlock and, per ADR-0018, a 500 rather than a 409. Routed rather than solved here: the enforcing mechanism belongs with the slice that adds the second writer, and inventing one now against a write path that does not exist is the shape this project keeps catching. Recorded so slice 06 inherits an obligation rather than rediscovering a deadlock.
+- *file:* `docs/adr/0018-lock-the-bay-and-the-technician-before-each-insert.md`
 
 </details>
 

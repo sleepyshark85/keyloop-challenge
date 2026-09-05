@@ -239,5 +239,18 @@
    "Option E \u2014 parse the error's DETAIL line"
   ],
   "decision": "Chosen option: B \u2014 on 23503 naming appointmentvehicleownedbycustomer, and only then, run one"
+ },
+ "0018-lock-the-bay-and-the-technician-before-each-insert.md": {
+  "options": [
+   "Option A \u2014 40P01 \u21d2 other \u21d2 500 \u2014 the design as written",
+   "Option B \u2014 40P01 \u21d2 409 /problems/no-capacity",
+   "Option C \u2014 Retry the same candidate, with backoff and/or a lower deadlocktimeout",
+   "Option D \u2014 A 503 /problems/contention-timeout row for a request that never obtains a verdi",
+   "Option E \u2014 locktimeout below deadlocktimeout, so a waiter aborts before the detector runs",
+   "Option F \u2014 INSERT \u2026 ON CONFLICT DO NOTHING",
+   "Option G \u2014 One advisory lock per dealership (ADR-0004 Option D)",
+   "Option H \u2014 Two class-scoped advisory locks per attempt"
+  ],
+  "decision": "Chosen option: H. Each attempt is its own transaction and takes two advisory locks before the"
  }
 }

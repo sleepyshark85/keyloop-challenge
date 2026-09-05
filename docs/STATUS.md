@@ -15,12 +15,12 @@
 
 | | |
 |---|---|
-| Last commit | `199cc9a chore(02): red observed in CI, and T-02-9 raised` |
+| Last commit | `7a2e222 docs(02): T-02-9 ruled (c) — a deadlock is a missing verdict, and the obvious remedy livelocks` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process |
-| Agent runs recorded | 80 |
+| Agent runs recorded | 81 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
-| Open DCRs | **1** — a slice is blocked |
+| Open DCRs | none |
 
 ## What happens next
 
@@ -191,7 +191,8 @@
 | 2026-09-05 17:25 | architect | 7m15 | 96 / 5,687 / 2,574,902 | `derived` |
 | 2026-09-05 17:31 | architect | 12m40 | 138 / 13,940 / 4,524,932 | `derived` |
 | 2026-09-05 18:35 | test-engineer | 63m22 | 412 / 65,432 / 47,783,901 | `derived` |
-| | **total** | **4527m45** | **20,034 / 1,834,476 / 1,553,905,623** | |
+| 2026-09-05 19:14 | architect | 35m55 | 472 / 34,003 / 37,601,913 | `derived` |
+| | **total** | **4563m41** | **20,506 / 1,868,479 / 1,591,507,536** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
