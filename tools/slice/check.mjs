@@ -414,6 +414,7 @@ if (!onlyReady) {
     && ['MAJOR', 'BLOCKING'].includes(e.severity) && !closed.has(e.ref));
   const light = String(slice.gate ?? 'full') === 'light';
 
+
   check('done', 'human approved',
     gateE ? (isApproval(gateE.decision) ? PASS : FAIL)
       : light ? (openSerious.length ? FAIL : PASS)
@@ -431,6 +432,23 @@ if (!onlyReady) {
     `${loops} of max 2${loops > 2 ? ' — should have been split, not ground through' : ''}`);
 }
 
+/**
+ * RULED IN THE HUMAN'S ABSENCE.
+ *
+ * The human delegated mid-slice authority to the architect on 2026-09-06 — scope,
+ * acceptance criteria and quality goals included — with nothing escalating between steps 1
+ * and 5. CLAUDE.md §6 promises in return that the gate is SHOWN what moved rather than
+ * asked to notice, and a promise in a constitution with no mechanism behind it is the
+ * defect this project has catalogued six times. This is the mechanism.
+ *
+ * It lists EVERY architect ruling in the slice, not only those that touched a criterion.
+ * Filtering by keyword would be a guess about what a rationale says, and the asymmetry is
+ * stark: over-listing costs the human seconds of reading, while under-listing hides the
+ * exact class of change they gave up seeing in advance.
+ */
+const architectRulings = events.filter((e) =>
+  e.actor === 'architect' && ['finding.ruled', 'dcr.resolved'].includes(e.event));
+
 // ------------------------------------------------------------------ report --
 const C = { PASS: '\x1b[32m', FAIL: '\x1b[31m', UNVERIFIED: '\x1b[33m', 'N/A': '\x1b[2m' };
 const R = '\x1b[0m';
@@ -441,6 +459,16 @@ let phase = '';
 for (const r of results) {
   if (r.phase !== phase) { phase = r.phase; console.log(dim(`\n  ${phase === 'ready' ? 'DEFINITION OF READY' : 'DEFINITION OF DONE'}`)); }
   console.log(`  ${C[r.verdict]}${r.verdict.padEnd(10)}${R} ${r.name.padEnd(34)} ${dim(r.detail)}`);
+}
+
+if (architectRulings.length) {
+  console.log(dim(`\n  RULED BY THE ARCHITECT IN YOUR ABSENCE (${architectRulings.length}) — CLAUDE.md §6`));
+  for (const r of architectRulings) {
+    const what = r.ref ?? r.ruling ?? r.span_id ?? '—';
+    const verdict = r.verdict ?? (r.ruling ? `(${r.ruling})` : '');
+    const why = (r.rationale ?? r.message ?? '').replace(/\s+/g, ' ').slice(0, 132);
+    console.log(`  ${String(what).padEnd(12)} ${String(verdict).padEnd(10)} ${dim(why)}`);
+  }
 }
 
 const failed = results.filter((r) => r.verdict === FAIL);

@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `e750c79 chore(02): step 1 design recorded, three escalations queued, step 2 dispatched in parallel` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process |
-| Agent runs recorded | 76 |
+| Last commit | `ce41a0d docs(02): the retry loop is in scope — E-02-1 ruled` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process |
+| Agent runs recorded | 79 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -75,6 +75,10 @@
 **Gate process** · 2026-09-05 · concise-docs-one-home-per-fact-and-shorten-accepted-adrs
 
 > Ruled 2026-09-05 on measured figures, not impression: arc42 31.8k words, ADRs 35.4k, slices 69k - about 136k words, with an average ADR of 2,080 against a normal MADR's 400-800, and 'Considered options' plus 'Pros and cons of the options' spending 11.5k words on one job. DECIDED: ONE HOME PER FACT. The ADR carries the decision, its options table and its consequences; arc42 says what the system IS, present tense, no history; a slice design carries only that slice's delta; narrative and measurement live in the event log and on the PR. The duplication being removed is ACROSS artifacts rather than inside them - R-01-4's dead-branch-versus-live-defect argument was told five times. SECOND RULING, overriding §4. Accepted ADRs MAY be shortened, provided the meaning does not change. §4 says an accepted ADR is immutable and must be superseded rather than edited; the human overrode that for length only. The override holds on §4's own terms: its stated purpose is that 'the history of how thinking changed is the point', and that history is in git and in this log rather than in the file being frozen. What immutability uniquely protects is that a reader citing ADR-0006 later gets the same DECISION, which a meaning-preserving condensation does not touch. The orchestrator's earlier §4-derived exemption for the thirteen accepted ADRs is therefore withdrawn and they are back in scope. THIRD RULING: the slice designs are in scope too, and are to be shortened AGGRESSIVELY. Measured: four design files hold 54,605 of the 69k words in docs/slices/ - 00a 17,459, 00 15,294, 01 11,573, 02 10,279 - while every slice file itself is between 156 and 1,416. A merged slice's design has already been reconciled into arc42 by step 7, which is what step 7 IS, so keeping the working prose afterwards is the cross-artifact duplication this ruling is about in its purest form.
+
+**Gate process** · 2026-09-05 · full-delegation-of-mid-slice-authority-to-the-architect
+
+> Ruled 2026-09-06. NOTHING ESCALATES TO THE HUMAN BETWEEN STEPS 1 AND 5. The architect decides mid-slice on scope, acceptance criteria and quality goals as well as architecture; the human reviews at step 6 and may overturn anything. Driven by measured cost: five human decisions mid-slice across two slices, each serialising the whole team, against §8's statement that human review attention is the scarce resource. THE ORCHESTRATOR RECOMMENDED AGAINST THIS and the dissent is recorded per §6, because a ruling whose counter-argument is lost cannot be reviewed later. It proposed a narrower line - the architect interprets a criterion, the human is kept only for a change that WEAKENS or deletes one - on the evidence of the AC-6 case at slice 01: the architect wanted to amend arc42 §5.2 to fit its design, the test-engineer objected, and the human ruled the criterion LITERALLY, against the architect's preference, reshaping the module signatures and booking four items of debt. Under full delegation that call would have gone the other way and the human would have met it at the gate with the slice already built around it. The human weighed that and ruled full delegation anyway, on the ground that a per-question judgement about which class a decision falls into is itself a cost - three of the five escalations arrived partly as 'is this mine or theirs?'. THE COUNTERWEIGHT THE HUMAN KEEPS. CLAUDE.md §6 now obliges the gate to be SHOWN what moved rather than asked to notice: slice:check prints every architect ruling in the slice before the gate line. It lists ALL of them rather than filtering to those touching a criterion, because filtering by keyword would be a guess about what a rationale says and the asymmetry is stark - over-listing costs seconds of reading, under-listing hides the exact class of change the human gave up seeing in advance. PROPAGATION. CLAUDE.md §6 Authority and §11 amended; DCR outcome (d) is no longer 'Escalate - human decides' but 'Defer to the gate - architect rules; the gate reviews'. METHODOLOGY §2's role table changed in ONE place and the architect's definition regenerated itself through tools/agents/generate.mjs - the generator built earlier today paying for itself within the hour. CLAUDE.md is 1,537 against a 1,500 budget and STAYS OVER: the overage is a rule the human just added, and a budget that cannot absorb a new rule would pressure the deletion of an old one, which is the wrong incentive for a constitution.
 
 ## Decisions on record
 
@@ -178,7 +182,10 @@
 | 2026-09-05 12:14 | architect | 40m06 | 262 / 22,175 / 12,916,581 | `derived` |
 | 2026-09-05 14:57 | architect | 22m10 | 182 / 75,824 / 11,488,798 | `derived` |
 | 2026-09-05 15:10 | architect | 6m52 | 112 / 4,073 / 3,660,512 | `derived` |
-| | **total** | **4441m38** | **19,336 / 1,746,652 / 1,497,934,605** | |
+| 2026-09-05 17:21 | architect | 2m50 | 52 / 2,765 / 1,087,283 | `derived` |
+| 2026-09-05 17:25 | architect | 7m15 | 96 / 5,687 / 2,574,902 | `derived` |
+| 2026-09-05 17:31 | architect | 12m40 | 138 / 13,940 / 4,524,932 | `derived` |
+| | **total** | **4464m23** | **19,622 / 1,769,044 / 1,506,121,722** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

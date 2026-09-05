@@ -135,7 +135,7 @@ convenes **one** round of discussion, then rules:
 | **(a) Clarification** | Design right, wording ambiguous | Update slice file; resume from raising step |
 | **(b) Deferred improvement** | Work is **correct** under the agreed ADR; something better exists | **Merge as-is.** New backlog slice + ADR with `status: proposed` |
 | **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede the ADR; revise (never delete) prior work |
-| **(d) Escalate** | Genuine trade-off or scope question | Human decides |
+| **(d) Defer to the gate** | Trade-off or scope question | Architect rules; the gate reviews it |
 
 To rule **(c)** the architect **must name the acceptance criterion, §10 quality scenario, or §2
 standing invariant that would fail**. If it cannot name one, the outcome is (b). Preference is not
@@ -177,11 +177,14 @@ than the amended design alone.
 
 ### Authority
 
-- **Architect** decides architecture: interfaces, layering, data model, patterns.
-- **Architect may not** change scope, acceptance criteria or quality goals — those are the human's.
+- **Architect** decides architecture — interfaces, layering, data model, patterns — **and, mid-slice,
+  scope, acceptance criteria and quality goals.** Nothing escalates between steps 1 and 5; each such
+  ruling is recorded and **provisional until the gate**.
 - **Reviewer** may block a merge and raise a DCR, but may not change the design.
 - **Implementer / test-engineer** may raise and argue once, but not decide.
-- **Human** overrides anyone; every override is recorded with rationale.
+- **Human** decides at **step 6** and overrides anyone; every override is recorded with rationale.
+  `slice:check` lists the architect's scope, AC and QS rulings, so the gate is shown what moved in
+  the human's absence rather than asked to notice.
 
 One round of discussion, then a decision. No multi-turn agent debate — two agents arguing past
 each other is not rigor, it is spend.
@@ -223,6 +226,5 @@ says so.
 
 ## 11. Ambiguity
 
-The assessment states that ambiguity is deliberate. Do not silently invent a resolution. Record the
-assumption explicitly, flag it for the human, and once decided capture it as an ADR. Documented
-assumptions are graded work, not preamble.
+Ambiguity is deliberate. Never resolve it silently: record the assumption, have the architect rule
+it, capture the decision as an ADR. Documented assumptions are graded work, not preamble.
