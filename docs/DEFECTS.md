@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **76** |
-| Severity | 10 blocking · 42 major · 24 minor |
+| Findings recorded | **83** |
+| Severity | 10 blocking · 46 major · 27 minor |
 | Verdicts | 5 narrowed · 35 accepted · 1 escalated · 5 deferred |
-| Raised by | reviewer 24 · test-engineer 19 · implementer 13 · orchestrator 11 · architect 8 · human 1 |
-| Awaiting a ruling | **30** |
-| Mean escape distance | 1.47 step(s) |
+| Raised by | reviewer 24 · test-engineer 19 · architect 15 · implementer 13 · orchestrator 11 · human 1 |
+| Awaiting a ruling | **37** |
+| Mean escape distance | 1.94 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -465,6 +465,13 @@ rather than narrated.*
 | **O-15** | MINOR | 5 *(+0)* | orchestrator | The test-engineer's justification for SPANS_LOCAL_DAYS_FLOOR = 100 asserts what a rejected floor WOULD have done instead of measuring it, and the assertion is false | **open** |
 | **O-16** | MAJOR | 5 *(+0)* | orchestrator | The orchestrator bypassed the validating write path and appended five schema-invalid records; no local command could have caught it | accepted |
 | **O-17** | MAJOR | 5 *(+5)* | orchestrator | The 'tests green' DoD gate never checks that the CI run it cites covers the commit being gated | **open** |
+| **AB-01-1** | MINOR | 7 *(+7)* | architect | §5.3 states the layering ruleset cruises 40 modules; it cruises 54 | **open** |
+| **AB-01-2** | MAJOR | 7 *(+7)* | architect | §8.5's tests/property/ row describes a test strategy ADR-0013 falsified in both halves | **open** |
+| **AB-01-3** | MAJOR | 7 *(+7)* | architect | §7.2 and §7.4 still document the test invocation that the T-01-2 (c) ruling replaced, three lines from a paragraph citing §2.4 | **open** |
+| **AB-01-4** | MINOR | 7 *(+7)* | architect | §5.3 said four of five modules appear in the generated graph because src/domain ships empty; five appear from slice 01 | **open** |
+| **AB-01-5** | MAJOR | 7 *(+7)* | architect | The mutation gate has a demonstrated false-negative mode recorded only in a config comment, and nothing in arc42 says so | **open** |
+| **AB-01-6** | MINOR | 7 *(+7)* | architect | TC-9 states the test suite is not runnable in a Docker-less runner; twelve of fifteen files now are | **open** |
+| **AB-01-7** | MAJOR | 7 *(+7)* | architect | §11.1 claimed the debt register is generated from deferred-improvement slices as well as proposed ADRs; the generator never reads docs/slices/, and ratifying two ADRs dropped both agreed remedies out of the table | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -566,6 +573,41 @@ rather than narrated.*
 
 - *scenario:* check.mjs takes the LAST check.run event and reads its checks for /FAIL/. It never compares checks.head_sha to HEAD. Measured on this branch: after the AC-6 remedy landed in 9c266c2, e8d6e16, 234540c, 8bf9d39 and 91190cd, npm run slice:check 01 reported 'tests green' citing run 33913771072 at head_sha f2b11c4 - FIVE commits behind, and predating every part of the remedy the gate exists to approve. Worse, the CI run for the real HEAD had FAILED at that moment (33946000635, the log-schema job), and the gate still read green, because a failing run that has not been collected is indistinguishable from one that does not exist. It went green here only because the orchestrator then ran collect-ci.mjs by hand - discipline again, which is the thing this project keeps refusing to accept as a mechanism. Same family as O-6 (a CI run recorded out of order satisfying red-before-green) and O-14 (the arc42 gate testing a declaration's presence rather than its correspondence): the predicate reads a record that exists rather than a record that APPLIES. The mechanism: check.mjs derives HEAD via git rev-parse and reports UNVERIFIED - not PASS - when the newest check.run's head_sha is not an ancestor-or-equal of it, per this tool's own three-verdict contract. NOT done inside slice 01: orchestrator tooling rather than slice work, the shape the human ruled for T-01-2, and slice 01 is at its gate. Recommended alongside O-14 before slice 02's step 3.
 - *file:* `tools/slice/check.mjs`
+
+**AB-01-1** — §5.3 states the layering ruleset cruises 40 modules; it cruises 54
+
+- *scenario:* Line 241 gives '40 modules cruised across src and tests, every root covered' as THE FACT behind QS-10. npm run lint:arch at f661988 reports 54. Drifted during slice 01 and nothing gates it: the number is prose in a section whose own argument is that architecture conformance is measured rather than asserted. Verified by the orchestrator. Low harm on its own; recorded because it is the cheapest possible instance of the pattern the same section warns about.
+- *file:* `docs/arc42/05-building-blocks.md`
+
+**AB-01-2** — §8.5's tests/property/ row describes a test strategy ADR-0013 falsified in both halves
+
+- *scenario:* Line 404 says tests/property/ runs against 'src/domain and real PostgreSQL'. Neither half holds as built. ADR-0013 (outside-in tests exercise the BUILT ARTIFACT) means property tests reach dist/, never src/ - that is what outside-in-tests-do-not-import-src enforces and what tests/architecture/ambiguity-containment.test.ts scans for. And vitest.config.ts splits tests/property/ by whether the property needs a database, so the DST properties run in the nodb project with no PostgreSQL at all. §8.5 carries none of ADR-0013's three clauses. §4 makes arc42 the single source of truth for architecture, so this is the source of truth being wrong about how its own tests execute.
+- *file:* `docs/arc42/08-crosscutting-concepts.md`
+
+**AB-01-3** — §7.2 and §7.4 still document the test invocation that the T-01-2 (c) ruling replaced, three lines from a paragraph citing §2.4
+
+- *scenario:* Line 148 gives 'npm run test:nodb' as the Docker-less command and line 165 'npx vitest run --project db' as the inner loop, with npm test implied to be a single vitest run. As built npm test is tools/ci/run-tests.mjs: two separate invocations, merged, where a project that did not run is EXIT_DID_NOT_RUN = 2 rather than an empty contribution. That remedy exists because the OLD shape was measured to destroy the nodb project's 94 results when the db container failed, so a red commit could be judged 'no suite failed' - the architect ruled it (c) naming §2.4. The stale text therefore does not merely lag; it instructs a reader toward the invocation whose failure mode a NON-NEGOTIABLE ruling was spent removing, and §7.4's own paragraph about §2.4 sits three lines away.
+- *file:* `docs/arc42/07-deployment-view.md`
+
+**AB-01-4** — §5.3 said four of five modules appear in the generated graph because src/domain ships empty; five appear from slice 01
+
+- *scenario:* Found in the same paragraph as AB-01-1 and fixed in the same commit d473a88. Verified against npm run graph:modules: duration.ts, interval.ts and openingHours.ts render as three sibling nodes inside the domain subgraph with NO EDGES between them and no edges at all - the literal AC-6 ruling visible in the picture rather than only in prose. Recorded rather than folded silently into AB-01-1 because it is a second independent staleness in one paragraph, which is what makes the paragraph rather than the sentence the unit that was ungated.
+- *file:* `docs/arc42/05-building-blocks.md`
+
+**AB-01-5** — The mutation gate has a demonstrated false-negative mode recorded only in a config comment, and nothing in arc42 says so
+
+- *scenario:* stryker.config.mjs:19 records that @stryker-mutator/vitest-runner@10.0.0 does not activate mutants under vitest@5.0.0: every checkHealth.ts mutant SURVIVED, while the same mutant activated by hand is killed by five tests. Lines 46-47 work around it with testRunner: 'command' over vitest.mutation.config.ts. Verified by the orchestrator. The mutation score is a Definition of Done criterion - CLAUDE.md §10, threshold 0.75, currently gating slice 01 at 0.9806 - so this is a DoD gate whose failure mode is invisible outside one config file. If the workaround is ever removed on the assumption the comment is stale, every mutant survives and the score reads as a perfect zero-survivor result rather than as a runner that activated nothing. Same shape as R-5, O-6, O-14 and O-17: a mechanism that reports success over work it never did. Found by the architect reading arc42 against the tree at step 7; it is a GAP rather than a drift, since arc42 never claimed otherwise - §8.5 states the mutation budget's scope and stops.
+- *file:* `stryker.config.mjs`
+
+**AB-01-6** — TC-9 states the test suite is not runnable in a Docker-less runner; twelve of fifteen files now are
+
+- *scenario:* Line 36. The constraint was total when written and is now partial: npm run test:nodb runs 12 of 15 files with no Docker at all, and the db project carries the remaining 3. TC-9 still holds for anything asserting a persistence invariant, which §2.2 makes NON-NEGOTIABLE, so the correction narrows the constraint without weakening it. Recorded because a constraint stated more broadly than it holds is the kind of text a reader routes around rather than trusts, and TC-9's own stated purpose is to explain why a reader's first npm test fails.
+- *file:* `docs/arc42/02-constraints.md`
+
+**AB-01-7** — §11.1 claimed the debt register is generated from deferred-improvement slices as well as proposed ADRs; the generator never reads docs/slices/, and ratifying two ADRs dropped both agreed remedies out of the table
+
+- *scenario:* §11.1's lead sentence read 'Generated: every ADR with status: proposed AND EVERY DEFERRED-IMPROVEMENT SLICE'. tools/docs/build.mjs:57 filters adrList on status === 'proposed' and never reads docs/slices/ at all. The second half was a mechanism claim nobody had run - the shape this project has spent three slices removing - and it stayed invisible only because until 2026-09-05 every deferred-improvement slice had a proposed ADR standing in the register on its behalf. Ratifying ADR-0014 and ADR-0015 is what made it bite: both are now ACCEPTED AND UNIMPLEMENTED, and both dropped straight out of the generated table because the table keys on 'proposed'. Verified by the orchestrator: npm run docs:build went from 5 deferred to 2, and grep finds no reference to slices 12 or 13 in the generated block. The debt did not shrink; its RECORD did - which is the worse direction, because the register is what a reader consults to find out what is owed. Live in main today and now recorded by hand under 'Agreed and unbuilt': an Instant that is unrenderable and can throw out of a function documented as pure, and a midnight-ending job refused. Closing it needs the register generated from slice frontmatter as well as ADR frontmatter - orchestrator tooling, and it joins O-14 and O-17 in slice 02's prep window.
+- *file:* `docs/arc42/11-risks-technical-debt.md`
 
 </details>
 

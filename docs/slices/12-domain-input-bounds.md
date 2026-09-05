@@ -61,5 +61,7 @@ wrong place. **ADR-0014** records the decision and the alternatives that were re
 
 Beyond `CLAUDE.md` §10:
 
-- ADR-0014 moves from `proposed` to `accepted` at the human's gate, or is superseded.
+- **ADR-0014 was accepted by the human on 2026-09-05** and is now immutable — this slice implements a
+  ratified decision rather than proposing one. If the work argues the decision was wrong, that is a
+  DCR and a superseding ADR, never an edit to 0014.
 - AC-5 is reported as named mutants, not as a score: *for a discrimination claim, name the mutant.*

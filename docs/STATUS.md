@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| Last commit | `3a0b4d8 fix(01): the event-log schema gains two event types, and its guard becomes runnable` |
-| Gates decided | A, B, C, E, E, E, D |
-| Agent runs recorded | 58 |
-| ADRs accepted | 10 |
+| Last commit | `82ad614 chore(docs): regenerate system-design.md for the ratification` |
+| Gates decided | A, B, C, E, E, E, D, E |
+| Agent runs recorded | 61 |
+| ADRs accepted | 13 |
 | Slices defined | 12 |
 | Open DCRs | none |
 
@@ -59,6 +59,10 @@
 
 > Gate D decided on the pre-registered rule in process-criteria.md, read off rather than argued: two non-fatal criteria fail and neither is C1 nor C2, so tune the mechanisms and proceed to slice 01, with no second pilot. C5 needs no remedy beyond its threshold — the retro shows all seven out-of-gate interventions were decisions section 6 reserves to the human, so the threshold encoded an assumption the methodology contradicts; it is raised for future slices and the pilot stands as FAILED. C6 is remedied by CUTTING SLICES ONLY. The criterion offers a disjunction — cut slices or reduce agent count — and the human ruled the first and declined the second, keeping the team and the loop as they are. The reduction options were put and refused: the reviewer is where 17 of 56 findings came from and the architect's 19 runs are adjudication, which is where the value was. Backlog cut from 11 remaining slices to 8: slice 03 (error taxonomy, QS-11) folds into 02, and slices 10 and 11 fold into 09 as one close-out slice carrying observability, the OpenAPI document with the cURL harness, and the performance budget (QS-13, QS-11, QS-14). The 06/07 seam is NOT touched: Gate C defended it by name so the atomic move stays separated from the two concurrency scenarios that catch a cancel-then-insert, and the orchestrator's first proposed cut was withdrawn for reversing it without saying so. Stated plainly and not hidden by the ruling: a 27 percent slice reduction does not close a 3.5x gap against the 10-hour ceiling, so C6 is expected to fail again at slice 01 unless the per-slice cost falls on its own. That is now measurable, which it was not before, because R-5 is fixed.
 
+**Gate E** · 2026-09-05 · approved-and-merged
+
+> Approved and merged as PR #10, merge commit f661988, at 2026-09-05T05:54Z. The human's word was 'merged' and no further rationale was given, so none is invented here (§11): what is recorded is the decision, not a reconstruction of the reasoning behind it. What the gate approved, stated so the record is not thinner than the work: AC-6's second clause ruled UNMET at this gate and remedied in-slice in both halves - `to: {}` in the rule's own text and a planted intra-domain control that was watched to fail under the mutant; four (b) deferred improvements, two of which became backlog slices 12 and 13 with ADR-0014 and ADR-0015; and one loopback consumed of two, from T-01-2 at step 2. STILL OPEN AND NOT CLOSED BY THE MERGE: ADR-0013, ADR-0014 and ADR-0015 remain status: proposed. The orchestrator put them to the human at this gate and received no verdict, and a merge is not an ADR ratification - MADR status is a decision record, not a consequence of code landing. ADR-0015 in particular carries the architect's own flag that it sits closer to the human's authority than its own, since whether a dealership open until midnight may take a 23:00-24:00 booking is an acceptance question. Carried forward as an open item rather than resolved by inference.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -75,9 +79,9 @@
 | [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | accepted | — |
 | [0011](adr/0011-health-is-an-operational-probe.md) | Treat /health as an operational probe outside the API contract, not as a sixth operation | proposed | — |
 | [0012](adr/0012-seed-fixtures-are-a-test-owned-loader.md) | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | proposed | — |
-| [0013](adr/0013-outside-in-tests-exercise-the-built-artifact.md) | Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost | proposed | — |
-| [0014](adr/0014-an-instant-is-renderable-by-construction.md) | An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | proposed | — |
-| [0015](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) | An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | proposed | — |
+| [0013](adr/0013-outside-in-tests-exercise-the-built-artifact.md) | Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost | accepted | — |
+| [0014](adr/0014-an-instant-is-renderable-by-construction.md) | An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | accepted | — |
+| [0015](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) | An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | accepted | — |
 
 ## Agent runs
 
@@ -141,7 +145,10 @@
 | 2026-09-04 20:22 | architect | 225m14 | 234 / 10,961 / 15,747,040 | `derived` |
 | 2026-09-05 04:39 | architect | 7m55 | 132 / 17,232 / 4,495,099 | `derived` |
 | 2026-09-05 04:55 | test-engineer | 15m28 | 162 / 20,836 / 7,227,950 | `derived` |
-| | **total** | **3997m30** | **15,286 / 1,242,928 / 1,200,715,696** | |
+| 2026-09-05 06:03 | architect | 7m42 | 156 / 8,338 / 6,159,757 | `derived` |
+| 2026-09-05 06:08 | architect | 12m50 | 232 / 9,551 / 11,127,069 | `derived` |
+| 2026-09-05 06:15 | architect | 20m00 | 330 / 17,971 / 19,192,822 | `derived` |
+| | **total** | **4038m01** | **16,004 / 1,278,788 / 1,237,195,344** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

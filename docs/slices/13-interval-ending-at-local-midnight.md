@@ -63,8 +63,10 @@ not what failed.
 
 Beyond `CLAUDE.md` §10:
 
-- ADR-0015 moves from `proposed` to `accepted` at the human's gate, or is superseded. **The architect
-  flagged that this ADR sits closer to the human's authority than its own**: whether a dealership open
-  until midnight should be able to take a 23:00–24:00 booking is arguably an acceptance question, and
-  the architect declined to treat *"the half-open convention should be consistent"* as authority to
-  decide a behaviour change on the human's side of the line.
+- **ADR-0015 was accepted by the human on 2026-09-05** and is now immutable. The precondition this line
+  used to carry is satisfied, but the reason it existed is worth keeping: the architect **declined to
+  decide this one**, holding that whether a dealership open until midnight may take a 23:00–24:00
+  booking is an acceptance question, and refusing to treat *"the half-open convention should be
+  consistent"* as authority to cross into the human's side of the line. The human answered it
+  directly. So this slice implements a ratified behaviour change, and AC-1 is a scope decision that
+  was made rather than a consequence that was inferred.
