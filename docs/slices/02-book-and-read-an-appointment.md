@@ -103,16 +103,17 @@ contended one from an unknown vehicle without parsing prose.
 - `tests/concurrency/no-bay-overlap.test.ts` and `tests/concurrency/no-technician-overlap.test.ts`.
 - `tests/contract/error-taxonomy.test.ts`, the problem+json serialiser, and the
   outcome-not-exception mapping of §8.6.
-- Enough candidate selection to allocate *a* free bay and technician — the ordering policy and the
-  retry loop are slice 04.
+- **The minimal prune-and-retry loop (ADR-0004), brought into scope by the human's ruling of
+  2026-09-06.** Attempt, classify the `23P01`, prune *that candidate value*, retry; a list that empties
+  is the refusal, and the resource named is the list that emptied. Candidate *ordering* stays slice
+  04's; this is the loop only.
 - The two ratified domain fixes: the epoch bound in `src/domain/interval.ts`'s `instant()` **and** in
   `src/domain/openingHours.ts` step 1 (ADR-0014), and step 4's midnight normalisation (ADR-0015).
 
 ## Out of scope
 
-- Retrying across remaining candidates on conflict (ADR-0004) — slice 04. Here a `23P01` on the
-  chosen candidate is a `409`, which is correct but pessimistic, and slice 04's QS-3 is what proves
-  it improved.
+- **ADR-0009's candidate *ordering* and attempt cap** — the seeded shuffle and the cap of 16 remain
+  slice 04's, with QS-3. Only the minimal loop is here.
 - `appointment-not-confirmed` (`409` on moving a cancelled appointment) — it needs rescheduling, so
   it lands with slice 06 and extends the taxonomy test.
 - Asserting the emitted OpenAPI document matches the committed one — slice 09, where the document
