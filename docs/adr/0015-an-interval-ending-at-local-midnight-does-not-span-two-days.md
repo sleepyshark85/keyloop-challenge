@@ -1,7 +1,7 @@
 ---
 id: "0015"
 title: An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days
-status: proposed
+status: accepted
 date: 2026-09-05
 supersedes: null
 superseded_by: null
@@ -11,6 +11,18 @@ arc42: ["§5.2", "§8.2", "§8.3", "§11"]
 proposed-by: architect
 decided-by: human
 ai-input: >
+  ACCEPTED as recommended on 2026-09-05, after Gate E, unmodified: an interval ending at local
+  midnight ends on the day it started, and a dealership open until midnight can take a 23:00-24:00
+  booking. Option C stays refused on the `'24:00:00'::time` measurement. Backlog slice 13 is
+  therefore the agreed remedy, not a proposal.
+
+  THE DECIDING PART OF THIS RECORD IS THAT THE ARCHITECT DID NOT MAKE THIS CALL. The substance was
+  put to the human rather than ruled from the chair, and the human answered it. That is not a
+  formality: the architect ruled (b) precisely BECAUSE it declined to widen CLAUDE.md §6's closed
+  list of nameable things to reach (c), and the alternative — quietly deciding what a dealership open
+  until midnight may book — is scope, which §6 reserves to the human. Read the paragraph below as
+  written at the time, not as a decision the architect took and the human rubber-stamped.
+
   Raised by the REVIEWER as finding R-01-4 at slice 01 step 5, characterised as a DEAD BRANCH: the
   `'24:00:00'` arm of the time parser is unreachable, because nothing can produce a rendered
   `secondsOfDay` of 86400 and so the arm's mutants are unkillable. The measurement is correct and the
@@ -23,8 +35,8 @@ ai-input: >
   §6's closed list of nameable things, even though ADR-0001's "the whole derived interval must fall
   within opening hours" IS contradicted. The upgrade is the load-bearing part of this record: a
   backlog item reading "a branch is unreachable" invites the remedy of deleting the branch, and
-  deleting it would be exactly wrong. AWAITING the human's ruling; `proposed`, and carried in
-  arc42 §11 until ratified.
+  deleting it would be exactly wrong. Put to the human's ruling rather than settled by the
+  architect, and carried in arc42 §11 as debt until it was.
 ---
 
 ## Context and problem statement

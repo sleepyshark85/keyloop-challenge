@@ -1,7 +1,7 @@
 ---
 id: "0014"
 title: An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary
-status: proposed
+status: accepted
 date: 2026-09-05
 supersedes: null
 superseded_by: null
@@ -11,6 +11,10 @@ arc42: ["§5.2", "§8.1", "§11"]
 proposed-by: architect
 decided-by: human
 ai-input: >
+  ACCEPTED as recommended on 2026-09-05, after Gate E, unmodified. The remedy is therefore the
+  AGREED remedy and backlog slice 12 is the agreed work, not a proposal. Immutable from here under
+  CLAUDE.md §4.
+
   Raised by the REVIEWER as finding R-01-1 at slice 01 step 5: `instant()` admits
   `8_640_000_000_000_001`, which `Number.isFinite` accepts and `new Date` cannot represent, so a
   value that satisfies the constructor makes `formatToParts` throw out of a function this design
@@ -21,9 +25,9 @@ ai-input: >
   bound belongs; the architect named both places, which is the substance of this ADR and the part
   that is a decision rather than a bug report. The defect is the architect's own: §4.2 step 1 of
   docs/slices/01-design.md specifies "finite integers and end > start" and the implementer matched
-  that specification exactly. Recommended as written below. AWAITING the human's ruling; it is
-  scheduled as a backlog slice, so this ADR is `proposed` and carries a technical-debt entry in
-  arc42 §11 until it is ratified.
+  that specification exactly. Recommended as written below and put to the human's ruling;
+  it is scheduled as a backlog slice, and carried a technical-debt entry in arc42 §11 until it was
+  ratified.
 ---
 
 ## Context and problem statement

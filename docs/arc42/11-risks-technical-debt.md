@@ -4,17 +4,22 @@
 
 ## 11.1 Deferred improvements
 
-Generated: every ADR with `status: proposed` and every deferred-improvement slice is, by
-construction, a debt item traceable to the decision that created it.
+Generated from **every ADR with `status: proposed`**, so an open decision is a debt item by
+construction and traceable to the decision that created it.
+
+**It does not generate from slices, and this section used to claim it did.** The sentence above read
+"every ADR with `status: proposed` *and every deferred-improvement slice*"; `tools/docs/build.mjs`
+filters ADR frontmatter on `status === 'proposed'` and never reads `docs/slices/`. The second half was
+a mechanism claim nobody had run — the shape this project has spent three slices removing — and it
+went unnoticed while it happened to cost nothing, because until 2026-09-05 every deferred-improvement
+slice had a `proposed` ADR standing in the register on its behalf. See *Agreed and unbuilt* below for
+what it costs now.
 
 <!-- generated:debt-register -->
 | Item | Origin | Why deferred |
 |---|---|---|
 | Treat /health as an operational probe outside the API contract, not as a sixth operation | [ADR-0011](../adr/0011-health-is-an-operational-probe.md) | deferred improvement |
 | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | [ADR-0012](../adr/0012-seed-fixtures-are-a-test-owned-loader.md) | deferred improvement |
-| Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost | [ADR-0013](../adr/0013-outside-in-tests-exercise-the-built-artifact.md) | deferred improvement |
-| An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | [ADR-0014](../adr/0014-an-instant-is-renderable-by-construction.md) | deferred improvement |
-| An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | [ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) | deferred improvement |
 <!-- /generated:debt-register -->
 
 The register held nothing until slice 00a, and that was the correct reading rather than an omission.
@@ -23,23 +28,44 @@ debt, because it is generated from `status: proposed` and those were the *foundi
 awaiting ratification, not deferred improvements. **The human accepted all six at Gate B on
 2026-09-04**, so the register emptied on its own.
 
-**The register now holds five, and they are two different kinds of thing.** ADR-0011, ADR-0012 and
-ADR-0013 are **open decisions with a recommendation attached** — raised by the architect at a slice's
-step 1, `proposed` because they are the human's to rule at that slice's gate rather than the
-architect's to close inline. ADR-0014 and ADR-0015 are **deferred improvements from a `(b)` DCR
-ruling** under `CLAUDE.md` §6, which is what the register exists to make impossible to lose. Either
-kind leaves the register the moment it is accepted or rejected.
+**Two entries stand: ADR-0011 and ADR-0012** — open decisions with a recommendation attached, raised
+by the architect at a slice's step 1 and `proposed` because they are the human's to rule at that
+slice's gate rather than the architect's to close inline. They leave the register the moment they are
+accepted or rejected.
 
-**A merge is not a ratification, and slice 01 is the case that makes the distinction load-bearing.**
-Slice 01 merged at `f661988` carrying three `proposed` ADRs — 0013, 0014 and 0015 — and the human
-ruled on none of them at the gate. The code they describe is either built (0013's split test run and
-built-artifact seam) or deliberately not built (0014's bound, 0015's midnight normalisation), and in
-both cases the *decision* is still open. Nothing in the merge flips a status, and the architect's
-step-7 reconciliation does not flip one either: an ADR leaves `proposed` when a human rules, and by no
-other route. ADR-0013 was **revised twice before ratification** rather than superseded, which
-`CLAUDE.md` §4 permits because it forbids editing an *accepted* ADR; each revision carries its own
-*Revision before ratification* note, so the record does not depend on reading the slice file alongside
-it.
+**A merge is not a ratification, and slice 01 is the case that proves it rather than the case that
+muddies it.** Slice 01 merged at `f661988` carrying three `proposed` ADRs — 0013, 0014 and 0015 — and
+the human ruled on **none** of them at the gate. For a day the register carried five, three of them
+describing code that had already shipped. The human then ruled all three **accepted on 2026-09-05,
+after Gate E**, as a separate act, and the register fell back to two. Nothing about the merge did
+that; a human ruling did, which is the only thing that ever moves an ADR out of `proposed`. ADR-0013
+was **revised twice before ratification** rather than superseded, which `CLAUDE.md` §4 permits because
+it forbids editing an *accepted* ADR; both revisions are visible in the file the human ruled on, and
+from acceptance it is immutable and can only be superseded.
+
+### Agreed and unbuilt — what the generated register above cannot show
+
+**ADR-0014 and ADR-0015 are accepted and unimplemented.** Ratifying them did not build them: it turned
+two proposals into two *agreed remedies* with the work still outstanding, and it removed them from the
+generated table, because that table keys on `status: proposed`. The debt did not shrink; its record
+did.
+
+| Agreed remedy | Decision | The work | Live in `main` today |
+|---|---|---|---|
+| Bound the epoch-millisecond range in `instant()`, and again at `withinOpeningHours` step 1 | [ADR-0014](../adr/0014-an-instant-is-renderable-by-construction.md), accepted 2026-09-05 | slice 12 | `instant()` admits an unrenderable value; `formatToParts` can throw out of a function specified as pure |
+| Normalise an exclusive endpoint rendering as local `00:00:00` on the next local date to `secondsOfDay = 86400` | [ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md), accepted 2026-09-05 | slice 13 | a job ending exactly at local midnight is refused as `spans-local-days`, and the parser's `'24:00:00'` arm is unreachable |
+
+Both rows are here by hand because nothing generates them. **That is the gap named at the top of this
+section**: a decision that is `proposed` is carried automatically, and a decision that is `accepted`
+but unbuilt is carried by whoever remembers to write it down. The mechanism that would close it is a
+register generated from slice frontmatter as well as ADR frontmatter — tooling rather than
+architecture, so it is recorded here as a known limitation of this section rather than promised.
+
+**ADR-0015's ratification is also a record of who decided what.** The architect ruled the finding
+`(b)` and deliberately did *not* settle the substance — whether a dealership open until midnight may
+take a 23:00–24:00 booking is scope, which `CLAUDE.md` §6 reserves to the human. The human answered
+it. The ADR is written so that distinction survives, and it should not be read as an architect's call
+that a human approved.
 
 ### The cost of the literal AC-6 ruling — slice 01, and debt rather than defect
 
@@ -138,10 +164,10 @@ Recorded so a later reader does not over-read a green tick:
   because there is no module specifier to record, but the rendering depends on the runtime's ICU data.
   A Node build with small-icu would change `withinOpeningHours`'s answers without changing a line of
   `src/`. TC-10's version pin is what stands there, and it is not a mechanism aimed at this.
-- **`instant()` does not bound its input** — ADR-0014 is `proposed` and unimplemented, so the
-  unrenderable-instant case above is live in the merged code. Slice 12 is raised against it.
-- **An interval ending at local midnight is refused** — ADR-0015 is `proposed` and unimplemented.
-  Slice 13 is raised against it, and §8.3 records the behaviour.
+- **`instant()` does not bound its input** — ADR-0014 is **accepted** and unimplemented, so the
+  unrenderable-instant case above is live in the merged code and slice 12 is the agreed remedy.
+- **An interval ending at local midnight is refused** — ADR-0015 is **accepted** and unimplemented;
+  slice 13 is the agreed remedy, and §8.3 records the behaviour that is live until then.
 
 ## 11.2 Known risks
 

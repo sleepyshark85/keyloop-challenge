@@ -347,9 +347,12 @@ knowing it, because it never counts hours.
 ending exactly at local midnight is rejected as `spans-local-days` — its end renders on the next local
 date. A job finishing at closing time on a dealership open until 00:00 is therefore refused. The time
 parser accepts `'24:00:00'` and normalises it to 86 400 seconds-of-day precisely to describe such a
-window, so the two halves disagree and the `'24:00:00'` arm is currently unreachable. Deferred as
-[ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) (`status:
-proposed`) with slice 13 raised against it; §11 carries it.
+window, so the two halves disagree and the `'24:00:00'` arm is currently unreachable. **[ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) settles it
+and was accepted on 2026-09-05**: an interval ending at local midnight ends on the day it started, so
+an end rendering as `00:00:00` on the local date immediately following the start's is normalised to
+`secondsOfDay = 86400` before step 4's comparison — and a genuine crossing, 23:00 to 01:00, stays
+rejected. The decision is agreed; the code is not yet written. Slice 13 is the agreed remedy, and §11
+carries it under *Agreed and unbuilt* because the generated register cannot.
 
 ## 8.4 Observability
 
@@ -429,11 +432,11 @@ property test from importing them; and widening the rule does not even work, bec
 `red-proof` reject the red commit. Two phase-2 artifacts of this design contradicted each other, and
 the contradiction was structural rather than a matter of degree.
 
-**Three clauses resolve it. All three are built and in force at `f661988`; none is ratified.**
-[ADR-0013](../adr/0013-outside-in-tests-exercise-the-built-artifact.md) is `status: proposed` — the
-architect raised it at slice 01 step 1, it was revised twice before ratification, and the human merged
-slice 01 without ruling on it. A merge is not a ratification, so this subsection states what was built
-rather than what was decided, and §11 carries it as debt until a human rules.
+**Three clauses resolve it, and all three are built and in force at `f661988`.**
+[ADR-0013](../adr/0013-outside-in-tests-exercise-the-built-artifact.md) was raised by the architect at
+slice 01 step 1, revised twice before ratification, and **accepted on 2026-09-05, after Gate E** — as
+a separate act from the merge, because a merge is not a ratification and slice 01 merged with this
+decision still open. It is immutable from here and can only be superseded.
 
 1. **An outside-in test reaches a pure module through the built artifact.** It loads
    `dist/domain/*.js` — the output of `npm run build`, which `pretest` guarantees is current — never

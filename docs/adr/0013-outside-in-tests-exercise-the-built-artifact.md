@@ -1,8 +1,8 @@
 ---
 id: "0013"
 title: Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost
-status: proposed
-date: 2026-09-04
+status: accepted
+date: 2026-09-05
 supersedes: null
 superseded_by: null
 arc42: ["§5.2", "§8.5", "§10"]
@@ -11,17 +11,21 @@ arc42: ["§5.2", "§8.5", "§10"]
 proposed-by: architect
 decided-by: human
 ai-input: >
+  ACCEPTED as recommended on 2026-09-05, after Gate E, unmodified — all three clauses,
+  including the third, which was not in the ADR as first written. Proposed 2026-09-04; the `date`
+  above is the ratification. From here it is immutable under CLAUDE.md §4 and is superseded, never
+  edited.
+
   Raised by the architect at step 1 of slice 01, on finding that two phase-2 artifacts of its own
   contradict each other: `.dependency-cruiser.js`'s `outside-in-tests-do-not-import-src` forbids
   `tests/property/` from importing `src/`, while arc42 §10 maps QS-9 to a property test whose subject
   is three pure functions with no HTTP or SQL boundary. A second, harder constraint was then MEASURED
   rather than reasoned about: a literal dynamic-import specifier for a module that does not exist yet
   fails `tsc`, which fails the `verify` job, which makes `red-proof` reject the red commit — so the
-  obvious remedy (widen the rule) does not even work. Recommended as written below. AWAITING the
-  human's ruling at slice 01's gate. Testability is architecture and this is within the architect's
+  obvious remedy (widen the rule) does not even work. Recommended as written below and put to the
+  human's ruling at slice 01's gate rather than taken unilaterally. Testability is architecture and this is within the architect's
   authority under CLAUDE.md §6, but it changes what *outside-in* means operationally for every later
-  property test, and the ownership of the test directories was itself a human ruling at Gate B — so it
-  is put to the gate rather than taken unilaterally.
+  property test, and the ownership of the test directories was itself a human ruling at Gate B.
 
   REVISED IN PLACE 2026-09-05, before ratification, after the test-engineer measured that the second
   clause as first written did not do what it claimed. See "Revision before ratification" below. The
@@ -29,16 +33,20 @@ ai-input: >
 
   REVISED IN PLACE A SECOND TIME 2026-09-05 at slice 01 step 5, on the reviewer's finding R-01-2 and
   the architect's ruling (b): the step-2 revision's own narrowing claim was overstated, and the
-  computed-import hole is narrowed rather than closed. Still `proposed`; still unratified; it reaches
-  the human at Gate E with both revisions visible, which is the point of revising rather than
-  superseding a decision nobody has yet taken.
+  computed-import hole is narrowed rather than closed. It reached the human at Gate E with both revisions
+  visible, which is the point of revising rather than superseding a decision nobody has yet taken,
+  and it was accepted in that form.
 ---
 
 ## Revision before ratification — 2026-09-05
 
+> **This ADR was accepted on 2026-09-05 and is now immutable.** The two revisions below happened
+> while it was `proposed` and unratified; the heading is kept because that is exactly what they were,
+> and because the revised text is what the human ruled on. Any further change is a superseding ADR.
+
 This ADR was revised in place at slice 01's step-2 loopback rather than superseded. `CLAUDE.md` §4
-says *"Never edit an **accepted** ADR"*; this one is `status: proposed` and has never been ratified,
-so the rule does not bind — and superseding a decision nobody has taken manufactures a history of a
+says *"Never edit an **accepted** ADR"*; at the time of both revisions this one was `status: proposed`
+and had never been ratified, so the rule did not bind — and superseding a decision nobody has taken manufactures a history of a
 decision that did not happen, which inverts the reason ADRs are immutable. The orchestrator confirmed
 the reading rather than overruling it.
 

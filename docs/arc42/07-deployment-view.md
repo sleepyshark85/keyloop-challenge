@@ -155,8 +155,7 @@ unknown flagged for verification before 00a's red commit, and it was verified on
 would have started a PostgreSQL container to exercise three pure functions that import nothing — and
 worse, would have let a Docker hiccup turn QS-9's red evidence into a `globalSetup` crash rather than
 an assertion failure. A property test that needs the database is named `*.db.test.ts`; everything else
-runs in `nodb`. Built under ADR-0013, which is `status: proposed` — §8.5 states the three clauses and
-that they are as-built rather than ratified.
+runs in `nodb`. Built under ADR-0013, accepted 2026-09-05; §8.5 states all three clauses.
 
 **`npm test` is not `vitest run`, and the difference is a NON-NEGOTIABLE.** It is
 [`tools/ci/run-tests.mjs`](../../tools/ci/run-tests.mjs), which runs the two projects as **separate**
