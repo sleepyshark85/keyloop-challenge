@@ -53,7 +53,7 @@ plan that reads as though it never was. §11 and §13 discuss the material delta
 | **8** | [Cross-cutting concepts](arc42/08-crosscutting-concepts.md) | Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API writes, and `opening_hours` is the only one that exists becaus… |
 | **9** | [Architecture decisions](arc42/09-architecture-decisions.md) | Decisions live as individual MADR files under `docs/adr/`. |
 | **10** | [Quality requirements](arc42/10-quality-requirements.md) | The §1.2 ranking, refined into the scenarios below it. |
-| **11** | [Risks and technical debt](arc42/11-risks-technical-debt.md) | Generated from **every ADR with `status: proposed`**, so an open decision is a debt item by construction and traceable to the decision that created it. |
+| **11** | [Risks and technical debt](arc42/11-risks-technical-debt.md) | Generated from two sources, because debt arrives in two shapes and one table has to carry both. |
 | **12** | [Glossary](arc42/12-glossary.md) | Domain terms only. Process vocabulary lives in `docs/METHODOLOGY.md`. |
 | **13** | [AI collaboration](arc42/13-ai-collaboration.md) | Sourced from artifacts, never from memory: the ADR set, PR threads, `docs/team-log/events.jsonl`, the prompt library under `docs/team-log/prompts/`, and git… |
 

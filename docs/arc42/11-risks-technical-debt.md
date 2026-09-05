@@ -4,16 +4,35 @@
 
 ## 11.1 Deferred improvements
 
-Generated from **every ADR with `status: proposed`**, so an open decision is a debt item by
-construction and traceable to the decision that created it.
+Generated from two sources, because debt arrives in two shapes and one table has to carry both. The
+sources are:
 
-**It does not generate from slices, and this section used to claim it did.** The sentence above read
-"every ADR with `status: proposed` *and every deferred-improvement slice*"; `tools/docs/build.mjs`
-filters ADR frontmatter on `status === 'proposed'` and never reads `docs/slices/`. The second half was
-a mechanism claim nobody had run — the shape this project has spent three slices removing — and it
-went unnoticed while it happened to cost nothing, because until 2026-09-05 every deferred-improvement
-slice had a `proposed` ADR standing in the register on its behalf. See *Agreed and unbuilt* below for
-what it costs now.
+- **every ADR with `status: proposed`** — an open decision, traceable to the decision that created it.
+  Status: *proposed — not yet agreed*;
+- **every slice carrying `deferred_from` that is not `done`** — a finding that was raised, judged real,
+  and consciously not fixed under a `CLAUDE.md` §6 **(b)** ruling. Status: **agreed and unbuilt**.
+
+The two are different claims and the *Status* column keeps them apart rather than merging them into an
+undifferentiated pile. `deferred_from` is a list of `"<finding>:<adr>"` pairs, so the register can
+point a reader at the **argument** — the review finding — and not only at the remedy.
+
+**The second source is new, and the reason it had to exist is worth keeping.** Until 2026-09-05 this
+section claimed both sources and `tools/docs/build.mjs` implemented only the first. That went
+unnoticed for three slices because it happened to cost nothing: every deferred-improvement slice had a
+`proposed` ADR standing in the register on its behalf. **Ratifying ADR-0014 and ADR-0015 is what made
+it bite.** Both became *accepted and unimplemented* — a state the table could not represent — and both
+dropped straight out of it. The debt did not shrink; its record did, which is the worse direction,
+because the register is what a reader consults to find out what is owed.
+
+**Two design details of the fix are load-bearing and would each have reintroduced the bug.** The
+predicate is `deferred_from`, not "an accepted ADR on an unfinished slice": the looser test produced
+nineteen rows, listing the *founding* decisions as outstanding debt because slices 02 to 09 have not
+run yet, which buries the two real items under seventeen restatements of "the project is not
+finished". And `deferred_from` is carried by the **absorbing** slice as a **list**: Gate D folded
+slices 12 and 13 into 02, and a tombstone carries no `id:` and drops out of the slice list entirely —
+so a scheme that read the deferral off the *original* slice, or that took only the first ADR from the
+absorbing one, would have taken one or both remedies straight back out of the register. The fix for
+the bug would have caused the bug.
 
 <!-- generated:debt-register -->
 | Item | Origin | Status |
@@ -30,10 +49,12 @@ debt, because it is generated from `status: proposed` and those were the *foundi
 awaiting ratification, not deferred improvements. **The human accepted all six at Gate B on
 2026-09-04**, so the register emptied on its own.
 
-**Two entries stand: ADR-0011 and ADR-0012** — open decisions with a recommendation attached, raised
-by the architect at a slice's step 1 and `proposed` because they are the human's to rule at that
-slice's gate rather than the architect's to close inline. They leave the register the moment they are
-accepted or rejected.
+**The `proposed` rows are open decisions with a recommendation attached** — raised by the architect at
+a slice's step 1 and left `proposed` because they are the human's to rule at that slice's gate rather
+than the architect's to close inline. They leave the register the moment they are accepted or
+rejected. ADR-0011 and ADR-0012 have stood there since slice 00a; each slice's design step may add
+more, and the count is deliberately not written here, because a number in prose beside a generated
+table is a number that goes stale (§5.3 has the same paragraph for the same reason).
 
 **A merge is not a ratification, and slice 01 is the case that proves it rather than the case that
 muddies it.** Slice 01 merged at `f661988` carrying three `proposed` ADRs — 0013, 0014 and 0015 — and
@@ -45,23 +66,23 @@ was **revised twice before ratification** rather than superseded, which `CLAUDE.
 it forbids editing an *accepted* ADR; both revisions are visible in the file the human ruled on, and
 from acceptance it is immutable and can only be superseded.
 
-### Agreed and unbuilt — what the generated register above cannot show
+### Agreed and unbuilt — what the register's second source means
 
-**ADR-0014 and ADR-0015 are accepted and unimplemented.** Ratifying them did not build them: it turned
-two proposals into two *agreed remedies* with the work still outstanding, and it removed them from the
-generated table, because that table keys on `status: proposed`. The debt did not shrink; its record
-did.
+**ADR-0014 and ADR-0015 are accepted and unimplemented, and the register above says so by itself.**
+Ratifying them did not build them: it turned two proposals into two *agreed remedies* with the work
+still outstanding. Both rows are generated — from slice 02's `deferred_from`, which names the review
+findings they came from (R-01-1 and R-01-4) as well as the ADRs that answer them — so what a reader
+has to check is the register, not this prose and not somebody's memory.
 
-| Agreed remedy | Decision | The work | Live in `main` today |
-|---|---|---|---|
-| Bound the epoch-millisecond range in `instant()`, and again at `withinOpeningHours` step 1 | [ADR-0014](../adr/0014-an-instant-is-renderable-by-construction.md), accepted 2026-09-05 | slice 12 | `instant()` admits an unrenderable value; `formatToParts` can throw out of a function specified as pure |
-| Normalise an exclusive endpoint rendering as local `00:00:00` on the next local date to `secondsOfDay = 86400` | [ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md), accepted 2026-09-05 | slice 13 | a job ending exactly at local midnight is refused as `spans-local-days`, and the parser's `'24:00:00'` arm is unreachable |
+What the generated rows deliberately do **not** say is what is live in `main` while the remedy is
+outstanding. That is behaviour rather than bookkeeping, so it is recorded where behaviour is recorded:
+§8.3 for the midnight-ending interval, and *What slice 01 did not make true* below for both.
 
-Both rows are here by hand because nothing generates them. **That is the gap named at the top of this
-section**: a decision that is `proposed` is carried automatically, and a decision that is `accepted`
-but unbuilt is carried by whoever remembers to write it down. The mechanism that would close it is a
-register generated from slice frontmatter as well as ADR frontmatter — tooling rather than
-architecture, so it is recorded here as a known limitation of this section rather than promised.
+**And a generated row is not a ratification either** — the same distinction the paragraph above draws
+for merges, one level down. The register shows what is *owed*; it has no opinion about whether the
+work is *correct*, and it cannot, because a row leaves it when the slice reaches `done`, which is a
+`slice:check` verdict rather than a judgement. Slice 02 carrying these two remedies is not slice 02
+having discharged them.
 
 **ADR-0015's ratification is also a record of who decided what.** The architect ruled the finding
 `(b)` and deliberately did *not* settle the substance — whether a dealership open until midnight may
@@ -167,9 +188,12 @@ Recorded so a later reader does not over-read a green tick:
   A Node build with small-icu would change `withinOpeningHours`'s answers without changing a line of
   `src/`. TC-10's version pin is what stands there, and it is not a mechanism aimed at this.
 - **`instant()` does not bound its input** — ADR-0014 is **accepted** and unimplemented, so the
-  unrenderable-instant case above is live in the merged code and slice 12 is the agreed remedy.
-- **An interval ending at local midnight is refused** — ADR-0015 is **accepted** and unimplemented;
-  slice 13 is the agreed remedy, and §8.3 records the behaviour that is live until then.
+  unrenderable-instant case above is live in the merged code. The agreed remedy is **slice 02**
+  (AC-13 to AC-16); it was backlog slice 12 until the human's cost ruling of 2026-09-05 folded that
+  slice in, and `docs/slices/12-domain-input-bounds.md` is the tombstone recording the move.
+- **An interval ending at local midnight is refused** — ADR-0015 is **accepted** and unimplemented,
+  and §8.3 records the behaviour that is live until it is not. The agreed remedy is **slice 02**
+  (AC-17 to AC-19), folded in from backlog slice 13 by the same ruling.
 
 ## 11.2 Known risks
 
