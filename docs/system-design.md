@@ -44,7 +44,7 @@ plan that reads as though it never was. §11 and §13 discuss the material delta
 | § | Section | |
 |---|---|---|
 | **1** | [Introduction and goals](arc42/01-introduction-goals.md) | A service-appointment scheduler for automotive dealerships. |
-| **2** | [Architecture constraints](arc42/02-constraints.md) | A constraint is something **imposed** — by the brief, by the constitution, or by the environment. |
+| **2** | [Architecture constraints](arc42/02-constraints.md) | A constraint is something **imposed** — by the brief, by the human, by the constitution, or by the environment. |
 | **3** | [Context and scope](arc42/03-context-scope.md) | The system sits alone: human actors, one persistent store, and **no neighbouring systems** — the single most consequential fact about the context, justified… |
 | **4** | [Solution strategy](arc42/04-solution-strategy.md) | Five decisions. Everything in §5 to §8 follows from them, and each links to the record that argues it. |
 | **5** | [Building block view](arc42/05-building-blocks.md) | The decomposition and the reasons for it are ADR-0008. |

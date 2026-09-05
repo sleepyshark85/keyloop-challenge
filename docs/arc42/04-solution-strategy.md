@@ -61,10 +61,10 @@ decidable from the request alone, so it cannot reintroduce a check-then-act wind
 
 ## 4.2 Technology decisions
 
-`CLAUDE.md` §3 fixes TypeScript, Node, PostgreSQL, Vitest, Testcontainers, `fast-check`, Stryker,
-`dependency-cruiser`, OpenTelemetry and `pino`. It reserves four choices to this gate. They are taken
-here, each with the alternative that was rejected and why — a technology named without a rejected
-alternative is a preference, not a decision.
+§2.2 fixes TypeScript, Node, PostgreSQL, Vitest, Testcontainers, `fast-check`, Stryker,
+`dependency-cruiser`, OpenTelemetry and `pino` — the human's, at phase 0 — and reserves four choices
+to this gate. They are taken here, each with the alternative that was rejected and why — a technology
+named without a rejected alternative is a preference, not a decision.
 
 | Choice | Decision | The rejected alternative that mattered | Record |
 |---|---|---|---|

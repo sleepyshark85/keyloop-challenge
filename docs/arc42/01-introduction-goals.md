@@ -113,6 +113,7 @@ recommendation was accepted, modified or overridden.
 | **OQ-4** | When a request conflicts but capacity remained, is a refusal acceptable? | **No — retry across the remaining candidates, then refuse.** The candidate read stays **advisory**, so this is not check-then-act | [ADR-0004](../adr/0004-retry-across-remaining-candidates.md) — *accepted as recommended* |
 
 *Not questions for Gate A, recorded so it is clear they were not asked:* the HTTP framework, the query
-layer, the migration tool, the module decomposition, candidate ordering, the retry mechanism and the
-attempt cap's value are all reserved to the architect by `CLAUDE.md` §3. Gate A decided what the system
-does, not how.
+layer, the migration tool and the module decomposition were reserved to the architect at phase 0;
+candidate ordering, the retry mechanism and the attempt cap's value by
+[ADR-0004](../adr/0004-retry-across-remaining-candidates.md). All were decided at Gate B (§2.2, §4.2).
+Gate A decided what the system does, not how.

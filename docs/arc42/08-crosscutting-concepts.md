@@ -301,9 +301,9 @@ rejected. **Accepted, and not yet written**; §11.1 carries it as agreed and unb
 
 ## 8.4 Observability
 
-`CLAUDE.md` §3 and TC-8 fix OpenTelemetry with `pino`. §1.2 goal 4 says what for: *the check-then-act
-window is visible in a waterfall even though the code never relies on it*, and the invariant is
-measurable in production rather than only in tests.
+TC-8 fixes OpenTelemetry with `pino`. §1.2 goal 4 says what for: *the check-then-act window is visible
+in a waterfall even though the code never relies on it*, and the invariant is measurable in production
+rather than only in tests.
 
 ### Spans
 
