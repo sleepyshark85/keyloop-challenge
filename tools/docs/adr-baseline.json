@@ -209,5 +209,35 @@
    "Option E \u2014 skip the seconds comparison for an endpoint rendering 00:00:00"
   ],
   "decision": "Chosen option: A \u2014 an end rendering as 00:00:00 on the local day immediately following the start's"
+ },
+ "0016-a-capacity-refusal-requires-a-database-verdict.md": {
+  "options": [
+   "Option A \u2014 do nothing structural; rely on AC-5's source scan and reviewer attention.",
+   "Option A \u2014 the source scan and reviewer attention alone",
+   "Option B \u2014 a dependency-cruiser rule",
+   "Option B \u2014 a dependency-cruiser rule.",
+   "Option C \u2014 brand the contended resource",
+   "Option C \u2014 brand the contended resource, minted only by the SQLSTATE classifier, and make",
+   "Option D \u2014 carry the whole PgOutcome conflict object into the no-capacity outcome.",
+   "Option D \u2014 carry the whole conflict object into the outcome",
+   "Option E \u2014 assert at runtime that a 409 followed a 23P01",
+   "Option E \u2014 assert at runtime that a 409 was preceded by a 23P01, e.g. through the span or"
+  ],
+  "decision": "Chosen option: C \u2014 ContendedResource is a branded type minted only inside"
+ },
+ "0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md": {
+  "options": [
+   "Option A \u2014 validate ownership before the insert",
+   "Option A \u2014 validate ownership with a read before the insert; treat any 23503 as 500.",
+   "Option B \u2014 classify after the failure",
+   "Option B \u2014 classify with a read after the insert is refused, on",
+   "Option C \u2014 add singleton foreign keys on customerid and vehicleid",
+   "Option C \u2014 add singleton foreign keys on customerid and vehicleid so the three failures",
+   "Option D \u2014 collapse the rows; return unknown-reference for all three",
+   "Option D \u2014 collapse the two taxonomy rows: return /problems/unknown-reference for all thre",
+   "Option E \u2014 parse the DETAIL line of the PostgreSQL error.",
+   "Option E \u2014 parse the error's DETAIL line"
+  ],
+  "decision": "Chosen option: B \u2014 on 23503 naming appointmentvehicleownedbycustomer, and only then, run one"
  }
 }
