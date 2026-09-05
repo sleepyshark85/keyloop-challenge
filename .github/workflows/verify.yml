@@ -135,26 +135,17 @@ jobs:
 
       - name: every event-log record validates against the schema
         # append.mjs validates on the write path, so this catches the one way round it:
-        # a line edited by hand.  Ten lines of inline node is acceptable; if this grows it
-        # becomes a tools/ script with a test in tools/test/ (ADR-0010, Consequences).
-        shell: bash
-        run: |
-          node --input-type=module -e '
-            import { readFileSync } from "node:fs";
-            import { validate } from "./tools/team-log/schema.mjs";
-            const file = "docs/team-log/events.jsonl";
-            const lines = readFileSync(file, "utf8").split("\n").filter(Boolean);
-            let bad = 0;
-            lines.forEach((line, i) => {
-              let e;
-              try { e = JSON.parse(line); }
-              catch { console.log("::error file=" + file + ",line=" + (i + 1) + "::not valid JSON"); bad++; return; }
-              const { ok, errors } = validate(e);
-              if (!ok) { console.log("::error file=" + file + ",line=" + (i + 1) + "::" + errors.join("; ")); bad++; }
-            });
-            console.log(lines.length + " record(s) checked, " + bad + " invalid");
-            if (bad) process.exit(1);
-          '
+        # a line edited by hand.
+        #
+        # This was ten lines of inline node until slice 01, with a comment saying it would
+        # become a tools/ script "if this grows".  It did not grow; it was UNRUNNABLE
+        # LOCALLY, which is worse.  The orchestrator appended five records with event names
+        # the schema does not define, ran `npm test`, `npm run test:tools` and
+        # `npm run lint:arch` — all green, because none of them validated the log — pushed,
+        # and learned about it here.  A guard that only fires after the push costs a round
+        # trip every time it earns its keep.  It is now `npm run log:check`, is in the
+        # `test:tools` chain, and has its own cases in tools/test/log-check.test.mjs.
+        run: npm run log:check
 
   # The criterion that decides what lives here rather than in the PHASE 4 block below is
   # "does it need `src/`", not "which phase does it belong to".  `npm test` does not need

@@ -144,6 +144,8 @@ function threadLine(e) {
     case 'check.run': return Object.entries(e.checks ?? {}).map(([k, v]) => `${k}=${v}`).join('  ');
     case 'review.finding': return `${e.severity} ${e.file}${e.line ? `:${e.line}` : ''} — ${e.claim}`;
     case 'review.response': return `${e.finding_ref} → ${e.resolution}${e.message ? ` · ${e.message}` : ''}`;
+    case 'finding.resolved': return `${e.ref} resolved${e.message ? ` · ${e.message}` : ''}`;
+    case 'backlog.added': return `${(e.slices_added ?? []).join(', ')}${e.refs ? ` from ${e.refs.join(', ')}` : ''}${e.message ? ` · ${e.message}` : ''}`;
     case 'dcr.raised': return `step ${e.step}: ${e.reason}`;
     case 'dcr.discussed': return e.position;
     case 'dcr.resolved':

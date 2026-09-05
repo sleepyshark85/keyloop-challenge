@@ -44,6 +44,29 @@ export const EVENTS = {
   // built on — had no data. `ref` is the human-facing id used in the PR thread.
   'finding.raised':   ['actor', 'ref', 'severity', 'claim', 'scenario', 'step'],
   'finding.ruled':    ['actor', 'ref', 'verdict', 'rationale'],
+  // The close of a finding's lifecycle: raised -> ruled -> RESOLVED. Added at slice 01
+  // by the human's ruling, and the reasoning is recorded because it went against the
+  // orchestrator's recommendation.
+  //
+  // It overlaps `review.response`, which is the reviewer's reply to its own finding and
+  // carries a `resolution` from a fixed four-value set. `finding.resolved` is the
+  // ORCHESTRATOR's record that a remedy landed and was VERIFIED — the distinction that
+  // matters here is who is speaking and what was checked, not what the outcome was
+  // called. Slice 01's AC-6 remedy is the shaping case: the reviewer raised R-01-3, the
+  // architect ruled it (b), the human overrode the deferral at the gate, two roles
+  // implemented the two halves, and the orchestrator re-ran the mutant on both. None of
+  // `review.response`'s four resolutions describes that, and attributing it to the
+  // reviewer would be false.
+  //
+  // The orchestrator argued for reusing `review.response` and was overruled. Recorded
+  // per §6's Authority clause: the human overrides anyone, and every override is
+  // recorded with rationale.
+  'finding.resolved': ['actor', 'ref', 'message'],
+  // A (b) deferred-improvement ruling's §6 effect, made visible as one event rather than
+  // inferred from slice files appearing. `slice.ready` says a slice may start; this says
+  // WHY it exists and which finding produced it, which is what the defect register reads
+  // to compute escape distance for work that was correctly deferred rather than fixed.
+  'backlog.added':    ['actor', 'slices_added'],
   'dcr.raised':       ['actor', 'reason', 'step'],
   'dcr.discussed':    ['actor', 'position'],
   'dcr.resolved':     ['ruling', 'rationale'],
@@ -134,6 +157,17 @@ export function validate(e) {
   }
   if (e.event === 'review.response' && e.resolution && !RESOLUTIONS.includes(e.resolution)) {
     errors.push(`invalid resolution: ${e.resolution} (expected ${RESOLUTIONS.join(' | ')})`);
+  }
+  // A resolution is only evidence if it names what was verified, so `message` is required
+  // above and an empty `ref` is rejected here rather than closing an unnamed finding.
+  if (e.event === 'finding.resolved' && e.ref !== undefined && typeof e.ref !== 'string') {
+    errors.push('finding.resolved `ref` must be the finding id as a string');
+  }
+  // The whole point of the event is which slices a (b) produced; an empty list would
+  // record a deferral that deferred nothing.
+  if (e.event === 'backlog.added' && e.slices_added !== undefined
+      && (!Array.isArray(e.slices_added) || e.slices_added.length === 0)) {
+    errors.push('backlog.added `slices_added` must be a non-empty array of slice ids');
   }
   if (e.event === 'dcr.resolved' && e.ruling && !(e.ruling in DCR_RULINGS)) {
     errors.push(`invalid ruling: ${e.ruling} (expected a | b | c | d)`);

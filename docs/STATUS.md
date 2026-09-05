@@ -15,19 +15,18 @@
 
 | | |
 |---|---|
-| Last commit | `5eb3e14 fix(log): the audit pairs by agent id, and its git half stops being inert (O-3, R-10)` |
+| Last commit | `3a0b4d8 fix(01): the event-log schema gains two event types, and its guard becomes runnable` |
 | Gates decided | A, B, C, E, E, E, D |
-| Agent runs recorded | 46 |
+| Agent runs recorded | 58 |
 | ADRs accepted | 10 |
-| Slices defined | 10 |
+| Slices defined | 12 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Next: slice [`01`](slices/01-domain-policy-core.md) — The domain policy core — duration, occupancy interval, and opening hours**
-- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
-- It claims QS-9, QS-12.
-- 8 slice(s) remain of 10 defined; Gate D folded 3 (03, 10, 11) into their successors.
+- **Slice [`01`](slices/01-domain-policy-core.md) is in flight** — The domain policy core — duration, occupancy interval, and opening hours.
+- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
+- 10 slice(s) remain of 12 defined; Gate D folded 3 (03, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
 ## Gate decisions
@@ -76,6 +75,9 @@
 | [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | accepted | — |
 | [0011](adr/0011-health-is-an-operational-probe.md) | Treat /health as an operational probe outside the API contract, not as a sixth operation | proposed | — |
 | [0012](adr/0012-seed-fixtures-are-a-test-owned-loader.md) | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | proposed | — |
+| [0013](adr/0013-outside-in-tests-exercise-the-built-artifact.md) | Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost | proposed | — |
+| [0014](adr/0014-an-instant-is-renderable-by-construction.md) | An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | proposed | — |
+| [0015](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) | An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | proposed | — |
 
 ## Agent runs
 
@@ -127,7 +129,19 @@
 | 2026-09-04 11:00 | test-engineer | 163m49 | 284 / 24,116 / 23,909,782 | `derived` |
 | 2026-09-04 11:07 | test-engineer | 171m00 | 322 / 27,344 / 29,300,388 | `derived` |
 | 2026-09-04 11:23 | architect | 211m53 | 572 / 40,007 / 62,900,812 | `derived` |
-| | **total** | **3469m25** | **13,316 / 1,009,664 / 1,083,681,763** | |
+| 2026-09-04 16:55 | architect | 17m35 | 118 / 6,959 / 5,227,025 | `derived` |
+| 2026-09-04 16:59 | architect | 21m41 | 146 / 7,284 / 7,475,577 | `derived` |
+| 2026-09-04 17:04 | implementer | 4m06 | 54 / 16,372 / 1,618,862 | `derived` |
+| 2026-09-04 17:06 | test-engineer | 6m06 | 34 / 29,517 / 771,446 | `derived` |
+| 2026-09-04 17:12 | architect | 34m49 | 150 / 7,288 / 7,475,577 | `derived` |
+| 2026-09-04 18:54 | architect | 136m30 | 230 / 10,951 / 15,711,998 | `derived` |
+| 2026-09-04 19:30 | test-engineer | 24m55 | 244 / 62,546 / 21,214,281 | `derived` |
+| 2026-09-04 19:53 | implementer | 17m36 | 258 / 24,152 / 17,417,497 | `derived` |
+| 2026-09-04 20:17 | reviewer | 16m10 | 208 / 19,166 / 12,651,581 | `derived` |
+| 2026-09-04 20:22 | architect | 225m14 | 234 / 10,961 / 15,747,040 | `derived` |
+| 2026-09-05 04:39 | architect | 7m55 | 132 / 17,232 / 4,495,099 | `derived` |
+| 2026-09-05 04:55 | test-engineer | 15m28 | 162 / 20,836 / 7,227,950 | `derived` |
+| | **total** | **3997m30** | **15,286 / 1,242,928 / 1,200,715,696** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

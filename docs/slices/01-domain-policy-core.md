@@ -3,7 +3,7 @@ id: "01"
 title: The domain policy core — duration, occupancy interval, and opening hours
 status: ready
 depends_on: ["00"]
-arc42: ["§5.2", "§8.3", "§12"]
+arc42: ["§5.2", "§8.3", "§10.2", "§12"]
 adr: [1]
 quality_scenarios: [QS-9, QS-12]
 loopbacks: 0
@@ -22,8 +22,10 @@ to one file, so the change most likely to arrive is absorbed by one module plus 
   derived, then it is `[s, s + d)` and no client-supplied end is consulted (A-1).
 - **AC-2** — Given a dealership in `Europe/London` open 09:00–17:00 local, when an instant is
   validated, then it is accepted if and only if its **local** rendering lies within the window —
-  including on both sides of both DST transitions, where the instant that is 08:30 local but 09:30
-  UTC is rejected and its counterpart accepted. *(QS-9)*
+  including on both sides of both DST transitions. Worked pair: `2026-03-28T08:30Z` renders 08:30
+  local (GMT) and is **rejected**; its counterpart `2026-03-29T08:30Z`, the same UTC wall time on
+  the far side of the spring-forward transition, renders 09:30 local (BST) and is **accepted**.
+  The same instant, the same window, opposite verdicts — which is the whole point. *(QS-9)*
 - **AC-3** — Given a 60-minute job starting 00:30 local on a spring-forward night, when its interval
   is derived, then it ends 02:30 local — duration is added on the absolute timeline, not the
   wall clock (§8.3).
@@ -35,6 +37,14 @@ to one file, so the change most likely to arrive is absorbed by one module plus 
   `src/domain/openingHours.ts`. *(QS-12)*
 - **AC-6** — Given `.dependency-cruiser.js`, when `depcruise` runs, then `src/domain` imports nothing
   at all — the `domain-is-pure` rule holds with no allowlist.
+
+> **AC-2's worked pair was amended on 2026-09-04 by human ruling (O-13), at step 1.** As written it
+> read *"the instant that is 08:30 local but 09:30 UTC"*, which describes Europe/London at UTC−1 — an
+> offset the zone never has, since it is GMT or BST and local is never behind UTC. UTC and local were
+> transposed. The substance of AC-2 is unchanged; only the illustrative pair was corrected, and it was
+> corrected against measured offsets rather than reasoned about. Raised at step 1, where an ambiguous
+> criterion costs a paragraph, rather than at step 3 where the test-engineer would have had to assert
+> something impossible or silently reinterpret an acceptance criterion that is not its to change.
 
 ## In scope
 
