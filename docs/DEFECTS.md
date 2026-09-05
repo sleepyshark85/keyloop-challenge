@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **93** |
-| Severity | 10 blocking · 52 major · 31 minor |
+| Findings recorded | **94** |
+| Severity | 10 blocking · 52 major · 32 minor |
 | Verdicts | 5 narrowed · 35 accepted · 1 escalated · 5 deferred |
-| Raised by | reviewer 24 · orchestrator 21 · test-engineer 19 · architect 15 · implementer 13 · human 1 |
-| Awaiting a ruling | **47** |
-| Mean escape distance | 1.82 step(s) |
+| Raised by | reviewer 24 · orchestrator 21 · test-engineer 19 · architect 16 · implementer 13 · human 1 |
+| Awaiting a ruling | **48** |
+| Mean escape distance | 1.80 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -630,6 +630,7 @@ rather than narrated.*
 | **O-25** | MAJOR | 0 *(+0)* | orchestrator | Every agent definition instructed its editor to regenerate from METHODOLOGY, and no generator existed | **open** |
 | **O-26** | MAJOR | 0 *(+0)* | orchestrator | The test guarding the O-17 fix was flaky about one run in three, in test:tools, in CI | **open** |
 | **O-27** | MINOR | 0 *(+0)* | orchestrator | METHODOLOGY §12 claimed CLAUDE.md is generated from METHODOLOGY, while METHODOLOGY cites CLAUDE.md as normative | **open** |
+| **O-28** | MINOR | 0 *(+0)* | architect | arc42 §1.4 attributed seven reserved decisions to CLAUDE.md §3, which reserved four | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -677,6 +678,11 @@ rather than narrated.*
 
 - *scenario:* Found by the architect. §12's table listed eight files as derived from named METHODOLOGY sections, including 'CLAUDE.md \| Operative rules only \| From §1, §5-§8, §10'. Two documents each claiming to be the other's source, and an agent reading both had no way to know which wins - worse than either wording alone. Compounded by the file header still reading 'Machine-facing files are derived from this', the same overclaim §12 warns against and the same shape as O-25's non-existent generator. §12 now states exactly what tools/agents/generate.mjs does - three things - and everything else as hand-maintained and related by citation. Related: METHODOLOGY's copy of the event vocabulary had already drifted from tools/team-log/schema.mjs, and the architect caught itself ADDING finding.raised to the copy rather than to the schema, which is the drift happening in real time during the pass that removed it.
 - *file:* `docs/METHODOLOGY.md`
+
+**O-28** — arc42 §1.4 attributed seven reserved decisions to CLAUDE.md §3, which reserved four
+
+- *scenario:* Found only because the orchestrator's CLAUDE.md §1/§3 pointer change made nine arc42 citations circular and the architect had to visit each one. §1.4 claimed 'the HTTP framework, the query layer, the migration tool, the module decomposition, candidate ordering, the retry mechanism and the attempt cap's value are all reserved to the architect by CLAUDE.md §3.' §3 named the FIRST FOUR. Candidate ordering, the retry mechanism and the cap's value were reserved by ADR-0004, which says its value is a Gate B parameter and its existence fixed there, and that candidate ordering is an architecture decision for Gate B rather than a Gate A ruling. Verified by the orchestrator against §3's text before it became a pointer. THE LOOP WAS HIDING A WRONG CITATION - a citation nobody follows is a citation nobody checks, and this one had been wrong since it was written. Now split, with ADR-0004 linked. TWO RELATED FINDINGS from the same pass. TC-1, TC-6 and TC-8 cited CLAUDE.md §3 for the STACK, and the brief names no language, no database and no test framework - it asks for 'a list of your chosen technologies with justifications' and 'your strategy for observability'. So the OBLIGATION to have an observability story is brief-imposed and OpenTelemetry with pino is the human's choice; TC-1 and TC-6 have no brief basis at all and their only origin is the human at phase 0. They now say so, and §2's preamble gained 'the human' as a category because it had none. That makes an honest shape visible: several §2.2 rows constrain THE ARCHITECT rather than the project. And TC-8's other citation, METHODOLOGY §9, was a near-loop too - §9 says the application-plane OTel/pino contract IS arc42 §8, deferring to arc42 rather than imposing on it, so it could not be the origin either.
+- *file:* `docs/arc42/01-introduction-goals.md`
 
 </details>
 
