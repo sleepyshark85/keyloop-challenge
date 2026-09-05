@@ -72,11 +72,29 @@ function makeFixture() {
   adrFile('0003', 'A deferred idea', 'proposed');   // must reach the debt register
   writeFileSync(join(adr, '_template.md'), '---\nid: "NNNN"\n---\n');  // must be ignored
 
-  return { root, arc42, adr, out: join(root, 'system-design.md') };
+  // AB-01-7. The register has a SECOND source, and until slice 01 it claimed one it
+  // never read: §11.1 said the table is generated from proposed ADRs *and every
+  // deferred-improvement slice*, while nothing here opened docs/slices/ at all.
+  //
+  // Three shapes, because the predicate is `deferred_from` and NOT "accepted ADR on an
+  // unfinished slice". The looser test was written first and produced nineteen rows —
+  // it listed the FOUNDING decisions as outstanding debt, because every unbuilt slice
+  // references them. `ordinary` is the fixture that catches that regression.
+  const slices = join(root, 'slices');
+  mkdirSync(slices);
+  const sliceFile = (id, title, fm) =>
+    writeFileSync(join(slices, `${id}-${title.toLowerCase().replace(/\W+/g, '-')}.md`),
+      `---\nid: "${id}"\ntitle: ${title}\n${fm}\n---\n\n## Goal\n`);
+
+  sliceFile('50', 'Ordinary unbuilt work', 'status: ready\nadr: [1]');
+  sliceFile('51', 'A deferred remedy', 'status: ready\nadr: [2]\ndeferred_from: "R-99-1"');
+  sliceFile('52', 'A deferred remedy already built', 'status: done\nadr: [1]\ndeferred_from: "R-99-2"');
+
+  return { root, arc42, adr, slices, out: join(root, 'system-design.md') };
 }
 
 const run = (f, extra = []) => spawnSync('node',
-  [BUILD, '--arc42', f.arc42, '--adr', f.adr, '--out', f.out, ...extra],
+  [BUILD, '--arc42', f.arc42, '--adr', f.adr, '--slices', f.slices, '--out', f.out, ...extra],
   { encoding: 'utf8' });
 
 // --------------------------------------------------------------------- run ---
@@ -128,7 +146,20 @@ check('§9 links are relative to the section, not the assembly',
 
 // --- the debt register ---
 check('a proposed ADR reaches the debt register', s11.includes('A deferred idea'));
-check('an accepted ADR does not', !s11.includes('First decision'));
+check('a proposed ADR is labelled as not yet agreed, not as agreed debt',
+  /A deferred idea.*proposed — not yet agreed/.test(s11), s11);
+
+// --- AB-01-7: the second source, and the line that keeps it narrow ---
+check('a slice with deferred_from and an accepted ADR is AGREED AND UNBUILT',
+  /Second decision.*slice 51.*agreed and unbuilt/.test(s11), s11);
+check('...and it names the finding it was deferred from, not just the remedy',
+  s11.includes('deferred from R-99-1'), s11);
+check('an ordinary unbuilt slice is NOT debt — its founding ADR is the architecture, '
+  + 'and listing it would bury the real items under "the project is not finished"',
+  !s11.includes('slice 50'), s11);
+check('a deferred slice that is DONE is no longer debt', !s11.includes('slice 52'), s11);
+check('an accepted ADR alone does not reach the register',
+  !/First decision.*agreed and unbuilt/.test(s11), s11);
 
 // --- ↩ --check must catch drift in BOTH places ---
 check('--check passes immediately after a build', run(f, ['--check']).status === 0);

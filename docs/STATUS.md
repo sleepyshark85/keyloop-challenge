@@ -11,12 +11,12 @@
 
 ## Where we are
 
-**Phase 5 — Slice loop**, which closes at Gate E (per slice).
+**Phase 4 — Pilot + retro**, which closes at Gate D.
 
 | | |
 |---|---|
-| Last commit | `82ad614 chore(docs): regenerate system-design.md for the ratification` |
-| Gates decided | A, B, C, E, E, E, D, E |
+| Last commit | `af20234 chore(01): Gate E recorded, three ADRs ratified, step 7 logged` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process |
 | Agent runs recorded | 61 |
 | ADRs accepted | 13 |
 | Slices defined | 12 |
@@ -24,10 +24,11 @@
 
 ## What happens next
 
-- **Slice [`01`](slices/01-domain-policy-core.md) is in flight** — The domain policy core — duration, occupancy interval, and opening hours.
-- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
-- 10 slice(s) remain of 12 defined; Gate D folded 3 (03, 10, 11) into their successors.
-- **Gate E** on each, then `npm run slice:close`.
+- **Both pilot slices are done and the retro is written** — see [`team-log/phase-4-retro.md`](team-log/phase-4-retro.md).
+- Verdict: C1 PASS · C2 PASS on git, weakened on hooks · C3 PASS · C4 PASS · **C5 FAIL** · **C6 FAIL** · C7 PASS with three open defects · C8 the human's.
+- Two non-fatal criteria fail and neither is C1 nor C2, so the pre-registered decision rule reads: **tune the mechanisms and proceed to slice 01, no second pilot.**
+- **Gate D is open and undecided.** C6 is the one needing a ruling — its own wording says the response to a breach is to cut slices or reduce agent count, not to proceed and hope.
+- Open findings are in [`DEFECTS.md`](DEFECTS.md); the C2 and C7 clusters are what the retro says to tune first.
 
 ## Gate decisions
 
@@ -62,6 +63,14 @@
 **Gate E** · 2026-09-05 · approved-and-merged
 
 > Approved and merged as PR #10, merge commit f661988, at 2026-09-05T05:54Z. The human's word was 'merged' and no further rationale was given, so none is invented here (§11): what is recorded is the decision, not a reconstruction of the reasoning behind it. What the gate approved, stated so the record is not thinner than the work: AC-6's second clause ruled UNMET at this gate and remedied in-slice in both halves - `to: {}` in the rule's own text and a planted intra-domain control that was watched to fail under the mutant; four (b) deferred improvements, two of which became backlog slices 12 and 13 with ADR-0014 and ADR-0015; and one loopback consumed of two, from T-01-2 at step 2. STILL OPEN AND NOT CLOSED BY THE MERGE: ADR-0013, ADR-0014 and ADR-0015 remain status: proposed. The orchestrator put them to the human at this gate and received no verdict, and a merge is not an ADR ratification - MADR status is a decision record, not a consequence of code landing. ADR-0015 in particular carries the architect's own flag that it sits closer to the human's authority than its own, since whether a dealership open until midnight may take a 23:00-24:00 booking is an acceptance question. Carried forward as an open item rather than resolved by inference.
+
+**Gate process** · 2026-09-05 · light-gate-on-mechanical-slices
+
+> Ruled 2026-09-05 in response to a cost analysis, not a hunch: slice 01 cost 9.5h wall and 8.30 Mtok against 30.7h/30.53 Mtok for slice 00 and 26.1h/23.90 Mtok for 00a - already a 3x fall and UNDER the 10-hour ceiling Gate D predicted C6 would fail again against. The architect holds 9 of 15 runs and 72 percent of billable tokens, and most of that concentration was ORCHESTRATION rather than the constitution: step 7 alone was three separate dispatches. DECIDED: slices 02, 04, 06 and 07 keep the FULL human Gate E - they carry the booking path, candidate allocation and the 06/07 atomic-move seam Gate C defended by name. Slices 05, 08 and 09 get a LIGHT GATE: auto-approve on a green Definition of Done unless the reviewer raises a MAJOR or BLOCKING finding, which reverts them to a full gate. §8 makes human review attention the scarce resource and this spends it where a §2 invariant is at risk. The orchestrator's position is on record and was NOT that this is free: it proposed a light gate before slice 01, then argued against it for slice 01 specifically, because AC-6's unenforced second clause is exactly what a light gate would have merged. 05, 08 and 09 carry no §2 invariant, which is the distinction the ruling rests on. TO BE MECHANISED, NOT REMEMBERED: the light gate becomes a `gate:` field in slice frontmatter that slice:check reads and enforces, because a policy whose only enforcement is the orchestrator recalling it is the failure this project has catalogued nine times. Scoped to slice 02 rather than to phase 5 because the schema deliberately rejects phase 5 - slice work uses `slice` - and a cross-slice PROCESS ruling made during phase 5 has no other home. Slice 02 is where both rulings first take effect. Recorded as O-18.
+
+**Gate process** · 2026-09-05 · fold-12-and-13-into-02
+
+> Ruled 2026-09-05 alongside the light-gate decision. Backlog slices 12 and 13 - the R-01-1 instant bound and the R-01-4 midnight-ending interval - fold into slice 02 rather than running as two separate loops. Both are small domain fixes whose remedies are already NAMED EXACTLY by the architect and now RATIFIED as ADR-0014 and ADR-0015, so the design step they would each consume has effectively already happened; running two full seven-step loops to apply two ratified decisions is the slicing problem §6's loopback governor warns about, seen from the other end. The 06/07 seam is again NOT touched, per Gate C. Backlog goes from 10 remaining to 8. Explicitly accepted as a cost: slice 02 grows from AC-1..AC-12 to carry both remedies and their negative controls, and a bigger slice is a bigger unit to review - which is precisely why 02 keeps the FULL human gate under the ruling above. Scoped to slice 02 rather than to phase 5 because the schema deliberately rejects phase 5 - slice work uses `slice` - and a cross-slice PROCESS ruling made during phase 5 has no other home. Slice 02 is where both rulings first take effect. Recorded as O-18.
 
 ## Decisions on record
 

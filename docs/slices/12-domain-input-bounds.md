@@ -7,6 +7,7 @@ arc42: ["§5.2", "§8.1", "§11"]
 adr: [14]
 quality_scenarios: [QS-9, QS-12]
 loopbacks: 0
+deferred_from: "R-01-1"   # §6 (b) ruling at slice 01 step 5; remedy ratified as ADR-0014
 ---
 
 ## Goal

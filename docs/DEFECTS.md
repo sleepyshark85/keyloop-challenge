@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **83** |
-| Severity | 10 blocking · 46 major · 27 minor |
+| Findings recorded | **85** |
+| Severity | 10 blocking · 47 major · 28 minor |
 | Verdicts | 5 narrowed · 35 accepted · 1 escalated · 5 deferred |
-| Raised by | reviewer 24 · test-engineer 19 · architect 15 · implementer 13 · orchestrator 11 · human 1 |
-| Awaiting a ruling | **37** |
-| Mean escape distance | 1.94 step(s) |
+| Raised by | reviewer 24 · test-engineer 19 · architect 15 · implementer 13 · orchestrator 13 · human 1 |
+| Awaiting a ruling | **39** |
+| Mean escape distance | 1.96 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -472,6 +472,7 @@ rather than narrated.*
 | **AB-01-5** | MAJOR | 7 *(+7)* | architect | The mutation gate has a demonstrated false-negative mode recorded only in a config comment, and nothing in arc42 says so | **open** |
 | **AB-01-6** | MINOR | 7 *(+7)* | architect | TC-9 states the test suite is not runnable in a Docker-less runner; twelve of fifteen files now are | **open** |
 | **AB-01-7** | MAJOR | 7 *(+7)* | architect | §11.1 claimed the debt register is generated from deferred-improvement slices as well as proposed ADRs; the generator never reads docs/slices/, and ratifying two ADRs dropped both agreed remedies out of the table | **open** |
+| **O-19** | MAJOR | 6 *(+6)* | orchestrator | The 'human approved' gate compared the decision string by exact equality, so the human's actual wording read as NOT approved - and slice 00a had already worked around it by logging the same decision twice | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -608,6 +609,26 @@ rather than narrated.*
 
 - *scenario:* §11.1's lead sentence read 'Generated: every ADR with status: proposed AND EVERY DEFERRED-IMPROVEMENT SLICE'. tools/docs/build.mjs:57 filters adrList on status === 'proposed' and never reads docs/slices/ at all. The second half was a mechanism claim nobody had run - the shape this project has spent three slices removing - and it stayed invisible only because until 2026-09-05 every deferred-improvement slice had a proposed ADR standing in the register on its behalf. Ratifying ADR-0014 and ADR-0015 is what made it bite: both are now ACCEPTED AND UNIMPLEMENTED, and both dropped straight out of the generated table because the table keys on 'proposed'. Verified by the orchestrator: npm run docs:build went from 5 deferred to 2, and grep finds no reference to slices 12 or 13 in the generated block. The debt did not shrink; its RECORD did - which is the worse direction, because the register is what a reader consults to find out what is owed. Live in main today and now recorded by hand under 'Agreed and unbuilt': an Instant that is unrenderable and can throw out of a function documented as pure, and a midnight-ending job refused. Closing it needs the register generated from slice frontmatter as well as ADR frontmatter - orchestrator tooling, and it joins O-14 and O-17 in slice 02's prep window.
 - *file:* `docs/arc42/11-risks-technical-debt.md`
+
+**O-19** — The 'human approved' gate compared the decision string by exact equality, so the human's actual wording read as NOT approved - and slice 00a had already worked around it by logging the same decision twice
+
+- *scenario:* check.mjs read gate.decision === 'approved'. The human's slice 01 decision was recorded as 'approved-and-merged' and the gate reported the slice not approved with every other check green. Slice 00a hit the identical wall and the workaround was to append a SECOND gate.decided carrying the exact spelling - the same human decision in the permanent record twice, to satisfy a string compare. That is the ninth instance of a guard enforced by the orchestrator remembering something. Two further defects in the same predicate: it took the last gate.decided of ANY kind, so a PROCESS ruling (gate: 'process' - slice 02 carries two, because the schema rejects phase 5) would have passed a slice on a decision about how it was going to be gated; and a non-approval was indistinguishable from a missing gate. Fixed: gate === 'E', decision matched on meaning, and a non-approval FAILS with its decision named. 4 test cases; reverting to exact equality fails 1.
+- *file:* `tools/slice/check.mjs`
+
+</details>
+
+## Slice 02
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **O-18** | MINOR | 0 *(+0)* | orchestrator | A process ruling made during phase 5 has nowhere to be scoped: phase 5 is rejected and the ruling is not slice work | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**O-18** — A process ruling made during phase 5 has nowhere to be scoped: phase 5 is rejected and the ruling is not slice work
+
+- *scenario:* PHASES excludes '5' on the stated grounds that slice work uses `slice`, which is right for slice work. The light-gate and fold-12-13 rulings are neither: they are cross-slice PROCESS decisions that change how every remaining slice is gated and how the backlog is shaped, made while phase 5 is in progress. Both were attached to slice 02 because that is where they first bite, which is defensible but misattributes a process decision to a unit of work - the board and the defect register will read them as slice 02's. Gate A through D had `phase` available and used it. NOT fixed here: it is a schema change during a cost-reduction ruling, which is the wrong moment, and scoping to the first affected slice loses nothing that cannot be recovered from the span_id. For the retro.
+- *file:* `tools/team-log/schema.mjs`
 
 </details>
 
