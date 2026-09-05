@@ -282,6 +282,37 @@ machine; on a fresh checkout it reports every honest agent run as `UNSUPPORTED` 
 correct behaviour, and it is why §9 calls it a gate-time command. CI substitutes two structural
 checks it *can* make — the log is append-only, and every record validates against the schema.
 
+### R-12 · The mutation gate's failure mode is silence, and it is held by a workaround
+
+`CLAUDE.md` §10 makes the mutation score part of *Done* and `tools/slice/check.mjs` gates on 0.75.
+**The tool that produces that number has a demonstrated mode in which it reports survivors it never
+tested.** `@stryker-mutator/vitest-runner@10.0.0` does not activate mutants under `vitest@5.0.0`; on
+the run the human ruled blocking, 118 of 130 survivors had `testsCompleted: 0`, and every mutant of a
+file with six dedicated tests survived — including one that empties the function body. §8.5 carries
+the measurement and the re-measurement recipe.
+
+Three things about this are worth keeping in front of a reader rather than in a config comment:
+
+- **It was caught by a low score, which is luck.** 6.34 was obviously wrong. A partially-broken runner
+  producing 0.81 against a 0.75 threshold would have passed, and nothing in the pipeline would have
+  said the mutants were never activated. `slice:check` is careful about this number in one dimension
+  and blind in the other: it distinguishes *no score*, *a score measuring the previous slice* and *a
+  slice with no mutable files*, because collapsing those cost the gate its meaning in both directions
+  at once. None of that helps here. A score that covers exactly the right changed files and was
+  produced over mutants nothing ever ran passes every one of those checks.
+- **The workaround is sound but unguarded.** The `command` runner has no framework integration to
+  break, which is precisely why it works — but nothing fails if someone sets `testRunner: 'vitest'`
+  back. The protection is §8.5's step 2, `testsCompleted: 0`, and a person remembering to run it.
+- **It is the same shape three times now.** `depcruise` exiting 0 having cruised nothing (§5.3,
+  closed by `tools/ci/lint-arch.mjs`), a single `vitest run` writing 0 tests after a `globalSetup`
+  abort (§7.2, closed by `tools/ci/run-tests.mjs`), and this. Two were closed by putting the coverage
+  assertion **inside the thing that produces the pass**. This one has no such wrapper, and building
+  one — a `mutation.json` check on `testsCompleted` — is the obvious next payment.
+
+The mitigation available today is that mutation is run by the reviewer at step 5 rather than by CI, so
+a human reads the survivor list. That is real, and it is why the defect was found; it is not a
+mechanism.
+
 ### R-9 · `npm run db:migrate` does not conform to ADR-0007, and the built artifact cannot migrate
 
 Two items, recorded together because **the second is a trap laid for whoever pays the first**.

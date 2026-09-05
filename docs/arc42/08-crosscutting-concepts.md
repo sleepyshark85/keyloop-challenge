@@ -487,6 +487,62 @@ Stated this way the rule keeps its teeth while being true. "Nothing outside `dom
 was easy to state and false, and a rule that is visibly false is a rule the next person routes around
 on their own judgement.
 
+### Mutation testing does not run through Stryker's Vitest runner, and the reason is a false negative
+
+`CLAUDE.md` §10 makes a mutation score part of Definition of Done and `tools/slice/check.mjs` gates
+on **0.75**,
+so a slice cannot reach `done` without this running. It is run by the **reviewer** at step 5 and
+deliberately not in CI: survivors are findings for a role that wrote neither the tests nor the code,
+and a number in a pipeline answers that question by ignoring it. Scope is `src/**` less `main.ts`.
+
+**It runs through Stryker's `command` runner, over a separate `vitest.mutation.config.ts`, and that is
+a workaround for a measured defect rather than a preference.**
+`@stryker-mutator/vitest-runner@10.0.0` **does not activate mutants** under `vitest@5.0.0`. Its peer
+range is `vitest: ">=2.0.0"`, so npm warns about nothing — the same shape as `dependency-cruiser`'s
+TypeScript range in §5.3, and the same shape as everything else this project keeps finding: a tool
+reporting a number over work it never did.
+
+The evidence, from the run whose 6.34 score the human ruled blocking:
+
+| Measured | |
+|---|---|
+| survivors that ran no test at all | **118 of 130** had `testsCompleted: 0` in `mutation.json` — Stryker ran nothing against them and recorded them as *survived* |
+| `src/application/checkHealth.ts` | **every** mutant survived, including the one that empties the whole function body, against a file with six dedicated tests |
+| the same mutant, activated by hand | in Stryker's own unmodified sandbox, `__STRYKER_ACTIVE_MUTANT__=0 npx vitest run -c vitest.mutation.config.ts` makes **five of those tests fail**. The mutant is killed. The runner simply never ran them |
+| same tree, same mutants, command runner | **76.06** rather than 6.34; `config.ts` 90.28 rather than 1.39 |
+
+A second defect in the same runner: `--logLevel debug` crashes it with *"Converting circular structure
+to JSON"* at `vitest-test-runner.js:95`, which `JSON.stringify`s the resolved Vitest config — so the
+integration cannot be debugged through its own logging.
+
+The command runner has no framework integration to break: Stryker sets `__STRYKER_ACTIVE_MUTANT__`,
+runs the command, reads the exit code. It is what a person does by hand, which is why it is
+trustworthy, and at this size it costs nothing — 142 mutants in about 33 seconds. Its one consequence
+is `coverageAnalysis: 'off'`: with no per-test attribution to collect, every mutant runs the whole
+suite. That is the conservative direction — a mutant is never skipped as *not covered* — and it is
+what makes *"Ran 1.00 tests per mutant"* in the output mean one full suite run.
+
+**What would make removing the workaround safe.** A future reader upgrading Stryker or Vitest must not
+infer from a plausible score that the integration is fixed; the broken runner's tell is not a low
+score, it is unrun tests. Re-measure, in this order:
+
+1. Set `testRunner: 'vitest'`, remove `commandRunner`, run `npx stryker run` on an unchanged tree.
+2. **Open `reports/mutation/mutation.json` and count mutants with `testsCompleted: 0`.** Over files
+   that have unit tests this must be **zero**. Any non-zero count means mutants are not being
+   activated, whatever the score says. This is the check that matters and it is the one a score
+   comparison alone will not give you.
+3. Compare the score against the command runner's on the same tree. A large drop is the same signal
+   arriving the slower way.
+4. **Positive control**: pick one mutant a test should kill, activate it by hand with
+   `__STRYKER_ACTIVE_MUTANT__=<id> npx vitest run -c vitest.mutation.config.ts`, and confirm the
+   tests fail. If they fail by hand while Stryker reports *survived*, the integration is still broken
+   no matter what changed upstream.
+5. Only with 2 and 4 both clean is `coverageAnalysis` worth revisiting — it is `off` because of the
+   workaround, not on its own merits.
+
+§11 carries this as a risk, because a Definition-of-Done gate that can report a clean number over
+mutants it never activated is a gate that can be passed without being satisfied.
+
 ### The response-schema seam is a serialiser, not an assertion
 
 **A TypeBox `response` schema does not validate what a handler produced. It reshapes it on the way
