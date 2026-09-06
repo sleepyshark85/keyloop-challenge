@@ -67,14 +67,17 @@ Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
   ADR-0016 shape: *"forgot the lock"* becomes a compile error and *"correctly exempt"* (ADR-0023's
   cancel path) becomes a signature that does not ask for one. Slice 06 is the destination **because it
   writes `rescheduleAppointment`, a newly written locking path** — the first moment the mistake is live
-  rather than historical. Residue: it does not prove the keys match the row. **`F-02-9`'s slice-06
-  half rides on the same signature**: one minting site, so no call site can skip or reorder them.
+  rather than historical. *As built ADR-0026 took Option C: the lock carries its keys, so that residue is
+  closed between lock and write. What is left: the lock does not prove the write shares its
+  transaction (ADR-0028, deferred), and a `ResourceLock` can be written by hand with no cast (§11
+  D-06-2). **`F-02-9`'s slice-06 half is discharged by the required parameter**, not by the minting
+  site being unique.*
 - **ADR-0024 — `setNotFoundHandler`, the `404 /problems/route-not-found` row, and the hostile-request
-  corpus.** Measured today: `GET /nope` returns `404 application/json` with no `type`, and
-  `content-type: application/xml` returns `500`. `server.ts`'s docblock asserts §8.6's totality *"is
-  kept"* in `setErrorHandler` and it is not; that docblock is corrected with the handler. The corpus
+  corpus.** *Both merged: `GET /nope` now answers `404 /problems/route-not-found`; the
+  `application/xml` `500` is the invariant's one residual (§8.6).* `server.ts`'s docblock claimed §8.6's totality was kept in
+  `setErrorHandler`; corrected with the handler. The corpus
   is `tests/contract/`, the test-engineer's, asserted in the direction that can fail (∀responses ∃row).
-  **§8.6 gains the row at this slice's step 7.** Two warnings, both ruled at slice 05 step 5 so they
+  **§8.6 gained the row at step 7.** Two warnings, both ruled at slice 05 step 5 so they
   are not discovered here: registering the handler **breaks the media-type half of AC-4's vacuity
   guard** in `cancel-appointment.test.ts:247`, which discriminates on Fastify's default body — the
   `type` member still discriminates, and the test-engineer re-derives that case rather than deleting
@@ -86,15 +89,14 @@ Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
   never a logged finding)*, by
   [ADR-0025](../adr/0025-existence-is-the-reads-legality-is-the-statements.md) decision 6: under
   that ruling transition legality is a database verdict on ADR-0016's ground, so a module holding
-  one allowlist whose only consumer is a SQL predicate is a relocation of a literal. §5.2's
-  as-built cell records the retirement and its reason at step 7, so the pointer does not dangle.
+  one allowlist whose only consumer is a SQL predicate is a relocation of a literal. §5.2 records the retirement at step 7.
   The residue — the constraints' denylist against the move's allowlist — goes to §11.
 - **The Stryker exhaustiveness disables** (`R-05-9`). ~13 structurally unkillable mutants cap
   `routes/appointments.ts` near 88%, so 83.04 has stopped discriminating (reviewer, slice 05).
   A `// Stryker disable all : <reason>` … `// Stryker restore all` pair around each
   `const unhandled: never` arm — **those arms only**, not the schema-options or description mutants, which are inert for reasons that change
-  when Fastify's config or slice 09's OpenAPI assertion does. Slice 06 adds the fourth route
-  and therefore the fourth arm, so doing it once here costs one pass instead of two. The *decision* is
+  when Fastify's config or slice 09's OpenAPI assertion does. Slice 06 adds the fourth arm, so doing it
+  once costs one pass instead of two. The *decision* is
   the architect's, on the same ground as `stryker.config.mjs`'s `mutate` list; the *edit* is in `src/`
   and is the implementer's. *The pair suppressed 93 mutants where 8 were ruled;
   ruled at step 5 under `R-05-9`.*

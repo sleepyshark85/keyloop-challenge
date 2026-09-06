@@ -187,13 +187,15 @@ Two details a reviewer should check any implementation against:
 ## 6.3 Rescheduling — one atomic `UPDATE`
 
 `PATCH /appointments/{id}` with a new `startsAt`. Steps 1–6 are §6.2's, with the appointment's own
-dealership and service type read from the existing row; step 7 replaces the `INSERT`:
+dealership and service type read from the existing row — **and that read also decides `404`**, being
+one the move cannot be built without (ADR-0025). Step 7 replaces the `INSERT`, and **attempt 1 is the
+pair the row already holds** before ADR-0009's shuffle opens (ADR-0027):
 
 ```sql
 UPDATE appointment
    SET bay_id = $2, technician_id = $3, starts_at = $4, ends_at = $5, updated_at = now()
  WHERE id = $1 AND status = 'confirmed'
-RETURNING *;
+RETURNING <the ten columns>;   -- as built: named, never `*`
 ```
 
 **No `AND id <> $1` predicate anywhere, no pre-read of the target slot, no application-side
@@ -208,8 +210,10 @@ because none of them is obvious:
 | The appointment id survives | It is an `UPDATE`. A caller holding the id still holds it | QS-6 |
 
 A move racing another move, or racing a fresh booking, is the §6.1 story with `UPDATE` in place of
-`INSERT`. There is one mechanism, and rescheduling does not add a second. `0 rows` returned means the
-appointment does not exist (`404`) or is not `confirmed` (`409`), distinguished by a follow-up read.
+`INSERT`: the same two advisory locks precede it, carried as a value the write takes (ADR-0026). One
+mechanism; rescheduling adds none. **`0 rows` means one thing — not `confirmed`.** Existence was
+settled by the read above, so there is no follow-up read: §6.6's two `0 rows` rows have two deciders
+(ADR-0025).
 
 ## 6.4 Cancellation
 
@@ -232,11 +236,7 @@ guarded `AND status <> 'cancelled'` would return zero for a replay too. The `CAS
 ADR-0003's idempotent `200` change **no column** (asserted as `to_jsonb` equality) — but `xmin` advances, so
 *changes nothing* is true where *writes nothing* is not.
 
-**QS-7's stated reason was wrong twice and is now measured.** It is not the sole guard on the
-predicate — slice 00 pins that definitionally and, on the bay side, behaviourally. Uniquely QS-7's:
-nothing else asserts the **technician** constraint *releases*, and the candidate list carries no
-availability filter, so it is identical either side of the cancel and the only thing moving between
-the `409` and the `201` is the constraint's verdict.
+What QS-7 uniquely pins, and why its stated reason was wrong twice, is in §10 — one home, not two.
 
 ## 6.5 Availability query — advisory by contract
 
@@ -268,11 +268,10 @@ consulted.
 | Outside opening hours | `domain/openingHours.ts` | reference data only — **never a booking** (GC-1) | `400` |
 | Unknown dealership, service type, customer or vehicle | reference read, then the FK (`23503`) | reference data | `422` |
 | Vehicle not owned by the named customer | composite FK (`23503`) | reference data | `422` |
-| Unknown appointment id | the `UPDATE`'s `0 rows` | one row | `404` |
-| Appointment not `confirmed` | the `UPDATE`'s `0 rows` | one row | `409` |
+| Unknown appointment id | the read the move needs anyway (ADR-0025) | one row | `404` |
+| Appointment not `confirmed` | the guarded `UPDATE`'s `0 rows` | one row | `409` |
+| Unmatched route | `setNotFoundHandler` (ADR-0024) | nothing | `404` |
 | Every candidate refused | **PostgreSQL, `23P01`, repeatedly** | the whole live schedule, as a side effect of writing | `409` |
 
-The last row is the only one whose answer depends on what else is happening at that instant, and the
-only one the application does not decide. The two `0 rows` rows are not equally decided either: slice
-05's cancel is unconditional, so zero rows is unambiguously *no such id*, where slice 06's guarded
-move reproduces the ambiguity §6.3 resolves with a follow-up read.
+The `409` row above it is the only one whose answer depends on what else is happening at that instant,
+and the only one the application does not decide.
