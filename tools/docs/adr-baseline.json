@@ -338,5 +338,31 @@
    "Option D \u2014 an ambiguity-containment marker or a dependency-cruiser rule."
   ],
   "decision": "Chosen option: C."
+ },
+ "0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md": {
+  "options": [
+   "Option A \u2014 shuffle from the first attempt",
+   "Option A \u2014 shuffle from the first attempt, bookAppointment's order applied unchanged.",
+   "Option B \u2014 current pair first, then the shuffle",
+   "Option B \u2014 the current pair is attempt 1, then ADR-0009's seeded shuffle over the remainde",
+   "Option C \u2014 current pair only",
+   "Option C \u2014 the current pair only; refuse if it conflicts.",
+   "Option D \u2014 order by distance from the current pair",
+   "Option D \u2014 order by distance from the current pair \u2014 current, then same bay other technici"
+  ],
+  "decision": "Chosen option: B. Attempt 1 is the appointment's own (bayid, technicianid). On a 23P01"
+ },
+ "0028-the-lock-carries-the-transaction-it-was-taken-on.md": {
+  "options": [
+   "Option A \u2014 leave it as \u00a711 debt",
+   "Option A \u2014 leave it as \u00a711 debt, ADR-0026's position.",
+   "Option B \u2014 a runtime identity assertion",
+   "Option B \u2014 a runtime identity assertion in each write.",
+   "Option C \u2014 the lock carries its Db",
+   "Option C \u2014 the lock carries the Db it was taken on, and the write takes no Db of its own.",
+   "Option D \u2014 a dependency-cruiser rule or an ambiguity-containment marker.",
+   "Option D \u2014 a rule or a marker"
+  ],
+  "decision": "Chosen option: C, proposed and not applied."
  }
 }

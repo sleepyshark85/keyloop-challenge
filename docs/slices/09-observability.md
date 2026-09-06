@@ -96,16 +96,29 @@ is a goal nobody can fail.
 ## Inherited scope — written here, not only where it was deferred
 
 - **F-06-1 — two attempt loops, one design.** `bookAppointment` and `rescheduleAppointment` each
-  carry ADR-0004's retry loop: the same pruning, the same attempt cap, the same `booking.conflict`
-  line, in two files. Slice 06 duplicated it deliberately rather than refactor the project's
-  most-measured code path inside its largest slice, and deferred the extraction here under
-  ADR-0019. **Slice 09 is the destination because it must instrument both loops anyway** —
-  `appointment.insert` and `appointment.update` spans, `booking_attempts`, and
-  `booking_conflicts_total` (§8.4) — so it opens both files regardless; *cheaper* there, and
-  *stronger*, because an extracted loop is instrumented once instead of twice with a chance to
-  differ. Both premises are re-measurable on arrival: if slice 09 turns out to open only one file,
-  say so in the PR (D-05-3).
-- **OQ-05-2** — deferred here at slice 05; already written up as AC-6b above.
+  carry ADR-0004's retry loop — same pruning, same cap, same `booking.conflict` line — in two files.
+  Slice 06 duplicated it rather than refactor the project's most-measured path inside its largest
+  slice. **The destination is here because this slice must instrument both loops anyway**
+  (`appointment.insert` / `appointment.update` spans, `booking_attempts`, §8.4), so it opens both
+  files regardless: *cheaper*, and *stronger*, because an extracted loop is instrumented once. Note
+  ADR-0027 — the loops start on different first attempts, so the extraction takes a parameter rather
+  than being a lift. Re-measurable on arrival (D-05-3).
+- **OQ-05-2** — deferred here at slice 05; written up as AC-6b above.
+- **A-06-2 — nothing asserts that `deps.newId()` is the only place an appointment id is minted.**
+  ADR-0025 rests on it: an id unreachable before it exists makes the read's `absent` answer
+  permanent, so the `404` cannot go stale. Declined for slice 06 — the mechanism exists, the hazard
+  does not — and **deferred here because this slice emits the OpenAPI document**, so the check
+  asserts over *every operation* that none accepts a caller-supplied id, rather than over the files
+  someone grepped. A `dependency-cruiser` rule is file-granular and cannot see it; *"the reviewer
+  looked"* is not executable.
+- **T-06-5 / [ADR-0028](../adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) — the lock
+  does not prove the write shares its transaction.** ADR-0026 named the hole; the test-engineer
+  measured it and returned a **negative result** — no black-box test can observe it, because the
+  exclusion constraint backstops correctness either way. Types are the only control:
+  ADR-0028 (`proposed`) has `ResourceLock` carry the `Db` it was taken on. **Here for F-06-1's
+  reason** — the signature then changes once over an extracted loop instead of twice. Accepting it
+  is a decision, not a formality: slice 06 declined it as outcome (b) because nothing fails
+  without it.
 
 ## In scope
 
@@ -124,10 +137,9 @@ is a goal nobody can fail.
 - Tracing the availability query's internals. The span that matters is the one that shows the window.
 - A client SDK, a UI, or a Postman collection. `CLAUDE.md` §1 stubs the client layer at the contract
   and the harness.
-- Reference-data endpoints. A-7 keeps seeding to migrations and fixtures precisely so this surface
-  stays the five operations that carry risk.
-- Optimising to beat the budget. If it passes, nothing changes: goal 3 beats goal 5, and §1.2 says to
-  prefer the decomposition that isolates an ambiguity over the one that saves a query.
+- Reference-data endpoints. A-7 keeps seeding to migrations and fixtures so this surface stays the
+  five operations that carry risk.
+- Optimising to beat the budget. If it passes, nothing changes: goal 3 beats goal 5.
 - Load testing beyond a single dealership, connection-pool tuning, or read replicas. §11 carries them.
 
 ## Definition of done

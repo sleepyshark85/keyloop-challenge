@@ -59,6 +59,20 @@ every test in slice 06.
   one is refused"* mean something rather than count to one. **If either premise is false on
   arrival, say so in the PR**; that is what D-05-3 asked for.
 
+- **O-41 — the `Inherited scope` guard becomes bidirectional, and this file is where it first
+  bites.** A-05-5's check is a *subset* guard (every ref deferred here appears in `inherits:`) and
+  not a *completeness* guard: slice 06 listed five obligations in prose while three of its four
+  `inherits:` refs appeared nowhere but the front-matter line, so a silent drop would have left
+  `slice:check` green. Ruled at slice 06 step 2 with **one correction to the proposed remedy**:
+  requiring every bullet to carry a ref is false against slice 06 today, because the retired
+  `appointment.ts` bullet is a §5.2 prediction that was never a logged finding and has no ref to
+  carry — a rule demanding one would invent a false ref to satisfy a rule that exists to stop false
+  refs. So the guard runs **both ways**: every ref in `inherits:` appears in a body bullet, and
+  every body bullet carries a ref **or** an explicit no-ref-with-reason escape. Bare bullets fail;
+  escaped bullets pass and are visible. **Built at this slice's dispatch, before it reaches Ready**,
+  so a Definition-of-Ready rule first bites on a file written under it rather than on one already
+  declared ready. The tool is `tools/slice/check.mjs` and the edit is the orchestrator's.
+
 ## In scope
 
 - `tests/concurrency/refused-move-leaves-original.test.ts` and

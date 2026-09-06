@@ -15,6 +15,7 @@ real and consciously not fixed under §6 **(b)**.
 | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | [ADR-0012](../adr/0012-seed-fixtures-are-a-test-owned-loader.md) | proposed — not yet agreed |
 | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | [ADR-0016](../adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | proposed — not yet agreed |
 | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | [ADR-0017](../adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | proposed — not yet agreed |
+| The lock carries the transaction it was taken on | [ADR-0028](../adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | proposed — not yet agreed |
 <!-- /generated:debt-register -->
 
 **A row states what is owed, never that anything is correct.** A `proposed` row leaves when the human
