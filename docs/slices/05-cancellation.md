@@ -3,8 +3,8 @@ id: "05"
 title: Cancellation — and the proof that the constraint's predicate is live
 status: ready
 depends_on: ["04"]
-arc42: ["§6.4", "§8.6"]
-adr: [3]
+arc42: ["§5.2", "§6.4", "§6.6", "§8.6", "§10", "§11"]
+adr: [3, 23]
 quality_scenarios: [QS-7]
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
@@ -34,6 +34,8 @@ that clause is an unverified claim sitting inside the system's most important co
 
 - The cancel route, use case and `UPDATE`.
 - `tests/integration/cancellation-releases-slot.test.ts`.
+- `tests/concurrency/cancellation-takes-no-lock.test.ts` — added at step 1 as a scope ruling, so
+  ADR-0023's exemption from F-02-9 is measured rather than asserted (`05-design.md` §5).
 
 ## Out of scope
 
