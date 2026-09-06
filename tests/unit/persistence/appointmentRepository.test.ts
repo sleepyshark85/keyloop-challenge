@@ -4,6 +4,7 @@ import {
   findAppointmentById,
   insertAppointment,
   lockResources,
+  rescheduleAppointmentById,
 } from '../../../src/persistence/appointmentRepository.js';
 import type { ResourceLock } from '../../../src/persistence/appointmentRepository.js';
 import { scriptedDb } from '../helpers/stub-db.js';
@@ -334,5 +335,100 @@ describe('cancelAppointmentById — slice 05, D1 and ADR-0023', () => {
     const failure = Object.assign(new Error('deadlock detected'), { code: '40P01' });
     const { db } = scriptedDb([{ error: failure }]);
     await expect(cancelAppointmentById(db, IDS.appointment)).rejects.toBe(failure);
+  });
+});
+
+describe('rescheduleAppointmentById — slice 06, ADR-0025 and ADR-0026', () => {
+  const MOVED_ROW = { ...RETURNED_ROW, starts_at: new Date('2026-09-08T09:15:00.000Z'), ends_at: new Date('2026-09-08T10:15:00.000Z') };
+  const MOVE = { id: IDS.appointment, startsAt: MOVED_ROW.starts_at, endsAt: MOVED_ROW.ends_at };
+
+  it('is ONE guarded UPDATE — no pre-read, and the guard is `status = \'confirmed\'` (ADR-0025)', async () => {
+    // The shape is the argument, same reason `cancelAppointmentById`'s is: no `select` exists to
+    // check availability with, so there is no check for an act to follow. Unlike D1, THIS write
+    // DOES carry a guard — the read that decided existence already ran, and this statement's
+    // job is only to decide LEGALITY (decision 2), never to re-establish existence.
+    const { db, recorded } = scriptedDb([{ rows: [MOVED_ROW] }]);
+    await rescheduleAppointmentById(db, MOVE, LOCK);
+
+    expect(recorded).toHaveLength(1);
+    const sql = recorded[0]?.sql ?? '';
+    expect(sql.startsWith('update "appointment"')).toBe(true);
+    expect(sql).not.toMatch(/\bselect\b/i);
+    expect(sql).toMatch(/where "id" = \$\d+ and "status" = \$\d+/);
+  });
+
+  it('bay_id and technician_id come off the LOCK, never off `move` (ADR-0026)', async () => {
+    // `Move` carries no `bayId`/`technicianId` at all — a compile-time argument this test backs
+    // with a runtime one: the values written are the LOCK's, and a lock minted for a different
+    // pair than `move`'s own would write the LOCK's pair, not silently ignore it.
+    const { db, recorded } = scriptedDb([{ rows: [MOVED_ROW] }]);
+    const differentLock = { bayId: 'a-different-bay', technicianId: 'a-different-tech' } as ResourceLock;
+    await rescheduleAppointmentById(db, MOVE, differentLock);
+    expect(recorded[0]?.parameters).toContain('a-different-bay');
+    expect(recorded[0]?.parameters).toContain('a-different-tech');
+  });
+
+  it('advances `updated_at` to the DATABASE\'s clock, UNCONDITIONALLY and with no CASE', async () => {
+    // `now()`, never `new Date()` — the same clock `0003_appointment.sql`'s column DEFAULT and
+    // `cancelAppointmentById`'s CASE both use, so this statement's timestamp cannot disagree
+    // with either. Unconditional because a move is never idempotent (this slice's own "Out of
+    // scope": a move to the identical instant still executes this statement and is a request,
+    // not a replay of one) — unlike D1, there is no unchanged-row case for a CASE to protect.
+    const { db, recorded } = scriptedDb([{ rows: [MOVED_ROW] }]);
+    await rescheduleAppointmentById(db, MOVE, LOCK);
+    const sql = recorded[0]?.sql ?? '';
+    expect(sql).toContain('"updated_at" = now()');
+    expect(sql).not.toMatch(/case/i);
+  });
+
+  it('is EXACTLY this statement — one UPDATE, both guards, no CASE, and the ten returned columns', async () => {
+    const { db, recorded } = scriptedDb([{ rows: [MOVED_ROW] }]);
+    await rescheduleAppointmentById(db, MOVE, LOCK);
+    expect(recorded[0]?.sql).toBe(
+      'update "appointment" set "bay_id" = $1, "technician_id" = $2, "starts_at" = $3, ' +
+        '"ends_at" = $4, "updated_at" = now() ' +
+        'where "id" = $5 and "status" = $6 ' +
+        'returning "id", "dealership_id", "customer_id", "vehicle_id", "service_type_id", ' +
+        '"technician_id", "bay_id", "starts_at", "ends_at", "status"',
+    );
+    expect(recorded[0]?.parameters).toEqual([
+      IDS.bay,
+      IDS.technician,
+      MOVE.startsAt,
+      MOVE.endsAt,
+      IDS.appointment,
+      'confirmed',
+    ]);
+  });
+
+  it('returns the mapped row the DATABASE wrote, moved', async () => {
+    expect(await rescheduleAppointmentById(scriptedDb([{ rows: [MOVED_ROW] }]).db, MOVE, LOCK)).toEqual({
+      id: IDS.appointment,
+      dealershipId: IDS.dealership,
+      customerId: IDS.customer,
+      vehicleId: IDS.vehicle,
+      serviceTypeId: IDS.serviceType,
+      technicianId: IDS.technician,
+      bayId: IDS.bay,
+      startsAt: MOVE.startsAt,
+      endsAt: MOVE.endsAt,
+      status: 'confirmed',
+    });
+  });
+
+  it('returns null for zero rows — ADR-0025: legality only, because existence was already read', async () => {
+    // The whole reason this write DOES carry a guard where D1 does not: the read that ran before
+    // this already established the row exists, so zero rows here means exactly one thing — not
+    // confirmed — and there is no ambiguity with "unknown id" for the caller to disambiguate.
+    expect(await rescheduleAppointmentById(scriptedDb([{ rows: [] }]).db, MOVE, LOCK)).toBeNull();
+  });
+
+  it('DOES NOT CATCH — a refused UPDATE propagates for `classify` to read (AC-1)', async () => {
+    const refusal = Object.assign(new Error('conflicting key value'), {
+      code: '23P01',
+      constraint: 'no_bay_overlap',
+    });
+    const { db } = scriptedDb([{ error: refusal }]);
+    await expect(rescheduleAppointmentById(db, MOVE, LOCK)).rejects.toBe(refusal);
   });
 });

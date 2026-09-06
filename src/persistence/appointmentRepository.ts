@@ -60,6 +60,17 @@ export interface NewAppointment {
 }
 
 /**
+ * What a move writes. Same shape as {@link NewAppointment} minus the columns a move cannot
+ * touch (ADR-0025: no dealership, customer, vehicle or service type change — "Out of scope" in
+ * the slice file) and minus `bayId`/`technicianId` for the same reason as above.
+ */
+export interface Move {
+  readonly id: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+}
+
+/**
  * ADR-0026 — a value the write takes, carrying the keys it took.
  *
  * `lockResources` is the ONLY minting site: a write cannot be called without one, and there is
@@ -255,10 +266,10 @@ function toAppointmentRow(row: {
  * wait is one-directional, and a one-directional wait cannot cycle.
  *
  * F-05-1, RESOLVED at slice 06 by ADR-0026: `lockResources` returns a branded {@link
- * ResourceLock} that {@link insertAppointment} takes as a parameter (and the reschedule write
- * about to land beside it will too), so "forgot the lock" is a compile error and this function's
- * signature — a plain {@link Db} and no lock parameter — is now itself the readable statement of
- * "correctly exempt", with no docblock required to tell the two apart.
+ * ResourceLock} that {@link insertAppointment} and {@link rescheduleAppointmentById} take as a
+ * parameter, so "forgot the lock" is a compile error and this function's signature — a plain
+ * {@link Db} and no lock parameter — is now itself the readable statement of "correctly exempt",
+ * with no docblock required to tell the two apart.
  *
  * ── ONE STATEMENT, NO GUARD, AND §2.1 NEVER ARISES ────────────────────────────────────────────
  *
@@ -290,6 +301,82 @@ export async function cancelAppointmentById(db: Db, id: string): Promise<Appoint
       updated_at: sql<Date>`case when "status" = ${sql.lit(CANCELLED)} then "updated_at" else now() end`,
     })
     .where('id', '=', id)
+    .returning([
+      'id',
+      'dealership_id',
+      'customer_id',
+      'vehicle_id',
+      'service_type_id',
+      'technician_id',
+      'bay_id',
+      'starts_at',
+      'ends_at',
+      'status',
+    ])
+    .executeTakeFirst();
+
+  return row === undefined ? null : toAppointmentRow(row);
+}
+
+/**
+ * Slice 06 — `PATCH /appointments/{id}`, as ONE guarded `UPDATE`. ADR-0025's chosen Option C.
+ *
+ * ── EXISTENCE IS THE READ'S; LEGALITY IS THIS STATEMENT'S ─────────────────────────────────────
+ *
+ * `findAppointmentById` already decided the id exists before this is ever called (ADR-0025
+ * decision 1) — absence is permanent, because appointment ids are minted by `deps.newId()` and
+ * never client-supplied. What THIS statement decides is legality: `WHERE id = $1 AND status =
+ * 'confirmed'` means zero rows here can mean exactly one thing, a row that exists but is not
+ * `confirmed` (decision 2) — there is no follow-up read (decision 3), and the caller maps `null`
+ * straight to `not-confirmed`.
+ *
+ * THE STATUS GUARD LIVES ONLY HERE, never in a preceding check (decision 4): a cancelled
+ * appointment moved to an out-of-hours interval never reaches this statement at all, because the
+ * domain rule (`deriveInterval`) is evaluated first and unconditionally in the use case — the
+ * ruled consequence is a `400`, not a `409`, and it is a fact about ORDER in the caller, not
+ * about this SQL.
+ *
+ * NOT CHECK-THEN-ACT (decision 5). The read this statement follows touches one row by primary
+ * key and answers nothing about any OTHER appointment's interval — nothing on this path can
+ * answer "is that bay free". Its `absent` answer cannot go stale; its `confirmed` answer can, and
+ * is re-adjudicated atomically by this statement's own `status = 'confirmed'`. A read is
+ * check-then-act when the write TRUSTS it; this write re-asks the question the read cannot
+ * answer for itself.
+ *
+ * `bay_id` AND `technician_id` COME OFF THE LOCK, NOT OFF `move` — ADR-0026, the same reason
+ * {@link insertAppointment} does. `updated_at = now()`, WITH NO `CASE`: unlike D1's cancellation,
+ * a move is never idempotent (there is no client-reachable no-op interval, per the slice's own
+ * "Out of scope" — a move to the identical instant still executes this statement and is a
+ * request, not a replay of one), so `now()` is never a write to an unchanged row.
+ *
+ * THE TWO PARTIAL GiST INDEXES NEVER SEE THE SUPERSEDED VERSION (AC-1, arc42 §8.2 consequence
+ * 4). An `UPDATE` writes a new heap tuple and stamps the old one's `xmax` with this transaction's
+ * own xid; `check_exclusion_constraint` runs after the new index entry exists, skips it by
+ * `ctid`, and every other candidate is tested for liveness — the superseded version's `xmax` is
+ * this transaction's own xid, so it is "deleted by me" rather than a live conflict. That is a
+ * property of the enforcement MECHANISM, not of this statement, and it is why there is no `AND
+ * id <> $1` anywhere here: a `BEFORE UPDATE` trigger computing the same overlap would need one,
+ * because it reads the heap and would see the prior version; this statement never does.
+ */
+export async function rescheduleAppointmentById(
+  db: Db,
+  move: Move,
+  lock: ResourceLock,
+): Promise<AppointmentRow | null> {
+  const row = await db
+    .updateTable('appointment')
+    .set({
+      bay_id: lock.bayId,
+      technician_id: lock.technicianId,
+      starts_at: move.startsAt,
+      ends_at: move.endsAt,
+      // The database's own clock, exactly as `0003_appointment.sql`'s column DEFAULT and
+      // `cancelAppointmentById`'s CASE both use it — never `new Date()`, which would be a
+      // second clock this statement's timestamp could disagree with.
+      updated_at: sql<Date>`now()`,
+    })
+    .where('id', '=', move.id)
+    .where('status', '=', 'confirmed')
     .returning([
       'id',
       'dealership_id',
