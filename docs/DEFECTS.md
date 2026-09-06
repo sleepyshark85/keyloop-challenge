@@ -21,9 +21,9 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 |---|---|
 | Findings recorded | **166** |
 | Severity | 10 blocking · 89 major · 67 minor |
-| Verdicts | 8 narrowed · 60 accepted · 1 escalated · 10 deferred |
+| Verdicts | 8 narrowed · 60 accepted · 3 escalated · 13 deferred |
 | Raised by | test-engineer 36 · architect 34 · reviewer 34 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
-| Awaiting a ruling | **87** |
+| Awaiting a ruling | **82** |
 | Mean escape distance | 1.91 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -863,7 +863,7 @@ rather than narrated.*
 
 | ref | sev | step | raised by | claim | verdict |
 |---|---|---|---|---|---|
-| **D-04-1** | MAJOR | 1 *(+1)* | architect | ADR-0009 sized the cap of 16 on a premise that does not hold until slice 08's availability filter exists | **open** |
+| **D-04-1** | MAJOR | 1 *(+1)* | architect | ADR-0009 sized the cap of 16 on a premise that does not hold until slice 08's availability filter exists | escalated |
 | **T-04-1** | MAJOR | 2 *(+1)* | test-engineer | The recorded seed is a label, not a handle — AC-5's re-runnability leg is undelivered, and no retry can be forced deterministically | accepted |
 | **T-04-2** | MAJOR | 2 *(+1)* | test-engineer | AC-4 should be asserted at the shipped cap of 16; the cheap-fixture premise is wrong and cap=3 unpins ADR-0009's number | accepted |
 | **T-04-3** | MINOR | 2 *(+1)* | test-engineer | D-04-1's spurious-refusal leg cannot become an AC-1 case — every candidate fixture is a coin flip | accepted |
@@ -882,7 +882,7 @@ rather than narrated.*
 | **T-04-6** | MAJOR | 3 *(+3)* | test-engineer | A docs commit can silently disarm the red-proof discriminator: docs:check was failing at HEAD since ee868c3, which would have failed verify and made red-proof classify the red run as broken rather than as a red proof | **open** |
 | **A-04-2** | MAJOR | 4 *(+3)* | architect | ADR-0021 startup warn is R-7a stated mitigation and no test in any test-engineer-owned directory asserts it exists | **open** |
 | **A-04-3** | MINOR | 4 *(+4)* | architect | The word-budget counter ignores generated blocks, so a generated register can grow without limit and never register as pressure | **open** |
-| **A-04-4** | MAJOR | 4 *(+4)* | architect | F-04-1 third recurrence, with a second failure mode behind it: the committed baseline escapes non-ASCII codepoints, which JSON.stringify does not reproduce, so the obvious fix silently rewrites all 285 existing pins | **open** |
+| **A-04-4** | MAJOR | 4 *(+4)* | architect | F-04-1 third recurrence, with a second failure mode behind it: the committed baseline escapes non-ASCII codepoints, which JSON.stringify does not reproduce, so the obvious fix silently rewrites all 285 existing pins | deferred |
 | **A-04-5** | MINOR | 4 *(+4)* | architect | The drift direction is diagnostic: BOOKING_SEED reached §5.2, §6.2 and §11 R-7a and never reached §7.3 | **open** |
 | **A-04-6** | MAJOR | 4 *(+4)* | architect | ADRs that cite each other STATUS rot, and §4 immutability then freezes the rot | **open** |
 | **I-04-10** | MAJOR | 4 *(+3)* | implementer | Slice 02 QS-2 concurrency test is a 44 percent flake under ADR-0009 Order-C, and it is green in the run we would merge on | accepted |
@@ -891,7 +891,7 @@ rather than narrated.*
 | **I-04-13** | MINOR | 4 *(+3)* | implementer | Design section 3 carrier needed no per-list cast, and the shape it specified would have reproduced I-04-4 one level down | **open** |
 | **A-04-7** | MAJOR | 4 *(+4)* | orchestrator | docs:refs put two project rules in contradiction and survived four slices by being prefix-lucky rather than correct | **open** |
 | **A-04-8** | MINOR | 4 *(+4)* | architect | Blast radius of Order-C is exactly one file, and the structural reason is worth more than the finding | **open** |
-| **A-04-9** | MAJOR | 4 *(+4)* | architect | The tsc-versus-vitest gap and I-04-10 are one principle, and section 2.4 states only half of it | **open** |
+| **A-04-9** | MAJOR | 4 *(+4)* | architect | The tsc-versus-vitest gap and I-04-10 are one principle, and section 2.4 states only half of it | escalated |
 | **A-04-10** | MINOR | 4 *(+4)* | architect | Section 7.3 preamble is false today, independently of any guard | **open** |
 | **A-04-11** | MAJOR | 4 *(+0)* | architect | A-04-2 is only half discharged, and by the wrong owner | **open** |
 | **A-04-12** | MINOR | 4 *(+0)* | architect | The ORDER BY assertion became MORE load-bearing at this merge, not less, and its comment still says the opposite | **open** |
@@ -903,8 +903,8 @@ rather than narrated.*
 | **R-04-4** | MINOR | 5 *(+1)* | reviewer | bookAppointment.ts:312 is an ESTABLISHED equivalent mutant, and the proof is stronger than what ADR-0020 and arc42 6.2 currently state | accepted |
 | **R-04-5** | MINOR | 5 *(+1)* | reviewer | The mulberry32 survivors are equivalent for the contract, by more than the implementer claimed | **open** |
 | **R-04-6** | MINOR | 5 *(+5)* | reviewer | A naive main..HEAD diff MISREADS section 8.3 as a regression that this slice did not make | **open** |
-| **A-04-13** | MAJOR | 5 *(+5)* | architect | The derivation R-04-1 asks for is already built, already fired, and no artifact carries its verdict | **open** |
-| **A-04-14** | MAJOR | 5 *(+5)* | architect | Section 13 asserts a property section 13 does not have, and it went stale inside the slice that wrote it | **open** |
+| **A-04-13** | MAJOR | 5 *(+5)* | architect | The derivation R-04-1 asks for is already built, already fired, and no artifact carries its verdict | deferred |
+| **A-04-14** | MAJOR | 5 *(+5)* | architect | Section 13 asserts a property section 13 does not have, and it went stale inside the slice that wrote it | deferred |
 | **T-04-8** | MINOR | 5 *(+5)* | test-engineer | main.ts line 46 is now guarded; the general claim in the Stryker comment is still undischarged | **open** |
 | **A-04-15** | MAJOR | 7 *(+7)* | architect | Section 8.4 carried a sentence slice 04 made false, in the row an operator reads while looking at the counter | **open** |
 | **A-04-16** | MINOR | 7 *(+7)* | architect | Three stale as-built numbers, one of which argues against itself | **open** |
@@ -916,6 +916,7 @@ rather than narrated.*
 
 - *scenario:* The sharpest finding of this design, and it falls out of deferring the availability filter to slice 08 under ADR-0019's criterion. ADR-0009 sized the cap 'against contention depth, the only driver Bound-2 leaves' - true only of a candidate list ALREADY FILTERED to free resources. Until slice 08, a dealership with more than roughly 16 bays-plus-technicians can reach the cap WITH NO CONCURRENCY AT ALL. And QS-3's fixtures will not see it, because they seed exactly M. So the cap's justification and the cap's behaviour diverge in a way the slice's own tests are shaped not to notice.
 - *file:* `docs/adr/0009-candidate-ordering-and-attempt-cap.md`
+- *escalated* by orchestrator — FOR THE HUMAN. The cap of 16 is a Gate B number the human accepted, and it sits below Bound-2 additive bound at section 1.1 scale — so a capped refusal is EXPECTED today rather than the signal ADR-0009 intended it to be, and slice 09 AC-13 cannot pass until either the advisory pre-filter lands after slice 08 or the cap is raised. The architect twice declined to act on it because changing the number is not its authority, which is correct. Both remedies are recorded. Not a merge blocker and not a defect in this slice code: the cap behaves exactly as designed, and what is in question is the number the design was given.
 
 **T-04-1** — The recorded seed is a label, not a handle — AC-5's re-runnability leg is undelivered, and no retry can be forced deterministically
 
@@ -1021,6 +1022,7 @@ rather than narrated.*
 
 - *scenario:* A new ADR fails as unpinned and the message instructs a hand-edit of a file outside the architect directory. Taking the obvious route produced a 398-line diff on the exact file whose own error message says do NOT run --rebaseline, which rewrites every existing pin. Caught and rewritten as an 8-line append. The guard warns you off the dangerous command and then hands you a footgun that does the same thing
 - *file:* `tools/docs/adr-invariants.mjs`
+- *deferred* by orchestrator — OUT OF SLICE, not deferred for convenience. docs:adr-check warns you off --rebaseline because it rewrites every pin, then instructs a hand-edit that does the same thing, because the committed baseline escapes non-ASCII in a way JSON.stringify does not reproduce — 198 of 294 lines would change on a naive round-trip, which I verified. Home: tooling branch, orchestrator. ADR-0019 asks whether deferring makes the work cheaper or stronger, and the honest answer here is neither — this is not slice-04 work that is being postponed, it is project-tooling work that slice 04 happened to surface. Ruling it (b) would misuse the outcome; recording it with a named home and no slice attached is the accurate act. It is NOT a defect in this slice's code, and the gate is not held on it.
 
 **A-04-5** — The drift direction is diagnostic: BOOKING_SEED reached §5.2, §6.2 and §11 R-7a and never reached §7.3
 
@@ -1069,6 +1071,7 @@ rather than narrated.*
 
 - *scenario:* A check is evidence only if its verdict is CAUSED by what it names. Section 2.4 states one half — a test that has never failed is not evidence. The flake is the other half (a verdict not caused by the change under test) and vitest-transpiling-without-typechecking is the incomplete-check half (a verdict that never examined what it claims to). Declined as an arc42 section 11 row: CI already gates typecheck over src and tests, so the real gap is that section 7 "every implementer commit is green" uses a weaker local green than CI does, which is a tools/ remedy rather than architecture. Recommended to the human at the gate as a section 2.4 amendment with both instances as evidence; the architect cannot write it, because section 2 is NON-NEGOTIABLE and human-owned.
 - *file:* `CLAUDE.md`
+- *escalated* by orchestrator — FOR THE HUMAN, and correctly not ruled by anyone else. The architect recommended amending CLAUDE.md section 2.4 to state both halves of one principle — a check is evidence only if its verdict is CAUSED by what it names — with I-04-10 (a verdict not caused by the change under test) and the vitest-without-typecheck case (a verdict that never examined what it claims to) as the two instances. It declined to write it because section 2 is NON-NEGOTIABLE and human-owned, which is the right refusal. Carried to the gate rather than resolved, and it is not a merge blocker: section 2.4 as written is not wrong, it is incomplete.
 
 **A-04-10** — Section 7.3 preamble is false today, independently of any guard
 
@@ -1132,11 +1135,13 @@ rather than narrated.*
 
 - *scenario:* npm run slice:check 04 had been printing FAIL "hand-edited but not declared: 07-deployment-view.md, 13-ai-collaboration.md" since 13:15 — 98 minutes before step 5. R-01-7 asked for the derivation at slice 01 and O-14 built it in tools/slice/check.mjs; it is branch-selected precisely so a subject line cannot hide a mid-slice edit, strips generated markers, and reports UNVERIFIED rather than PASS when it cannot resolve a base. It works, and the reviewer re-deriving it by hand found ONE of the two files while the tool had both. So amend-the-declaration is the right remedy per instance but is not the answer: the field was already amended once this slice (04b7879 added 11) and still missed twice afterwards. THE GAP IS THE READING, NOT THE DERIVATION. check.run records carry CI job outcomes only, so the Ready/Done grid is computed on demand, printed to a terminal and persisted nowhere — a red line that no artifact carries is a red line nobody is accountable for. Remedy: check.run should carry the grid alongside the CI jobs, so a FAIL lands in the log, in the DEFECTS.md inputs and on the board. Fourth slice running in which the architect names a tools/ remedy it may not build (F-02-10, F-04-1, A-04-4).
 - *file:* `tools/team-log/collect-ci.mjs`
+- *deferred* by orchestrator — OUT OF SLICE, not deferred for convenience. check.run persists CI job outcomes only, so the slice:check Ready/Done grid is computed on demand, printed to a terminal and carried by no artifact. It printed the FAIL that would have caught R-04-1 for 98 minutes and nobody was accountable for reading it. Home: tooling branch, orchestrator. ADR-0019 asks whether deferring makes the work cheaper or stronger, and the honest answer here is neither — this is not slice-04 work that is being postponed, it is project-tooling work that slice 04 happened to surface. Ruling it (b) would misuse the outcome; recording it with a named home and no slice attached is the accurate act. It is NOT a defect in this slice's code, and the gate is not held on it.
 
 **A-04-14** — Section 13 asserts a property section 13 does not have, and it went stale inside the slice that wrote it
 
 - *scenario:* Line 46 reads "The register is generated from the log and cannot drift: 130 findings — 10 blocking, 71 major, 49 minor. Mean escape distance 1.66 steps." Written at 13:15. Measured now: 474 log records not 407, a 160-row register not 130, 10/86/64 not 10/71/49, 146 prompt files not 130, mean escape 1.76 not 1.66, and 84 of 160 awaiting a ruling rather than 67 of 130. Every cited number was wrong within two hours, before the reviewer even opened the branch. The register genuinely cannot drift; the SENTENCE SAYING SO is hand-copied prose and had already drifted, under a header reading "Sourced from artifacts, never memory". Fixable with a mechanism that already exists and is used twice: tools/docs/build.mjs has a general replaceBlock(marker) that section 9 and section 11 both consume, and section 13 has zero generated markers. A generated:team-stats block would regenerate these with docs:build and, better, make docs:check FAIL when they go stale — which is what caught this class everywhere else.
 - *file:* `docs/arc42/13-ai-collaboration.md`
+- *deferred* by orchestrator — OUT OF SLICE, not deferred for convenience. arc42 section 13 claims the register is generated from the log and cannot drift, then hand-copies six derived numbers, every one of which was wrong within two hours. The fix is a generated:team-stats block consuming the replaceBlock mechanism sections 9 and 11 already use, which would also make docs:check FAIL when the numbers go stale. Home: scribe plus tooling branch. ADR-0019 asks whether deferring makes the work cheaper or stronger, and the honest answer here is neither — this is not slice-04 work that is being postponed, it is project-tooling work that slice 04 happened to surface. Ruling it (b) would misuse the outcome; recording it with a named home and no slice attached is the accurate act. It is NOT a defect in this slice's code, and the gate is not held on it.
 
 **T-04-8** — main.ts line 46 is now guarded; the general claim in the Stryker comment is still undischarged
 

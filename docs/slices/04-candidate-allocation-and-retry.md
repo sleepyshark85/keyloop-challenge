@@ -1,7 +1,7 @@
 ---
 id: "04"
 title: Candidate allocation and retry — no refusal while capacity remains
-status: ready
+status: done
 depends_on: ["02"]
 arc42: ["§6.2", "§5.2", "§7.3", "§8.4", "§11", "§13"]
 adr: [4, 9]
