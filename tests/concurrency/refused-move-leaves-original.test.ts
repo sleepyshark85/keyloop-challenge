@@ -114,35 +114,49 @@ import type { Scenario } from '../support/booking.js';
  * uncritically: this fixture forces every attempt 1 to fail first, which costs an extra
  * round trip before the two movers' contended attempt 2 statements are in flight together,
  * and that changes how often their timing actually aligns into a cycle. MEASURED on this
- * file's own fixture at RACE_COUNT x 25 trials, over three throwaway runs against the
- * unfixed build: 6, 5 and 5 `40P01` per 1000 attempts — roughly 0.5%, an order of magnitude
- * below the architect's own number and worth recording rather than assuming.
+ * file's own fixture against the unfixed build, six throwaway runs: three at RACE_COUNT x 25
+ * trials (1000 attempts each — 6, 5, 5 `40P01`) and three at RACE_COUNT x 40 trials (1600
+ * attempts each — 13, 4, 8). 41 `40P01` in 7800 attempts total, roughly 0.5% — an order of
+ * magnitude below the architect's own number and worth recording rather than assuming.
  *
- * At a 0.5% per-attempt rate, modelled as independent Bernoulli draws (a simplification —
- * the two attempts of one pair are not independent of each other, but the pairs are), the
- * chance a single run of RACE_COUNT x 25 trials (1000 attempts) observes ZERO deadlocks by
- * chance alone is (1 - 0.005)^1000, on the order of 0.7% — small, but not the negligible
- * figure the architect's own rate would suggest, and not a number this file's design should
- * quietly assume away. `TRIAL_COUNT` is therefore set to 40, not 25 (the AC's floor is
- * "≥ 25"): at 1000 -> 1600 attempts, the same arithmetic gives (1 - 0.005)^1600, on the order
- * of 0.03% — small enough to trust, and cheap (roughly 60% more wall time) against the cost
- * of a flaky discriminator. It is still not zero, and a single green run is still not proof
- * on its own; it is the same standard `no-spurious-refusal.test.ts` applies to its own
- * absence assertions (T-04-4): a positive witness (attempt >= 2 for both movers of a pair,
- * forced by construction here rather than merely likely) must be on the record before the
- * absence of `40P01` is trusted as evidence about ADR-0030 rather than about a race that
- * never bit.
+ * R-07-6: 0.5% IS A POINT ESTIMATE OF AN UNKNOWN RATE `p`, NOT `p` ITSELF, and `p` is
+ * machine-dependent — unmeasured on whatever machine actually runs this file in CI — so the
+ * false-pass arithmetic below must carry that uncertainty rather than treat 41/7800 as exact.
+ * A 95% binomial confidence interval on 41/7800 is roughly 0.27%-0.80%, not a single number.
+ *
+ * Modelled as independent Bernoulli draws at each bound (a simplification — the two attempts
+ * of one pair are not independent of each other, but the pairs are): at the POINT ESTIMATE
+ * (0.5%), a single run of RACE_COUNT x 25 trials (1000 attempts) observes ZERO deadlocks by
+ * chance alone with probability (1 - 0.005)^1000, on the order of 0.67% — small, but not the
+ * negligible figure the architect's own 11.7% would suggest. `TRIAL_COUNT` is therefore set
+ * to 40, not 25 (the AC's floor is "≥ 25"): at 1000 -> 1600 attempts, the same point-estimate
+ * arithmetic gives (1 - 0.005)^1600, on the order of 0.034%.
+ *
+ * THAT 0.034% IS ALSO A POINT ESTIMATE, and reporting it alone overstates confidence. At the
+ * LOWER bound of the interval (0.27%) — the bound that matters, since a lower `p` is what
+ * makes a silent false pass MORE likely, not less — `(1 - 0.0027)^1600` is on the order of
+ * 1.3%: 38x worse than the 0.034% headline, and worse than the 0.67% the raise from 25 to 40
+ * trials was made to fix in the first place. The raise is still the right call: at that same
+ * lower bound, 25 trials gives `(1 - 0.0027)^1000` on the order of 6.7%, so going to 40 trials
+ * still cuts the worst-case false-pass risk roughly 5x even though it falls well short of the
+ * 0.034% the point estimate implied. State the interval, not the point. It is still not
+ * zero, and a single green run is still not proof on its own; it is the same standard
+ * `no-spurious-refusal.test.ts` applies to its own absence assertions (T-04-4): a positive
+ * witness (attempt >= 2 for both movers of a pair, forced by construction here rather than
+ * merely likely) must be on the record before the absence of `40P01` is trusted as evidence
+ * about ADR-0030 rather than about a race that never bit.
  */
 
 const RACE_COUNT = 20;
 /**
  * ADR-0030's own measurement used 25 trials (20 x 25 x 2 = 1000). Empirically, THIS fixture's
  * observed deadlock rate under the built (target-only) lock is lower than the 11.7% the
- * architect measured on their own fixture — around 0.5% per attempt across three throwaway
- * runs at 25 trials (5, 5 and 6 of 1000). 40 trials is kept as the floor here rather than 25
- * for exactly the reason stated in the false-pass analysis below: it is still >= the AC's
- * "≥ 25", and it turns a false-pass probability that is small but not negligible at 25 trials
- * into one that is small enough to trust.
+ * architect measured on their own fixture — a point estimate of 0.5% per attempt over six
+ * throwaway runs (41 `40P01` in 7800 attempts; 95% CI roughly 0.27%-0.80%, see the false-pass
+ * analysis below). 40 trials is kept as the floor here rather than 25 for exactly the reason
+ * stated there: it is still >= the AC's "≥ 25", and it materially reduces the false-pass
+ * probability at both the point estimate and the interval's lower bound, even though it does
+ * not reach the headline point-estimate figure once that uncertainty is carried through.
  */
 const TRIAL_COUNT = 40;
 
@@ -534,7 +548,6 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
       const dealershipIds = races.map((r) => r.dealershipId);
 
       await withService(async (service) => {
-        const allRecords: Record<string, unknown>[] = [];
         const badAnswers: string[] = [];
         const unchangedViolations: string[] = [];
         let refusedCount = 0;
@@ -590,7 +603,20 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
           }
         }
 
-        allRecords.push(...service.logRecords());
+        // R-07-11: DRAIN, DON'T SNAPSHOT — a child's stdout reaches this process
+        // asynchronously (`service.ts`'s own reason `awaitLogRecords` exists), so a bare
+        // `logRecords()` right after the last trial's last answer can still be missing that
+        // trial's final lines, including a `reschedule.deadlock` this file most needs to see.
+        // `no-spurious-refusal.test.ts` already adopts this convention; this file diverged
+        // from it at the red commit with no stated reason, and is brought in line with it here
+        // rather than justified as an exception. The predicate waits for the `conflicts.length`
+        // floor asserted below (RACE_COUNT * TRIAL_COUNT * 2) — a bound a correct OR a
+        // defective build both owe, unlike `deadlocks.length`, which a correct build must hold
+        // at zero and so can never be the thing polled for.
+        const allRecords = await service.awaitLogRecords(
+          (rs) => conflictRecords(rs).length >= RACE_COUNT * TRIAL_COUNT * 2,
+          10_000,
+        );
         const conflicts = conflictRecords(allRecords);
         const loop = describeLoopLines(allRecords);
 
@@ -615,6 +641,45 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
             `fail at least once (its own bay, blocked by construction), so at least that many ` +
             `booking.conflict lines are owed.`,
         ).toBeGreaterThanOrEqual(RACE_COUNT * TRIAL_COUNT * 2);
+
+        // ── R-07-5: THE POSITIVE WITNESS, SHARPENED. `deepestAttempt >= 2` is a MAXIMUM and
+        // `conflicts.length` above a FLOOR over ALL attempts together — both are satisfied by
+        // ONE mover reaching attempt 2 and the other 1599 sitting at attempt 1, which is not
+        // what the file header claims. The header argues every one of the
+        // RACE_COUNT * TRIAL_COUNT * 2 attempts is forced past its own attempt-1 refusal into
+        // the mutual cross-vacate at attempt 2 (see "NEITHER MOVE CAN EVER SUCCEED" above),
+        // which means at least that many booking.conflict lines must themselves report
+        // attempt >= 2 — counted directly, T-07-2's own standard applied to this file rather
+        // than inferred from an unrelated max and an unrelated total.
+        const deepAttempts = conflicts.filter((c) => Number(c.attempt) >= 2).length;
+        expect(
+          deepAttempts,
+          `every one of the ${String(RACE_COUNT * TRIAL_COUNT * 2)} attempts is forced by ` +
+            `construction (file header) past its own attempt-1 refusal into a second ` +
+            `candidate, so at least that many booking.conflict lines must report attempt >= 2. ` +
+            `Only ${String(deepAttempts)} did — a heterogeneous shortfall a bare max()/floor ` +
+            `pair does not catch.\n${loop}`,
+        ).toBeGreaterThanOrEqual(RACE_COUNT * TRIAL_COUNT * 2);
+
+        // ── R-07-3: THE STRUCTURAL CLAIM ITSELF, MEASURED — T-07-2's own vacuity standard
+        // applied to the file that raised it. The header argues NEITHER MOVE CAN EVER SUCCEED:
+        // every one of the RACE_COUNT * TRIAL_COUNT * 2 attempts is refused, never a 200.
+        // `succeededCount` was computed above but, until this line, never asserted — a
+        // fixture regression (a blocker interval that stopped overlapping, a qualification
+        // wired to a second technician) that let some movers succeed at attempt 1 would still
+        // pass every assertion in this file: `badAnswers` accepts 200, `unchangedViolations`
+        // only inspects 409s, and the remaining movers' extra conflicts keep `conflicts.length`
+        // and `deepAttempts` over their floors regardless. Asserting it directly also PINS
+        // `refusedCount` at RACE_COUNT * TRIAL_COUNT * 2 by arithmetic, since `badAnswers`
+        // below is already required empty (every attempt is 200 or 409).
+        expect(
+          succeededCount,
+          `the fixture is built so neither move in a pair can ever succeed (file header): ` +
+            `every attempt must be refused. ${String(succeededCount)} of ` +
+            `${String(RACE_COUNT * TRIAL_COUNT * 2)} attempts answered 200, which means at ` +
+            `least one mover never entered a contended cross-vacate at all — a fixture defect, ` +
+            `not evidence about ADR-0030.`,
+        ).toBe(0);
 
         // ── THE CORE CLAIM. Every attempt receives a database verdict: 200 or 409, never a
         // 500 — which is what an unresolved 40P01 looks like at the edge (arc42 §8.6,
