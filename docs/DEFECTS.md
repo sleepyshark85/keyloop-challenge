@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **163** |
-| Severity | 10 blocking · 88 major · 65 minor |
+| Findings recorded | **166** |
+| Severity | 10 blocking · 89 major · 67 minor |
 | Verdicts | 8 narrowed · 60 accepted · 1 escalated · 10 deferred |
-| Raised by | test-engineer 36 · reviewer 34 · architect 31 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
-| Awaiting a ruling | **84** |
-| Mean escape distance | 1.82 step(s) |
+| Raised by | test-engineer 36 · architect 34 · reviewer 34 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
+| Awaiting a ruling | **87** |
+| Mean escape distance | 1.91 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -906,6 +906,9 @@ rather than narrated.*
 | **A-04-13** | MAJOR | 5 *(+5)* | architect | The derivation R-04-1 asks for is already built, already fired, and no artifact carries its verdict | **open** |
 | **A-04-14** | MAJOR | 5 *(+5)* | architect | Section 13 asserts a property section 13 does not have, and it went stale inside the slice that wrote it | **open** |
 | **T-04-8** | MINOR | 5 *(+5)* | test-engineer | main.ts line 46 is now guarded; the general claim in the Stryker comment is still undischarged | **open** |
+| **A-04-15** | MAJOR | 7 *(+7)* | architect | Section 8.4 carried a sentence slice 04 made false, in the row an operator reads while looking at the counter | **open** |
+| **A-04-16** | MINOR | 7 *(+7)* | architect | Three stale as-built numbers, one of which argues against itself | **open** |
+| **A-04-17** | MINOR | 7 *(+7)* | architect | The ratchet made every arc42 addition self-funding, and what paid for it was genuine cross-artifact duplication | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1139,6 +1142,21 @@ rather than narrated.*
 
 - *scenario:* The architect corrected the exclusion justification while the test-engineer worked, and the new comment is true after the change — the test IS the remedy it names. But its stated cost, that every line of main.ts is guarded by an outside-in assertion or by nothing and the mutation score cannot tell which, remains exactly true. One line moved from the second class to the first; nothing tells a reader which other lines are in which.
 - *file:* `src/main.ts`
+
+**A-04-15** — Section 8.4 carried a sentence slice 04 made false, in the row an operator reads while looking at the counter
+
+- *scenario:* It said "a non-zero capped in production means the cap is wrong". Section 11.2 R-4 has falsified that since step 4, but 8.4 is what an operator reads AT the counter and still said the old thing. Fixed, and the declaration gains 8.4 rather than the edit going undeclared — I-04-12 rule applied to the architect own work, with A-04-13 as the precedent. ADR-0009 still contains the claim and correctly still does: it is history.
+- *file:* `docs/arc42/08-crosscutting-concepts.md`
+
+**A-04-16** — Three stale as-built numbers, one of which argues against itself
+
+- *scenario:* Section 11 QS-12 corpus said twenty-one files and three domain against a real twenty-two and four; 5.3 said src/domain has three files; and 5.3 lint:arch sample transcript quoted 54 modules against a real 86. The last is the pointed one: the same paragraph argues that a hand-written count goes stale silently, and its own transcript had. Replaced with a shape rather than a number.
+- *file:* `docs/arc42/05-building-blocks.md`
+
+**A-04-17** — The ratchet made every arc42 addition self-funding, and what paid for it was genuine cross-artifact duplication
+
+- *scenario:* Section 5 had 1 word of headroom, section 7 had 2, section 11 had 6. About 350 words of additions were paid for out of ADR-0008 repository-port argument retold at length in 5.2, section 11 R-9 --single-transaction consequence told twice with each copy pointing at the other, CLAUDE.md 2.2 restated, and 10.2 QS-10 and QS-12 definitions restated. Nothing unique was cut, and each payment is flagged inside its own commit message rather than left to be discovered in a diff. Recorded because it is evidence the ratchet is doing what the human asked for rather than merely blocking.
+- *file:* `tools/docs/budget.mjs`
 
 </details>
 
