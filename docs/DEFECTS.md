@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **202** |
-| Severity | 10 blocking · 106 major · 86 minor |
-| Verdicts | 10 narrowed · 72 accepted · 3 escalated · 14 deferred |
-| Raised by | test-engineer 49 · reviewer 44 · implementer 35 · architect 35 · orchestrator 32 · scribe 5 · human 2 |
-| Awaiting a ruling | **103** |
-| Mean escape distance | 2.03 step(s) |
+| Findings recorded | **205** |
+| Severity | 10 blocking · 107 major · 88 minor |
+| Verdicts | 10 narrowed · 74 accepted · 3 escalated · 14 deferred |
+| Raised by | test-engineer 49 · reviewer 44 · architect 38 · implementer 35 · orchestrator 32 · scribe 5 · human 2 |
+| Awaiting a ruling | **104** |
+| Mean escape distance | 2.04 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1201,10 +1201,13 @@ rather than narrated.*
 | **R-05-11** | MINOR | 5 *(+5)* | reviewer | ADR-0019 criterion is 0-for-3 on premises, not 0-for-2 | **open** |
 | **I-05-8** | MINOR | 5 *(+5)* | implementer | The two sibling whitelist cases carry as-unknown-as casts the widened-const form makes unnecessary | deferred |
 | **T-05-10** | MAJOR | 5 *(+5)* | test-engineer | Phase 4 closes a reading of phase 2 that nobody had closed, and it is the reading that reintroduces check-then-act | **open** |
-| **T-05-11** | MINOR | 5 *(+5)* | test-engineer | race() had no simultaneity measurement and the file headline claim rested on the word | **open** |
-| **T-05-12** | MINOR | 5 *(+0)* | test-engineer | Control 2 margin is thin and the test-engineer refused to hide it | **open** |
+| **T-05-11** | MINOR | 5 *(+5)* | test-engineer | race() had no simultaneity measurement and the file headline claim rested on the word | accepted |
+| **T-05-12** | MINOR | 5 *(+0)* | test-engineer | Control 2 margin is thin and the test-engineer refused to hide it | accepted |
 | **O-37** | MINOR | 5 *(+0)* | orchestrator | The orchestrator dispatch named a file that does not have the structure it described — the same unverified-destination mechanism a third time | **open** |
 | **T-05-13** | MINOR | 5 *(+0)* | test-engineer | A defect nearly reported, checked instead, and withdrawn | **open** |
+| **A-05-7** | MAJOR | 7 *(+7)* | architect | Section 10.2 asserted a CI check that section 11 R-8 records as absent — arc42 contradicting itself across two sections | **open** |
+| **A-05-8** | MINOR | 7 *(+0)* | architect | R-05-2 committed again by the role that ruled on it, and fixed rather than reported | **open** |
+| **A-05-9** | MINOR | 7 *(+0)* | architect | Three undeclared arc42 sections took pointer-only edits to fund this slice ratchet | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1387,11 +1390,13 @@ rather than narrated.*
 
 - *scenario:* The docblock has said twenty SIMULTANEOUS inserts since slice 02 and nothing measured that they ever were — the barrier arranges it, no assertion observed it. Now recorded in every phase and ASSERTED ONLY IN PHASE 4, where 1 is the claim. The test-engineer deliberately did NOT assert it in phases 1 to 3 because the value is nondeterministic there and an assertion would trade evidence for flake, and stated explicitly that whether phases 1 to 3 should assert it is a DESIGN CALL and not its own. Routed to the architect at step 7.
 - *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
+- *accepted* by architect — PHASES 1 TO 3 KEEP SIMULTANEITY MEASURED AND UNASSERTED. In phases 1 to 3 maxInFlight is not the claim — the DDL is, and their verdicts hold for sequential inserts, so an assertion there would assert the ARRANGEMENT, nondeterministically, buying flake instead of evidence. In phase 4 the number IS the claim, 1 meaning serialised, so asserting it asserts the property. The test-engineer call was right and the architect records that ITS RESTRAINT IS THE BETTER HALF OF IT. Recorded in section 11 R-7i including the honest consequence: "twenty simultaneous inserts" overstates what phases 1 to 3 test.
 
 **T-05-12** — Control 2 margin is thin and the test-engineer refused to hide it
 
 - *scenario:* The mutant that takes the locks and releases them before the write was caught at 2 against 1. It caught it, but only just. Reported as a caveat rather than omitted from the report.
 - *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
+- *accepted* by architect — CONTROL 2 IS ADEQUATE AND GETS A ROW, and the margin is not thin in the way it looks: an equality at 1 is the tightest assertion available and 2 is the minimum falsification, so the control discriminates exactly at its boundary. What deserves recording is different — its discriminating power is ONE UNIT WIDE, and nothing detects the margin narrowing to zero if the race later gains a client-side await between lock release and insert. Section 11 R-7i, framed as a control silently ceasing to discriminate rather than as a wrong verdict.
 
 **O-37** — The orchestrator dispatch named a file that does not have the structure it described — the same unverified-destination mechanism a third time
 
@@ -1402,6 +1407,21 @@ rather than narrated.*
 
 - *scenario:* The first captured run showed phase 1 with 19 x 23P01 and ZERO 40P01, against ADR-0018 measured 108 deadlocks at N=20 — which would have put the liveness half of ADR-0018 case in doubt. Three further runs gave 40P01 19, 23P01 19, 40P01 19: it is all-or-nothing per race at roughly the frequency T-02-9 recorded. ADR-0018 REPRODUCES AND THERE IS NO FINDING. Reported because the single observation would have been a wrong and expensive claim.
 - *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
+
+**A-05-7** — Section 10.2 asserted a CI check that section 11 R-8 records as absent — arc42 contradicting itself across two sections
+
+- *scenario:* The 10.2 preamble said CI fails if a scenario names a test that does not exist, while section 11 R-8 lists that exact claim as unenforced and as the oldest unpaid item there. Section 10 was the one making the false promise. Corrected to point at R-8. Same defect class as I-05-6 and as 6.1 phantom measurement: A DOCUMENT ASSERTING ENFORCEMENT IT DOES NOT HAVE. Found unprompted at step 7.
+- *file:* `docs/arc42/10-quality-requirements.md`
+
+**A-05-8** — R-05-2 committed again by the role that ruled on it, and fixed rather than reported
+
+- *scenario:* Deleting the appointment.ts prediction meant 5.2 as-built cell now says slice 06 owns it — and slice 06 file did not say so. Second time in this slice that the person who ruled R-05-2 committed R-05-2. Fixed rather than reported: it is slice 06 fifth inherited obligation now, WITH THE CALLER THAT MAKES IT NON-DEAD THIS TIME (AC-4 "only a confirmed appointment may be moved" is a domain rule rather than a SQL predicate), and 5.2 joins slice 06 arc42 declaration so its step 7 can correct the pointer if it declines to build it.
+- *file:* `docs/slices/06-reschedule-atomic-move.md`
+
+**A-05-9** — Three undeclared arc42 sections took pointer-only edits to fund this slice ratchet
+
+- *scenario:* Sections 6.2, 6.3 and 6.5 were compressed to pointers to pay section 6 ratchet. No fact was lost — each now points at its one home — but "I compressed another slice section to fund mine" is a real description of what happened, and the slice frontmatter says so RATHER THAN LEAVING THE GATE TO FIND IT. Section 6.1 was added to the declaration outright, R-02-2 having been built here.
+- *file:* `docs/arc42/06-runtime-view.md`
 
 </details>
 
