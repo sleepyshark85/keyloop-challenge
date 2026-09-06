@@ -120,7 +120,21 @@ export const BUDGETS = {
   // Corrected by the same rule as arc42 §8: a number set by estimate loses to a number set
   // by enumeration. Correcting a guess with a measurement is not the same act as moving a
   // budget to fit a document that will not comply.
-  methodology: 3800,
+  // 3,800 → 3,900 on 2026-09-06, and this is the first exercise of the escape clause the
+  // concision rule itself states: a budget is not raised to fit a document; one that needs
+  // more room shows the enumeration.
+  //
+  // The enumeration: §4 gained the concision rule at the human's request — 135 charged
+  // words that did not exist, stating the ratchet, one-home-per-fact, and this clause. 44
+  // of them were paid for out of genuine duplication in the same pass (§4's homes sentence
+  // restated CLAUDE.md §4, the diagrams rationale explained one choice twice, and the
+  // rejected-framework note carried its argument at double length). The remaining ~91 is
+  // new rule, and a budget that cannot absorb a rule the human just added would pressure
+  // deleting an older one — the wrong incentive for the document that defines the process.
+  //
+  // What makes this different from moving a goalpost: the rule is countable, the payment
+  // is recorded, and the ratchet still forbids the NEXT growth without the same argument.
+  methodology: 3900,
 };
 
 /** Authored prose only — see the header for why each exclusion is narrow. */

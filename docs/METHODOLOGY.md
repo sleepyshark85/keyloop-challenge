@@ -90,12 +90,11 @@ work.
 
 ## 4. Documentation
 
-Homes and owners are `CLAUDE.md` §4, plus two nothing else writes: `docs/STATUS.md`, the generated
-resume point, and `CLAUDE.md` itself. arc42 keeps all twelve sections for recognisability, several
-deliberately thin and saying so — which reads as judgement where invented detail reads as padding —
-plus one honestly numbered outside the standard twelve, **§13 AI Collaboration**. It is written
-as-designed at Gate B and corrected at each merge, and that delta is kept: where the plan was wrong is
-stronger evidence than a plan pretending it never was.
+Homes and owners are `CLAUDE.md` §4, plus two nothing else writes: `docs/STATUS.md` and `CLAUDE.md`
+itself. arc42 keeps all twelve sections for recognisability, several deliberately thin and saying so,
+plus **§13 AI Collaboration** outside the standard twelve. §13 is written as-designed at Gate B and
+corrected at each merge, and that delta is kept: where the plan was wrong is stronger evidence than a
+plan pretending it never was.
 
 **Traceability**, walkable both ways — `arc42 §10 quality scenario → slice acceptance criterion → test
 name → CI result` — because a quality attribute not traceable to a test is aspiration, and a test not
@@ -107,19 +106,31 @@ and links resolve, the log is append-only and schema-valid, citations resolve, b
 test is claimed and **not yet enforced** (arc42 R-8). *Written*, therefore drifting — so keep it small
 and about **why**.
 
+<!-- agents:concision -->
+**Every document has a word budget, enforced as a ratchet** — `npm run docs:budget`. CI fails if a
+file grows past `max(budget, its current size)`, or if a *new* file exceeds its budget. Existing
+overage may shrink or hold, never grow.
+
+**One home per fact.** The argument for a decision is its ADR's; narrative and measurement are the
+event log's and the PR's; arc42 says what the system *is*; a slice design carries that slice's delta
+and shrinks at step 7, when arc42 absorbs it. Before writing a section, ask which already holds it —
+the duplication that costs is *across* artifacts. A budget is not raised to fit a document; one that
+needs more room shows the enumeration, because an estimate loses to a measurement.
+<!-- /agents:concision -->
+
 **ADRs.** Immutability is `CLAUDE.md` §4. MADR, extended with `proposed-by` / `decided-by` /
 `ai-input` as direct evidence for the AI-verification criterion. *Considered Options* must be
 populated honestly — one option considered is a note, not a decision record.
 
 **Diagrams** are refreshed once at phase 6, not per slice: SVG is not cheaply diffable and each
 drawing costs several hundred lines of mandatory reference reading. Both the `.html` and the exported
-`.svg` are committed, because an evaluator reading this on GitHub has no plugin installed and would
-otherwise find the §6 runtime view invisible. CI checks existence and linkage but **not layout** — the
-validators live outside the repository, so layout is *reported*, not proven (R-8).
+`.svg` are committed, so the §6 runtime view is visible on GitHub without a plugin. CI checks
+existence and linkage but **not layout** — the validators live outside the repository, so layout is
+*reported*, not proven (R-8).
 
-*Rejected: a second specification framework.* Spec-Kit and BMAD overlap arc42, so either would create
-two answers to "what is a task" and a pipeline to sync them. What is lost, Spec-Kit's `/clarify` and
-`/analyze`, is reproduced as Gate A and the reviewer.
+*Rejected: a second specification framework.* Spec-Kit and BMAD overlap arc42 — two answers to "what
+is a task" and a pipeline to sync them. What is lost, `/clarify` and `/analyze`, is Gate A and the
+reviewer.
 
 ---
 

@@ -68,13 +68,15 @@ export function parseRoles(text) {
  * section, and an empty generated block is the failure this project keeps finding: it
  * looks like a successful generation.
  */
-export function committingRule(text) {
-  const m = text.match(/<!-- agents:committing -->\n([\s\S]*?)<!-- \/agents:committing -->/);
-  if (!m) throw new Error('docs/METHODOLOGY.md has no <!-- agents:committing --> block');
+export function sourceBlock(text, name) {
+  const m = text.match(new RegExp(`<!-- agents:${name} -->\\n([\\s\\S]*?)<!-- /agents:${name} -->`));
+  if (!m) throw new Error(`docs/METHODOLOGY.md has no <!-- agents:${name} --> block`);
   const body = m[1].trim();
-  if (!body) throw new Error('the <!-- agents:committing --> block in METHODOLOGY is empty');
+  if (!body) throw new Error(`the <!-- agents:${name} --> block in METHODOLOGY is empty`);
   return body;
 }
+
+export const committingRule = (text) => sourceBlock(text, 'committing');
 
 const replaceBlock = (text, marker, body) => {
   const open = `<!-- generated:${marker} -->`;
@@ -84,7 +86,7 @@ const replaceBlock = (text, marker, body) => {
   return { text: text.replace(re, `${open}\n${body}\n${close}`), found: true };
 };
 
-export function render(agentText, role, roles, committing) {
+export function render(agentText, role, roles, committing, concision) {
   const spec = roles[role];
   if (!spec) throw new Error(`docs/METHODOLOGY.md §2 has no row for role "${role}"`);
   let out = agentText;
@@ -93,7 +95,12 @@ export function render(agentText, role, roles, committing) {
   out = out.replace(/^model:.*$/m, `model: ${spec.model}`);
 
   const constraints = `**Decides:** ${spec.decides}.\n\n**Must not:** ${spec.mustNot}.`;
-  for (const [marker, body] of [['role-constraints', constraints], ['committing', committing]]) {
+  // `concision` reaches every role because the rule that documents stay short is worthless
+  // if it lives only in the document nobody re-reads. It drifted straight back after the
+  // condensation pass precisely because each agent learned about the budget from a prompt
+  // (O-32), and a rule delivered by briefing is a rule enforced by whoever remembers.
+  for (const [marker, body] of [['role-constraints', constraints], ['committing', committing],
+    ['concision', concision]]) {
     const r = replaceBlock(out, marker, body);
     if (!r.found) throw new Error(`${role}.md has no <!-- generated:${marker} --> block`);
     out = r.text;
@@ -104,13 +111,14 @@ export function render(agentText, role, roles, committing) {
 const methodology = readFileSync(METHODOLOGY, 'utf8');
 const roles = parseRoles(methodology);
 const committing = committingRule(methodology);
+const concision = sourceBlock(methodology, 'concision');
 
 const stale = [];
 for (const file of readdirSync(AGENTS).filter((f) => f.endsWith('.md') && !f.startsWith('_'))) {
   const path = join(AGENTS, file);
   const current = readFileSync(path, 'utf8');
   const role = file.replace(/\.md$/, '');
-  const next = render(current, role, roles, committing);
+  const next = render(current, role, roles, committing, concision);
   if (next === current) continue;
   stale.push(file);
   if (!CHECK) writeFileSync(path, next, 'utf8');

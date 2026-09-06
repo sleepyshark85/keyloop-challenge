@@ -29,6 +29,12 @@ const METHODOLOGY = `# Methodology
 | **Architect** | Interfaces and layering | Change scope or AC | Opus |
 | **Scribe** | Nothing | Write code | Haiku |
 
+## 4. Documentation
+
+<!-- agents:concision -->
+Every document has a word budget, enforced as a ratchet.
+<!-- /agents:concision -->
+
 ## 8. Commits
 
 <!-- agents:committing -->
@@ -49,6 +55,11 @@ model: ${model}
 <!-- /generated:role-constraints -->
 
 Role-specific craft that must survive untouched.
+
+## Writing anything down
+
+<!-- generated:concision -->
+<!-- /generated:concision -->
 
 ## Committing
 
@@ -80,6 +91,11 @@ const build = (agents, methodology = METHODOLOGY, args = []) => {
   ok('so does Must not', /Must not:\*\* Change scope or AC/.test(out));
   ok('the committing rule comes from METHODOLOGY, not from the agent file',
     out.includes('Commit by explicit pathspec.'));
+  // The concision rule reaches every role because a rule that documents stay short is
+  // worthless if it lives only in the document nobody re-reads — which is exactly how it
+  // drifted back after the condensation pass (O-32).
+  ok('the concision rule reaches the role too, from the same single source',
+    out.includes('Every document has a word budget, enforced as a ratchet.'), out);
   ok('AUTHORED PROSE IS UNTOUCHED — the whole point of a narrow generator',
     out.includes('Role-specific craft that must survive untouched.'));
 }
@@ -117,6 +133,12 @@ const build = (agents, methodology = METHODOLOGY, args = []) => {
     METHODOLOGY.replace(/<!-- agents:committing -->[\s\S]*?<!-- \/agents:committing -->/, ''));
   ok('a missing source block is an ERROR, not an empty generated block',
     r.status !== 0 && /agents:committing/.test(r.stderr), r.stderr.trim());
+}
+{
+  const r = build({ 'architect.md': AGENT('architect') },
+    METHODOLOGY.replace(/<!-- agents:concision -->[\s\S]*?<!-- \/agents:concision -->/, ''));
+  ok('...and the same holds for the concision block, not just the first one written',
+    r.status !== 0 && /agents:concision/.test(r.stderr), r.stderr.trim());
 }
 {
   const r = build({ 'architect.md': AGENT('architect') },

@@ -95,6 +95,20 @@ Rules that keep findings honest:
 }
 ```
 
+## Writing anything down
+
+<!-- generated:concision -->
+**Every document has a word budget, enforced as a ratchet** — `npm run docs:budget`. CI fails if a
+file grows past `max(budget, its current size)`, or if a *new* file exceeds its budget. Existing
+overage may shrink or hold, never grow.
+
+**One home per fact.** The argument for a decision is its ADR's; narrative and measurement are the
+event log's and the PR's; arc42 says what the system *is*; a slice design carries that slice's delta
+and shrinks at step 7, when arc42 absorbs it. Before writing a section, ask which already holds it —
+the duplication that costs is *across* artifacts. A budget is not raised to fit a document; one that
+needs more room shows the enumeration, because an estimate loses to a measurement.
+<!-- /generated:concision -->
+
 ## Committing
 
 <!-- generated:committing -->
