@@ -289,5 +289,25 @@
    "Option C \u2014 Drop the prefix everywhere: ATTEMPTCAP and SEED"
   ],
   "decision": "Chosen option: B, and the rule behind it is the part worth keeping: BOOKING marks"
+ },
+ "0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md": {
+  "options": [
+   "Option A \u2014 Obey F-02-9 literally: pre-read, lock, update",
+   "Option A \u2014 pre-read, lock, update",
+   "Option B \u2014 Derive the lock keys from RETURNING",
+   "Option C \u2014 A third lock class on appointment.id, serialising cancels",
+   "Option C \u2014 a lock class on appointment.id",
+   "Option D \u2014 Narrow F-02-9 to an iff on the constraints' scope"
+  ],
+  "decision": "Chosen option: D."
+ },
+ "0024-the-error-taxonomys-residual-is-a-property-not-a-row.md": {
+  "options": [
+   "A \u2014 keep the catch-all, and close T-05-7 as misframed.",
+   "B \u2014 split the row, register a not-found handler, and assert the residual in the falsifiabl",
+   "C \u2014 reuse /problems/appointment-not-found for an unrouted path.",
+   "D \u2014 widen the 400 predicate in server.ts to statusCode < 500."
+  ],
+  "decision": "Chosen option: B, in four parts."
  }
 }

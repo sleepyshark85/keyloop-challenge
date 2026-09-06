@@ -47,7 +47,6 @@ allowlist. IANA-zone conversion uses the `Intl` global, which needs no import.
 | `duration.ts` *(built)* | The `DurationMinutes` type, `serviceDuration(serviceType)`, `durationMillis(duration)` — the only place minutes become milliseconds | **A-1.** If duration varies by vehicle this function gains a parameter; the interval arithmetic above it takes a number and does not change |
 | `openingHours.ts` *(built)* | `withinOpeningHours(startsAtMillis, endsAtMillis, ianaZone, weekly)`, returning the `OpeningHoursVerdict` union rather than a boolean. It carries the same epoch bound (ADR-0014) and normalises an end rendering as local `00:00:00` on the next date to 86 400 seconds-of-day (ADR-0015) | **ADR-0001 / GC-1.** The only place that reasons in wall-clock time (A-8). Breaks, holidays and one-off closures land here |
 | `candidates.ts` *(built)* | `orderCandidates(bays, technicians, seed)` and `prune(order, resource, id)` return `CandidateOrder \| null`, `null` *being* a list emptied; `nextCandidate(order)` is total, a `CandidateOrder` being **non-empty by construction** — both lists are `readonly [string, ...string[]]`, since a brand on the object leaves `noUncheckedIndexedAccess` in place and would merely *relocate* the assertion (I-04-3) | **A-10 / ADR-0009.** Seeded Fisher–Yates, pure and importing nothing. `prune` takes the **unbranded** union, to which a `ContendedResource` is assignable: no cast in, none out |
-| `appointment.ts` *(slice 05)* | The status model: `confirmed`/`cancelled`, and which transitions are legal | **ADR-0003.** Cancellation is terminal and idempotent; only a confirmed appointment may be moved |
 
 ### `src/application` — the use cases
 
@@ -115,7 +114,7 @@ on one path, breaking both the `booking_conflicts_total{resource}` label and ADR
 | `db.ts` | The Kysely instance and the `pg` pool |
 | `schema.ts` | The `Database` interface, derived from the migrations |
 | `pgError.ts` | SQLSTATE → `PgOutcome`, and the constraint-name → resource mapping |
-| `appointmentRepository.ts` | The **only** module permitted to name the table: `lockResources` (ADR-0018's two `pg_advisory_xact_lock` acquisitions, one statement, bay class then technician class), the unguarded `INSERT` and read-by-id (booking), the atomic `UPDATE` (move, ADR-0003), the status `UPDATE` (cancel). Nothing here catches — the error goes up to the one classifier |
+| `appointmentRepository.ts` | The **only** module permitted to name the table: `lockResources` (ADR-0018's two `pg_advisory_xact_lock` acquisitions, one statement, bay class then technician class), the unguarded `INSERT` and read-by-id (booking), the atomic `UPDATE` (move, ADR-0003), and `cancelAppointmentById` — one unconditional status `UPDATE` that takes **no lock**, ADR-0023, because a cancelled row satisfies no constraint's `WHERE`. Two write functions in one file, one locking and one not: §11 F-05-1. Nothing here catches — the error goes up to the one classifier |
 | `candidateRepository.ts` | The **advisory** free-bay and free-qualified-technician read (A-3, A-9) |
 | `referenceRepository.ts` | Dealership, its IANA zone and weekly opening hours; service type and its duration |
 | `migrations/*.sql` | The schema, including the two exclusion constraints verbatim (§8.2) |
@@ -130,17 +129,14 @@ one closed `as const` set, so a `type` outside §8.6 is a compile error at the c
 ### `src/platform` — the leaf
 
 Config (`BOOKING_ATTEMPT_CAP` 16, `BOOKING_SEED` unset — ADR-0009, ADR-0021, ADR-0022), the `pino` logger, the OpenTelemetry bootstrap and the
-metric registry. Importable by everyone, imports nothing from `src/`. That shape is also a junk drawer's: the leaf rule
-keeps it from acquiring behaviour, only a reviewer from acquiring *contents*.
+metric registry. Importable by everyone, imports nothing from `src/`. Its junk-drawer risk is §11 R-7c's.
 
-**ADR-0021 asks `loadConfig` for one startup `warn`, and `loadConfig` cannot emit one.** The logger is
-built *from* its return value, so at the moment `BOOKING_SEED` is read there is no logger, and writing
-to a stream from here would be the leaf acquiring exactly the behaviour the rule above keeps out. It
-ships as `configWarnings(config)`, a pure function returning strings, which `main.ts` emits through
-`pino`. The decision — option B, unset by default, one `warn` — is unchanged and correct as built, so
-ADR-0021 stands unsuperseded; only its emitting site was misstated (I-04-11). **The as-built shape is
-the better one**: a pure function is directly assertable, where a `logger.warn` inside `loadConfig`
-would have been observable only through a stream.
+**ADR-0021 asks `loadConfig` for one startup `warn`, and `loadConfig` cannot emit one**: the logger is
+built *from* its return value, and writing to a stream here would be the leaf acquiring the behaviour
+the rule above keeps out. It ships as `configWarnings(config)`, a pure function returning strings that
+`main.ts` emits through `pino` — directly assertable, where a `logger.warn` inside `loadConfig` would
+have been observable only through a stream. The decision is unchanged and ADR-0021 stands
+unsuperseded; only its emitting site was misstated (I-04-11).
 
 ### `src/main.ts` — the composition root
 
@@ -152,15 +148,12 @@ dependency is chosen rather than received.
 
 | Module | Contents |
 |---|---|
-| `src/domain` | `interval.ts`, `duration.ts`, `openingHours.ts`, `candidates.ts` — four files, **zero import statements between them**. `appointment.ts` is slice 05's. **`candidates.ts` ships with two brand casts where the design predicted three, and no index assertion at all** (I-04-13): destructuring head from tail *is* the emptiness test and *builds* the tuple, so guard and cast collapse into one reachable branch. Fisher–Yates is in **selection** form rather than the in-place swap, because the swap needs the two `noUncheckedIndexedAccess` assertions the tuple carrier was chosen to remove. Uniform to ±1.7 % over 8 bays and 100 000 seeds |
-| `src/application` | `bookAppointment.ts` (the loop, `BookOutcome`, and `AppointmentView` — the one body shape the `201` and the `200` share), `deriveInterval.ts`, `readAppointment.ts`, `checkHealth.ts`. Each outcome union is declared *here* and not in `src/http`, so every route `switch` is exhaustiveness-checked and every use case stays callable without a server |
+| `src/domain` | `interval.ts`, `duration.ts`, `openingHours.ts`, `candidates.ts` — four files, **zero import statements between them**. **`appointment.ts` was predicted here and was not built**: under slice 05's unconditional `UPDATE` idempotency is the statement's and transition legality is slice 06's, so it would have shipped with no caller. Slice 06 owns it. **`candidates.ts` ships with two brand casts where the design predicted three, and no index assertion at all** (I-04-13): destructuring head from tail *is* the emptiness test and *builds* the tuple, so guard and cast collapse into one reachable branch. Fisher–Yates is in **selection** form rather than the in-place swap, because the swap needs the two `noUncheckedIndexedAccess` assertions the tuple carrier was chosen to remove. Uniform to ±1.7 % over 8 bays and 100 000 seeds |
+| `src/application` | `bookAppointment.ts` (the loop, `BookOutcome`, and `AppointmentView` — the one body shape the `201` and the `200` share), `deriveInterval.ts`, `readAppointment.ts`, `cancelAppointment.ts`, `checkHealth.ts`. `CancelOutcome` is its own union though structurally identical to `ReadOutcome` today: sharing them would let a member added for one route change the other's exhaustiveness check. Each outcome union is declared *here* and not in `src/http`, so every route `switch` is exhaustiveness-checked and every use case stays callable without a server |
 | `src/persistence` | `db.ts` (the `Db` alias and the pool), `appointmentRepository.ts`, `candidateRepository.ts` and `referenceRepository.ts` (both reference-data reads only — neither can see `appointment`), `pgError.ts`, `health.ts` (`pingDatabase`, returning a boolean rather than rethrowing a driver error), `schema.ts`, `migrations/` |
 | `src/http` | `server.ts`, `problem.ts`, `routes/appointments.ts`, `routes/health.ts`. `buildServer` takes already-bound use cases, never a handle |
 | `src/platform` | `config.ts`, `logger.ts`. Telemetry is slice 09's; an empty OTel bootstrap now would be the junk drawer above |
 | `src/main.ts` | Composition root, signals, listen |
-
-`GET /health` was the skeleton's route precisely because it crosses every module: one that
-short-circuits the layering proves nothing about it.
 
 **The booking path names no table outside `appointmentRepository.ts`**, asserted by set equality
 rather than described (§10.2 QS-12). Check-then-act is absent because there is nowhere else that

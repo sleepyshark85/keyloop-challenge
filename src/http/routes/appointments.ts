@@ -32,10 +32,17 @@ import { ProblemSchema, problem, sendProblem } from '../problem.js';
 import type { Problem } from '../problem.js';
 import type { BookCommand, BookOutcome } from '../../application/bookAppointment.js';
 import type { ReadOutcome } from '../../application/readAppointment.js';
+import type { CancelOutcome } from '../../application/cancelAppointment.js';
 
 export interface AppointmentRouteDeps {
   readonly bookAppointment: (command: BookCommand) => Promise<BookOutcome>;
   readonly readAppointment: (id: string) => Promise<ReadOutcome>;
+  /**
+   * Slice 05. Its outcome is a union of its OWN, not `ReadOutcome`, although the two are
+   * structurally identical today: a member added for one route must not silently change the
+   * other route's exhaustiveness check (§5.2).
+   */
+  readonly cancelAppointment: (id: string) => Promise<CancelOutcome>;
 }
 
 const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
@@ -221,6 +228,53 @@ export function registerAppointmentRoutes(
         default: {
           const unhandled: never = outcome;
           throw new Error(`unhandled read outcome ${JSON.stringify(unhandled)}`);
+        }
+      }
+    },
+  );
+
+  /**
+   * `POST /appointments/{id}/cancellation` — AC-3, AC-4, and ADR-0003's status transition.
+   *
+   * A SUB-RESOURCE RATHER THAN `DELETE`, because the appointment remains readable at its own URL
+   * afterwards and `DELETE` would misdescribe that. AC-2 is the assertion that it does.
+   *
+   * It reads NO BODY: `AppointmentParams` is the whole input. It therefore carries no `body`
+   * schema, so a request that sends one is not rejected here — an empty or unparseable JSON body
+   * is answered by the content-type parser before this route is ever consulted, which is AC-5 and
+   * lives in `server.ts`.
+   *
+   * §8.6 gains no row. Both arms reuse types slice 02 minted, and the `200` is the same
+   * `AppointmentBody` the `201` and the `GET` return.
+   */
+  app.post<{ Params: AppointmentParamsType }>(
+    '/appointments/:id/cancellation',
+    {
+      schema: {
+        params: AppointmentParams,
+        response: { 200: AppointmentBody, ...PROBLEM_RESPONSES },
+      },
+    },
+    async (request, reply) => {
+      const outcome = await deps.cancelAppointment(request.params.id);
+
+      switch (outcome.kind) {
+        case 'cancelled':
+          // 200 and not 201: a cancellation creates nothing, and a replay must be able to answer
+          // the same thing twice (AC-3).
+          return await reply.code(200).send(outcome.appointment);
+
+        case 'not-found':
+          return await sendProblem(
+            reply,
+            problem('/problems/appointment-not-found', 404, 'No such appointment', {
+              detail: 'no appointment exists with that id',
+            }),
+          );
+
+        default: {
+          const unhandled: never = outcome;
+          throw new Error(`unhandled cancel outcome ${JSON.stringify(unhandled)}`);
         }
       }
     },

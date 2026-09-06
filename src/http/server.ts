@@ -33,8 +33,9 @@
  * one place a mistyped `type` would escape the compile-time constructor and reach the client as
  * `FST_ERR_FAILED_ERROR_SERIALIZATION` — the backstop becoming the defect.
  *
- * Everything that is not a validation error is `500 /problems/internal`, logged at error with the
- * cause. §8.6's `500 | Anything else` row is a claim of TOTALITY, and this is where it is kept.
+ * Everything that is not a malformed request is `500 /problems/internal`, logged at error with
+ * the cause. §8.6's `500 | Anything else` row is a claim of TOTALITY, and this is where it is
+ * kept — AC-5 is that claim being kept rather than assumed.
  */
 import Fastify from 'fastify';
 import type { FastifyBaseLogger, FastifyError, FastifyInstance } from 'fastify';
@@ -61,11 +62,48 @@ function isValidationError(error: FastifyError): boolean {
   return error.validation !== undefined;
 }
 
+/**
+ * AC-5 — the two Fastify content-type-parser errors, NAMED, because §8.6 has a row for them and
+ * it was not the one they were reaching.
+ *
+ * Measured three times independently on the pinned `fastify@5.12.1`: a `POST` carrying
+ * `content-type: application/json` with no body raises `FST_ERR_CTP_EMPTY_JSON_BODY`, and with an
+ * unparseable body `FST_ERR_CTP_INVALID_JSON_BODY`. Both carry `statusCode: 400`; NEITHER sets
+ * `validation`. So both missed the arm above and fell to the catch-all — `500 /problems/internal`,
+ * live on the already-merged booking route. §8.6 justifies its `500` row with *"a 4xx would tell a
+ * service advisor to correct something they did not send and cannot see"*, and here the client
+ * sent exactly that, can see it, and can correct it. The row was inverted, not missing: this maps
+ * to the `/problems/malformed-request` that already exists, and the taxonomy gains nothing.
+ *
+ * BY CODE, NEVER BY `statusCode < 500`. The comment above this one records a broader disjunction
+ * being deleted after mutation because no input reached its second arm; widening this one would
+ * be that mistake with a worse consequence. Fastify's other 4xx errors — a media type, an
+ * unrouted path — have no §8.6 row, and widening a predicate until the taxonomy has to grow to
+ * meet it is the tail wagging the dog.
+ *
+ * The parser runs BEFORE the router, measured: a malformed body addressed to a path that is not
+ * registered raises this too. So this arm is not per-route and cannot be, which is also why
+ * `POST /appointments/{id}/cancellation` — a route that reads no body — is answered by it.
+ *
+ * OQ-05-2, deferred to slice 10 and pinned at `400` meanwhile: a correct client that sets
+ * `application/json` reflexively on a bodyless request is now told to fix something the endpoint
+ * never reads. The alternative is a content-type parser mapping an empty body to `undefined`,
+ * which lands with the cURL harness that is the real client emitting the header.
+ */
+const MALFORMED_BODY_CODES: ReadonlySet<string> = new Set([
+  'FST_ERR_CTP_EMPTY_JSON_BODY',
+  'FST_ERR_CTP_INVALID_JSON_BODY',
+]);
+
+function isMalformedBody(error: FastifyError): boolean {
+  return MALFORMED_BODY_CODES.has(error.code);
+}
+
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ loggerInstance: deps.logger });
 
   app.setErrorHandler<FastifyError>(async (error, request, reply) => {
-    if (isValidationError(error)) {
+    if (isValidationError(error) || isMalformedBody(error)) {
       await reply
         .code(400)
         .type(PROBLEM_CONTENT_TYPE)

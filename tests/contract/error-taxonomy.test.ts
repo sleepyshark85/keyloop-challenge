@@ -13,6 +13,7 @@ import {
   member,
   occupy,
   postBooking,
+  postRaw,
   seedScenario,
 } from '../support/booking.js';
 import type { HttpAnswer } from '../support/booking.js';
@@ -421,6 +422,109 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
           .map(([type, statuses]) => `${type}: ${[...statuses].join(', ')}`),
         'AC-12 — a type carrying two statuses is a client that cannot branch on it',
       ).toEqual([]);
+    });
+  });
+
+  /* ─────────────────────────────────────────────────────────────────────── AC-5, slice 05 ──
+   *
+   * §8.6 CLAIMS TOTALITY. THESE TWO CASES ARE THAT CLAIM BEING KEPT, AND IT WAS NOT.
+   *
+   * `docs/slices/05-cancellation.md` AC-5 · `docs/slices/05-design.md` §4 · arc42 §8.6.
+   *
+   * Measured three times independently — by the architect, by the implementer, and again by
+   * this role on the pinned `fastify@5.12.1` — a `POST` carrying `content-type:
+   * application/json` and NO body, and the same header with an unparseable body, are raised by
+   * Fastify's content-type parser as `FST_ERR_CTP_EMPTY_JSON_BODY` and
+   * `FST_ERR_CTP_INVALID_JSON_BODY`. Both carry `statusCode: 400`; NEITHER sets `validation`.
+   * `server.ts`'s `400` arm keys on `validation !== undefined`, so both miss it and fall to the
+   * catch-all: `500 /problems/internal`, TODAY, on the already-merged booking route.
+   *
+   * §8.6 justifies its `500` row with "a 4xx would tell a service advisor to correct something
+   * they did not send and cannot see". Here the client sent exactly that, can see it, and can
+   * correct it. The row is inverted, and AC-5 is the ruling: both codes map to the EXISTING
+   * `400 /problems/malformed-request`. No new status, no new type, no new `Problem` member —
+   * a taxonomy that absorbs an operation without growing is evidence it was drawn correctly.
+   *
+   * THE TWO CASES ARE SPLIT BY WHICH ROUTE THEY PROBE, AND MEASURING THE RED CORRECTED WHAT
+   * THIS COMMENT FIRST CLAIMED. The expectation was that the booking route would fail on the
+   * content-type-parser path and the cancellation route on ROUTING, since it does not exist
+   * yet. It does not: Fastify runs the content-type parser BEFORE the router, so an empty or
+   * unparseable JSON body addressed to a route that has never been registered is still
+   * `FST_ERR_CTP_EMPTY_JSON_BODY` and still falls to the catch-all. Both cases were observed
+   * red at `500 /problems/internal`, neither at `404`:
+   *
+   *   POST /appointments                        500 /problems/internal   (the merged route)
+   *   POST /appointments/{id}/cancellation      500 /problems/internal   (no such route)
+   *
+   * So BOTH halves of AC-5 are regression evidence about behaviour that is live today, and
+   * neither is the routing failure the rest of this slice reds on. They stay two cases because
+   * they will diverge once the route ships — the second then also asserts that the new route
+   * did not arrive with the hole — but no claim here rests on the route being absent.
+   *
+   * `postRaw` rather than `postBooking`: `JSON.stringify` cannot express "no body at all", and
+   * both errors are raised before any route schema runs, so no value of a well-formed body can
+   * reach them.
+   */
+
+  /** AC-5's two inputs, both against `content-type: application/json`. */
+  const MALFORMED_BODIES: ReadonlyArray<readonly [string, string | undefined]> = [
+    ['no body at all (FST_ERR_CTP_EMPTY_JSON_BODY)', undefined],
+    ['an unparseable body (FST_ERR_CTP_INVALID_JSON_BODY)', '{oops'],
+  ];
+
+  it('AC-5 — on the ALREADY-MERGED POST /appointments, an empty or unparseable JSON body is 400 /problems/malformed-request and not 500', async () => {
+    await withService(async (service) => {
+      for (const [label, body] of MALFORMED_BODIES) {
+        const answer = await postRaw(service, '/appointments', {
+          contentType: 'application/json',
+          ...(body === undefined ? {} : { body }),
+        });
+
+        expect(
+          answer.status,
+          `AC-5 — ${label}. A 500 here is the defect as it stands on merged code: the error ` +
+            `carries statusCode 400 but no \`validation\`, so server.ts's 400 arm misses it ` +
+            `and the catch-all answers. A 404 would mean POST /appointments has gone missing, ` +
+            `which is a different failure entirely.\n${describeAnswer(answer)}`,
+        ).toBe(400);
+        expectProblem(answer, 400, '/problems/malformed-request', `AC-5 — ${label}`);
+        expect(
+          member(answer, 'type'),
+          `AC-5 — and it must NOT be the internal-error row. §8.6's 500 is for a fault the ` +
+            `client cannot see or correct; this one it sent.\n${describeAnswer(answer)}`,
+        ).not.toBe('/problems/internal');
+      }
+    });
+  });
+
+  it('AC-5 — and on the cancellation route, the same two bodies are 400 /problems/malformed-request', async () => {
+    // MEASURED AT THE RED COMMIT: this is a 500, not a 404. Fastify consults the content-type
+    // parser BEFORE the router, so the malformed body is rejected before anything discovers
+    // that no such route exists — which makes this case, too, a claim about behaviour that is
+    // live today rather than one waiting on the route. Once the route ships it keeps the new
+    // route from arriving with the same hole.
+    const id = uuidFor('ac5-cancel-malformed', 'never-booked');
+
+    await withService(async (service) => {
+      for (const [label, body] of MALFORMED_BODIES) {
+        const answer = await postRaw(service, `/appointments/${id}/cancellation`, {
+          contentType: 'application/json',
+          ...(body === undefined ? {} : { body }),
+        });
+
+        // The BODY is malformed, so it is answered before the id is ever looked up: this is
+        // 400 and not the 404 that AC-4's unknown id earns. Two rows of §8.6 that must not
+        // collide on one request.
+        expectProblem(
+          answer,
+          400,
+          '/problems/malformed-request',
+          `AC-5 — ${label}, on POST /appointments/{id}/cancellation. A 500 is the observed ` +
+            `red: the content-type parser answers before the router does, so this is the ` +
+            `same defect as the case above and not a missing-route failure. A 404 would mean ` +
+            `the parser stopped running first, which no version of this fix should cause.`,
+        );
+      }
     });
   });
 });

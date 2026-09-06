@@ -8,19 +8,17 @@ the happy path.
 Two conventions hold throughout, and both are load-bearing:
 
 - **Each attempt is exactly one transaction wide** — ADR-0018's two advisory locks, then the one
-  `INSERT` (A-6) or `UPDATE` (ADR-0003). That satisfies ADR-0004's requirement that every attempt be
-  independently recoverable without savepoint discipline, and the corresponding prohibition is
-  absolute: **no transaction may enclose the loop**, or the second attempt fails with `25P02`
-  (current transaction is aborted) instead of being retried. Nothing in `.dependency-cruiser.js` can
-  catch that; QS-3 does, immediately.
+  `INSERT` (A-6) or `UPDATE` (ADR-0003) — so every attempt is independently recoverable without
+  savepoint discipline (ADR-0004). **No transaction may enclose the loop**: §11 R-7e carries what
+  happens if one does, and QS-3 catches it immediately.
 - **Reads before the loop are validation; reads inside it are advisory.** Opening hours and reference
-  data are properties of the request, decided once (ADR-0001, ADR-0004). The candidate read is a
-  suggestion about *which write to attempt next*, never about whether a write is allowed.
+  data are properties of the request, decided once (ADR-0001, ADR-0004); the candidate read only
+  suggests *which write to attempt next*, never whether a write is allowed.
 
 ## 6.1 Concurrent booking — the database decides
 
-**Mandatory scenario.** Two service advisors book the same service, at the same dealership, for the
-same start, at the same instant. There is exactly one free bay.
+**Mandatory scenario.** Two service advisors book the same service, dealership and start at the same
+instant. There is exactly one free bay.
 
 ![Two racing bookings and where PostgreSQL rejects the second](../diagrams/concurrent-booking.svg)
 
@@ -79,39 +77,38 @@ check to have a window after.
 
 **Why the lock is there, and why it is not part of that.** Without it, simultaneous inserters do not
 queue: `check_exclusion_constraint` inserts the index tuple and *then* scans, so each waits on the
-others' in-progress tuples and they cycle. Measured, 20 racers on one bay over 20 trials —
-**285 of 400 losers returned `40P01` (deadlock), 95 returned `23P01`, and exactly one row survived
-every trial.** The invariant was never in question; the *status* was, because a deadlock carries no
-constraint and therefore no verdict to render as `409`. Retry does not rescue it — an aborted racer
-re-inserts its index tuple, so the in-flight population never falls to one and every measured
-configuration livelocked. ADR-0018 puts one `pg_advisory_xact_lock` per bay and per technician in
-front of each attempt instead, so at most one inserter is ever in flight against a given resource and
-every loser conflicts with a **committed** row.
+others' in-progress tuples and they cycle. Measured, 20 racers over 20 trials:
+**285 of 400 losers returned `40P01`, 95 returned `23P01`, and exactly one row survived every
+trial.** The invariant was never in question; the *status* was, a deadlock carrying no constraint
+and so no verdict to render as `409`. ADR-0018 holds the measurements and the rejected alternatives.
+One `pg_advisory_xact_lock` per bay and per technician now precedes each attempt, so at most one
+inserter is in flight against a given resource, every loser conflicts with a **committed** row, and
+the reported constraint is therefore deterministic. **The serialisation point moved but did not
+multiply**: it is still the only one in the system and still §11.2's write-throughput ceiling, now at
+three round trips per attempt.
 
-**The lock decides nothing, and that is measured both ways** — drop the constraints and keep the lock
-and 20 overlapping rows are written; drop the lock and keep the constraints and there is still
-exactly one row, with 108 deadlocks. *Correctness is entirely the constraint's; liveness is entirely
-the lock's.* Both controls run in `tests/integration/exclusion-constraint-adjudicates.test.ts`.
+**The lock decides nothing, and from slice 05 that is measured both ways.** Drop the lock, keep the
+constraints: still exactly one row, with 108 deadlocks. Drop the constraints and **hold** the locks:
+twenty overlapping rows land one at a time, zero refusals, at most **1** racer inside the `INSERT`
+against the unlocked phase's **20**. This section claimed that second cell as measured from slice 02
+when it was only argued; R-02-2 ran it. It matters because twenty rows written *without* the
+locks are equally consistent with *the writes were merely unserialised* — the reading under which a
+reintroduced check-then-act is correct rather than harmless (§11 D-02-1). Perfect mutual exclusion
+over exactly the contended bay prevents not one overlap. *The lock buys liveness; only the constraint
+makes overlap unrepresentable.* All four cells run in
+`tests/integration/exclusion-constraint-adjudicates.test.ts`.
 
-**The serialisation point moved but did not multiply.** It is now the advisory lock, immediately in
-front of the constraint's own, and it is still the only one in the system and still where §11.2's
-write-throughput ceiling comes from — at three round trips per attempt rather than one. It also makes
-the reported constraint deterministic: a loser now conflicts with a committed row rather than with
-whichever in-progress tuple it happened to meet.
-
-**Where `23P01` is caught and mapped**, in one place per stage:
+**Where `23P01` is caught and mapped**, one place per stage:
 
 | Stage | Module | Result |
 |---|---|---|
 | raised | PostgreSQL | SQLSTATE `23P01`, `constraint = no_bay_overlap` \| `no_technician_overlap` |
-| classified | `src/persistence/pgError.ts` — the **only** site (`sql-only-in-persistence`, §5.3) | `{ kind:'conflict', resource:'bay'\|'technician' }` |
+| classified | `src/persistence/pgError.ts`, the only site (§5.2) | `{ kind:'conflict', resource:'bay'\|'technician' }` |
 | acted on | `src/application/bookAppointment.ts` | prune, count, retry or refuse (ADR-0004, ADR-0009) |
-| rendered | `src/http` | `409` + `application/problem+json`, naming the contended resource (§1.3, §8.6) |
+| rendered | `src/http` | `409` + `problem+json`, naming the resource (§8.6) |
 
-A `40P01` is classified `no-verdict` and is **not retried**: under ADR-0018's locks a deadlock can
-only mean some write path skipped them, so it is an internal fault and renders `500`. Retrying it
-would turn the fault into a latency blip nobody investigates. §11.2 carries that obligation, which
-slices 06 and 07 inherit.
+A `40P01` is `no-verdict` and **not retried**: under ADR-0018's locks a deadlock can only mean a
+write path skipped them, so it is an internal fault rendering `500` (§11.2 F-02-9).
 
 ## 6.2 A booking that retries, and succeeds
 
@@ -177,22 +174,20 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
         D-04-1: a non-zero "capped" is expected today, not ADR-0009's intended signal.
 ```
 
-Three details that a reviewer should check any implementation against:
+Two details a reviewer should check any implementation against:
 
-- **Steps 2–4 run once**, and step 6 once: the loop varies only the candidate. Opening hours and
-  reference integrity are properties of the request (ADR-0004). The empty-candidate answers live in
-  step 6's `null` branch rather than in front of it, so every branch on this path is reachable.
-- **`23503` is never retried.** A foreign-key violation means a bad reference (A-6), which is a client
-  error and not contention. Swallowing it in the loop would turn a `422` into a `409` after sixteen
-  pointless attempts.
-- **The pruning uses `err.constraint`.** That is why ADR-0006 disqualified any query layer that wraps
-  the driver error, and why the constraint *names* in the migration are behaviour rather than
-  documentation (QS-1, QS-2 pin them).
+- **Steps 2–4 run once**, and step 6 once: the loop varies only the candidate, opening hours and
+  reference integrity being properties of the request (ADR-0004). The empty-candidate answers live in
+  step 6's `null` branch rather than in front of it, so every branch here is reachable.
+- **`23503` is never retried.** A bad reference (A-6) is a client error, not contention; swallowing it
+  in the loop turns a `422` into a `409` after sixteen pointless attempts.
+- **The pruning uses `err.constraint`** — why ADR-0006 disqualified any query layer that wraps the
+  driver error, and why the names are behaviour (§11 R-3).
 
 ## 6.3 Rescheduling — one atomic `UPDATE`
 
 `PATCH /appointments/{id}` with a new `startsAt`. Steps 1–6 are §6.2's, with the appointment's own
-dealership and service type read from the existing row; step 7 replaces the `INSERT` with:
+dealership and service type read from the existing row; step 7 replaces the `INSERT`:
 
 ```sql
 UPDATE appointment
@@ -209,7 +204,7 @@ because none of them is obvious:
 |---|---|---|
 | A refused move leaves the original **confirmed, at its original time** | The statement aborts. Nothing was released, so nothing must be restored — the atomicity is the statement's, not the application's | QS-4 |
 | A move never transiently frees its slot | There is no committed intermediate state in which the row does not occupy the bay. A concurrent booking for the original slot is refused throughout | QS-5 |
-| A move onto an interval overlapping its **own** current interval succeeds | PostgreSQL checks the new row version against *other* rows, not against the version it replaces. Extending a job by thirty minutes is an ordinary request | QS-6 |
+| A move onto an interval overlapping its **own** current interval succeeds | PostgreSQL checks the new row version against *other* rows, not against the version it replaces | QS-6 |
 | The appointment id survives | It is an `UPDATE`. A caller holding the id still holds it | QS-6 |
 
 A move racing another move, or racing a fresh booking, is the §6.1 story with `UPDATE` in place of
@@ -218,26 +213,37 @@ appointment does not exist (`404`) or is not `confirmed` (`409`), distinguished 
 
 ## 6.4 Cancellation
 
-`POST /appointments/{id}/cancellation`:
+`POST /appointments/{id}/cancellation` — one unconditional statement: no guard, no pre-read and
+**no advisory lock**, a cancelled row satisfying no constraint's `WHERE` and leaving nothing to
+serialise (ADR-0023).
 
 ```sql
-UPDATE appointment SET status = 'cancelled', updated_at = now()
- WHERE id = $1 RETURNING *;
+UPDATE appointment
+   SET status = 'cancelled',
+       updated_at = CASE WHEN status = 'cancelled' THEN updated_at ELSE now() END
+ WHERE id = $1
+RETURNING …;
 ```
 
 The row leaves the exclusion constraints' scope through their `WHERE (status <> 'cancelled')`
 predicate, so the slot becomes bookable again **by the same mechanism that guards every other write**
-— no bookkeeping, no compensating release, nothing to get wrong. Cancelling an already-cancelled
-appointment is idempotent and returns `200` (ADR-0003). QS-7 exercises the predicate, which would
-otherwise be a clause no test ever reaches.
+— no bookkeeping, no compensating release. Zero rows then means one thing only, no such id, where a
+guarded `AND status <> 'cancelled'` would return zero for a replay too. The `CASE` is what makes
+ADR-0003's idempotent `200` change **no column** (asserted as `to_jsonb` equality) — but `xmin` advances, so
+*changes nothing* is true where *writes nothing* is not.
+
+**QS-7's stated reason was wrong twice and is now measured.** It is not the sole guard on the
+predicate — slice 00 pins that definitionally and, on the bay side, behaviourally. Uniquely QS-7's:
+nothing else asserts the **technician** constraint *releases*, and the candidate list carries no
+availability filter, so it is identical either side of the cancel and the only thing moving between
+the `409` and the `201` is the constraint's verdict.
 
 ## 6.5 Availability query — advisory by contract
 
 `GET /availability?dealershipId&serviceTypeId&from&to` runs `candidateRepository.freeResources` over
-a window and returns free bays and qualified free technicians. It takes no lock, reserves nothing,
-and its answer may be stale before the response is serialised. **The response body says so**, and the
-OpenAPI description says so, because that staleness is a property of the domain interface and not an
-implementation detail (§3.1, §4.1).
+a window and returns free bays and qualified free technicians. It takes no lock, reserves nothing, and
+may be stale before the response is serialised — which the body and the OpenAPI description both say,
+staleness being a property of the domain interface rather than an implementation detail (§8.6).
 
 The overlap predicate is the same expression the exclusion constraint uses:
 
@@ -245,13 +251,11 @@ The overlap predicate is the same expression the exclusion constraint uses:
 tstzrange(a.starts_at, a.ends_at) && tstzrange($from, $to)   AND a.status <> 'cancelled'
 ```
 
-Those two expressions live in two files and nothing forces them to agree — §4.2 explains why a shared
-`IMMUTABLE` SQL function is a trap rather than a fix. QS-8 is what holds them together: under
-quiescence, anything availability reports free must be insertable, and anything it reports busy must
-be refused.
+Two expressions, two files, and nothing structural holding them equal (§11 R-5; §4.2 says why a
+shared `IMMUTABLE` function is a trap rather than a fix). QS-8 is what holds them together.
 
-The partial GiST indexes created by the exclusion constraints serve this query's range predicate, so
-the mechanism that costs write throughput (§11.2) pays for the read path.
+The partial GiST indexes the exclusion constraints create serve this query's range predicate: the
+mechanism that costs write throughput (§11.2) pays for the read path.
 
 ## 6.6 Where each failure is decided
 
@@ -268,5 +272,7 @@ consulted.
 | Appointment not `confirmed` | the `UPDATE`'s `0 rows` | one row | `409` |
 | Every candidate refused | **PostgreSQL, `23P01`, repeatedly** | the whole live schedule, as a side effect of writing | `409` |
 
-The last row is the only one whose answer depends on what else is happening at that instant, and it
-is the only one the application does not decide.
+The last row is the only one whose answer depends on what else is happening at that instant, and the
+only one the application does not decide. The two `0 rows` rows are not equally decided either: slice
+05's cancel is unconditional, so zero rows is unambiguously *no such id*, where slice 06's guarded
+move reproduces the ambiguity §6.3 resolves with a follow-up read.

@@ -6,6 +6,7 @@ import { buildServer } from '../../../src/http/server.js';
 import { PROBLEM_TYPES, problem } from '../../../src/http/problem.js';
 import type { BookOutcome } from '../../../src/application/bookAppointment.js';
 import type { ReadOutcome } from '../../../src/application/readAppointment.js';
+import type { CancelOutcome } from '../../../src/application/cancelAppointment.js';
 import type { HealthOutcome } from '../../../src/application/checkHealth.js';
 import { createLogger } from '../../../src/platform/logger.js';
 
@@ -49,6 +50,7 @@ const apps: FastifyInstance[] = [];
 function serverAnswering(options: {
   readonly book?: BookOutcome | ((command: unknown) => BookOutcome);
   readonly read?: ReadOutcome;
+  readonly cancel?: CancelOutcome | ((id: string) => CancelOutcome);
   readonly logger?: ReturnType<typeof createLogger>;
 }): FastifyInstance {
   const app = buildServer({
@@ -59,6 +61,10 @@ function serverAnswering(options: {
       return typeof book === 'function' ? book(command) : book;
     },
     readAppointment: async () => options.read ?? { kind: 'not-found' },
+    cancelAppointment: async (id) => {
+      const cancel = options.cancel ?? { kind: 'not-found' };
+      return typeof cancel === 'function' ? cancel(id) : cancel;
+    },
   });
   apps.push(app);
   return app;
@@ -296,6 +302,7 @@ describe('GET /appointments/:id — AC-2', () => {
         readRan = true;
         return { kind: 'not-found' };
       },
+      cancelAppointment: async () => ({ kind: 'not-found' }),
     });
     apps.push(app);
 
@@ -315,6 +322,158 @@ describe('GET /appointments/:id — AC-2', () => {
     const response = await app.inject({ method: 'GET', url: `/appointments/${APPOINTMENT_ID}` });
     expect(response.statusCode).toBe(200);
     expect(response.json().status).toBe('cancelled');
+  });
+
+  it('a member the 200 schema does not declare is STRIPPED — the schema is a WHITELIST', async () => {
+    // The same control the 201 and the cancellation 200 already carry; the GET was the one route
+    // without it. Emptying this route's `response` map changes nothing else observable — the 200
+    // still renders and the 404 sets its own media type — so without this case an internal field
+    // added to `AppointmentView` (a retry count, a lock key, an id from another table) would
+    // reach every client of this route silently and become the contract by use.
+    //
+    // No cast and no production change: TypeScript's excess-property check fires on FRESH
+    // literals at the use site, so a widened const assigns to `AppointmentView` cleanly.
+    const internalNote = 'seeded by the reconciliation job';
+    const WITH_EXTRA = { ...VIEW, internalNote, retryCount: 3 };
+
+    const app = serverAnswering({ read: { kind: 'found', appointment: WITH_EXTRA } });
+    const response = await app.inject({ method: 'GET', url: `/appointments/${APPOINTMENT_ID}` });
+
+    expect(response.statusCode).toBe(200);
+    // Sorted deliberately: key ORDER differs between the serialiser the schema compiles and the
+    // fallback, and pinning it would assert an incidental fact about `fast-json-stringify`.
+    expect(Object.keys(response.json() as object).sort()).toEqual([
+      'bayId',
+      'customerId',
+      'dealershipId',
+      'endsAt',
+      'id',
+      'serviceTypeId',
+      'startsAt',
+      'status',
+      'technicianId',
+      'vehicleId',
+    ]);
+  });
+});
+
+describe('POST /appointments/:id/cancellation — AC-3, AC-4', () => {
+  const CANCELLED = { ...VIEW, status: 'cancelled' as const };
+
+  async function cancel(app: FastifyInstance, id = APPOINTMENT_ID): Promise<LightMyRequestResponse> {
+    // NO `content-type` AND NO PAYLOAD, exactly as `tests/support/booking.ts` sends it. The route
+    // reads no body — the id is a path parameter and that is the whole input — and with AC-5 in
+    // place a reflexive `application/json` on a bodyless POST is answered 400 (OQ-05-2, deferred
+    // to slice 10). A test that set the header would be testing that friction, not this route.
+    return await app.inject({ method: 'POST', url: `/appointments/${id}/cancellation` });
+  }
+
+  it('cancelled is 200 with the AppointmentView, as application/json', async () => {
+    const response = await cancel(serverAnswering({ cancel: { kind: 'cancelled', appointment: CANCELLED } }));
+    expect(response.statusCode).toBe(200);
+    expect(response.statusCode, 'a cancellation is not a creation').not.toBe(201);
+    expect(response.headers['content-type']).toMatch(/application\/json/);
+    expect(response.json()).toEqual(CANCELLED);
+  });
+
+  it('the 200 says `cancelled`, and the response schema does not write it back to `confirmed`', async () => {
+    // Measurement 8 again, from the other side: `AppointmentBody.status` is a UNION of literals
+    // precisely so this route can render a value the booking route never produces. Under
+    // `Type.Literal('confirmed')` this body would come back confirmed over a cancelled row and
+    // every acceptance assertion downstream would pass.
+    const response = await cancel(serverAnswering({ cancel: { kind: 'cancelled', appointment: CANCELLED } }));
+    expect(response.json().status).toBe('cancelled');
+  });
+
+  it('not-found is 404 /problems/appointment-not-found — the arm D4 clause 3 watches', async () => {
+    // §8.6 gains no row: the type slice 02 minted for `GET` is reused verbatim. The design names
+    // a survivor on this switch as a MAJOR finding, because the outcome union has two members and
+    // both are client-visible — an unasserted arm here is half the route.
+    const response = await cancel(serverAnswering({ cancel: { kind: 'not-found' } }));
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toMatch(/application\/problem\+json/);
+    expect(response.json().type).toBe('/problems/appointment-not-found');
+    expect(response.json().status).toBe(404);
+    expect(response.json().title).toBe('No such appointment');
+    // The title AND the detail, because this file's own mutation history is that every string
+    // literal in a route survived until something asserted it: a row whose detail became `""`
+    // passes every status and `type` assertion above.
+    expect(response.json().detail).toBe('no appointment exists with that id');
+  });
+
+  it('the id from the PATH is what reaches the use case', async () => {
+    // Without this, a handler that passed a constant would answer 200 for every id and AC-4
+    // would be the only thing that noticed — as a 404 arm that never fired.
+    const other = '99999999-9999-4999-8999-999999999999';
+    let seen: string | undefined;
+    const app = serverAnswering({
+      cancel: (id) => {
+        seen = id;
+        return { kind: 'cancelled', appointment: CANCELLED };
+      },
+    });
+    await cancel(app, other);
+    expect(seen).toBe(other);
+  });
+
+  it('AC-8 — a NON-uuid id is 400 before the use case runs, so 400 and 404 do not collide', async () => {
+    let cancelRan = false;
+    const app = serverAnswering({
+      cancel: () => {
+        cancelRan = true;
+        return { kind: 'not-found' };
+      },
+    });
+
+    const response = await cancel(app, 'not-a-uuid');
+    expect(response.statusCode).toBe(400);
+    expect(response.json().type).toBe('/problems/malformed-request');
+    expect(cancelRan, 'the params schema must reject before any use case is called').toBe(false);
+  });
+
+  it('AC-3 at the edge — a replay renders a byte-identical body, because nothing here branches', async () => {
+    const app = serverAnswering({ cancel: { kind: 'cancelled', appointment: CANCELLED } });
+    const first = await cancel(app);
+    const second = await cancel(app);
+    expect(second.statusCode).toBe(200);
+    expect(second.body).toBe(first.body);
+  });
+
+  it('the cancellation and the READ describe one appointment through one schema', async () => {
+    // AC-2 (b) asserts this end to end. Here it is structural: both routes send an
+    // `AppointmentView` through `AppointmentBody`, so a client parses one thing.
+    const app = serverAnswering({
+      cancel: { kind: 'cancelled', appointment: CANCELLED },
+      read: { kind: 'found', appointment: CANCELLED },
+    });
+    const cancelled = await cancel(app);
+    const read = await app.inject({ method: 'GET', url: `/appointments/${APPOINTMENT_ID}` });
+    expect(read.json()).toEqual(cancelled.json());
+  });
+
+  it('a member the 200 schema does not declare is STRIPPED', async () => {
+    // The `response` schema on this route is what does it, and without this assertion emptying
+    // that schema changes NOTHING observable: the 200 still renders and the 404 sets its own
+    // media type. An internal field added to `AppointmentView` — a retry count, a lock key —
+    // would then reach every client of this route silently.
+    const response = await cancel(
+      serverAnswering({
+        cancel: {
+          kind: 'cancelled',
+          appointment: { ...CANCELLED, internalAttempts: 7 },
+        } as unknown as CancelOutcome,
+      }),
+    );
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(response.json() as object)).not.toContain('internalAttempts');
+  });
+
+  it('cancellation is a SUB-RESOURCE, not a DELETE — the appointment keeps its URL (ADR-0003)', async () => {
+    // The shape of the API is the criterion here: `DELETE /appointments/{id}` would misdescribe
+    // a status transition, and AC-2 exists because the appointment must still read afterwards.
+    const app = serverAnswering({ cancel: { kind: 'cancelled', appointment: CANCELLED } });
+    const deleted = await app.inject({ method: 'DELETE', url: `/appointments/${APPOINTMENT_ID}` });
+    expect(deleted.statusCode).toBe(404);
   });
 });
 
@@ -337,6 +496,7 @@ describe('a 500 the route KNOWS about is not an unhandled fault', () => {
       checkHealth: async (): Promise<HealthOutcome> => ({ kind: 'ok' }),
       bookAppointment: async () => outcome,
       readAppointment: async () => ({ kind: 'not-found' }),
+      cancelAppointment: async () => ({ kind: 'not-found' }),
     });
     apps.push(app);
 
@@ -361,6 +521,7 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
         throw Object.assign(new Error('undefined column "bya_id"'), { code: '42703' });
       },
       readAppointment: async () => ({ kind: 'not-found' }),
+      cancelAppointment: async () => ({ kind: 'not-found' }),
     });
     apps.push(app);
 
@@ -383,6 +544,84 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
     expect(response.json().detail).toBe(
       'the service could not complete this request; the failure has been logged',
     );
+  });
+
+  it.each<[string, string | undefined]>([
+    ['an EMPTY body (FST_ERR_CTP_EMPTY_JSON_BODY)', undefined],
+    ['an UNPARSEABLE body (FST_ERR_CTP_INVALID_JSON_BODY)', '{oops'],
+  ])(
+    'AC-5 — %s with content-type: application/json is 400 /problems/malformed-request, on BOTH routes',
+    async (_label, payload) => {
+      // §8.6 CLAIMS TOTALITY, AND THIS IS THE CLAIM BEING KEPT. Measured on the pinned
+      // fastify@5.12.1 — by the architect, the implementer and the test-engineer independently —
+      // both errors carry `statusCode: 400` and NEITHER sets `validation`, so before this they
+      // missed the validation arm and fell to the catch-all: `500 /problems/internal`, live on
+      // the already-merged booking route. §8.6 justifies its 500 row with "a 4xx would tell a
+      // service advisor to correct something they did not send and cannot see" — here the client
+      // sent exactly that, can see it, and can correct it. The row was inverted.
+      //
+      // The content-type parser runs BEFORE the router (measured: even an unrouted path raises
+      // it), which is why the cancellation route is included: a route reads no body and still
+      // answers this.
+      for (const url of [
+        '/appointments',
+        `/appointments/${APPOINTMENT_ID}/cancellation`,
+      ]) {
+        const response = await serverAnswering({}).inject({
+          method: 'POST',
+          url,
+          headers: { 'content-type': 'application/json' },
+          ...(payload === undefined ? {} : { payload }),
+        });
+
+        expect(response.statusCode, url).toBe(400);
+        expect(response.statusCode, `${url} — the row that was inverted`).not.toBe(500);
+        expect(response.headers['content-type']).toMatch(/application\/problem\+json/);
+        expect(response.json().type).toBe('/problems/malformed-request');
+        expect(response.json().status).toBe(400);
+        // The client is told what to fix, which is the entire argument for moving this off the
+        // 500 row. Both Fastify messages name the header that made the body mandatory.
+        expect(String(response.json().detail)).toContain('content-type');
+      }
+    },
+  );
+
+  it('AC-5 — and a malformed body is NOT logged as an unhandled fault', async () => {
+    // It is the client's mistake, not the system's. If it reached `request.failed` the one line
+    // an operator greps for a genuine fault would fire on every mistyped curl.
+    const lines: string[] = [];
+    const capturing = pino({ level: 'error' }, { write: (line: string): void => void lines.push(line) });
+    const app = serverAnswering({ logger: capturing });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/appointments',
+      headers: { 'content-type': 'application/json' },
+      payload: '{oops',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(lines.join('\n')).not.toContain('request.failed');
+  });
+
+  it('AC-5 is named BY CODE — a DIFFERENT error carrying statusCode 400 is still a 500', async () => {
+    // The predicate is two named codes, never `statusCode < 500`. This file already records that
+    // a broader disjunction was deleted after mutation because no input reached its second arm;
+    // widening it here would be the same mistake with a worse consequence — Fastify's other 4xx
+    // codes have no §8.6 row, so the taxonomy would have to grow to meet the predicate rather
+    // than the other way round. This is the case that fails if someone widens it.
+    const app = serverAnswering({
+      book: () => {
+        throw Object.assign(new Error('some other 4xx'), {
+          code: 'FST_ERR_SOMETHING_ELSE',
+          statusCode: 400,
+        });
+      },
+    });
+
+    const response = await post(app, VALID_BODY);
+    expect(response.statusCode).toBe(500);
+    expect(response.json().type).toBe('/problems/internal');
   });
 
   it('renders through the SAME builder the routes use, so the taxonomy cannot escape itself', async () => {

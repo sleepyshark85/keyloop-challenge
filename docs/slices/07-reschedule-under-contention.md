@@ -30,6 +30,19 @@ every test in slice 06.
 - **AC-3** — Given the racing scenario of AC-2, when it is run repeatedly with recorded seeds, then
   the result is stable across runs and a failure names the seed that produced it.
 
+## Inherited scope — written here, not only where it was deferred
+
+- **A-05-6 — two unkilled guards inside ADR-0016's only sanctioned cast site.**
+  `src/persistence/pgError.ts` carries surviving `ConditionalExpression` mutants at **80:9**
+  (`typeof code === 'string'`, the duck-typing guard that makes `classify` total over `unknown`) and
+  **103:39** (`constraint !== undefined` on the `23P01` arm). Nothing hands `classify` an error whose
+  `code` is not a string, and nothing hands it a `23P01` carrying no constraint name — so both guards
+  are specified and unproven, which is §11 R-11's shape inside the one file where ADR-0016 permits a
+  `ContendedResource` to be minted. **Slice 07 is the destination** because it is where `23P01`
+  classification on the `UPDATE` path becomes live rather than historical: a reschedule racing a
+  booking is the first execution reaching that arm from a second call site. Two unit cases, the
+  implementer's; no production change is expected, and if one is needed that is the finding.
+
 ## In scope
 
 - `tests/concurrency/refused-move-leaves-original.test.ts` and

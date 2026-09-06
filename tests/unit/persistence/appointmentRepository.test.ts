@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cancelAppointmentById,
   findAppointmentById,
   insertAppointment,
   lockResources,
@@ -224,5 +225,105 @@ describe('findAppointmentById', () => {
         '"technician_id", "bay_id", "starts_at", "ends_at", "status" ' +
         'from "appointment" where "id" = $1',
     );
+  });
+});
+
+describe('cancelAppointmentById — slice 05, D1 and ADR-0023', () => {
+  const CANCELLED_ROW = { ...RETURNED_ROW, status: 'cancelled' };
+
+  it('is ONE unconditional UPDATE — no pre-read, no guard, and §2.1 never arises', async () => {
+    // The shape is the argument. There is no `select` to check availability with and no
+    // `AND status <> 'cancelled'` to decide on, so there is no check for an act to follow:
+    // `CLAUDE.md` §2.1 is not obeyed here, it is unreachable. And the guard D1 rejects is
+    // asserted ABSENT rather than assumed absent, because it is the natural thing to write and
+    // it is what makes zero rows ambiguous (§6.6, AC-3 and AC-4 would then collide).
+    const { db, recorded } = scriptedDb([{ rows: [CANCELLED_ROW] }]);
+    await cancelAppointmentById(db, IDS.appointment);
+
+    expect(recorded).toHaveLength(1);
+    const sql = recorded[0]?.sql ?? '';
+    expect(sql.startsWith('update "appointment"')).toBe(true);
+    expect(sql).not.toMatch(/\bselect\b/i);
+    // The WHERE clause on its own, because `returning` names "status" a few words later and a
+    // whole-statement probe for it would pass over the guarded statement too.
+    expect(sql.split(' where ')[1]?.split(' returning ')[0]).toBe('"id" = $2');
+  });
+
+  it('takes NO advisory lock and opens NO transaction — ADR-0023, and F-05-1 is what makes it worth asserting', async () => {
+    // ADR-0023 exempts this path from F-02-9 because a cancelled row satisfies no constraint's
+    // `WHERE (status <> 'cancelled')`, so there is no adjudication for a lock to serialise.
+    // F-05-1: this file now holds two write functions, one locking and one not, and "correctly
+    // exempt" reads identically to "forgot the lock". Until slice 06's branded `ResourceLock`
+    // makes that a compile error, this is the cheapest thing that fails when someone adds the
+    // lock here for uniformity — `tests/concurrency/` measures the consequence, this names it.
+    const { db, recorded, events } = scriptedDb([{ rows: [CANCELLED_ROW] }]);
+    await cancelAppointmentById(db, IDS.appointment);
+
+    expect(recorded[0]?.sql).not.toMatch(/pg_advisory/);
+    // One statement IS its own transaction. An explicit block would be a second thing that can
+    // wait, which is exactly the case ADR-0023's "the unit is the transaction" clause excludes
+    // from the exemption.
+    expect(events).toEqual([]);
+  });
+
+  it('advances `updated_at` on the FIRST cancellation and leaves it alone on a replay — the CASE, pinned', async () => {
+    // AC-3 taken literally: a replayed cancellation changes NO COLUMN. A plain
+    // `updated_at = now()` advances it on the second call, which would make a replay a
+    // client-reachable write to a column arc42 §8.1 says the application maintains. The CASE
+    // reads `status` inside the statement that writes it — atomic under the row's own lock,
+    // and not a check-then-act window, because nothing decides WHETHER to write.
+    //
+    // `tests/integration/cancellation-releases-slot.test.ts` is what proves this over a real
+    // row; this pins the text, which is where a mutant would land.
+    const { db, recorded } = scriptedDb([{ rows: [CANCELLED_ROW] }]);
+    await cancelAppointmentById(db, IDS.appointment);
+    const sql = recorded[0]?.sql ?? '';
+    expect(sql).toContain(
+      '"updated_at" = case when "status" = \'cancelled\' then "updated_at" else now() end',
+    );
+  });
+
+  it('is EXACTLY this statement — one UPDATE, the CASE, `where id`, and the ten returned columns', async () => {
+    // Pinned whole, for `insertAppointment`'s reason and one more: `returning` is where the
+    // 200 body comes from, so a dropped column is a member missing from `AppointmentView` that
+    // the response schema strips rather than rejects.
+    const { db, recorded } = scriptedDb([{ rows: [CANCELLED_ROW] }]);
+    await cancelAppointmentById(db, IDS.appointment);
+    expect(recorded[0]?.sql).toBe(
+      'update "appointment" set "status" = $1, ' +
+        '"updated_at" = case when "status" = \'cancelled\' then "updated_at" else now() end ' +
+        'where "id" = $2 ' +
+        'returning "id", "dealership_id", "customer_id", "vehicle_id", "service_type_id", ' +
+        '"technician_id", "bay_id", "starts_at", "ends_at", "status"',
+    );
+    expect(recorded[0]?.parameters).toEqual(['cancelled', IDS.appointment]);
+  });
+
+  it('returns the mapped row the DATABASE wrote, cancelled', async () => {
+    expect(await cancelAppointmentById(scriptedDb([{ rows: [CANCELLED_ROW] }]).db, IDS.appointment)).toEqual({
+      id: IDS.appointment,
+      dealershipId: IDS.dealership,
+      customerId: IDS.customer,
+      vehicleId: IDS.vehicle,
+      serviceTypeId: IDS.serviceType,
+      technicianId: IDS.technician,
+      bayId: IDS.bay,
+      startsAt: STARTS_AT,
+      endsAt: ENDS_AT,
+      status: 'cancelled',
+    });
+  });
+
+  it('returns null for zero rows — which means EXACTLY ONE thing: no such id (§6.6, AC-4)', async () => {
+    // The whole reason D1 carries no `AND status <> 'cancelled'`. Under that guard zero rows
+    // would also mean "already cancelled", and this null would become a 404 for a row that
+    // exists — AC-3 answered as AC-4.
+    expect(await cancelAppointmentById(scriptedDb([{ rows: [] }]).db, IDS.appointment)).toBeNull();
+  });
+
+  it('DOES NOT CATCH — SQLSTATE is read in exactly one module', async () => {
+    const failure = Object.assign(new Error('deadlock detected'), { code: '40P01' });
+    const { db } = scriptedDb([{ error: failure }]);
+    await expect(cancelAppointmentById(db, IDS.appointment)).rejects.toBe(failure);
   });
 });

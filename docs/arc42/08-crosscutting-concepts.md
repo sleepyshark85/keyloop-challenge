@@ -192,13 +192,10 @@ Six consequences, each of which something elsewhere in this document depends on:
    *"a row does not conflict with its own prior version"* but *"the mechanism cannot be made to
    conflict with it, because it never sees it"*.
 
-   > **Inherited obligation for slice 06.** AC-10 fixes the **single-threaded** `UPDATE` semantics and
-   > nothing more. ADR-0003 claims that *"two racing reschedules onto the same slot behave exactly like
-   > two racing bookings: one commits, the other gets `23P01`"* — and **no scenario and no test asserts
-   > that.** QS-4 and QS-5 assert what a *refused* move leaves behind, QS-6 the self-overlap; the
-   > mirror of QS-1 on the `UPDATE` path is named by nothing. The patched trigger proves the gap is
-   > real: it passes everything slice 00 asserts and fails only under simultaneity. **Slice 06 owes a
-   > concurrency test for racing moves.**
+   > **AC-10 fixes the single-threaded `UPDATE` semantics and nothing more**, so ADR-0003's claim about
+   > two *racing* reschedules is asserted by nothing. The obligation now lives where it is executed —
+   > `docs/slices/06-reschedule-atomic-move.md`, inherited scope — because a deferral recorded only at
+   > its origin is what R-05-2 measured going missing.
 5. **`btree_gist` is required** (TC-3), because `bay_id WITH =` is an equality operator on a `uuid`
    and plain GiST cannot index it. This is the extension dependency that constrains deployment.
 6. **The GiST indexes serve the availability query too.** Its `tstzrange(...) && ...` predicate over
@@ -488,24 +485,22 @@ staleness is a property of the domain interface rather than an implementation de
 ### Status codes
 
 Errors are RFC 9457 `application/problem+json`, with a stable `type` per failure so a client
-distinguishes cases without parsing prose. §3.2 called the media type an obvious candidate and left
-it to Gate B; it is decided here.
+distinguishes cases without parsing prose (§3.2 left the media type to Gate B).
 
 | Status | `type` | When | Decided by |
 |---|---|---|---|
-| `400` | `/problems/malformed-request` | Schema violation, unparseable timestamp | TypeBox, before any handler (ADR-0005) |
+| `400` | `/problems/malformed-request` | Schema violation, unparseable timestamp; and, from slice 05, an empty or unparseable JSON body | TypeBox before any handler (ADR-0005), or `setErrorHandler` on two named Fastify parser codes |
 | `400` | `/problems/outside-opening-hours` | The derived interval leaves the dealership's hours | `domain/openingHours.ts` — **reads no booking** (GC-1) |
 | `404` | `/problems/appointment-not-found` | The id in the path does not exist | The `UPDATE`'s zero rows |
 | `409` | `/problems/no-capacity` | Every candidate refused, or the cap reached (ADR-0004, ADR-0009). Carries `resource` | **PostgreSQL, `23P01`, repeatedly** |
 | `409` | `/problems/appointment-not-confirmed` | Moving a cancelled appointment (ADR-0003) | Appointment status |
 | `422` | `/problems/unknown-reference` | Unknown dealership, service type, customer or vehicle. Carries `reference` | Reference read, then `23503` |
 | `422` | `/problems/vehicle-not-owned` | The vehicle is not the named customer's | Composite FK, `23503` (A-6, GC-2) |
-| `500` | `/problems/internal` | Reference data the client cannot see or correct, and anything else | The use case, or the fallback handler |
+| `500` | `/problems/internal` | Reference data the client cannot see or correct — a described class, not a catch-all (ADR-0024) | The use case, or the fallback handler |
 
 Four deliberate choices in that table:
 
-- **Ownership failure is a `422`, not a `403`** — validation, not authorisation (ADR-0002). No
-  deliberate ambiguity about whether the vehicle exists, and no audit event.
+- **Ownership failure is a `422`, not a `403`** — validation, not authorisation (ADR-0002).
 - **Two distinct `409`s, and only one touches the conflict metric.** `no-capacity` is contention;
   `appointment-not-confirmed` is a state conflict, and `booking_conflicts_total` counts `23P01` so it
   cannot see the second (§8.4).
@@ -517,11 +512,16 @@ Four deliberate choices in that table:
   no service bays, and a candidate refused by a composite foreign key — as does a `40P01` under
   ADR-0018's locks. A `4xx` would tell a service advisor to correct something they did not send and
   cannot see, so the body says nothing actionable and the detail goes to the log. QS-11 reaches it
-  end-to-end through a seeded unresolvable zone rather than treating it as unprovable.
+  end-to-end through a seeded unresolvable zone. **The residual is an invariant rather than this
+  row: every response with status ≥ 400 is `problem+json` carrying a `type` from the closed set. Two
+  responses break it today, both measured. `content-type: application/xml` renders
+  `500 /problems/internal` — 415 has no row, and a status with no row falls to the residual rather
+  than being refused. `GET /nope` renders `404 application/json` with no `type` at all, never
+  reaching the error handler. ADR-0024 rules both; slice 06 registers `setNotFoundHandler` and the
+  `route-not-found` row.**
 
-Two members of `BookOutcome` render as that one row — `no-verdict` and `reference-data-invalid`.
-They stay apart in the union so the `switch` and the operator's log line distinguish them; the client
-contract does not grow. Symmetrically, a dealership with **no technician qualified for the requested
+Two members of `BookOutcome` render as that one row, staying apart for the reason §5.2 gives; the
+client contract does not grow. Symmetrically, a dealership with **no technician qualified for the requested
 service type** is `422 /problems/unknown-reference` with `reference=service-type`: the request names a
 (dealership, service type) pair and that pair does not resolve, which is the only sense in which this
 API knows service types at all. It is not contention and there is nothing to retry.

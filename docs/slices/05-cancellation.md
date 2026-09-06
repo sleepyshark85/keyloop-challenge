@@ -1,13 +1,17 @@
 ---
 id: "05"
-title: Cancellation — and the proof that the constraint's predicate is live
-status: ready
+title: Cancellation — and the proof at the edge that both constraints release
+status: done
 depends_on: ["04"]
-arc42: ["§6.4", "§8.6"]
-adr: [3]
+arc42: ["§5.2", "§6.1", "§6.4", "§6.6", "§8.6", "§10", "§11"]
+                     # §6.6 and §8.6 amended at step 2; §6.1 at step 7, R-02-2 having been
+                     # built in this slice. §6.2, §6.3 and §6.5 took pointer-only edits to
+                     # pay the ratchet for the additions — one home per fact, no fact lost.
+adr: [3, 23, 24]
 quality_scenarios: [QS-7]
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
+                     # step 5: REVOKED — seven open MAJORs (05-design.md §2 D4)
 ---
 
 ## Goal
@@ -16,8 +20,11 @@ gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/B
 becomes bookable. A sub-resource rather than `DELETE`, because the appointment remains readable at
 its URL afterwards — which `DELETE` would misdescribe.
 
-This is the only slice that exercises `WHERE (status <> 'cancelled')` through the API. Without it
-that clause is an unverified claim sitting inside the system's most important constraint.
+Slice 00 already guards the clause definitionally and behaviourally **on the bay side**. What AC-1
+adds is the **technician** side behaviourally — nothing else anywhere asserts that constraint
+releases — and an attribution: the candidate list carries no availability filter, so it is identical
+before and after the cancel, and the only thing that moved between the `409` and the `201` is the
+constraint's verdict. (`05-design.md` §1, corrected at step 2 and again at step 5 by measurement.)
 
 ## Acceptance criteria
 
@@ -26,24 +33,70 @@ that clause is an unverified claim sitting inside the system's most important co
 - **AC-2** — Given A has been cancelled, when `GET /appointments/{id}` is requested, then `200` is
   returned with `status: cancelled` — it is not a `404`.
 - **AC-3** — Given A has been cancelled, when it is cancelled again, then `200` is returned and
-  nothing changes. Cancellation is idempotent (§8.6).
+  nothing changes. Cancellation is idempotent (§8.6). Asserted in **two places**, because one cannot
+  reach it: the contract test takes the `200` and the identical body; the integration test takes
+  `to_jsonb(appointment)` equality across the replay, which is the only assertion that distinguishes
+  the designed statement from the `updated_at = now()` it rejects. *(A-05-1, amended at step 2.)*
 - **AC-4** — Given an unknown id, when cancellation is requested, then `404` with
   `type=/problems/appointment-not-found`.
+- **AC-5** *(added at step 2 — measured twice, independently, by both reviewing roles)* — Given
+  `Content-Type: application/json` with **no body**, and given the same header with an **unparseable**
+  body, when either request is made to the cancellation route **or to `POST /appointments`**, then
+  `400` with `type=/problems/malformed-request` is returned — **not** the `500 /problems/internal`
+  returned today. §8.6 gains no row for it. *(Step 5: it keeps two thirds of that claim — ADR-0024
+  measured two responses still outside the taxonomy and rules them into slice 06.)*
 
 ## In scope
 
 - The cancel route, use case and `UPDATE`.
+- **`src/http/server.ts`** — AC-5's one predicate. The only line in this slice that changes behaviour
+  on an already-merged route, which is why the gate must exercise it.
 - `tests/integration/cancellation-releases-slot.test.ts`.
+- `tests/concurrency/cancellation-takes-no-lock.test.ts` — a scope ruling, **respecified at step 2**
+  so it can fail for the reason it exists: the discriminating case holds the bay advisory lock in a
+  second session, with a booking control and a release witness (`05-design.md` §5).
+- **Added at step 5 — the two controls ADR-0019 deferred into this slice and nobody built.**
+  - **R-02-2 · phase 4 of `tests/integration/exclusion-constraint-adjudicates.test.ts`.** The
+    existing `race()` helper and phase 2's dropped constraint, with each racing insert wrapped in
+    ADR-0018's two advisory locks **hand-written** (class constant, `hashtext`; a
+    `tests/integration/` file may not import `src/`, and the divergence is residue the concurrency
+    tests bound). Expect **twenty overlapping rows** — the matrix's fourth cell, and the one sentence
+    it cannot otherwise say: *the lock cannot replace the constraint.* Test-engineer's.
+  - **R-02-3 · one case in `tests/unit/http/appointments.test.ts`.** Stub `readAppointment` with a
+    `found` view carrying a member the contract does not declare (an `as` cast — no production path
+    reaches that state, which is what the guard is for) and assert the `200` body carries exactly the
+    ten schema members. Measured against `dist/`: it does today, and with the `response` map absent
+    Fastify installs no serializer and emits the extra members. That kills `appointments.ts:210:19`,
+    surviving since slice 02. Implementer's, and it asserts a real property — **the response schema
+    is an output whitelist**, not merely a document.
 
 ## Out of scope
 
 - Cancellation windows, fees, notification, or any record of *who* cancelled — ADR-0002 puts actors
   and audit out of scope, and §11 carries it.
 - Restoring a cancelled appointment. Not in the brief; a fresh booking is the path back.
+- **F-05-1's structural remedy** — a branded `ResourceLock` on `insertAppointment`. **Owned by slice
+  06** and written into `06-reschedule-atomic-move.md`, which writes a new locking path and so makes
+  the control stronger rather than merely later (ADR-0019). Until then the rule is enforced by review.
+- **Empty body on a bodyless route answering `200` rather than `400`** — OQ-05-2, re-routed at step 5
+  to **slice 09** (slice 10 is a tombstone) and written into `09-observability.md` as AC-6b.
+- **`setNotFoundHandler` and the `404 /problems/route-not-found` row** — [ADR-0024](../adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md),
+  ruled here and **built at slice 06**, because registering it breaks the media-type half of AC-4's
+  vacuity guard and this step has no test-engineer round left to re-derive it.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
-- The freed-slot assertion books through the API rather than inserting directly, so it proves the
-  predicate end to end rather than at the SQL level slice 00 already covered.
+- The freed-slot assertion books **through the API** rather than inserting directly, so it proves the
+  released slot over the whole path — allocation, ADR-0004's retry, and the constraint's verdict —
+  rather than at the SQL level slice 00 already covers.
+- **Step-7 arc42 edits, ruled at step 5 so step 7 executed rather than decided — all done.** §6.4
+  takes D1's statement, the `CASE`, and the sentence that a replay advances `xmin` while changing no
+  column; §6.6 says the two *"`UPDATE`'s 0 rows"* rows are not equally decided; §5.2 loses its
+  prediction of `src/domain/appointment.ts` and gains `cancelAppointment.ts`, `CancelOutcome` and the
+  no-lock `cancelAppointmentById`; §8.6's `400` row and its residual paragraph say what the code does
+  today; §10 corrects QS-7's false reason and QS-11's direction; §11 gains F-05-1, D-05-1 and D-05-3,
+  narrows F-02-9 to ADR-0023's *iff*, and updates R-10 and R-12. **§6.1 was added to the declaration
+  at step 7**, R-02-2 having been built here — the four-cell control it claimed as measured from slice
+  02 was only argued until this slice ran it.
