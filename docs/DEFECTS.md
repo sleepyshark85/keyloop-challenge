@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **179** |
-| Severity | 10 blocking · 96 major · 73 minor |
+| Findings recorded | **182** |
+| Severity | 10 blocking · 98 major · 74 minor |
 | Verdicts | 10 narrowed · 67 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 44 · architect 34 · reviewer 34 · implementer 31 · orchestrator 29 · scribe 5 · human 2 |
-| Awaiting a ruling | **86** |
-| Mean escape distance | 1.85 step(s) |
+| Raised by | test-engineer 44 · implementer 34 · architect 34 · reviewer 34 · orchestrator 29 · scribe 5 · human 2 |
+| Awaiting a ruling | **89** |
+| Mean escape distance | 1.88 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1182,6 +1182,9 @@ rather than narrated.*
 | **A-05-4** | MINOR | 2 *(+2)* | orchestrator | Two consecutive adjudication rounds have produced zero DISAGREE verdicts on findings | **open** |
 | **T-05-7** | MAJOR | 3 *(+3)* | test-engineer | AC-12, section 8.6 totality sweep, is GREEN in the same run over the very build AC-5 proves is broken | **open** |
 | **T-05-8** | MINOR | 3 *(+0)* | test-engineer | Two sub-assertions are green at the red and would be green over a wrong build | **open** |
+| **I-05-5** | MAJOR | 4 *(+3)* | implementer | freeResources does not exist in src/, so AC-1 named mutant is unreachable today and the design inference is not yet true of this repository | **open** |
+| **I-05-6** | MAJOR | 4 *(+4)* | implementer | AC-5 closed two of three content-type-parser holes; the third is live after this slice and is T-05-7 next instance | **open** |
+| **I-05-7** | MINOR | 4 *(+3)* | implementer | The cancellation route publishes two response schemas it can never produce | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1258,6 +1261,21 @@ rather than narrated.*
 
 - *scenario:* The concurrency file step-1 LIVENESS half — the cancel answered within 5000ms — passes at the red because a 404 is fast, for a reason unrelated to locking; the status assertion beside it is what actually failed, at 13ms. And AC-4 status assertion toBe(404) is green because Fastify own not-found handler already answers 404, the documented vacuous-green trap; the media-type assertion is what failed. Both become load-bearing the moment the route exists. Named unprompted for the third consecutive slice.
 - *file:* `tests/concurrency/cancellation-takes-no-lock.test.ts`
+
+**I-05-5** — freeResources does not exist in src/, so AC-1 named mutant is unreachable today and the design inference is not yet true of this repository
+
+- *scenario:* Section 1 and three test-file headers say AC-1 uniquely holds freeResources overlap predicate and that it is a mutant in TypeScript where Stryker reaches it. THERE IS NO freeResources UNDER src/ — verified by the orchestrator, it appears only in docs and prompts. candidateRepository.candidateResources reads reference data only, and its own docblock records that the availability filter deliberately lands AFTER SLICE 08, because the pre-filter is only trustworthy once QS-8 validates it; arc42 6.5 describes freeResources as part of the FINISHED system. The test-engineer header is honest — it says the two predicates were driven behind a STUB ROUTE — but the inference drawn from that measurement is not yet true: the seam 6.5 names, two copies of the predicate with nothing forcing them to agree, has ONE copy in the codebase. What AC-1 actually proves at this slice is narrower and still worth having: that ADR-0004 retry loop re-attempts over a cancelled row and the CONSTRAINT predicate lets the insert through, on the technician side as well as the bay side, through the API. The design claim becomes true at slice 08, so section 1 sentence and the AC-1 header want a date attached at step 7, or slice 08 wants to inherit the claim.
+- *file:* `docs/slices/05-design.md`
+
+**I-05-6** — AC-5 closed two of three content-type-parser holes; the third is live after this slice and is T-05-7 next instance
+
+- *scenario:* Measured on the BUILT ARTIFACT after this slice, through buildServer from dist/: POST /appointments with content-type application/xml and a body returns 500 /problems/internal. The error is FST_ERR_CTP_INVALID_MEDIA_TYPE, statusCode 415, no validation — identical shape to the two AC-5 named, falling to the same catch-all. Same for x-www-form-urlencoded and multipart/form-data. The design argument for naming by code cites 415 as a code with no 8.6 row; that is true, and the measurement shows the absence is NOT NEUTRAL — with no row it lands on 500 Anything else, precisely the inversion AC-5 exists to correct, because the client sent a header it can see and can fix and is told the system broke. The implementer did NOT widen the predicate: a 415 row is a taxonomy change the architect owns, and widening to statusCode under 500 is the move server.ts already records being deleted after mutation. It added a unit test staging a different error carrying statusCode 400 and asserting it is STILL a 500, so the predicate cannot be widened silently. Third concrete instance of T-05-7, and evidence that T-05-7 is a live defect rather than a methodological worry.
+- *file:* `src/http/server.ts`
+
+**I-05-7** — The cancellation route publishes two response schemas it can never produce
+
+- *scenario:* Design section 4 prescribes the shared PROBLEM_RESPONSES, which carries 400, 404, 409 and 422; this route can produce 400 and 404 only. Harmless at runtime, but ADR-0005 emits it as the OpenAPI document at slice 10, so the published contract advertises two statuses the endpoint cannot return. Implemented as designed rather than trimmed, because narrowing a shared constant at one call site is how it forks. Worth a per-route response set at slice 10.
+- *file:* `src/http/routes/appointments.ts`
 
 </details>
 
