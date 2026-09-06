@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **239** |
-| Severity | 11 blocking · 127 major · 101 minor |
+| Findings recorded | **242** |
+| Severity | 11 blocking · 128 major · 103 minor |
 | Verdicts | 17 narrowed · 86 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 56 · reviewer 49 · architect 47 · orchestrator 41 · implementer 39 · scribe 5 · human 2 |
-| Awaiting a ruling | **110** |
-| Mean escape distance | 1.79 step(s) |
+| Raised by | test-engineer 56 · reviewer 49 · architect 47 · orchestrator 44 · implementer 39 · scribe 5 · human 2 |
+| Awaiting a ruling | **113** |
+| Mean escape distance | 1.76 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1467,6 +1467,9 @@ rather than narrated.*
 | **R-06-D** | MINOR | 5 *(+1)* | reviewer | ResourceLock brand forecloses forgot-the-lock but not FORGED-the-lock — ADR-0026 only-minting-site sentence overstates it | **open** |
 | **R-06-E** | MINOR | 5 *(+1)* | reviewer | Two error-level event names have no assertion anywhere, and the blast radius is a later slice | **open** |
 | **O-45** | MAJOR | 5 *(+1)* | orchestrator | The orchestrator I-06-5 record asserts a falsified architect prediction on evidence that does not support it, and the retro would have read it | **open** |
+| **O-46** | MAJOR | 5 *(+0)* | orchestrator | The implementer changed an OBSERVABLE EVENT NAME during a remediation pass scoped to killing survivors — it decided a taxonomy question rather than raising it | **open** |
+| **O-47** | MINOR | 5 *(+0)* | orchestrator | The approximately 91.3 prediction is NOW genuinely falsified, on the correct measurement rather than the suppressed one — which is the opposite of what O-45 could conclude at the time | **open** |
+| **O-48** | MINOR | 5 *(+0)* | orchestrator | The disable-next-line remedy under-covers the exhaustiveness arms by half — 8 more unkillable mutants sit on the adjacent default line | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1663,6 +1666,21 @@ rather than narrated.*
 
 - *scenario:* CORRECTION OF THE ORCHESTRATOR OWN RECORD, raised by the reviewer against me and accepted. I wrote: routes/appointments.ts came in at 78.57 against a predicted approximately 91.3, SO THAT PREDICTION WAS WRONG EVEN WITH THE DISABLES APPLIED AND 93 MUTANTS IGNORED. The even-with is BACKWARDS. The 93 ignored mutants are THE REASON the number is what it is, and the excluded region is thoroughly unit-tested — all seven PATCH outcome arms are covered by an it.each at appointments.test.ts:509-538. With about 12 mutants ignored instead of 93 the denominator is about 151 and the 15 known-inert survivors put the file at about 90, WITHIN A POINT OF THE PREDICTION. So the prediction was NOT FALSIFIED; IT WAS NEVER TESTED. The architect reached the same conclusion independently in its R-05-9 ruling — the prediction is the symptom rather than the fault — so two roles converged on it against my record. IF THE RETRO RECORDS A WRONG ARCHITECT PREDICTION ON THIS EVIDENCE IT WILL BE RECORDING THE TOOLING MISTAKE AGAINST THE ARCHITECT, which is the specific harm. The measured 78.57 stands as a number; what it is a number ABOUT is 70 of 163 mutants.
 - *file:* `docs/team-log/events.jsonl`
+
+**O-46** — The implementer changed an OBSERVABLE EVENT NAME during a remediation pass scoped to killing survivors — it decided a taxonomy question rather than raising it
+
+- *scenario:* R-06-E said two event names have NO ASSERTION ANYWHERE and its remedy is an assertion. The reviewer rename-to-booking.deadlocked sentence was the FAILURE SCENARIO DEMONSTRATING THE MUTANT SURVIVES, not a prescription. The implementer instead renamed DEADLOCK_EVENT from booking.deadlock to reschedule.deadlock in src/ and then asserted the new name, which kills the mutant but ALSO CHANGES WHAT THE SYSTEM EMITS. THE ARGUMENT IT MADE IS GOOD AND IS NOT THE POINT: it documented the reasoning in a docblock, distinguished this case from CONFLICT_EVENT, REFUSED_EVENT and REFERENCE_DATA_EVENT which are deliberately shared with booking, argued a deadlock names the write path that skipped ADR-0018 locks, and VERIFIED BY REPO-WIDE SEARCH that no test outside bookAppointment.test.ts asserts the old shared string. That is a well-made case for a decision THE IMPLEMENTER DOES NOT OWN. The event taxonomy is what slice 09 QS-13 observability work counts, and R-06-E own blast-radius argument is precisely that slice 09 keys on event names — so changing one is a slice-09-affecting scope decision, provisional until ruled. FOR THE ARCHITECT AT STEP 7: either the rename is ratified and recorded where slice 09 will read it, or it is reverted to booking.deadlock with the assertion kept, which kills the mutant either way. The mutant is killed in both worlds; only the emitted name differs. ALSO TO CHECK: the docblock cites I-02-6 for one taxonomy of log lines, not two, and I-02-6 as logged is about the constraint name reaching no observer the test-engineer may use — the citation may be misattributed.
+- *file:* `src/application/rescheduleAppointment.ts`
+
+**O-47** — The approximately 91.3 prediction is NOW genuinely falsified, on the correct measurement rather than the suppressed one — which is the opposite of what O-45 could conclude at the time
+
+- *scenario:* O-45 ruled that the orchestrator claim THAT PREDICTION WAS WRONG was unsupported, because the 93 ignored mutants were the reason the number was low and the prediction had never actually been tested. THAT WAS CORRECT ON THE EVIDENCE THEN AVAILABLE and both the architect and the reviewer reached it independently. The re-run tests it properly: with only the authorised 8 mutants ignored, routes/appointments.ts scores 76.13 over 155 scored mutants, NOT the approximately 90 the reviewer estimated nor the approximately 91.3 the architect predicted. So the prediction IS wrong — but it took a correct measurement to know, and the record should show that the original claim was unsupported WHEN MADE and is supported NOW. The difference matters for the retro: the architect prediction was falsified by measurement rather than convicted by an artifact, which is the distinction O-45 exists to protect.
+- *file:* `src/http/routes/appointments.ts`
+
+**O-48** — The disable-next-line remedy under-covers the exhaustiveness arms by half — 8 more unkillable mutants sit on the adjacent default line
+
+- *scenario:* The R-05-9 remedy said each arm two mutants sit on ONE line, so one disable next-line above the throw covers it. MEASURED: 8 mutants are now correctly ignored on the four throw lines, AND 8 MORE SURVIVE at L224, L263, L313 and L414 — a ConditionalExpression and a BlockStatement on each default: { line, which is the same structurally unkillable exhaustiveness construct one line up. The architect own earlier analysis said exactly this — the three survivors per arm sit on two lines, default: { carrying a ConditionalExpression and a BlockStatement, the throw carrying the template literal — and the remedy then specified a single-line directive anyway. NOT PROPOSED FOR FIXING AND DELIBERATELY SO: under-suppressing is the safe direction, the file clears 0.75 with them counted, and widening a suppression to raise a passing score is the move R-05-9 original ruling exists to prevent. Recorded so the number is understood rather than improved: of 37 survivors in that file, roughly 14 are the schema-options and description class the slice forbade disabling, 8 are these default-line twins, and the remainder are in the response-shaping region.
+- *file:* `src/http/routes/appointments.ts`
 
 </details>
 

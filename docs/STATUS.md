@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `2588a9c docs(06): the disable pairs suppressed 93 mutants where 8 were ruled` |
+| Last commit | `ebb6e37 test(06): R-06-C — close 27 killable survivors, and R-06-E's event-name collision` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 132 |
+| Agent runs recorded | 133 |
 | ADRs accepted | 23 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -272,7 +272,8 @@
 | 2026-09-06 14:45 | implementer | 45m14 | 932 / 48,017 / 153,606,424 | `derived` |
 | 2026-09-06 15:49 | architect | 13m37 | 210 / 10,958 / 10,716,699 | `derived` |
 | 2026-09-06 15:49 | reviewer | 14m21 | 192 / 5,853 / 10,695,764 | `derived` |
-| | **total** | **5523m12** | **33,242 / 2,426,310 / 2,784,075,707** | |
+| 2026-09-06 16:03 | implementer | 11m01 | 294 / 20,657 / 17,395,424 | `derived` |
+| | **total** | **5534m13** | **33,536 / 2,446,967 / 2,801,471,131** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
