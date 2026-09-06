@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `d046670 feat(06): ADR-0024 — setNotFoundHandler, the second handler §8.6's totality is kept in` |
+| Last commit | `8bcf822 test(06): R-06-1 — a high-water mark scopes rowAuditFor past the fixture's own arrange` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 126 |
+| Agent runs recorded | 129 |
 | ADRs accepted | 23 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -266,7 +266,10 @@
 | 2026-09-06 14:07 | architect | 6m13 | 74 / 1,082 / 2,148,910 | `derived` |
 | 2026-09-06 14:26 | architect | 7m05 | 86 / 2,387 / 2,532,254 | `derived` |
 | 2026-09-06 14:37 | implementer | 37m17 | 864 / 44,592 / 139,691,199 | `derived` |
-| | **total** | **5358m45** | **29,932 / 2,266,734 / 2,305,128,920** | |
+| 2026-09-06 14:43 | test-engineer | 3m44 | 148 / 3,289 / 3,960,267 | `derived` |
+| 2026-09-06 14:44 | implementer | 43m34 | 908 / 45,724 / 149,236,013 | `derived` |
+| 2026-09-06 14:44 | implementer | 43m59 | 920 / 45,735 / 150,731,620 | `derived` |
+| | **total** | **5450m01** | **31,908 / 2,361,482 / 2,609,056,820** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
