@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **152** |
-| Severity | 10 blocking · 82 major · 60 minor |
+| Findings recorded | **154** |
+| Severity | 10 blocking · 84 major · 60 minor |
 | Verdicts | 7 narrowed · 58 accepted · 1 escalated · 10 deferred |
-| Raised by | test-engineer 34 · architect 29 · reviewer 28 · implementer 27 · orchestrator 27 · scribe 5 · human 2 |
-| Awaiting a ruling | **76** |
-| Mean escape distance | 1.74 step(s) |
+| Raised by | test-engineer 35 · architect 29 · orchestrator 28 · reviewer 28 · implementer 27 · scribe 5 · human 2 |
+| Awaiting a ruling | **78** |
+| Mean escape distance | 1.77 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -895,6 +895,8 @@ rather than narrated.*
 | **A-04-10** | MINOR | 4 *(+4)* | architect | Section 7.3 preamble is false today, independently of any guard | **open** |
 | **A-04-11** | MAJOR | 4 *(+0)* | architect | A-04-2 is only half discharged, and by the wrong owner | **open** |
 | **A-04-12** | MINOR | 4 *(+0)* | architect | The ORDER BY assertion became MORE load-bearing at this merge, not less, and its comment still says the opposite | **open** |
+| **T-04-7** | MAJOR | 3 *(+3)* | test-engineer | E-02-1 discrimination has migrated: two file headers claim a guarantee that now lives somewhere else | **open** |
+| **O-34** | MAJOR | 5 *(+4)* | orchestrator | Slice 04 ran steps 1 through 4 with no pull request, against both section 7 and the step-1 draft-PR rule | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1070,6 +1072,16 @@ rather than narrated.*
 
 - *scenario:* The repository order is the shuffle stable input, so a recorded seed reproduces the draw only because that order is pinned. The comment still calls it F-02-7 substitute for a seed. Commit 994bfc5 fixed two other stale promises in the same file and missed this one.
 - *file:* `tests/unit/persistence/candidateRepository.test.ts`
+
+**T-04-7** — E-02-1 discrimination has migrated: two file headers claim a guarantee that now lives somewhere else
+
+- *scenario:* Beyond the assertion the ruling named, the header banner claimed THIS CASE CANNOT PASS WITHOUT THE RETRY LOOP. Under Order-C a loop-less build draws one candidate, conflicts on the technician and PASSES about 44 percent of the time, so the file is a 56 percent detector; the error-taxonomy AC-11 mirror is about 33 percent. Prose rather than an assertion, so it never made anything flaky — but it overstates what the fixture proves, and I-02-9 ruled the false comment the more dangerous half. The suite has NO hole: candidate-retry AC-3 catches a loop-less build exactly. The guarantee migrated; only the narration had not. Written into all three headers rather than proposed as a (b), with the explicit note that re-homing QS-2 discriminator is the orchestrator call and not the test-engineer.
+- *file:* `tests/concurrency/no-technician-overlap.test.ts`
+
+**O-34** — Slice 04 ran steps 1 through 4 with no pull request, against both section 7 and the step-1 draft-PR rule
+
+- *scenario:* Section 7 requires one branch and one PR per slice, and METHODOLOGY says the slice PR opens as a draft at step 1. Slice 04 had neither until step 5. Section 6 says every reply, disagreement and vote goes on the PR because the reasoning is the graded artifact — so nine objections, nine AGREE verdicts, a (b), a DCR and four ADR ratifications were recorded in docs/slices and the event log and nowhere a reviewer would look first. The record is complete and was in the wrong place. Nothing enforces the rule: slice-check does not require a PR to exist, so a slice can reach step 5 without one and report nothing wrong. Raised by the orchestrator against the orchestrator.
+- *file:* `docs/METHODOLOGY.md`
 
 </details>
 
