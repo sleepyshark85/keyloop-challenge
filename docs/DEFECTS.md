@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **142** |
-| Severity | 10 blocking · 77 major · 55 minor |
+| Findings recorded | **147** |
+| Severity | 10 blocking · 80 major · 57 minor |
 | Verdicts | 6 narrowed · 56 accepted · 1 escalated · 10 deferred |
-| Raised by | test-engineer 34 · reviewer 28 · orchestrator 26 · architect 24 · implementer 23 · scribe 5 · human 2 |
-| Awaiting a ruling | **69** |
-| Mean escape distance | 1.69 step(s) |
+| Raised by | test-engineer 34 · reviewer 28 · implementer 27 · orchestrator 27 · architect 24 · scribe 5 · human 2 |
+| Awaiting a ruling | **74** |
+| Mean escape distance | 1.72 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -885,6 +885,11 @@ rather than narrated.*
 | **A-04-4** | MAJOR | 4 *(+4)* | architect | F-04-1 third recurrence, with a second failure mode behind it: the committed baseline escapes non-ASCII codepoints, which JSON.stringify does not reproduce, so the obvious fix silently rewrites all 285 existing pins | **open** |
 | **A-04-5** | MINOR | 4 *(+4)* | architect | The drift direction is diagnostic: BOOKING_SEED reached §5.2, §6.2 and §11 R-7a and never reached §7.3 | **open** |
 | **A-04-6** | MAJOR | 4 *(+4)* | architect | ADRs that cite each other STATUS rot, and §4 immutability then freezes the rot | **open** |
+| **I-04-10** | MAJOR | 4 *(+3)* | implementer | Slice 02 QS-2 concurrency test is a 44 percent flake under ADR-0009 Order-C, and it is green in the run we would merge on | **open** |
+| **I-04-11** | MAJOR | 4 *(+3)* | implementer | ADR-0021 and slice-04 design section 4 both say loadConfig emits the startup warn; that sentence is false as built | **open** |
+| **I-04-12** | MINOR | 4 *(+0)* | implementer | The env-var set-equality guard ADR-0022 recommended would not pass today: config.ts reads five variables, section 7.3 lists six | **open** |
+| **I-04-13** | MINOR | 4 *(+3)* | implementer | Design section 3 carrier needed no per-list cast, and the shape it specified would have reproduced I-04-4 one level down | **open** |
+| **A-04-7** | MAJOR | 4 *(+4)* | orchestrator | docs:refs put two project rules in contradiction and survived four slices by being prefix-lucky rather than correct | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1007,6 +1012,31 @@ rather than narrated.*
 
 - *scenario:* ADR-0019 option-A analysis read ADR-0018 is proposed, and a merge does not rule it - a claim the same commit falsified. Removed while 0019 was still amendable. Had 0019 been accepted a week earlier that sentence would now be permanent and false. The rule: cite the DECISION, never the status
 - *file:* `docs/adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md`
+
+**I-04-10** — Slice 02 QS-2 concurrency test is a 44 percent flake under ADR-0009 Order-C, and it is green in the run we would merge on
+
+- *scenario:* Its header states candidate ordering is deterministic, so every racer attempts the same pair first, and it closes at line 208 asserting at least 2 attempts. Order-C removes that premise: with 24 bays and 1 technician a loser whose first draw is not the winning bay conflicts on the TECHNICIAN at attempt 1 and refuses correctly, wasting no attempt. Only a loser drawing the winning bay reaches a second attempt — about 56 percent. Measured 3 failures in 5 local runs; it passed in CI. Raised, not touched: test-engineer-owned file, section 5.
+- *file:* `tests/concurrency/no-technician-overlap.test.ts`
+
+**I-04-11** — ADR-0021 and slice-04 design section 4 both say loadConfig emits the startup warn; that sentence is false as built
+
+- *scenario:* The logger is constructed FROM the loadConfig return value, so at the moment BOOKING_SEED is read there is no logger, and writing to a stream from src/platform is the wrong fix for a module the leaf rule keeps free of behaviour. It ships as configWarnings, called in src/main.ts and emitted through pino. ADR-0021 was ratified accepted an hour earlier and is now immutable under section 4, so the instrument is a superseding ADR or a step-7 as-built correction, never an edit.
+- *file:* `docs/adr/0021-the-booking-seed-is-overridable-by-environment.md`
+
+**I-04-12** — The env-var set-equality guard ADR-0022 recommended would not pass today: config.ts reads five variables, section 7.3 lists six
+
+- *scenario:* OTEL_EXPORTER_OTLP_ENDPOINT is listed and read by no code — the OTel SDK auto-configures from it at slice 09. The check needs an exemption for variables a LIBRARY reads, which is a design question rather than a rail to bolt on. Found by the implementer against the guard the architect proposed one step earlier.
+- *file:* `docs/adr/0022-application-configuration-is-prefixed-booking.md`
+
+**I-04-13** — Design section 3 carrier needed no per-list cast, and the shape it specified would have reproduced I-04-4 one level down
+
+- *scenario:* Section 3 pairs a length-zero guard with a per-list cast, which asserts the fact the guard just established. Destructuring head from tail BUILDS the tuple and the head being undefined IS the emptiness test, so the two collapse into one reachable branch. Measured: tsc exit 0, TWO brand casts where section 3 predicted three, and no index assertion anywhere. The same file takes Fisher-Yates in SELECTION form rather than the in-place swap, because the swap needs two noUncheckedIndexedAccess assertions — the exact thing the tuple carrier was chosen to remove. Distribution measured uniform to plus or minus 1.7 percent across 8 bays over 100000 seeds.
+- *file:* `docs/slices/04-design.md`
+
+**A-04-7** — docs:refs put two project rules in contradiction and survived four slices by being prefix-lucky rather than correct
+
+- *scenario:* The slice-00a ruling and section 9 make the event log a finding DEFINITION site; refs.mjs read it only as a citation source, so a finding whose ref matched the design-local shape was reported as citing itself into the void. REF matches A-, D-, F-, DA- and OQ-, and findings are logged under T-, I-, S-, R-, O-, E-, J-, AB- and AC-, so no logged finding had ever collided until five architect findings landed as A-04-star, into a prefix that already meant "assumption defined in a design". Fixed in 7173b34 as a WIDENING strictly stronger than what it widens — the log is append-only and CI enforces it, so a definition recorded there can never be deleted. refs.mjs had no tests; it now has 16.
+- *file:* `tools/docs/refs.mjs`
 
 </details>
 
