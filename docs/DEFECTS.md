@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **232** |
-| Severity | 10 blocking · 123 major · 99 minor |
+| Findings recorded | **233** |
+| Severity | 10 blocking · 124 major · 99 minor |
 | Verdicts | 15 narrowed · 85 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 56 · architect 47 · reviewer 44 · implementer 39 · orchestrator 39 · scribe 5 · human 2 |
-| Awaiting a ruling | **106** |
+| Raised by | test-engineer 56 · architect 47 · reviewer 44 · orchestrator 40 · implementer 39 · scribe 5 · human 2 |
+| Awaiting a ruling | **107** |
 | Mean escape distance | 1.81 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -1460,6 +1460,7 @@ rather than narrated.*
 | **O-44** | MAJOR | 4 *(+0)* | orchestrator | A DCR was raised, adjudicated and acted on without the orchestrator knowing — the board never went blocked and none of it reached the log until reconstructed after the fact | **open** |
 | **I-06-3** | MAJOR | 4 *(+0)* | implementer | Five http-layer files were overwritten mid-session and RECONSTRUCTED FROM THE TRANSCRIPT — the merged code is attested by the party who reconstructed it | **open** |
 | **I-06-4** | MINOR | 4 *(+2)* | implementer | ADR-0025 speaks only to the APPOINTMENT existence and is silent on its referenced reference-data vanishing after the read succeeds | **open** |
+| **I-06-5** | MAJOR | 4 *(+0)* | orchestrator | The slice principal new file scores 0.70 with 36 survivors — below the 0.75 Definition of Done threshold — while the aggregate over changed files passes at 0.86 | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1618,6 +1619,11 @@ rather than narrated.*
 
 - *scenario:* An EXTENSION OF THE DESIGN RATHER THAN A DIVERGENCE FROM IT, flagged because the ADR text does not cover it. If findDealership or findServiceType returns null for the row own dealershipId or serviceTypeId AFTER the existence read has already succeeded, ADR-0025 says nothing. There is no direct foreign key from appointment to dealership or service_type — only transitive, via the bay and technician composite FKs — so the state is structurally near-unreachable, but the path would otherwise be null-unsafe. The implementer added reference-data-invalid arms MIRRORING BOOKING SHAPE rather than leaving it, and reported the decision rather than absorbing it. For the architect to rule at step 7: either the ADR gains the case or section 11 records why near-unreachable is the right place to stop.
 - *file:* `docs/adr/0025-existence-is-the-reads-legality-is-the-statements.md`
+
+**I-06-5** — The slice principal new file scores 0.70 with 36 survivors — below the 0.75 Definition of Done threshold — while the aggregate over changed files passes at 0.86
+
+- *scenario:* rescheduleAppointment.ts is 287 lines of new application code behind 340 lines of new unit test, and it is the WORST-SCORING file in the repository. 84 killed, 36 survived, 70.00. The aggregate over changed files is 86.14 and PASSES, so slice:check as written reports PASS: tools/slice/check.mjs:417 reads a SINGLE mutation_score and compares it to the threshold, and the recorded number follows slice 05 precedent of being the aggregate. SO SECTION 10 CLAUSE MUTATION SCORE ABOVE THRESHOLD ON CHANGED FILES IS AMBIGUOUS IN A WAY THAT DECIDES THIS SLICE: read as an aggregate over changed files it passes at 86.14, read as each changed file it FAILS on the one file this slice exists to add. The orchestrator recorded the aggregate for comparability with slice 05 and raises this rather than choosing the reading that makes the gate green. TWO QUESTIONS, and neither is the orchestrator to answer: the reviewer must classify the 36 survivors — slice 05 found eighteen of nineteen were inert by shape — and the architect or the gate must rule which reading of section 10 governs. Also recorded: routes/appointments.ts came in at 78.57 against a predicted approximately 91.3, so the step-2 prediction was wrong even with all four disable-all pairs applied and 93 mutants ignored.
+- *file:* `src/application/rescheduleAppointment.ts`
 
 </details>
 

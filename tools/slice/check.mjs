@@ -119,6 +119,65 @@ if (!onlyDone) {
   // mentioning what was sent to it. Extra entries in `inherits:` are NOT an error — a slice
   // may take on an obligation nobody deferred to it, and forbidding that would punish the
   // one behaviour this whole mechanism is trying to encourage.
+  // O-41 — THE SUBSET GUARD BECOMES BIDIRECTIONAL.
+  //
+  // The check below asks whether `inherits:` covers everything deferred here. It cannot ask
+  // the other question: whether the slice's PROSE still describes what `inherits:` claims.
+  // Measured on slice 06 — `F-02-9`, `R-05-7` and `R-05-9` appeared in the front matter and
+  // NOWHERE ELSE IN THE FILE. The substance was all present in the bullets; nothing linked a
+  // bullet to the ruling that put it there, so a silent drop would have stayed green.
+  //
+  // A REF IS A REF BECAUSE THE LOG KNOWS IT, not because it matches a pattern. Matching by
+  // shape would accept `AC-1` and `QS-6`, which are not findings, and would accept an invented
+  // `F-06-x` — which is the failure O-38 already caught once, a false destination manufactured
+  // to satisfy a rule that exists to stop false destinations. Checking against the log's own
+  // refs enforces O-39 in the same stroke: a bullet may only cite a finding that was actually
+  // raised.
+  //
+  // THE ESCAPE IS DELIBERATE AND VISIBLE. The architect's first version of this rule was
+  // "every bullet carries a ref", and it is false against slice 06's own file: the
+  // `src/domain/appointment.ts` bullet is a retired §5.2 prediction that was never a logged
+  // finding and has no ref to carry. A rule demanding one would invent it. So a bullet may say
+  // `(no ref — <reason>)` instead; bare bullets fail, escaped bullets pass and can be counted.
+  const inheritedScope = (() => {
+    // NOT a lookahead for `\Z`: JavaScript has no such escape, and `(?=^##\s|\Z)` silently
+    // becomes "or a literal Z", so the section never matched and every slice reported N/A —
+    // a guard that could only ever say "nothing to check". Caught by this check's own tests
+    // on their first run, which is the argument for writing them.
+    const m = slice.text.match(/^##\s+Inherited scope[^\n]*\n([\s\S]*)$/m);
+    if (!m) return null;
+    const next = m[1].search(/^##\s/m);
+    return next === -1 ? m[1] : m[1].slice(0, next);
+  })();
+
+  if (inheritedScope === null) {
+    check('ready', 'inherited scope is traceable', NA,
+      'this slice declares no `## Inherited scope` section');
+  } else {
+    const knownRefs = new Set(allEvents
+      .filter((e) => ['finding.raised', 'finding.ruled', 'finding.routed', 'finding.resolved'].includes(e.event))
+      .map((e) => e.ref).filter(Boolean));
+
+    // Top-level bullets only: a nested list belongs to the bullet above it.
+    const bullets = inheritedScope.split(/\n(?=- )/).map((b) => b.trim()).filter(Boolean);
+    const refsIn = (b) => [...knownRefs].filter((r) => new RegExp(`\\b${r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(b));
+    const escaped = (b) => /\(no ref\s*[—-]\s*[^)]+\)/.test(b);
+
+    const bare = bullets.filter((b) => !refsIn(b).length && !escaped(b));
+    const cited = new Set(bullets.flatMap(refsIn));
+    const uncited = (slice.inherits ?? []).filter((r) => !cited.has(r));
+
+    const problems = [
+      ...bare.map((b) => `a bullet cites no ref and carries no escape: "${b.slice(0, 60).replace(/\s+/g, ' ')}…"`),
+      ...(uncited.length ? [`declared in \`inherits:\` but named in no bullet — ${uncited.join(', ')}`] : []),
+    ];
+    check('ready', 'inherited scope is traceable', problems.length ? FAIL : PASS,
+      problems.length
+        ? `${problems.join('; ')}. A ref must be one the log knows; use \`(no ref — reason)\` when there `
+          + 'genuinely is none.'
+        : `${bullets.length} bullet(s), every ref in \`inherits:\` named in one`);
+  }
+
   const owed = refsDeferredTo(allEvents, id);
   const inherits = slice.inherits ?? [];
   const missing = owed.filter((r) => !inherits.includes(r));

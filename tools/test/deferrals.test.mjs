@@ -169,6 +169,62 @@ d = adrWorld('nothing here', { '99-x.md': live('99', 'ready') });
 ok('a slice named only in Context is not a destination',
   checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), []).length === 0);
 
+// --------------------------------------------- inherited scope traceable (O-41) --
+console.log('\ninherited scope — the subset guard becomes bidirectional');
+{
+  const world = (inherits, body) => {
+    const dir = mkdtempSync(join(tmpdir(), 'trace-'));
+    mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'slices', '06-x.md'),
+      `---\nid: "06"\nstatus: ready\narc42: ["§6.3"]\nquality_scenarios: [QS-6]\n`
+      + `inherits: [${inherits.map((r) => `"${r}"`).join(', ')}]\n---\n\n`
+      + '- **AC-1** — a thing.\n\n## Inherited scope\n\n' + body + '\n');
+    writeFileSync(join(dir, 'log.jsonl'), JSON.stringify({
+      ts: AFTER, event: 'finding.raised', source: 'reported', slice: '02', actor: 'architect',
+      ref: 'F-02-9', severity: 'MAJOR', step: 1, claim: 'c', scenario: 's',
+    }) + '\n' + JSON.stringify({
+      ts: AFTER, event: 'finding.ruled', source: 'reported', slice: '02', actor: 'architect',
+      ref: 'F-02-9', verdict: 'deferred', deferred_to: ['06'], rationale: 'r',
+    }) + '\n');
+    const r = spawnSync(process.execPath, [CHECK, '06', '--ready'],
+      { encoding: 'utf8', cwd: dir, env: { ...process.env, TEAM_LOG: join(dir, 'log.jsonl') } });
+    return strip(r.stdout);
+  };
+  const line = (out) => (out.split('\n').find((l) => /inherited scope is traceable/.test(l)) ?? '');
+
+  ok('a bullet naming its ref passes',
+    /PASS/.test(line(world(['F-02-9'], '- **F-02-9 — the lock order.** Body.'))));
+
+  ok('a ref in `inherits:` named in no bullet fails',
+    /FAIL/.test(line(world(['F-02-9'], '- **Something else entirely.** (no ref — a prediction)'))));
+
+  ok('a bare bullet fails — nothing links it to a ruling',
+    /FAIL/.test(line(world(['F-02-9'], '- **F-02-9 — ok.** x\n\n- **A bare bullet.** y'))));
+
+  ok('...and the explicit escape passes, because slice 06 has a bullet with no ref to carry',
+    /PASS/.test(line(world(['F-02-9'],
+      '- **F-02-9 — ok.** x\n\n- **appointment.ts** (no ref — a retired §5.2 prediction) y'))));
+
+  // THE CASE THAT MAKES THIS A LOG CHECK RATHER THAN A REGEX. Matching ref-shaped tokens
+  // would accept both of these, and O-38 already caught one invented destination.
+  ok('an AC or QS id is not a ref',
+    /FAIL/.test(line(world(['F-02-9'], '- **AC-1 and QS-6 are cited here.** Body.'))));
+  ok('an invented ref the log has never seen is not a ref',
+    /FAIL/.test(line(world(['F-02-9'], '- **F-06-99 — invented.** Body.'))));
+
+  ok('a slice with no Inherited scope section is N/A, not a failure',
+    /N\/A/.test((() => {
+      const dir = mkdtempSync(join(tmpdir(), 'trace2-'));
+      mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+      writeFileSync(join(dir, 'docs', 'slices', '06-x.md'),
+        '---\nid: "06"\nstatus: ready\narc42: ["§6.3"]\nquality_scenarios: [QS-6]\n---\n\n- **AC-1** — a thing.\n');
+      writeFileSync(join(dir, 'log.jsonl'), '');
+      const r = spawnSync(process.execPath, [CHECK, '06', '--ready'],
+        { encoding: 'utf8', cwd: dir, env: { ...process.env, TEAM_LOG: join(dir, 'log.jsonl') } });
+      return strip(r.stdout).split('\n').find((l) => /inherited scope is traceable/.test(l)) ?? '';
+    })()));
+}
+
 // ------------------------------------------------- destination liveness (O-42) --
 console.log('\ndestinations must resolve to a live slice — the write path refuses a tombstone');
 {
