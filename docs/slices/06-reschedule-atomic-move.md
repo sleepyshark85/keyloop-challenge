@@ -3,9 +3,9 @@ id: "06"
 title: Rescheduling — one atomic UPDATE, and a row that does not conflict with itself
 status: ready
 depends_on: ["05"]
-arc42: ["§6.3", "§8.6"]
-adr: [3]
-quality_scenarios: [QS-6]
+arc42: ["§6.3", "§8.2", "§8.6"]
+adr: [3, 24]
+quality_scenarios: [QS-6, QS-11]
 loopbacks: 0
 ---
 
@@ -33,6 +33,40 @@ without being obvious.
   that does **not** increment `booking_conflicts_total` (§8.4).
 - **AC-5** — Given an unknown id, when a move is requested, then `404`, decided by the `UPDATE`
   affecting zero rows rather than by a preceding read.
+
+## Inherited scope — written here, not only where it was deferred
+
+Four obligations were ruled elsewhere and name this slice. They are recorded here so slice 06's
+Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
+
+- **A concurrency test for racing moves** (from §8.2, where this used to be the only record). AC-10
+  fixes the **single-threaded** `UPDATE` semantics; ADR-0003 claims two racing reschedules behave like
+  two racing bookings — one commits, the other gets `23P01` — and **no scenario and no test asserts
+  it.** QS-4 and QS-5 cover what a *refused* move leaves behind, QS-6 the self-overlap; the mirror of
+  QS-1 on the `UPDATE` path is named by nothing. A `BEFORE UPDATE` trigger passing everything slice 00
+  asserts and failing only under simultaneity is the proof the gap is real. *(Slice 07 owns
+  rescheduling under contention; this is the one assertion that cannot wait for it, because ADR-0003's
+  claim is what slice 06 ships on.)*
+- **F-05-1 — `lockResources` returns a branded `ResourceLock` that `insertAppointment` takes as a
+  parameter** (slice 05 §6, deferred under ADR-0019). Type-only, erased, one minting cast, the
+  ADR-0016 shape: *"forgot the lock"* becomes a compile error and *"correctly exempt"* (ADR-0023's
+  cancel path) becomes a signature that does not ask for one. Slice 06 is the destination **because it
+  writes `rescheduleAppointment`, a newly written locking path** — the first moment the mistake is live
+  rather than historical. Residue: it does not prove the keys match the row.
+- **ADR-0024 — `setNotFoundHandler`, the `404 /problems/route-not-found` row, and the hostile-request
+  corpus.** Measured today: `GET /nope` returns `404 application/json` with no `type`, and
+  `content-type: application/xml` returns `500`. `server.ts`'s docblock asserts §8.6's totality *"is
+  kept"* in `setErrorHandler` and it is not; that docblock is corrected with the handler. The corpus
+  is `tests/contract/`, the test-engineer's, asserted in the direction that can fail (∀responses ∃row).
+  **§8.6 gains the row at this slice's step 7.**
+- **The Stryker exhaustiveness disables.** ~13 structurally unkillable mutants cap
+  `routes/appointments.ts` near 88%, so 83.04 has stopped discriminating (reviewer, slice 05).
+  `// Stryker disable next-line` on each `const unhandled: never` arm, with the reason on the line —
+  **those arms only**, not the schema-options or description mutants, which are inert for reasons that
+  change when Fastify's config or slice 09's OpenAPI assertion does. Slice 06 adds the fourth route
+  and therefore the fourth arm, so doing it once here costs one pass instead of two. The *decision* is
+  the architect's, on the same ground as `stryker.config.mjs`'s `mutate` list; the *edit* is in `src/`
+  and is the implementer's.
 
 ## In scope
 

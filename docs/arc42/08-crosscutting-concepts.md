@@ -192,13 +192,10 @@ Six consequences, each of which something elsewhere in this document depends on:
    *"a row does not conflict with its own prior version"* but *"the mechanism cannot be made to
    conflict with it, because it never sees it"*.
 
-   > **Inherited obligation for slice 06.** AC-10 fixes the **single-threaded** `UPDATE` semantics and
-   > nothing more. ADR-0003 claims that *"two racing reschedules onto the same slot behave exactly like
-   > two racing bookings: one commits, the other gets `23P01`"* — and **no scenario and no test asserts
-   > that.** QS-4 and QS-5 assert what a *refused* move leaves behind, QS-6 the self-overlap; the
-   > mirror of QS-1 on the `UPDATE` path is named by nothing. The patched trigger proves the gap is
-   > real: it passes everything slice 00 asserts and fails only under simultaneity. **Slice 06 owes a
-   > concurrency test for racing moves.**
+   > **AC-10 fixes the single-threaded `UPDATE` semantics and nothing more**, so ADR-0003's claim about
+   > two *racing* reschedules is asserted by nothing. The obligation now lives where it is executed —
+   > `docs/slices/06-reschedule-atomic-move.md`, inherited scope — because a deferral recorded only at
+   > its origin is what R-05-2 measured going missing.
 5. **`btree_gist` is required** (TC-3), because `bay_id WITH =` is an equality operator on a `uuid`
    and plain GiST cannot index it. This is the extension dependency that constrains deployment.
 6. **The GiST indexes serve the availability query too.** Its `tstzrange(...) && ...` predicate over
@@ -500,7 +497,7 @@ it to Gate B; it is decided here.
 | `409` | `/problems/appointment-not-confirmed` | Moving a cancelled appointment (ADR-0003) | Appointment status |
 | `422` | `/problems/unknown-reference` | Unknown dealership, service type, customer or vehicle. Carries `reference` | Reference read, then `23503` |
 | `422` | `/problems/vehicle-not-owned` | The vehicle is not the named customer's | Composite FK, `23503` (A-6, GC-2) |
-| `500` | `/problems/internal` | Reference data the client cannot see or correct, and anything else | The use case, or the fallback handler |
+| `500` | `/problems/internal` | Reference data the client cannot see or correct — a described class, not a catch-all (ADR-0024) | The use case, or the fallback handler |
 
 Four deliberate choices in that table:
 
@@ -517,7 +514,9 @@ Four deliberate choices in that table:
   no service bays, and a candidate refused by a composite foreign key — as does a `40P01` under
   ADR-0018's locks. A `4xx` would tell a service advisor to correct something they did not send and
   cannot see, so the body says nothing actionable and the detail goes to the log. QS-11 reaches it
-  end-to-end through a seeded unresolvable zone rather than treating it as unprovable.
+  end-to-end through a seeded unresolvable zone. **The residual is an invariant rather than this
+  row — every response with status ≥ 400 carries a `type` from the closed set. Two exits break it
+  today, both measured; ADR-0024 rules them and slice 06 closes them.**
 
 Two members of `BookOutcome` render as that one row — `no-verdict` and `reference-data-invalid`.
 They stay apart in the union so the `switch` and the operator's log line distinguish them; the client

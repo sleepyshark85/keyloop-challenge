@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **190** |
-| Severity | 10 blocking · 103 major · 77 minor |
-| Verdicts | 10 narrowed · 67 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 44 · reviewer 42 · implementer 34 · architect 34 · orchestrator 29 · scribe 5 · human 2 |
+| Findings recorded | **191** |
+| Severity | 10 blocking · 103 major · 78 minor |
+| Verdicts | 10 narrowed · 68 accepted · 3 escalated · 13 deferred |
+| Raised by | test-engineer 45 · reviewer 42 · implementer 34 · architect 34 · orchestrator 29 · scribe 5 · human 2 |
 | Awaiting a ruling | **97** |
-| Mean escape distance | 1.98 step(s) |
+| Mean escape distance | 1.97 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1189,10 +1189,11 @@ rather than narrated.*
 | **R-05-2** | MAJOR | 5 *(+4)* | reviewer | Slice 05 is repeating the same mechanism prospectively: its three deferrals are recorded only in its own documents | **open** |
 | **R-05-3** | MAJOR | 5 *(+4)* | reviewer | A whole response class is outside the taxonomy, and the docblock this slice rewrote claims otherwise | **open** |
 | **R-05-4** | MAJOR | 5 *(+4)* | reviewer | The remedy accepted for I-05-5 does not fix the sentence it was accepted to fix — the narrowed premise is also false | **open** |
-| **R-05-5** | MINOR | 5 *(+4)* | reviewer | AC-1 central failure message names a module that does not exist as the diagnosis | **open** |
+| **R-05-5** | MINOR | 5 *(+4)* | reviewer | AC-1 central failure message names a module that does not exist as the diagnosis | accepted |
 | **R-05-6** | MINOR | 5 *(+4)* | reviewer | additionalProperties false does not reject unknown body properties; Fastify removeAdditional strips them silently | **open** |
 | **R-05-7** | MAJOR | 5 *(+5)* | reviewer | problem.ts sits at exactly section 10 threshold with three survivors, and slice 06 is the slice that touches it | **open** |
 | **R-05-8** | MINOR | 5 *(+5)* | reviewer | Two surviving guard mutants sit inside ADR-0016 single sanctioned cast site | **open** |
+| **T-05-9** | MINOR | 5 *(+0)* | test-engineer | A defect in the remedy itself, found by FORCING the assertion rather than reading the diff | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1309,6 +1310,7 @@ rather than narrated.*
 
 - *scenario:* Line 192. When AC-1 fails the reader is told a 409 means freeResources overlap predicate has dropped status <> cancelled, and is directed AWAY from the two places the failure can actually be: the cancel statement and the constraint predicate. Lines 42 and 45 carry the same claim as narrative and go to step 7 with slice 08 named; line 192 is a diagnostic and the reviewer argued specifically that it be fixed before merge.
 - *file:* `tests/acceptance/cancel-appointment.test.ts`
+- *accepted* by orchestrator — THE TEST-ENGINEER WENT BEYOND ITS BRIEF AND FLAGGED IT RATHER THAN ASSUMING, AND THE ORCHESTRATOR UPHOLDS IT. The reviewer scoped lines 42-45 to step 7 as narrative and line 192 to now as a diagnostic; the test-engineer fixed all three, arguing that the split is about URGENCY rather than correctness, that both came from the same false premise, and that leaving the header asserting the allocator copy is TypeScript where Stryker reaches it — four screens above an assertion saying no such copy exists — would put a self-contradicting file in front of the human at step 6, which arrives BEFORE step 7. That is right, and its own correction makes it stronger: the premise is not early but wrong about the code path. It kept the measurement block, which is true of what was measured, and relabelled it as measured against a stub of the slice-08 filter so it reads as evidence for a future mutant rather than a diagnosis available today. It also made the hunk separable and named it in the commit message so it could be reverted alone if ruled the other way.
 
 **R-05-6** — additionalProperties false does not reject unknown body properties; Fastify removeAdditional strips them silently
 
@@ -1324,6 +1326,11 @@ rather than narrated.*
 
 - *scenario:* ConditionalExpression survivors at 80:9 (typeof code === string) and 103:39 (constraint !== undefined). Pre-existing and out of scope; noted because ADR-0016 is the record asserting that file is the only place a ContendedResource may be minted, and two unkilled guards sit inside that claim.
 - *file:* `src/persistence/pgError.ts`
+
+**T-05-9** — A defect in the remedy itself, found by FORCING the assertion rather than reading the diff
+
+- *scenario:* The first draft of the new failure message told the reader to consult the stored-row assertions at the END of the case. Those sit BELOW the failing line, so vitest aborts the body and they never run — a 2am reader would have been pointed at evidence that does not exist. The shipped version says so explicitly and interpolates a runnable SELECT instead. The role reported that forcing the failure is what caught it and that reading the diff would not have.
+- *file:* `tests/acceptance/cancel-appointment.test.ts`
 
 </details>
 
