@@ -290,14 +290,14 @@ never performs. QS-9 asserts that equality explicitly. A related consequence tha
 is not: on 25 October a dealership open 00:00–06:00 local is open for **seven** absolute hours and on
 29 March for **five**, which the rule produces without knowing it, because it never counts hours.
 
-**One case the rule as built gets wrong.** An interval ending exactly at local midnight is rejected as
-`spans-local-days`, its end rendering on the next local date, so a job finishing at closing time on a
-dealership open until 00:00 is refused — while the time parser accepts `'24:00:00'` and normalises it
-to 86 400 seconds-of-day precisely to describe such a window, leaving that arm unreachable.
-[ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) settles it: an
-end rendering as `00:00:00` on the local date immediately after the start's is normalised to
-`secondsOfDay = 86400` before step 4's comparison, while a genuine crossing (23:00 to 01:00) stays
-rejected. **Accepted, and not yet written**; §11.1 carries it as agreed and unbuilt.
+**An interval ending exactly at local midnight** would render its end on the next local date and be
+rejected as `spans-local-days` — refusing a job that finishes at closing time at a dealership open
+until 00:00, and leaving the time parser's `'24:00:00'` arm, which exists to describe exactly that
+window, unreachable.
+[ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) settles it and
+**shipped in slice 02** (AC-17–19): an end rendering `00:00:00` on the local date immediately after
+the start's normalises to `secondsOfDay = 86400` before step 4's comparison, while a genuine crossing
+(23:00 to 01:00) stays rejected.
 
 ## 8.4 Observability
 
