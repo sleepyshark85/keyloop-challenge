@@ -6,6 +6,7 @@ depends_on: ["05"]
 arc42: ["§5.2", "§6.3", "§8.2", "§8.6"]   # §5.2 added at slice 05 step 7 — appointment.ts
 adr: [3, 24]
 quality_scenarios: [QS-6, QS-11]
+inherits: ["F-02-9", "F-05-1", "R-05-7", "R-05-9"]   # deferred here by ruling; slice:check enforces it (A-05-5)
 loopbacks: 0
 ---
 
@@ -31,8 +32,13 @@ without being obvious.
 - **AC-4** — Given A is `cancelled`, when it is rescheduled, then `409` with
   `type=/problems/appointment-not-confirmed` — a **different** `type` from a contended `409`, and one
   that does **not** increment `booking_conflicts_total` (§8.4).
-- **AC-5** — Given an unknown id, when a move is requested, then `404`, decided by the `UPDATE`
-  affecting zero rows rather than by a preceding read.
+- **AC-5** — *Amended at step 1 by [ADR-0025](../adr/0025-existence-is-the-reads-legality-is-the-statements.md);
+  the original required the `404` to come from the `UPDATE`'s zero rows, which is unimplementable
+  because the `UPDATE` cannot be built without first reading the row.* Given an unknown id, when a
+  move is requested, then `404` with `type=/problems/appointment-not-found`, decided by the
+  appointment read the move needs anyway to know its own dealership and service type — **and the
+  `UPDATE` is never issued.** Zero rows from the `UPDATE` therefore means exactly one thing, which
+  is what makes AC-4 assertable.
 
 ## Inherited scope — written here, not only where it was deferred
 

@@ -7,6 +7,7 @@ absorbs: ["10", "11"]
 arc42: ["§3.1", "§8.4", "§8.6", "§10.2", "§11.1"]
 adr: [5, 6, 10]
 quality_scenarios: [QS-13, QS-11, QS-14]
+inherits: ["OQ-05-2"]   # deferred here by ruling; slice:check enforces it (A-05-5)
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
 ---

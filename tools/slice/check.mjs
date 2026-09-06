@@ -21,6 +21,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { frontmatter, body } from '../lib/frontmatter.mjs';
+import { refsDeferredTo, deferralMap } from '../lib/deferrals.mjs';
 
 const SLICE_DIR = resolve('docs/slices');
 const LOG = resolve(process.env.TEAM_LOG ?? 'docs/team-log/events.jsonl');
@@ -49,12 +50,17 @@ if (!slice) {
   process.exit(2);
 }
 
-const events = existsSync(LOG)
+const allEvents = existsSync(LOG)
   ? readFileSync(LOG, 'utf8').split('\n').filter(Boolean)
       .flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } })
-      .filter((e) => e.slice === id)
       .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))
   : [];
+
+// Deferrals are the one thing this tool must read ACROSS slices. Everything else about a
+// slice is answered from its own span; an inherited obligation is by definition a ruling
+// made somewhere else, and reading only `events` is why the destination lived in prose for
+// five slices — the receiving slice's own record never mentioned it.
+const events = allEvents.filter((e) => e.slice === id);
 
 // ------------------------------------------------------------------ checks --
 const results = [];
@@ -97,6 +103,33 @@ if (!onlyDone) {
   const arc = slice.arc42 ?? [];
   check('ready', 'arc42 scope declared', arc.length ? PASS : FAIL,
     arc.length ? arc.join(' ') : 'declare the sections this slice may touch, or ["none"]');
+
+  // INHERITED OBLIGATIONS — A-05-5, and the fourth attempt at the same defect.
+  //
+  // The mechanism failed identically four times: a ruling said "routed to slice 06", the
+  // receiving slice's file said nothing, and the only thing joining them was memory. R-05-2
+  // twice, A-05-5, then O-37 — which named a destination file that did not have the
+  // structure the dispatch described, because nothing had ever checked that a named
+  // destination was real. The architect ruled the criterion SOUND and the ENFORCEMENT
+  // MISSING, and said in the same ruling that the honest alternative to building this check
+  // is an ADR superseding ADR-0019 rather than a fifth repetition.
+  //
+  // READY fails when a ref deferred here is missing from `inherits:`. The direction matters:
+  // the subset runs deferrals -> inherits, so a slice cannot become Ready by simply not
+  // mentioning what was sent to it. Extra entries in `inherits:` are NOT an error — a slice
+  // may take on an obligation nobody deferred to it, and forbidding that would punish the
+  // one behaviour this whole mechanism is trying to encourage.
+  const owed = refsDeferredTo(allEvents, id);
+  const inherits = slice.inherits ?? [];
+  const missing = owed.filter((r) => !inherits.includes(r));
+  check('ready', 'inherited obligations declared',
+    owed.length === 0 ? PASS : missing.length ? FAIL : PASS,
+    owed.length === 0
+      ? 'nothing was deferred to this slice'
+      : missing.length
+        ? `deferred here but absent from \`inherits:\` — ${missing.join(', ')}. `
+          + 'A slice does not stop owing an obligation by not listing it.'
+        : `${owed.join(' ')} — all declared`);
 
   // O-14. Presence is not correspondence.
   //
@@ -497,6 +530,30 @@ if (!onlyReady) {
     openSerious2.length
       ? `${openSerious2.length} open MAJOR/BLOCKING: ${openSerious2.map((e) => e.ref).join(', ')}`
       : `every MAJOR/BLOCKING finding is ruled or resolved`);
+
+  // The other half of A-05-5. READY asks whether the slice ADMITTED what it owes; DONE asks
+  // whether it did anything about it. An `inherits:` list with no ruling behind it at the end
+  // of the slice is the same omission one step later, and a slice that discharges an
+  // obligation by copying it into the next file is exactly what R-05-2 kept catching.
+  //
+  // "Did something about it" is deliberately broad: ruled, resolved, or re-deferred with a
+  // destination. Re-deferring COUNTS — an honest onward routing is a legitimate outcome and
+  // the register carries it — but it must be a logged ruling in this slice's own span, which
+  // is the thing prose in a design document is not.
+  const ruledHere = new Set(events
+    .filter((e) => ['finding.ruled', 'finding.resolved', 'finding.routed'].includes(e.event))
+    .map((e) => e.ref).filter(Boolean));
+  const inheritedRefs = slice.inherits ?? [];
+  const undischarged = inheritedRefs.filter((r) => !ruledHere.has(r));
+  check('done', 'inherited obligations discharged',
+    inheritedRefs.length === 0 ? NA : undischarged.length ? FAIL : PASS,
+    inheritedRefs.length === 0
+      ? 'this slice inherited nothing'
+      : undischarged.length
+        ? `no ruling in this slice's span for ${undischarged.join(', ')} — `
+          + 'rule it, resolve it, or re-defer it with a destination; carrying it silently '
+          + 'into the next slice is the defect this check exists for'
+        : `${inheritedRefs.join(' ')} — each ruled, resolved or re-routed here`);
 
   const loops = events.filter((e) => e.event === 'loopback').length;
   check('done', 'loopbacks within governor', loops <= 2 ? PASS : FAIL,
