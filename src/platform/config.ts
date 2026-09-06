@@ -35,6 +35,19 @@ export interface Config {
   readonly port: number;
   /** `pino` level; defaults to `info`. */
   readonly logLevel: LogLevel;
+  /**
+   * ADR-0021's `BOOKING_SEED`. **Unset by default, and unset in production** — every request
+   * draws its own seed, which is ADR-0009's Order-C. Set, every request in the process uses this
+   * one, which IS Order-A: one permutation for every caller, contention concentrated on
+   * whichever resource that permutation puts first, and retry work quadratic under a burst.
+   *
+   * It exists because a test needs a handle rather than a label (T-04-1), and the knob is
+   * announced at startup rather than hidden: {@link configWarnings}. ADR-0021 rejected gating it
+   * on `NODE_ENV` for a reason that outranks the discomfort — ADR-0013 has the outside-in tests
+   * exercise the BUILT artifact, and a test-only branch makes the tested artifact a different
+   * program from the shipped one.
+   */
+  readonly bookingSeed?: number;
 }
 
 /** Thrown by {@link loadConfig}. Names every problem it found, not just the first. */
@@ -61,6 +74,9 @@ const DEFAULT_LOG_LEVEL: LogLevel = 'info';
  * value is human-decided and is flagged at the gate rather than changed here.
  */
 export const DEFAULT_ATTEMPT_CAP = 16;
+
+/** The largest value `crypto.getRandomValues(new Uint32Array(1))` can produce. */
+const MAX_SEED = 0xffff_ffff;
 
 function isLogLevel(value: string): value is LogLevel {
   return (LOG_LEVELS as readonly string[]).includes(value);
@@ -102,7 +118,54 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     }
   }
 
+  // ADR-0021. Absent is the default and the only production setting, so an EMPTY or unset value
+  // is not a problem — it is the normal case. A malformed one is: silently ignoring
+  // `BOOKING_SEED=banana` would leave an operator believing the order is pinned when it is not,
+  // and this file's whole contract is that a bad value fails the process at startup rather than
+  // surfacing later as behaviour nobody can explain.
+  const rawSeed = (env['BOOKING_SEED'] ?? '').trim();
+  let bookingSeed: number | undefined;
+  if (rawSeed !== '') {
+    if (!/^\d+$/.test(rawSeed)) {
+      problems.push(
+        `BOOKING_SEED must be a non-negative integer, got ${JSON.stringify(rawSeed)}`,
+      );
+    } else if (Number(rawSeed) > MAX_SEED) {
+      problems.push(`BOOKING_SEED must be at most ${String(MAX_SEED)}, got ${rawSeed}`);
+    } else {
+      bookingSeed = Number(rawSeed);
+    }
+  }
+
   if (problems.length > 0) throw new ConfigError(problems);
 
-  return { databaseUrl, port, logLevel };
+  // Spread rather than `bookingSeed: undefined`, so "unset" is genuinely an absent property and
+  // a reader cannot tell the two apart by accident.
+  return {
+    databaseUrl,
+    port,
+    logLevel,
+    ...(bookingSeed === undefined ? {} : { bookingSeed }),
+  };
+}
+
+/**
+ * What an operator must be told about the configuration they have, at startup, once.
+ *
+ * WHY THIS IS A FUNCTION AND NOT A `logger.warn` INSIDE `loadConfig`. ADR-0021 asks for one
+ * startup `warn` naming the consequence, and `loadConfig` cannot emit one: the logger is BUILT
+ * FROM ITS RETURN VALUE, so at the moment the seed is read there is no logger, and
+ * `platform-is-a-leaf` plus the leaf's own no-behaviour rule make writing to a stream from here
+ * the wrong kind of fix. So this file keeps the WORDING — the consequence is a configuration
+ * fact and belongs beside the field it is about — and `main.ts` emits it through `pino` as soon
+ * as there is a logger. One line, at startup, at `warn`, exactly as the ADR requires.
+ */
+export function configWarnings(config: Config): readonly string[] {
+  if (config.bookingSeed === undefined) return [];
+  return [
+    `BOOKING_SEED=${String(config.bookingSeed)} is set: EVERY booking request will use this one ` +
+      `seed, so every request draws candidates in the same order. That is ADR-0009's rejected ` +
+      `Order-A — contention concentrates on one bay and one technician and retry work grows ` +
+      `quadratically under a burst. It is for reproducing a run, never for production.`,
+  ];
 }

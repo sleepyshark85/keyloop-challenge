@@ -22,7 +22,12 @@ import { checkHealth } from './application/checkHealth.js';
 import { readAppointment } from './application/readAppointment.js';
 import { buildServer } from './http/server.js';
 import { closeDb, createDb } from './persistence/db.js';
-import { ConfigError, DEFAULT_ATTEMPT_CAP, loadConfig } from './platform/config.js';
+import {
+  ConfigError,
+  DEFAULT_ATTEMPT_CAP,
+  configWarnings,
+  loadConfig,
+} from './platform/config.js';
 import { createLogger } from './platform/logger.js';
 
 function loadConfigOrExit(): ReturnType<typeof loadConfig> {
@@ -41,6 +46,9 @@ function loadConfigOrExit(): ReturnType<typeof loadConfig> {
 
 const config = loadConfigOrExit();
 const logger = createLogger(config);
+// ADR-0021's announcement, at the first moment there is anything to announce it with. The
+// wording lives beside the field in `config.ts`; emitting it is the composition root's job.
+for (const warning of configWarnings(config)) logger.warn({ event: 'config.warning' }, warning);
 const db = createDb(config, { logger });
 // PARTIAL APPLICATION, per 00a's shape: `buildServer` receives already-bound use cases and never
 // the handle, because `http-must-not-reach-persistence` forbids the edge from even NAMING the
@@ -53,7 +61,9 @@ const bookDeps = {
   // every layer, and the global costs nothing. `?? 0` is `noUncheckedIndexedAccess` on a
   // one-element array — `getRandomValues` fills it or throws, so the fallback is unreachable and
   // a zero seed would be a perfectly ordinary seed anyway.
-  seed: (): number => crypto.getRandomValues(new Uint32Array(1))[0] ?? 0,
+  // ADR-0021: `BOOKING_SEED`, when set, IS the seed for every request. Unset — the default and
+  // the only production setting — each request draws its own.
+  seed: (): number => config.bookingSeed ?? crypto.getRandomValues(new Uint32Array(1))[0] ?? 0,
   attemptCap: DEFAULT_ATTEMPT_CAP,
   logger,
 };
