@@ -132,6 +132,16 @@ export type BookOutcome =
       /** ADR-0016: minted by `classify` from `err.constraint`, never chosen. */
       readonly resource: ContendedResource;
       readonly attempts: number;
+      /**
+       * WHICH refusal this is — ADR-0020. `exhausted`: a candidate list emptied, so nothing was
+       * left untried. `capped`: ADR-0009's attempt cap stopped the loop with candidates
+       * remaining. Both render identically at the edge (AC-4) and §8.6 gains no row for the
+       * second; the difference is for the operator, on `booking.refused`.
+       *
+       * `exhausted` WINS A TIE. When one attempt both empties a list and reaches the cap, the
+       * stronger statement is true.
+       */
+      readonly exit: 'exhausted' | 'capped';
     }
   /** `40P01` under ADR-0018's locks — a write path skipped them. T-02-9. */
   | { readonly kind: 'no-verdict' }
@@ -154,6 +164,16 @@ export interface BookDeps {
    */
   readonly seed: () => number;
   /**
+   * ADR-0009's attempt cap, from `platform/config.ts`. A LATENCY guard, not a termination guard:
+   * Bound-2 already bounds the loop at `|bays| + |technicians|`, which is the loop's header, and
+   * the cap is a policy number that stops a request spending forty round trips before refusing.
+   *
+   * It is tested INSIDE the `23P01` arm (ADR-0020), never as the loop's bound — so no refusal
+   * exit is reachable without a `ContendedResource` a classification just minted, and the two
+   * numbers stay two numbers doing two jobs.
+   */
+  readonly attemptCap: number;
+  /**
    * I-02-6 — the observer AC-3, AC-4, QS-1 and QS-2 need and the design did not have.
    *
    * All four require "the violated constraint reported by PostgreSQL is named `no_bay_overlap`",
@@ -169,6 +189,17 @@ export interface BookDeps {
 
 /** The `pino` line the concurrency suite reads. Renaming it is a behaviour change. */
 const CONFLICT_EVENT = 'booking.conflict';
+/**
+ * The refusal line — one per refused booking, at BOTH exits.
+ *
+ * AC-4 requires the cap to be "visible in telemetry rather than silent", and an outside-in test
+ * may read exactly three things: the response, the database and stdout (I-02-6). The response
+ * carries no `exit` and no `attempts` by design, and a refusal writes no row — so this line is
+ * where the two exits become distinguishable at all, until slice 09's
+ * `booking_conflicts_total{outcome}`. The `seed` on it is what makes a reported failure
+ * re-runnable through `BOOKING_SEED` (ADR-0021): a label that cannot be fed back in is not one.
+ */
+const REFUSED_EVENT = 'booking.refused';
 const DEADLOCK_EVENT = 'booking.deadlock';
 const REFERENCE_DATA_EVENT = 'booking.reference-data-invalid';
 
@@ -249,17 +280,37 @@ export async function bookAppointment(
   const appointmentId = deps.newId();
   const startsAt = new Date(derivation.occupancyStartsAt);
   const endsAt = new Date(derivation.occupancyEndsAt);
-  let attempts = 0;
   let order: CandidateOrder = initialOrder;
+
+  /**
+   * BOTH REFUSAL EXITS, IN ONE PLACE. Only the `exit` differs, and both are called from inside
+   * the `23P01` arm holding a resource that classification minted (ADR-0016, ADR-0020).
+   */
+  const refuse = (
+    exit: 'exhausted' | 'capped',
+    resource: ContendedResource,
+    attempts: number,
+  ): BookOutcome => {
+    deps.logger.info({ event: REFUSED_EVENT, exit, resource, attempts, seed }, REFUSED_EVENT);
+    return { kind: 'no-capacity', resource, attempts, exit };
+  };
 
   // 6. The loop. It varies ONLY the candidate: steps 1-4 ran once and nothing inside re-derives.
   //
   // A `CandidateOrder` is non-empty by construction and `prune` returns `null` rather than an
   // empty one, so `nextCandidate` is total and there is no index assertion left on this path —
   // the `as string` pair that stood here is gone with the tuple carrier (I-04-3).
-  for (;;) {
+  //
+  // THE HEADER CARRIES BOUND-2'S STRUCTURAL BOUND, NOT THE CAP (ADR-0020 row F, I-04-2). Two
+  // encodings of one number drift, and these are two different numbers: `|bays| + |technicians|`
+  // is what pruning a whole resource per conflict guarantees, and the cap is a policy value that
+  // may be raised or lowered without touching liveness. The tail below is therefore unreachable —
+  // a list empties by attempt `|bays| + |technicians| - 1` and the arm has returned — and it
+  // THROWS rather than refusing, so that a future retried `PgOutcome` variant meets a loud fault
+  // instead of an unbounded loop.
+  const structuralBound = candidates.bays.length + candidates.technicians.length;
+  for (let attempts = 1; attempts <= structuralBound; attempts += 1) {
     const { bayId, technicianId } = nextCandidate(order);
-    attempts += 1;
 
     try {
       const row = await db.transaction().execute(async (trx) => {
@@ -313,19 +364,26 @@ export async function bookAppointment(
             outcome.resource,
             outcome.resource === 'bay' ? bayId : technicianId,
           );
-          if (remaining !== null) {
-            order = remaining;
-            continue;
-          }
 
-          // THE ONE REFUSAL EXIT, and it is reached holding a `ContendedResource` this very
-          // classification minted from `err.constraint` rather than one chosen here. A
-          // classification prunes only its own list, so the list that emptied is the one the
-          // last classification named — which is what makes `resource` the SCARCE resource and
-          // not the abundant one (E-02-1). Slice 04's attempt cap adds a SECOND exit, with both
-          // lists non-empty and no emptied list to name; that is where ADR-0016's claim needs
-          // re-measuring, in slice 04 and not here.
-          return { kind: 'no-capacity', resource: outcome.resource, attempts };
+          // BOTH REFUSAL EXITS LIVE HERE, IN THE ARM — ADR-0020, and the order of these two
+          // lines is the tie-break.
+          //
+          // The loop `continue`s only on `conflict` and returns on every other classification
+          // and on success, so a refusal is reachable ONLY from a classification: the
+          // `ContendedResource` below is one this very `23P01` minted from `err.constraint`,
+          // never one chosen here. That is what lets ADR-0016's claim survive the cap with no
+          // exception, no nullable carrier and no cast.
+          //
+          // EXHAUSTION FIRST. A classification prunes only its own list, so the list that
+          // emptied is the one the last classification named — which is what makes `resource`
+          // the SCARCE resource rather than the abundant one (E-02-1). When an attempt both
+          // empties a list and reaches the cap, nothing was left untried and `exhausted` is the
+          // stronger true statement.
+          if (remaining === null) return refuse('exhausted', outcome.resource, attempts);
+          if (attempts >= deps.attemptCap) return refuse('capped', outcome.resource, attempts);
+
+          order = remaining;
+          continue;
         }
 
         case 'bad-reference': {
@@ -377,4 +435,13 @@ export async function bookAppointment(
       }
     }
   }
+
+  // UNREACHABLE. Every classification either returns or prunes, and pruning a whole resource per
+  // conflict empties a list by attempt `|bays| + |technicians| - 1`. A `throw` rather than a
+  // refusal because nothing is minted here: there is no verdict to build a `409` from, and a
+  // fabricated one is exactly what ADR-0016 forbids. If this ever fires, a `PgOutcome` variant
+  // gained a second `continue` and the loop lost its bound (ADR-0020's one-directional guarantee).
+  throw new Error(
+    `booking loop exceeded its structural bound of ${String(structuralBound)} attempts`,
+  );
 }

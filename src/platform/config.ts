@@ -50,6 +50,18 @@ export class ConfigError extends Error {
 
 const DEFAULT_LOG_LEVEL: LogLevel = 'info';
 
+/**
+ * ADR-0009's cap: sixteen attempts, after which a booking is refused exactly as if its candidate
+ * list had emptied. It lives here because ADR-0009 put it here.
+ *
+ * D-04-1, recorded rather than fixed: sixteen sits BELOW the additive bound Bound-2 computes at
+ * §1.1 scale (`|bays| + |technicians| - 1`, roughly forty), so a `capped` refusal is expected
+ * today rather than the signal ADR-0009 intended by "a non-zero cap-exceeded counter means the
+ * cap is wrong". The remedies are the advisory pre-filter after slice 08, or a larger cap; the
+ * value is human-decided and is flagged at the gate rather than changed here.
+ */
+export const DEFAULT_ATTEMPT_CAP = 16;
+
 function isLogLevel(value: string): value is LogLevel {
   return (LOG_LEVELS as readonly string[]).includes(value);
 }

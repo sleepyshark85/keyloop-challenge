@@ -36,6 +36,13 @@ const APPOINTMENT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
  */
 const SEED = 2_026_0904;
 
+/**
+ * The shipped cap (ADR-0009), restated here rather than imported: `config.ts` owns the constant
+ * and this file owns the BEHAVIOUR, and they must fail to different regressions. A test that
+ * imported the value could not notice the value changing.
+ */
+const ATTEMPT_CAP = 16;
+
 /** Six bays, enough for a permutation to be visible and for a prune to have survivors. */
 const bays6 = ['bay-0', 'bay-1', 'bay-2', 'bay-3', 'bay-4', 'bay-5'];
 
@@ -89,7 +96,10 @@ function collectingDeps(): { deps: BookDeps; lines: LogLine[] } {
     trace: record('trace'),
     fatal: record('fatal'),
   } as unknown as Logger;
-  return { deps: { newId: () => APPOINTMENT, seed: () => SEED, logger }, lines };
+  return {
+    deps: { newId: () => APPOINTMENT, seed: () => SEED, attemptCap: ATTEMPT_CAP, logger },
+    lines,
+  };
 }
 
 function pgError(code: string, constraint?: string): unknown {
@@ -380,7 +390,12 @@ describe('bookAppointment — the refusal names the SCARCE resource (E-02-1, AC-
       }),
     );
     const outcome = await bookAppointment(db, collectingDeps().deps, COMMAND);
-    expect(outcome).toEqual({ kind: 'no-capacity', resource: 'bay', attempts: 1 });
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'bay',
+      attempts: 1,
+      exit: 'exhausted',
+    });
   });
 
   it('names `technician` when the technician list empties, with 24 bays free', async () => {
@@ -398,7 +413,166 @@ describe('bookAppointment — the refusal names the SCARCE resource (E-02-1, AC-
       }),
     );
     const outcome = await bookAppointment(db, collectingDeps().deps, COMMAND);
-    expect(outcome).toEqual({ kind: 'no-capacity', resource: 'technician', attempts: 2 });
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'technician',
+      attempts: 2,
+      exit: 'exhausted',
+    });
+  });
+});
+
+describe("bookAppointment — the attempt cap, inside the 23P01 arm (AC-4, ADR-0020)", () => {
+  /** `n` bays, every attempt refused on the bay: the loop walks the list and nothing else. */
+  function allBaysBlocked(bayCount: number, conflicts: number): ReturnType<typeof scriptedDb> {
+    return scriptedDb(
+      bookingScript({
+        bays: Array.from({ length: bayCount }, (_unused, i) => `bay-${String(i)}`),
+        attempts: Array.from({ length: conflicts }, () =>
+          attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+        ).flat(),
+      }),
+    );
+  }
+
+  it(`stops at ${String(ATTEMPT_CAP)} attempts with candidates still untried, and says CAPPED`, async () => {
+    // Twenty bays, all blocked. The structural bound is 21, so nothing but the cap can stop this
+    // at 16 — which is the discrimination: a loop bounded by the cap and a loop bounded by
+    // Bound-2 differ here and nowhere else.
+    const { db, recorded } = allBaysBlocked(20, ATTEMPT_CAP);
+    const { deps, lines } = collectingDeps();
+    const outcome = await bookAppointment(db, deps, COMMAND);
+
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'bay',
+      attempts: ATTEMPT_CAP,
+      exit: 'capped',
+    });
+    expect(
+      recorded.filter((q) => q.sql.startsWith('insert')),
+      'four bays were never tried — that is what `capped` MEANS, and D-04-1 is the fact that it ' +
+        'happens at §1.1 scale',
+    ).toHaveLength(ATTEMPT_CAP);
+    expect(lines.filter((l) => l.record['event'] === 'booking.conflict')).toHaveLength(ATTEMPT_CAP);
+  });
+
+  it('EXHAUSTED WINS THE TIE when the last candidate is also the capped attempt', async () => {
+    // Sixteen bays, all blocked: at attempt 16 BOTH conditions hold — the bay list has just
+    // emptied and the cap has been reached. ADR-0020 gives it to `exhausted`, because nothing
+    // was left untried. Swapping the two lines in the arm is a mutant that only this case kills.
+    const { db } = allBaysBlocked(ATTEMPT_CAP, ATTEMPT_CAP);
+    const outcome = await bookAppointment(db, collectingDeps().deps, COMMAND);
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'bay',
+      attempts: ATTEMPT_CAP,
+      exit: 'exhausted',
+    });
+  });
+
+  it('a cap of 1 refuses after the FIRST attempt — the test is `>=`, not `>`', async () => {
+    const { db, recorded } = allBaysBlocked(4, 1);
+    const { deps } = collectingDeps();
+    const outcome = await bookAppointment(db, { ...deps, attemptCap: 1 }, COMMAND);
+    expect(outcome).toMatchObject({ attempts: 1, exit: 'capped' });
+    expect(recorded.filter((q) => q.sql.startsWith('insert'))).toHaveLength(1);
+  });
+
+  it('THE CAP IS NOT THE LOOP\'S BOUND — a cap of 1000 still refuses when the list empties', async () => {
+    // Bound-2 is what terminates the loop; the cap is a latency policy on top of it. If the two
+    // were one number this would attempt a thousand times against three bays.
+    const { db, recorded } = allBaysBlocked(3, 3);
+    const { deps } = collectingDeps();
+    const outcome = await bookAppointment(db, { ...deps, attemptCap: 1_000 }, COMMAND);
+    expect(outcome).toMatchObject({ attempts: 3, exit: 'exhausted' });
+    expect(recorded.filter((q) => q.sql.startsWith('insert'))).toHaveLength(3);
+  });
+});
+
+describe('bookAppointment — booking.refused is the only place the two exits differ (AC-4)', () => {
+  it('writes ONE line at the exhausted exit, carrying exit, resource, attempts and the seed', async () => {
+    const { db } = scriptedDb(
+      bookingScript({
+        bays: ['bay-0', 'bay-1'],
+        attempts: [
+          ...attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+          ...attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+        ],
+      }),
+    );
+    const { deps, lines } = collectingDeps();
+    await bookAppointment(db, deps, COMMAND);
+
+    const refusals = lines.filter((l) => l.record['event'] === 'booking.refused');
+    expect(refusals).toHaveLength(1);
+    // The WHOLE record. A dropped `seed` is a refusal nobody can re-run (ADR-0021), a dropped
+    // `exit` makes the two refusals indistinguishable everywhere — the response and the table
+    // carry neither, so this line is the only observer either has.
+    expect(refusals[0]?.record).toEqual({
+      event: 'booking.refused',
+      exit: 'exhausted',
+      resource: 'bay',
+      attempts: 2,
+      seed: SEED,
+    });
+    expect(refusals[0]?.message, 'named in both pino renderings, as the conflict line is').toBe(
+      'booking.refused',
+    );
+  });
+
+  it('writes the SAME line at the capped exit, differing only in `exit`', async () => {
+    const { db } = scriptedDb(
+      bookingScript({
+        bays: ['bay-0', 'bay-1', 'bay-2'],
+        attempts: [...attempt({ error: pgError('23P01', 'no_bay_overlap') })],
+      }),
+    );
+    const { deps, lines } = collectingDeps();
+    await bookAppointment(db, { ...deps, attemptCap: 1 }, COMMAND);
+
+    expect(lines.find((l) => l.record['event'] === 'booking.refused')?.record).toEqual({
+      event: 'booking.refused',
+      exit: 'capped',
+      resource: 'bay',
+      attempts: 1,
+      seed: SEED,
+    });
+  });
+
+  it('reports the SEED THE REQUEST ACTUALLY DREW, not a fresh one', async () => {
+    // The line exists so a reported failure can be re-run under BOOKING_SEED. A number drawn at
+    // logging time would be a plausible-looking value that reproduces nothing.
+    const { db } = scriptedDb(
+      bookingScript({
+        bays: ['bay-0'],
+        attempts: [...attempt({ error: pgError('23P01', 'no_bay_overlap') })],
+      }),
+    );
+    const { deps, lines } = collectingDeps();
+    await bookAppointment(db, { ...deps, seed: () => 424_242 }, COMMAND);
+    expect(lines.find((l) => l.record['event'] === 'booking.refused')?.record['seed']).toBe(424_242);
+  });
+
+  it('writes NO refusal line when the booking is confirmed', async () => {
+    const { db } = scriptedDb(
+      bookingScript({ attempts: [...attempt({ rows: [insertedRow('bay-0', 'tech-0')] })] }),
+    );
+    const { deps, lines } = collectingDeps();
+    await bookAppointment(db, deps, COMMAND);
+    expect(lines.filter((l) => l.record['event'] === 'booking.refused')).toEqual([]);
+  });
+
+  it('writes no refusal line for a 40P01 or a 23503 — neither is a capacity refusal', async () => {
+    for (const error of [
+      pgError('40P01'),
+      pgError('23503', 'appointment_technician_qualified'),
+    ]) {
+      const { db } = scriptedDb(bookingScript({ attempts: [...attempt({ error })] }));
+      const { deps, lines } = collectingDeps();
+      await bookAppointment(db, deps, COMMAND);
+      expect(lines.filter((l) => l.record['event'] === 'booking.refused')).toEqual([]);
+    }
   });
 });
 

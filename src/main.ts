@@ -22,7 +22,7 @@ import { checkHealth } from './application/checkHealth.js';
 import { readAppointment } from './application/readAppointment.js';
 import { buildServer } from './http/server.js';
 import { closeDb, createDb } from './persistence/db.js';
-import { ConfigError, loadConfig } from './platform/config.js';
+import { ConfigError, DEFAULT_ATTEMPT_CAP, loadConfig } from './platform/config.js';
 import { createLogger } from './platform/logger.js';
 
 function loadConfigOrExit(): ReturnType<typeof loadConfig> {
@@ -54,6 +54,7 @@ const bookDeps = {
   // one-element array — `getRandomValues` fills it or throws, so the fallback is unreachable and
   // a zero seed would be a perfectly ordinary seed anyway.
   seed: (): number => crypto.getRandomValues(new Uint32Array(1))[0] ?? 0,
+  attemptCap: DEFAULT_ATTEMPT_CAP,
   logger,
 };
 const app = buildServer({
