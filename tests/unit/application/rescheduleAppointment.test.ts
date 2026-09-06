@@ -264,6 +264,33 @@ describe('rescheduleAppointment — the loop prunes and refuses exactly as booki
     expect(outcome).toEqual({ kind: 'no-capacity', resource: 'bay', attempts: 2, exit: 'exhausted' });
   });
 
+  it('R-06-B — the TECHNICIAN mirror: a no_technician_overlap prunes the technician list, not the bay one', async () => {
+    // Three bays, a SINGLE technician: attempt 1 is the incumbent pair (bay-0/tech-0), and it
+    // conflicts on the bay — pruning nothing here, since attempt 1's failure draws the shuffle
+    // rather than pruning (ADR-0027). Attempt 2 walks the shuffle's head, which is necessarily
+    // tech-0 (the only candidate), and conflicts on the TECHNICIAN this time. If the classified
+    // resource were ignored and `bayId` pruned in its place regardless of which resource
+    // conflicted, the technician list would never shrink and this would refuse `capped` after
+    // the attempt cap instead of `exhausted` at attempt 2 — which is exactly the QS-3 failure
+    // mode this loop exists to prevent.
+    const { db } = scriptedDb(
+      rescheduleScript({
+        bays: ['bay-0', 'bay-1', 'bay-2'],
+        technicians: ['tech-0'],
+        attempts: [
+          ...attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+          ...attempt({ error: pgError('23P01', 'no_technician_overlap') }),
+        ],
+      }),
+    );
+    const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'technician',
+      attempts: 2,
+      exit: 'exhausted',
+    });
+  });
   it('the attempt cap stops the loop with candidates still untried, and says CAPPED', async () => {
     const { db } = scriptedDb(
       rescheduleScript({
