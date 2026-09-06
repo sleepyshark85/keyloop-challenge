@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **243** |
-| Severity | 11 blocking · 129 major · 103 minor |
+| Findings recorded | **244** |
+| Severity | 11 blocking · 130 major · 103 minor |
 | Verdicts | 17 narrowed · 89 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 56 · reviewer 49 · architect 47 · orchestrator 45 · implementer 39 · scribe 5 · human 2 |
-| Awaiting a ruling | **111** |
-| Mean escape distance | 1.76 step(s) |
+| Raised by | test-engineer 56 · reviewer 49 · architect 47 · orchestrator 46 · implementer 39 · scribe 5 · human 2 |
+| Awaiting a ruling | **112** |
+| Mean escape distance | 1.75 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1584,7 +1584,7 @@ rather than narrated.*
 
 - *scenario:* Slice 09 carries fifteen acceptance criteria, absorbs slices 10 and 11 by Gate D, and now holds OQ-05-2, F-06-1, A-06-2 and T-06-5 with ADR-0028. EVERY ONE OF THOSE FOUR DEFERRALS IS INDIVIDUALLY CORRECT UNDER ADR-0019, and three were ruled by the architect in this slice alone. That is the gap: the criterion asks whether a slice is cheaper OR stronger for ONE control, and never whether it has become THE PLACE WORK GOES TO STOP BEING ANYONE PROBLEM. The measurement is visible in the budget — 09-observability.md went from 653 to 793 of 800 words in this run, and each new obligation must now be paid for by deleting an existing one.
 - *file:* `docs/slices/09-observability.md`
-- *deferred* by orchestrator — RULED BY THE ORCHESTRATOR AS DELEGATED GATE, WITH THE ARCHITECT AS ADVISOR RATHER THAN DECIDER — because the architect routed this here precisely on the ground that it owns ADR-0019 and cannot decide that its own four applications of it have overloaded a slice, and delegating the gate to it does not cure that. THE FINDING IS ACCEPTED IN FULL: ADR-0019 cheaper-or-stronger criterion is PER-ITEM AND HAS NO AGGREGATE. Slice 09 now holds OQ-05-2, F-06-1, A-06-2 and T-06-5, every one individually correct, THREE OF THEM RULED IN THIS SLICE ALONE, on top of fifteen acceptance criteria and slices 10 and 11 absorbed by Gate D — and its file went 653 to 793 of 800 words in a single run, so each new obligation must now be paid for by deleting an existing one. WHAT I DECLINE TO DO IS RESTRUCTURE THE BACKLOG ON A DELEGATED GATE. The human grant was you and the architect decide if the PR is good to go, which is authority over THIS MERGE; cutting or folding slice 09 is a Gate C scope decision the human made and has not reopened, and an orchestrator that treats a merge delegation as licence to re-cut the backlog has taken more than it was given. SO: slice 09 stands as the close-out and is accepted as large, PROVISIONALLY. Deferred to the HUMAN rather than absorbed, and the timing is deliberate — slices 07 and 08 come first, so there are two more gates before slice 09 starts and the human can overrule this at either without costing any work. TWO THINGS GO TO THE RETRO RATHER THAN TO A SLICE: whether ADR-0019 needs an aggregate clause — a per-item criterion that cannot see accumulation is the defect this finding actually names, and it will recur on whatever the next close-out slice is — and whether a slice that absorbs two folded slices should be exempt from receiving deferrals at all. I record that I am ruling on a finding whose subject is a rule the architect owns and whose consequence lands on a slice I will orchestrate, which is not an independence anyone should mistake for review.
+- *deferred* by orchestrator — RE-ROUTED FROM human TO SLICE 08, on the human instruction of 2026-09-07 to continue without waiting for my decisions. THE PREVIOUS DISPOSITION WAS A WAIT AND THIS ONE IS A SCHEDULED DECISION POINT, which is the difference the instruction asks for: deferred_to human meant the finding sat until someone came back, and nothing in the mechanism would have raised it again; deferred_to 08 means slice 08 Definition of Done FAILS unless it is ruled there, and slice:check enforces that in both directions. THE SUBSTANCE IS UNCHANGED AND STILL ACCEPTED: ADR-0019 criterion is per-item and cannot see accumulation, slice 09 now holds OQ-05-2, F-06-1, A-06-2 and T-06-5 with three of the four ruled in slice 06 alone, and its file went 653 to 793 of 800 words in a single run. WHY SLICE 08 AND NOT NOW: slice 09 is the slice AFTER 08, so its gate is the last moment the decision is still free — a slice cut at 08 gate costs nothing, and the same cut made now would be made with less information than the intervening slice will produce. Deciding early is not the same as deciding well, and the enforcement means it cannot be forgotten. WHAT SLICE 08 MUST RULE: whether slice 09 is split, whether a slice that has absorbed two folded slices should be exempt from receiving further deferrals at all, and whether ADR-0019 needs an aggregate clause — the last of those is the defect this finding actually names and it will recur on whatever the next close-out slice is, so it goes to the retro regardless of how the scope question falls. THE HUMAN RETAINS THE OVERRIDE and it costs nothing to exercise: two gates remain before slice 09 starts.
 
 **A-06-5** — 06-design.md landed at 2,997 of 3,000 words, so the next amendment to this slice cannot be absorbed without deleting argument
 
@@ -1690,6 +1690,21 @@ rather than narrated.*
 
 - *scenario:* Two cases in the A-05-5 suite read the LIVE slice 06 rather than a fixture: that it declared every ref deferred to it, and that it had NOT YET DISCHARGED THEM. The second was true when written and FALSE FOUR HOURS LATER, the moment the architect ruled F-02-9, F-05-1, R-05-7 and R-05-9 — so a correct advance of the project turned CI red on run 34043707926, on a DOCS-ONLY commit that changed no tool and no test. A TEST THAT ASSERTS A TRANSIENT PROJECT STATE IS NOT TESTING THE TOOL, IT IS PINNING THE CALENDAR. Fixed by moving both to the fixtures that already assert the same two conditions in both directions; what is kept from the live run is only that the two criteria APPEAR, which is a property of the tool and cannot go stale. Raised against the orchestrator by the orchestrator: the same suite whose docblock says every case is written in the direction that can fail contained a case that could only fail by the project succeeding. The failure was contained — the db suite and red-proof both passed on that run, so nothing about the slice code was in doubt — but it cost a red CI on a branch under review and it would have blocked the gate.
 - *file:* `tools/test/deferrals.test.mjs`
+
+</details>
+
+## Slice 07
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **O-50** | MAJOR | 1 *(+1)* | orchestrator | Three agent runs across slices 04 and 05 produced a prompt AND a report and NO agent.finish event — the run counter and the section 13 evidence base are undercounted | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**O-50** — Three agent runs across slices 04 and 05 produced a prompt AND a report and NO agent.finish event — the run counter and the section 13 evidence base are undercounted
+
+- *scenario:* FOUND BY THE O-44 CHECK ON ITS FIRST RUN, and NOT the defect it was built to catch. O-44 remedy reconciles captured prompts against the log to catch a role dispatching a role behind the orchestrator back. Slice 06 passes it, 14 captures each with an event. Slices 04 and 05 FAIL: s04-test-engineer-3 (I-04-10 remedy — remove the flaky claim), s05-test-engineer-3 (Fix AC-1 misleading diagnostic) and s05-implementer-3 (Build R-02-3 — the response whitelist) each have a prompt file AND a report file on disk, so THE AGENTS DEMONSTRABLY RAN AND RETURNED, and the ordinal sequence in the log skips them — implementer-4 exists where implementer-3 does not, test-engineer-4 where -3 does not. So this is not a self-dispatch: it is THREE LOST agent.finish EVENTS, the log-agent-finish hook not firing or its write being lost, in runs the orchestrator itself dispatched. CONSEQUENCES: STATUS.md agent-runs-recorded figure is undercounted by three; arc42 section 13 rests on that count; and any per-role invocation analysis in the retro is wrong by the same amount. The three runs are recoverable — prompt and report are both on disk with timestamps — but backfilling agent.finish would be the orchestrator asserting source derived for a measurement it did not make, which write.mjs refuses BY DESIGN. THE HONEST FORMS ARE a reported reconstruction that says what it is, or leaving the gap visible now that a check reports it. Recorded rather than fixed, because slices 04 and 05 are merged and gated and O-36 precedent says rewriting the history of an artifact under assessment is the worse act.
+- *file:* `docs/team-log/events.jsonl`
 
 </details>
 

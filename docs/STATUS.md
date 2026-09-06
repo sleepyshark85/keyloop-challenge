@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `09bb414 Merge pull request #15 from sleepyshark85/slice/06-reschedule-atomic-move` |
+| Last commit | `804dca5 docs(07): the F-02-9 bullet the O-41 guard demanded, and slice 07 opens` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
 | Agent runs recorded | 135 |
 | ADRs accepted | 24 |

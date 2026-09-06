@@ -614,6 +614,57 @@ if (!onlyReady) {
           + 'into the next slice is the defect this check exists for'
         : `${inheritedRefs.join(' ')} — each ruled, resolved or re-routed here`);
 
+  // O-44 — THE LOG MUST ACCOUNT FOR EVERY CAPTURED PROMPT.
+  //
+  // At slice 06 the implementer hit an unsatisfiable assertion, correctly refused to edit a
+  // test-engineer file, correctly raised a DCR — and then DISPATCHED THE ARCHITECT ITSELF.
+  // The architect ruled and committed. No `dcr.raised`, no `dcr.resolved`, no board move: the
+  // orchestrator found out by noticing a prompt file it had not written.
+  //
+  // The substance was handled well and fast, and the architect's ruling was that forbidding
+  // the dispatch is the wrong remedy — it puts the orchestrator on the critical path of every
+  // unblock, and the measured cost of this one was seven minutes saved. THE DANGEROUS CASE IS
+  // NARROWER: the ruling happened to be (a). Had it been (c), a loopback would have been due
+  // and the max-2 governor would not have counted it, because the governor is worth exactly
+  // what the log is.
+  //
+  // A reporting duty enforced only by the report is defeated by the omission it exists to
+  // catch — O-39's own words about a control defeated by the thing it was built to stop. So
+  // this reconciles two records that ALREADY EXIST: `capture-prompt.mjs` fires on every
+  // invocation regardless of who initiates it, which is the only reason slice 06 was
+  // recoverable at all. An unaccounted capture fails the slice whether or not anyone reports
+  // it.
+  //
+  // ONE DIRECTION ONLY, and the asymmetry is not laziness. Every capture needs an event;
+  // events without captures are legitimate and common — `SendMessage` resumes an agent from
+  // its transcript and produces an `agent.finish` with no new prompt, which is how slice 06
+  // has eighteen events against fourteen captures. Failing those would punish the cheap way
+  // to continue an agent.
+  const captures = (() => {
+    const dir = resolve('docs/team-log/prompts');
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir)
+      .filter((f) => f.endsWith('.md') && !f.includes('.report.'))
+      .map((f) => f.match(/^s([0-9]{2}[a-z]?)-(.+)-(\d+)\.md$/))
+      .filter((m) => m && m[1] === id)
+      .map((m) => ({ file: `s${m[1]}-${m[2]}-${m[3]}.md`, role: m[2], n: m[3] }));
+  })();
+
+  const accounted = new Set(events
+    .filter((e) => String(e.event).startsWith('agent.'))
+    .map((e) => `${e.actor}-${String(e.span_id ?? '').match(/-(\d+)$/)?.[1]}`));
+  const unaccounted = captures.filter((c) => !accounted.has(`${c.role}-${c.n}`));
+
+  check('done', 'every dispatch reached the log', captures.length === 0 ? NA
+    : unaccounted.length ? FAIL : PASS,
+    captures.length === 0
+      ? 'no prompt captures for this slice'
+      : unaccounted.length
+        ? `captured but no agent event — ${unaccounted.map((c) => c.file).join(', ')}. `
+          + 'A role dispatched a role without the orchestrator seeing it; if any ruling in that '
+          + 'run was (c), the loopback governor is owed one it did not count.'
+        : `${captures.length} capture(s), each with an agent event`);
+
   const loops = events.filter((e) => e.event === 'loopback').length;
   check('done', 'loopbacks within governor', loops <= 2 ? PASS : FAIL,
     `${loops} of max 2${loops > 2 ? ' — should have been split, not ground through' : ''}`);
