@@ -45,6 +45,12 @@ const flag = (n, d) => { const i = argv.indexOf(`--${n}`); return i === -1 ? d :
 const ARC42 = resolve(flag('arc42', 'docs/arc42'));
 const ADR = resolve(flag('adr', 'docs/adr'));
 const BASELINE = resolve(flag('baseline', 'tools/docs/budget-baseline.json'));
+// Overridable so the tool can be surveyed in isolation. These two were hard-coded against
+// the working directory, which meant every fixture run also measured the REAL CLAUDE.md
+// and METHODOLOGY — so the tool that enforces the concision rule could not be tested
+// without the repository leaking into the fixture, and it had no tests at all.
+const CLAUDE = resolve(flag('claude', 'CLAUDE.md'));
+const METHODOLOGY = resolve(flag('methodology', 'docs/METHODOLOGY.md'));
 const SLICES = resolve(flag('slices', 'docs/slices'));
 
 /** Budgets in words of authored prose. */
@@ -226,7 +232,7 @@ export function survey({ arc42 = ARC42, adr = ADR, slices = SLICES } = {}) {
   read(arc42, 'arc42');
   read(adr, 'adr');
   read(slices, 'slices');
-  for (const [path, key] of [[resolve('CLAUDE.md'), 'CLAUDE.md'], [resolve('docs/METHODOLOGY.md'), 'docs/METHODOLOGY.md']]) {
+  for (const [path, key] of [[CLAUDE, 'CLAUDE.md'], [METHODOLOGY, 'docs/METHODOLOGY.md']]) {
     if (!existsSync(path)) continue;
     const raw = readFileSync(path, 'utf8');
     rows.push({ file: key, words: countWords(raw, { file: key }), budget: budgetFor(key, {}), contested: false });
@@ -262,6 +268,17 @@ for (const r of rows) {
   r.was = baseline[r.file];
   r.ceiling = Math.max(r.budget, r.was ?? 0);
   r.grew = r.words > r.ceiling;
+  // A RATCHET THAT DOES NOT TIGHTEN IS A RATCHET WITH SLACK.
+  //
+  // `02-design.md` fell 13,566 → 1,200 and the baseline still said 13,566, so it could
+  // have grown back twelvefold with the check green the whole way. The reduction has to be
+  // recorded or it is not held. Found by the architect immediately after making it.
+  //
+  // Only MATERIAL slack is called out — more than 100 words and more than a tenth of the
+  // ceiling — so ordinary rewording does not demand a baseline commit, while a real
+  // reduction is locked in by the change that earned it.
+  r.slack = (r.was ?? r.budget) - r.words;
+  r.loose = r.slack > 100 && r.slack > r.ceiling / 10;
 }
 
 if (REBASELINE) {
@@ -272,6 +289,7 @@ if (REBASELINE) {
 }
 
 const over = rows.filter((r) => (RATCHET ? r.grew : r.over > 0));
+const loose = RATCHET ? rows.filter((r) => r.loose) : [];
 
 if (!CHECK || over.length) {
   const show = CHECK ? over : rows;
@@ -287,6 +305,17 @@ if (!CHECK || over.length) {
   const total = rows.reduce((n, r) => n + r.words, 0);
   console.log(`\n${rows.length} document(s), ${total} words of authored prose, ${over.length} over budget `
     + `(${rows.reduce((n, r) => n + Math.max(0, r.over), 0)} words to cut).`);
+}
+
+if (CHECK && RATCHET && !over.length && loose.length) {
+  console.error(
+    `\n${loose.length} document(s) are materially below their recorded ceiling, so the ratchet `
+    + 'has slack and the reduction is not held:\n'
+    + loose.map((r) => `  ${r.file}  ${r.words} against a ceiling of ${r.ceiling}`).join('\n')
+    + '\n\nRun `npm run docs:budget -- --rebaseline` and commit it, in the change that earned '
+    + 'the reduction. A ratchet that does not tighten after a reduction does not hold it.',
+  );
+  process.exit(1);
 }
 
 if (CHECK && over.length) {

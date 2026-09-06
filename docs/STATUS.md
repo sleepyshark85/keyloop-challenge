@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `1de2d34 feat(docs): a ratchet, because the meter existed and never ran` |
+| Last commit | `c854bab docs: pay down the concision debt slice 02 accrued` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process |
-| Agent runs recorded | 87 |
+| Agent runs recorded | 88 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -207,7 +207,8 @@
 | 2026-09-05 21:48 | reviewer | 24m04 | 296 / 13,938 / 23,681,391 | `derived` |
 | 2026-09-05 22:05 | architect | 13m16 | 150 / 12,454 / 8,174,449 | `derived` |
 | 2026-09-05 22:29 | architect | 14m27 | 202 / 6,211 / 12,722,777 | `derived` |
-| | **total** | **4733m26** | **22,016 / 1,934,466 / 1,740,154,977** | |
+| 2026-09-06 02:59 | architect | 17m29 | 230 / 14,588 / 15,995,983 | `derived` |
+| | **total** | **4750m55** | **22,246 / 1,949,054 / 1,756,150,960** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

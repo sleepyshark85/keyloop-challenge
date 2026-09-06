@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **119** |
-| Severity | 10 blocking · 65 major · 44 minor |
+| Findings recorded | **120** |
+| Severity | 10 blocking · 66 major · 44 minor |
 | Verdicts | 5 narrowed · 48 accepted · 1 escalated · 9 deferred |
-| Raised by | test-engineer 28 · reviewer 28 · orchestrator 25 · implementer 18 · architect 18 · human 2 |
-| Awaiting a ruling | **56** |
-| Mean escape distance | 1.73 step(s) |
+| Raised by | test-engineer 28 · reviewer 28 · orchestrator 26 · implementer 18 · architect 18 · human 2 |
+| Awaiting a ruling | **57** |
+| Mean escape distance | 1.72 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -656,6 +656,7 @@ rather than narrated.*
 | **O-30** | MAJOR | 5 *(+5)* | orchestrator | O-29 recurred three times inside the slice that found it, because a fix described inside a finding.raised record is invisible to every predicate that reads rulings | deferred |
 | **O-31** | MAJOR | 7 *(+7)* | orchestrator | The resume point silently regressed to phase 4, reporting Gate D open and undecided, two slices after Gate D was decided | **open** |
 | **O-32** | MAJOR | 7 *(+7)* | human | The concision ruling was undone in one slice, because the meter that measures it was deliberately kept out of CI | **open** |
+| **O-33** | MAJOR | 7 *(+0)* | orchestrator | The ratchet did not tighten after a reduction, so a 13,566 to 1,200 cut could have grown all the way back with the check green | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -849,6 +850,11 @@ rather than narrated.*
 **O-32** — The concision ruling was undone in one slice, because the meter that measures it was deliberately kept out of CI
 
 - *scenario:* Noticed by the HUMAN reading the new documents - 'new documents seem to encounter the same lengthy problem as before we do the concise' - and confirmed by measurement rather than agreed impressionistically. Right after the concision pass the corpus was 2,698 words over budget across 7 documents. One slice later: 18,607 over across 14, total prose 50,700 -> 65,643. The meter reported that the whole time. THE CAUSE IS NOT DISCIPLINE. docs:budget --check was deliberately kept OUT of CI when it was built, on the stated ground that documents were over budget and wiring in a red guard would be committing a broken build. That reasoning was sound and the consequence was that the guard existed and never ran - THIS PROJECT'S SIGNATURE DEFECT, committed by the tool built to prevent it, and the seventh instance. WHERE IT WENT: slices/02-design.md +12,366, which is 66 percent of the total, its budget having dropped from 3,000 to 1,200 when the slice went done under the merged-design rule; ADR-0016 and ADR-0017 +2,293, never condensed because they are slice 02's and stayed on the slice branch while the cleanup PR was cherry-picked to main; arc42 §5, §11, §8 and §10 +1,879 from step 7; ADR-0018 +213, new. FIXED WITH A RATCHET RATHER THAN ANOTHER CLEANUP. A guard demanding everything be under budget on the day it lands can only be switched on after a big-bang pass, which is exactly why it stayed off. A ratchet can be switched on TODAY: every file must be under max(budget, what it already was), so nothing may grow and a new file must meet its budget outright, while legacy overage is paid down at whatever pace the work allows. The direction is enforced even while the level is not. npm run docs:budget:check, in test:tools and in CI. Verified four ways: growing an over-budget file exits 1, a new over-budget file exits 1, shrinking an over-budget file exits 0, a clean tree exits 0. --rebaseline records current sizes and shows up in a diff, so ratcheting the wrong way is visible rather than silent.
+- *file:* `tools/docs/budget.mjs`
+
+**O-33** — The ratchet did not tighten after a reduction, so a 13,566 to 1,200 cut could have grown all the way back with the check green
+
+- *scenario:* Found by the ARCHITECT immediately after making the reduction, and reported rather than left: 'the ratchet's ceiling is now far above these files... 02-design could grow all the way back without docs:budget:check noticing'. Verified: the baseline still recorded 13,566 while the file stood at 1,200. A ratchet whose ceiling only ever moves up is not a ratchet - it is a high-water mark. The reduction has to be RECORDED or it is not held, and relying on someone remembering to run --rebaseline is discipline, which is what the ratchet exists to replace. Now a material reduction - more than 100 words AND more than a tenth of the ceiling - FAILS the check with an instruction to rebaseline in the change that earned it. Trivial rewording does not, so an ordinary edit does not demand a baseline commit. SECOND DEFECT FOUND WHILE TESTING IT: survey() hard-coded CLAUDE.md and docs/METHODOLOGY.md against the working directory, so every fixture run also measured the REAL repository - the tool enforcing the concision rule could not be exercised in isolation, and it had NO TESTS AT ALL. Both paths are now flags. 16 cases in tools/test/budget.test.mjs covering both --check and the ratchet in every direction, plus the four exclusions (frontmatter, generated blocks, fenced code, assumption registers) and the contested hatch. Three mutants: no tightening kills 2, no growth check kills 3, charging for fenced code kills 1.
 - *file:* `tools/docs/budget.mjs`
 
 </details>
