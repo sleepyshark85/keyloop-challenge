@@ -54,6 +54,9 @@ export interface NewAppointment {
   readonly endsAt: Date;
 }
 
+/** The terminal status. ADR-0003: cancellation is a transition, never a delete. */
+const CANCELLED = 'cancelled';
+
 /** Advisory-lock classes. Disjoint key spaces are what make the order total — ADR-0018. */
 const BAY_LOCK_CLASS = 1;
 const TECHNICIAN_LOCK_CLASS = 2;
@@ -190,4 +193,78 @@ function toAppointmentRow(row: {
     endsAt: row.ends_at,
     status: row.status,
   };
+}
+
+/**
+ * Slice 05 — `POST /appointments/{id}/cancellation`, as ONE unconditional statement.
+ *
+ * ── IT TAKES NO ADVISORY LOCK, AND THAT IS ADR-0023 RATHER THAN AN OMISSION ───────────────────
+ *
+ * {@link lockResources}'s docblock carries F-02-9 — "EVERY write path to `appointment` must take
+ * these two locks in this order" — and this is the one path that sentence was wrong about.
+ * ADR-0023 narrows it to an iff: a TRANSACTION takes the locks iff some statement in it writes a
+ * row version INTO an exclusion constraint's scope. Both constraints in `0003_appointment.sql`
+ * read
+ *
+ *     EXCLUDE USING gist (…) WHERE (status <> 'cancelled')
+ *
+ * so a row this statement writes satisfies neither predicate: there is no adjudication here for a
+ * lock to serialise, and the exemption is readable off two adjacent lines — what the statement
+ * sets, and what the predicate excludes. Measured (ADR-0023 M1-M3): an inserter waits on an
+ * uncommitted cancel and then gets its `201`; the cancel never waits on an exclusion check; the
+ * wait is one-directional, and a one-directional wait cannot cycle.
+ *
+ * F-05-1, stated where it can be read: this file now holds two write functions, one locking and
+ * one not, and "correctly exempt" reads identically to "forgot the lock". This docblock is a
+ * MITIGATION ONLY IN THE SENSE THAT A COMMENT IS. The remedy is slice 06's — `lockResources`
+ * returns a branded `ResourceLock` that {@link insertAppointment} takes as a parameter, so
+ * "forgot the lock" becomes a compile error and this signature becomes one that does not ask for
+ * one. Nothing here has to change when it lands: this function already takes a plain {@link Db}
+ * and no lock, which is exactly the shape the brand leaves it in.
+ *
+ * ── ONE STATEMENT, NO GUARD, AND §2.1 NEVER ARISES ────────────────────────────────────────────
+ *
+ * There is no pre-read and no `AND status <> 'cancelled'`, so nothing here checks anything before
+ * acting: the forbidden shape has no subject. The guard is rejected on its own merits too — it
+ * returns zero rows for an ALREADY-CANCELLED row as well as for an unknown id, which is arc42
+ * §6.6's ambiguity and would answer AC-3's replay with AC-4's `404`. Unguarded, `null` means
+ * exactly one thing: no such id.
+ *
+ * ── THE `CASE`, WHICH IS AC-3 TAKEN LITERALLY ─────────────────────────────────────────────────
+ *
+ * A plain `updated_at = now()` advances the column on a replay, making a repeated cancellation a
+ * client-reachable write to a column arc42 §8.1 says the APPLICATION maintains. The `CASE` reads
+ * `status` inside the statement that writes it — the old row version, under that row's own lock —
+ * so the replay changes no column at all. It is not a check-then-act window: nothing decides
+ * WHETHER to write, only what one column is set to.
+ *
+ * The strongest TRUE claim, because `tests/integration/cancellation-releases-slot.test.ts`
+ * measures it: *changes no column* holds; *writes nothing* does not. A replay still takes the row
+ * lock and leaves a dead tuple — `xmin` advances 739 -> 740.
+ */
+export async function cancelAppointmentById(db: Db, id: string): Promise<AppointmentRow | null> {
+  const row = await db
+    .updateTable('appointment')
+    .set({
+      status: CANCELLED,
+      // Kysely renders this verbatim; `sql.lit` rather than a bound parameter so the comparison
+      // and the value written are one token apart in the statement a reader sees.
+      updated_at: sql<Date>`case when "status" = ${sql.lit(CANCELLED)} then "updated_at" else now() end`,
+    })
+    .where('id', '=', id)
+    .returning([
+      'id',
+      'dealership_id',
+      'customer_id',
+      'vehicle_id',
+      'service_type_id',
+      'technician_id',
+      'bay_id',
+      'starts_at',
+      'ends_at',
+      'status',
+    ])
+    .executeTakeFirst();
+
+  return row === undefined ? null : toAppointmentRow(row);
 }
