@@ -24,7 +24,7 @@ re-sequenced so it costs one pass rather than two.
 | **Racing moves** — ADR-0003's claim that two racing reschedules behave like two racing bookings | **Deferred to slice 07 as `A-06-3`**, argued in full there. In short: the reason given for keeping it is equally true of QS-4 and QS-5, already slice 07's and deferred without complaint, and a reason that does not distinguish its own case is not one |
 | **F-05-1 — `ResourceLock`** | **Kept, and strengthened.** ADR-0026. A third deferral is D-05-3's pattern, and slice 06 is the path it was deferred *to* |
 | **ADR-0024 — `setNotFoundHandler`, the `route-not-found` row, the hostile corpus** | **Kept, and merged into one taxonomy change.** See §2.4 |
-| **`src/domain/appointment.ts`** | **Retired, not deferred** — ADR-0025 decision 6. No destination to name because no obligation is left: §5.2's as-built cell records the retirement and its reason at step 7 |
+| **`src/domain/appointment.ts`** | **Retired, not deferred** — ADR-0025 decision 6; §5.2 records it at step 7 |
 | **The Stryker exhaustiveness disables** | **Kept.** Four comment pairs; measured effect in §2.4 |
 
 **One item was added, and it is larger than anything removed.** ADR-0003 requires that a move
@@ -67,12 +67,14 @@ mechanism:** §2 forbids a read whose answer *authorises* a write its own stalen
 This read authorises a **refusal**, touches one row by primary key, and cannot answer *"is that bay
 free"*.
 
-**Ruled consequence, recorded because a test will hit it at step 3:** a cancelled appointment moved
-to an out-of-hours slot answers `400 /problems/outside-opening-hours`, not `409` — the status guard
-lives only in the statement, so the domain rule is evaluated first. Cost if wrong: one taxonomy row
-reported in place of another on a doubly-invalid request.
+**Ruled consequence** — ADR-0025 decision 4, flagged because a test hits it at step 3. Cost if
+wrong: one taxonomy row reported in place of another on a doubly-invalid request.
 
 ### 2.2 AC-1 — the mechanism, and what makes the pass honest
+
+**AC-1's worked example is amended** (T-06-6): `PATCH` carries `startsAt` and the interval's length
+is the service type's (ADR-0025), so the *extension* could never be issued. The second move overlaps
+the first instead. What AC-1 asserts is unchanged; §10's QS-6 is corrected with it.
 
 §8.2 consequence 4 states the mechanism; slice 06 owes the level below it, because QS-11 is on this
 slice and *"it passed"* does not distinguish a working constraint from an absent one.
@@ -130,7 +132,9 @@ invariant). Both are `AFTER`: they block nothing and change no semantics.
 firings is unsound against this harness: `vitest.config.ts`'s `db` project runs six directories
 against one container on one `databaseUrl` without `fileParallelism: false`, and a statement-level
 trigger has no `NEW` to filter by id — so a concurrent file's `UPDATE` would count, flaky toward
-**false failures**. That `UPDATE` matches rows; only one issued and matching nothing records zero.
+**false failures**. That `UPDATE` matches rows. **Two record zero** — Option A's unknown id and AC-4's cancelled row
+(T-06-7) — so the residual is false-failure only, never a false pass, and a strict subset of the
+rejected predicate's. Bounded to the call under test; §11 at step 7.
 
 | Implementation | Audit rows | Verdict |
 |---|---|---|
@@ -150,9 +154,8 @@ failed attempt's `UPDATE` raises `23P01` before its row triggers fire at end of 
 then the write rolls back with the attempt's savepoint (ADR-0004). It is asserted because the loop
 is new, and the obviousness is exactly what nobody checks.
 
-Rejected, and independently confirmed by the test-engineer: `pg_stat_user_tables`, whose counters
-are table-wide and stats-collector-lagged, so it would flake against a shared container; and `xmin`,
-which advances per transaction rather than per statement and cannot count to two.
+Rejected, and independently confirmed by the test-engineer: `pg_stat_user_tables` (table-wide,
+stats-lagged, so flaky against a shared container) and `xmin` (per transaction, cannot count to two).
 
 **No new quality scenario**, recorded so the gate is not left to notice the absence: §10 has zero
 ratchet headroom (§4), AC-2 now has two executable falsifiers of its own, and QS-5 at slice 07 is
@@ -161,7 +164,7 @@ the scenario that makes *one statement* matter under concurrency.
 ### 2.4 ADR-0024's two warnings
 
 **Warning 1 — `cancel-appointment.test.ts:247`.** Routed, not fixed: the file is the
-test-engineer's under §5, and the re-derivation lands **in the same red commit**, so the assertion
+test-engineer's, and the re-derivation lands **in the same red commit**, so the assertion
 is never a merged test degraded by a later fix. What still discriminates once `setNotFoundHandler`
 exists is the `type` member, plus the control the media type used to supply for free: `POST
 /appointments/{id}/nonsense` must answer `/problems/route-not-found`, proving the cancellation route
@@ -302,7 +305,7 @@ and F-05-1 and D-05-1 struck.
   document, so the check runs over ∀operations rather than over the files someone grepped — the
   direction-of-assertion move ADR-0024's corpus makes — and *cheaper* because that document is
   generated there anyway. **Slice 10 was named at step 2 and is a tombstone** Gate D folded into 09
-  (O-42), the second routing to it after OQ-05-2: the reasoning was never at issue, only the label.
+  (O-42).
 - **T-06-5 / ADR-0028** — ADR-0026's `ResourceLock` does not prove the write runs in the lock's
   transaction, and the test-engineer's contribution is a **negative result**: no black-box test can
   observe it, because the exclusion constraint backstops correctness either way, so any test that
