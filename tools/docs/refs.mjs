@@ -32,7 +32,8 @@
  * refers to it, and flagging that would push authors to delete records rather than keep
  * them, which is the opposite of the point.
  */
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { resolve, join } from 'node:path';
 
 const flag = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i === -1 ? d : process.argv[i + 1]; };
@@ -89,6 +90,40 @@ const readAll = (dir, filter = () => true) => {
     .map((f) => ({ file: `${dir.split('/').pop()}/${f}`, text: readFileSync(join(dir, f), 'utf8') }));
 };
 
+/**
+ * A `finding.raised` record DEFINES the identifier in its own `ref` field.
+ *
+ * This was missing and the omission put two project rules in direct contradiction. The
+ * slice-00a ruling and §9 say findings live in the event log and `DEFECTS.md` is derived
+ * from it — so the log is the definition site for a finding, not a citation of one. This
+ * tool read the log only as a citation source, so the moment the orchestrator logged a
+ * finding whose ref matched the design-local shape, the finding was reported as citing
+ * itself into the void.
+ *
+ * It had gone unnoticed because the guard is PREFIX-LUCKY rather than correct: findings
+ * are logged under `T-`, `I-`, `S-`, `R-`, `O-`, `E-`, `J-`, `AB-` and `AC-`, none of which
+ * `REF` matches, and `A-` — which it does. Five architect findings under `A-04-*` were the
+ * first to collide, and they collide with a real namespace: `A-04-1` is an ASSUMPTION
+ * defined in `04-design.md`. Two conventions had quietly grown into one prefix.
+ *
+ * A log definition is strictly stronger than a design one, which is why this is a widening
+ * and not a hole. §9 makes the log append-only and CI enforces it, so a definition recorded
+ * here can never be deleted — the exact failure this whole tool exists to catch.
+ */
+export function findingsIn(logText) {
+  const defined = new Set();
+  for (const line of logText.split('\n')) {
+    if (!line.trim()) continue;
+    let record;
+    try { record = JSON.parse(line); } catch { continue; }
+    if (record?.event !== 'finding.raised') continue;
+    const ref = typeof record.ref === 'string' ? record.ref : '';
+    // Anchored, so a `ref` field that merely CONTAINS an identifier is not a definition.
+    if (new RegExp(`^${REF.source}$`).test(ref)) defined.add(ref);
+  }
+  return defined;
+}
+
 export function check({ arc42 = ARC42, adr = ADR, slices = SLICES, log = LOG } = {}) {
   const designs = readAll(slices, (f) => f.endsWith('-design.md'));
   const defined = new Set();
@@ -97,10 +132,12 @@ export function check({ arc42 = ARC42, adr = ADR, slices = SLICES, log = LOG } =
       if (DEFINITION(ref).test(d.text)) defined.add(ref);
     }
   }
+  const logText = existsSync(log) ? readFileSync(log, 'utf8') : '';
+  for (const ref of findingsIn(logText)) defined.add(ref);
 
   const citations = new Map(); // ref -> [files]
   const sources = [...readAll(arc42), ...readAll(adr)];
-  if (existsSync(log)) sources.push({ file: 'team-log/events.jsonl (append-only)', text: readFileSync(log, 'utf8') });
+  if (logText) sources.push({ file: 'team-log/events.jsonl (append-only)', text: logText });
   for (const { file, text } of sources) {
     for (const ref of text.match(REF) ?? []) {
       if (!citations.has(ref)) citations.set(ref, []);
@@ -112,20 +149,26 @@ export function check({ arc42 = ARC42, adr = ADR, slices = SLICES, log = LOG } =
   return { defined, citations, orphans, designs: designs.length };
 }
 
-const { defined, citations, orphans, designs } = check();
+// Only when RUN, not when imported. Without this the tool's own test file could not exist:
+// importing `check` executed the CLI, which called `process.exit(0)` before a single case
+// ran — a test file that reports success by never running is this project's signature
+// defect, and it would have been introduced by the tests written to prevent it.
+if (realpathSync(process.argv[1] ?? '') === realpathSync(fileURLToPath(import.meta.url))) {
+  const { defined, citations, orphans, designs } = check();
 
-if (!orphans.length) {
-  console.log(
-    `${citations.size} identifier(s) cited from arc42 and the ADRs, all defined across `
-    + `${designs} slice design(s); ${defined.size} defined in total.`,
+  if (!orphans.length) {
+    console.log(
+      `${citations.size} identifier(s) cited from arc42 and the ADRs, all defined across `
+      + `${designs} slice design(s); ${defined.size} defined in total.`,
+    );
+    process.exit(0);
+  }
+
+  for (const [ref, files] of orphans) console.log(`  ${ref}  cited by ${files.join(', ')} — defined nowhere`);
+  console.error(
+    `\n${orphans.length} citation(s) no longer resolve. Shortening a design may cut the argument `
+    + 'around a definition; it may not cut the definition out from under something that cites it. '
+    + 'Either keep the definition, or remove the citation in the same commit.',
   );
-  process.exit(0);
+  process.exit(1);
 }
-
-for (const [ref, files] of orphans) console.log(`  ${ref}  cited by ${files.join(', ')} — defined nowhere`);
-console.error(
-  `\n${orphans.length} citation(s) no longer resolve. Shortening a design may cut the argument `
-  + 'around a definition; it may not cut the definition out from under something that cites it. '
-  + 'Either keep the definition, or remove the citation in the same commit.',
-);
-process.exit(1);

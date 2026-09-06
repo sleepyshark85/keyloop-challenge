@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **135** |
-| Severity | 10 blocking · 72 major · 53 minor |
-| Verdicts | 6 narrowed · 55 accepted · 1 escalated · 10 deferred |
-| Raised by | test-engineer 32 · reviewer 28 · orchestrator 26 · implementer 23 · architect 19 · scribe 5 · human 2 |
-| Awaiting a ruling | **63** |
-| Mean escape distance | 1.60 step(s) |
+| Findings recorded | **142** |
+| Severity | 10 blocking · 77 major · 55 minor |
+| Verdicts | 6 narrowed · 56 accepted · 1 escalated · 10 deferred |
+| Raised by | test-engineer 34 · reviewer 28 · orchestrator 26 · architect 24 · implementer 23 · scribe 5 · human 2 |
+| Awaiting a ruling | **69** |
+| Mean escape distance | 1.69 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -878,6 +878,13 @@ rather than narrated.*
 | **S-03** | MINOR | 0 *(+0)* | scribe | The step-2 AGREE rounds at slices 00a, 00 and 01 produced no review.response events, so how a design was argued into shape is reconstructable but not from one event type | **open** |
 | **S-04** | MINOR | 0 *(+0)* | scribe | The project counts its own signature defect shape as five, seven, eight and nine in four different files | **open** |
 | **S-05** | MINOR | 0 *(+0)* | scribe | The video shot list is on the scribe's owned-file list and does not exist | **open** |
+| **T-04-5** | MAJOR | 3 *(+2)* | test-engineer | arc42 names the attempt cap ATTEMPT_CAP in 5.2 and BOOKING_ATTEMPT_CAP in 7 deployment env table, and does not list BOOKING_SEED at all | accepted |
+| **T-04-6** | MAJOR | 3 *(+3)* | test-engineer | A docs commit can silently disarm the red-proof discriminator: docs:check was failing at HEAD since ee868c3, which would have failed verify and made red-proof classify the red run as broken rather than as a red proof | **open** |
+| **A-04-2** | MAJOR | 4 *(+3)* | architect | ADR-0021 startup warn is R-7a stated mitigation and no test in any test-engineer-owned directory asserts it exists | **open** |
+| **A-04-3** | MINOR | 4 *(+4)* | architect | The word-budget counter ignores generated blocks, so a generated register can grow without limit and never register as pressure | **open** |
+| **A-04-4** | MAJOR | 4 *(+4)* | architect | F-04-1 third recurrence, with a second failure mode behind it: the committed baseline escapes non-ASCII codepoints, which JSON.stringify does not reproduce, so the obvious fix silently rewrites all 285 existing pins | **open** |
+| **A-04-5** | MINOR | 4 *(+4)* | architect | The drift direction is diagnostic: BOOKING_SEED reached §5.2, §6.2 and §11 R-7a and never reached §7.3 | **open** |
+| **A-04-6** | MAJOR | 4 *(+4)* | architect | ADRs that cite each other STATUS rot, and §4 immutability then freezes the rot | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -964,6 +971,42 @@ rather than narrated.*
 
 - *scenario:* Outside the README task's scope and correctly not written on the way past. A phase-6 deliverable; recorded so it is scheduled rather than discovered at the end.
 - *file:* `docs/video-shotlist.md`
+
+**T-04-5** — arc42 names the attempt cap ATTEMPT_CAP in 5.2 and BOOKING_ATTEMPT_CAP in 7 deployment env table, and does not list BOOKING_SEED at all
+
+- *scenario:* CLAUDE.md 4 resolves a slice-file-versus-arc42 disagreement by ruling arc42 wins; here arc42 disagrees with arc42, so the tie-break has nothing to break. The red does not depend on it - T-04-2 runs at the default - but the implementer loadConfig unit assertion does, and would be written against a name chosen by whichever section it read
+- *file:* `docs/arc42/05-building-blocks.md`
+- *accepted* by architect — (a), not (c) - no AC, QS or §2 clause fails either way, and ADR-0009 never named a variable at all (it says only a platform/config.ts value), so nothing is superseded. BOOKING_ATTEMPT_CAP wins, and NOT on incumbency: the unprefixed option cannot reach the consistency that is its whole argument, because BOOKING_SEED is already read at tests/support/service.ts:178, a test-engineer-owned file the architect may not edit. So the alternative does not buy one namespace, it freezes a one-of-two split permanently. Verified: zero unprefixed occurrences remain in docs/arc42, the slice design or src/. The shape-based guard was MEASURED and declined - nine backticked SHOUTING_SNAKE tokens in arc42, four of them not this service configuration (DOCKER_HOST is genuinely an env var and genuinely not part of the deployment contract), a 44 percent false-positive rate. The guard recommended instead anchors to code: set equality between env[...] keys in src/platform/config.ts and §7.3 first column
+
+**T-04-6** — A docs commit can silently disarm the red-proof discriminator: docs:check was failing at HEAD since ee868c3, which would have failed verify and made red-proof classify the red run as broken rather than as a red proof
+
+- *scenario:* 2.4 requires the red be OBSERVED. red-proof reads verify success as its precondition, so any unrelated docs staleness converts a genuine red into an unclassifiable run and the observation is lost. Repaired mechanically in a separate commit 6e5f7b5 (one derived summary line) so the red commit stayed tests-only; nothing yet PREVENTS the recurrence
+- *file:* `.github/workflows/verify.yml`
+
+**A-04-2** — ADR-0021 startup warn is R-7a stated mitigation and no test in any test-engineer-owned directory asserts it exists
+
+- *scenario:* The ADR answer to this makes ADR-0009 named risk one variable away is the startup line, and OQ-04-1 two-seed assertion. OQ-04-1 asserts the seeds; grep -rn warn tests/ returns only LOG_LEVEL fixtures and an unrelated health test. The mitigation for the risk this ADR knowingly created is unverified. Left for the reviewer at step 5 rather than raised as a DCR, because the red is committed and the implementer may still be writing it
+- *file:* `docs/adr/0021-the-booking-seed-is-overridable-by-environment.md`
+
+**A-04-3** — The word-budget counter ignores generated blocks, so a generated register can grow without limit and never register as pressure
+
+- *scenario:* Deleting four rows from §11 generated debt register freed exactly zero words. Not a defect - nobody authored those words - but anyone planning an edit against §11 remaining budget will be wrong in the same way the architect was, having budgeted 90 words of headroom and had none
+- *file:* `tools/docs/budget.mjs`
+
+**A-04-4** — F-04-1 third recurrence, with a second failure mode behind it: the committed baseline escapes non-ASCII codepoints, which JSON.stringify does not reproduce, so the obvious fix silently rewrites all 285 existing pins
+
+- *scenario:* A new ADR fails as unpinned and the message instructs a hand-edit of a file outside the architect directory. Taking the obvious route produced a 398-line diff on the exact file whose own error message says do NOT run --rebaseline, which rewrites every existing pin. Caught and rewritten as an 8-line append. The guard warns you off the dangerous command and then hands you a footgun that does the same thing
+- *file:* `tools/docs/adr-invariants.mjs`
+
+**A-04-5** — The drift direction is diagnostic: BOOKING_SEED reached §5.2, §6.2 and §11 R-7a and never reached §7.3
+
+- *scenario:* §7.3 is the only one of those nobody opens during a slice. It is the deployment contract, and contracts nobody edits are exactly the ones that decay unnoticed. Generalises past environment variables and is the argument for anchoring the recommended guard to code rather than to prose
+- *file:* `docs/arc42/07-deployment-view.md`
+
+**A-04-6** — ADRs that cite each other STATUS rot, and §4 immutability then freezes the rot
+
+- *scenario:* ADR-0019 option-A analysis read ADR-0018 is proposed, and a merge does not rule it - a claim the same commit falsified. Removed while 0019 was still amendable. Had 0019 been accepted a week earlier that sentence would now be permanent and false. The rule: cite the DECISION, never the status
+- *file:* `docs/adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md`
 
 </details>
 
