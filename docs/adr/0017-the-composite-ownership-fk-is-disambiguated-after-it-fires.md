@@ -7,6 +7,11 @@ supersedes: null
 superseded_by: null
 arc42: ["§5.2", "§6.1", "§6.6", "§8.6", "§11"]
 
+# Condensed 2026-09-06 under the merged-design ruling. `contested: true` because the decision rests
+# on two measurements this record is the only home for — the five inserts, and `23P01` beating
+# `23503` — and because the genuinely argued half is WHERE the disambiguation goes, not whether.
+contested: true
+
 # AI provenance — evidence for the assessment's verification criterion.
 proposed-by: architect
 decided-by: human
@@ -37,8 +42,7 @@ ai-input: >
 
 ## Context and problem statement
 
-`0003_appointment.sql` carries seven named constraints and, deliberately, exactly seven. Ownership is
-one of them:
+`0003_appointment.sql` carries seven named constraints, deliberately exactly seven. Ownership is one:
 
 ```sql
 -- A-6 / ADR-0002: the vehicle belongs to the named customer. Validation, not authorisation.
@@ -46,26 +50,17 @@ CONSTRAINT appointment_vehicle_owned_by_customer
   FOREIGN KEY (vehicle_id, customer_id) REFERENCES vehicle (id, customer_id)
 ```
 
-That composite key is elegant: it makes "this vehicle belongs to this customer" unrepresentable rather
-than checked, in the same spirit as the exclusion constraints. Slice 00's migration comment says why
-the singleton foreign keys were left out — adding them *"would make the REPORTED constraint
-non-deterministic when two are violable at once"*.
+That composite key makes *"this vehicle belongs to this customer"* unrepresentable rather than
+checked, like the exclusion constraints. Slice 00's migration says why the singleton foreign keys were
+left out: they *"would make the REPORTED constraint non-deterministic when two are violable at once"*.
 
-**§8.6 then asks that key to distinguish three things it cannot distinguish.** Two rows of the
-taxonomy sit on it:
-
-| Status | `type` | When | AC |
-|---|---|---|---|
-| `422` | `/problems/unknown-reference` | Unknown dealership, service type, customer **or vehicle**. Carries `reference` | AC-9 |
-| `422` | `/problems/vehicle-not-owned` | The vehicle is not the named customer's | AC-10 |
-
-and QS-11 requires the taxonomy to be **total and stable** — *"each is reachable and no two rows
-collide"*.
+**§8.6 then asks that key to distinguish three things it cannot** — AC-9's
+`/problems/unknown-reference` and AC-10's `/problems/vehicle-not-owned` both sit on it, and QS-11
+requires the taxonomy to be total and stable, *"each reachable and no two rows colliding"*.
 
 ### The measurement
 
-Five inserts against this repository's migrations, on `postgres:16-alpine`, reading `err.constraint`
-back:
+Five inserts against this repository's migrations, on `postgres:16-alpine`, reading `err.constraint`:
 
 | Failure | SQLSTATE | Constraint reported |
 |---|---|---|
@@ -75,28 +70,24 @@ back:
 | unknown service type | `23503` | `appointment_technician_qualified` |
 | unknown dealership | `23503` | `appointment_bay_in_dealership` |
 
-**The first three are the same error.** The `DETAIL` line differs — it names the failing key pair —
-but parsing a PostgreSQL `DETAIL` string is not a contract; it is localised, version-dependent prose,
-and building a status code on it would be worse than any option below.
+**The first three are the same error.** The `DETAIL` line differs, but it is localised,
+version-dependent prose and not a contract. So `err.constraint` suffices for `23P01` — two
+constraints, two resources — and is **insufficient for `23503`**. The decision is *what* separates
+them and, more interestingly, *where*.
 
-So: `err.constraint` is sufficient for `23P01` (two constraints, two resources, ADR-0009 prunes on it)
-and **insufficient for `23503`**. Something has to separate three failures that the database reports
-identically, and the decision is *what* and, much more interestingly, *where*.
-
-A second fact shapes the answer. Rows four and five are **unreachable through the booking path**: an
-unknown dealership yields no candidate bays and an unknown service type yields no duration, so both are
-refused before any `INSERT`. Whatever is chosen must not quietly add a third unreachable arm to a file
-that already has to account for two.
+Rows four and five are **unreachable through the booking path**: an unknown dealership yields no
+candidate bays and an unknown service type no duration. Whatever is chosen must not quietly add a
+third unreachable arm.
 
 ## Considered options
 
-- **Option A** — validate ownership with a read **before** the insert; treat any `23503` as `500`.
-- **Option B** — classify with a read **after** the insert is refused, on
-  `appointment_vehicle_owned_by_customer` only.
-- **Option C** — add singleton foreign keys on `customer_id` and `vehicle_id` so the three failures
-  report different constraint names.
-- **Option D** — collapse the two taxonomy rows: return `/problems/unknown-reference` for all three.
-- **Option E** — parse the `DETAIL` line of the PostgreSQL error.
+| | Option | Why not, in a clause |
+|---|---|---|
+| **A** | Validate ownership with a read **before** the insert; treat any `23503` as `500` | Simplest, cheapest on the failure path, and what most reviewers would write — **and it makes the composite FK's `23503` arm unreachable.** See below |
+| **B** | Classify with a read **after** the insert is refused, on `appointment_vehicle_owned_by_customer` only | **Chosen** |
+| **C** | Add singleton foreign keys on `customer_id` and `vehicle_id` so the three failures report different names | Slice 00 rejected exactly this on exactly this reasoning: an unknown customer would violate both the singleton and the composite, and which one PostgreSQL names is index order. It trades a deterministic problem (three failures, one name) for a non-deterministic one, and it is a migration in a slice whose data-model delta is otherwise zero |
+| **D** | Collapse the two taxonomy rows: return `/problems/unknown-reference` for all three | AC-10 requires `/problems/vehicle-not-owned` and acceptance criteria are the human's, so this is a scope change wearing a design decision's clothes. It also erases the identity of the rule that would become an authorisation boundary if GC-2 arrives (ADR-0002), and it degrades the API: a service advisor can act on *"that vehicle is not that customer's"* and not on *"one of these four ids is wrong"* |
+| **E** | Parse the `DETAIL` line of the PostgreSQL error | `DETAIL` is localised prose that changes with `lc_messages` and is not a documented interface. It also cannot separate the three cases — all produce the same sentence with different key values — and it would put string-parsing of driver output inside the one module this architecture asks a reviewer to trust completely |
 
 ## Decision
 
@@ -109,152 +100,64 @@ export type OwnershipVerdict = 'unknown-customer' | 'unknown-vehicle' | 'not-own
 export function classifyOwnership(db: Db, customerId: string, vehicleId: string): Promise<OwnershipVerdict>;
 ```
 
-One statement, three `EXISTS` sub-selects over `customer` and `vehicle`. It is never retried, and it
-runs on a path where an `INSERT` has already been refused.
+One statement of **two** `EXISTS` sub-selects over `customer` and `vehicle`. *(Three as first
+written; the third asked what the FK had just answered, so its only reachable value was `false` — an
+equivalent mutant. Corrected at slice 02 step 4; the count was never the decision.)* It is never
+retried, and it runs where an `INSERT` has already been refused.
 
 ### Why this is not check-then-act, stated rather than assumed
 
-`CLAUDE.md` §2.1 is NON-NEGOTIABLE and this option adds a read to the booking path, so the burden is
-on the ADR. Three properties, and all three are load-bearing:
+1. **It runs strictly after the write.** There is no window between check and act, because there is no
+   act after it. Nothing this read learns can change what was written.
+2. **Its result cannot permit anything.** `OwnershipVerdict` has three members and **none is `'ok'`**.
+   The type cannot express permission, so an edit turning this into a pre-flight gate has to change
+   the type first — visible in a diff, and failing to compile in the meantime.
+3. **It reads reference data only** — `customer` and `vehicle`, never `appointment`: exactly the
+   category ADR-0001 admits for opening hours, a static property of the request that a concurrent
+   booking cannot invalidate.
 
-1. **It runs strictly after the write.** There is no window between check and act because there is no
-   act after it — the write already happened and was already refused. Nothing this read learns can
-   change what was written.
-2. **Its result cannot permit anything.** `OwnershipVerdict` has three members and **none of them is
-   `'ok'`**. The type cannot express permission. A later edit that turns this into a pre-flight gate
-   has to change the type first, which is visible in a diff and fails to compile in the meantime.
-3. **It reads reference data only** — `customer` and `vehicle`, never `appointment`. That is exactly
-   the category ADR-0001 already admits for opening hours: a static property of the request, whose
-   answer cannot be invalidated by a concurrent booking.
-
-Contrast the forbidden shape, which fails all three: it runs *before* the write, its result *is*
-permission, and it reads the live schedule.
+The forbidden shape fails all three: it runs before the write, its result *is* permission, and it
+reads the live schedule.
 
 ### Why not before the insert, which is the tempting answer
 
-Option A is simpler, is cheaper on the failure path, and is what most reviewers would write. It is
-rejected on the strength of a precedent this project set one slice ago.
-
 > A pre-flight ownership check makes the composite FK's `23503` arm **unreachable**. The constraint
-> would still be in the schema, still be correct, and never fire — and its mutants would be
-> unkillable.
+> would still be in the schema, still be correct, never fire — and its mutants would be unkillable.
 
-That is precisely finding R-01-4 at slice 01: a correct, measured artefact (the `'24:00:00'` parser
-arm) rendered inert by the design of its consumer, whose mutants then propped up a score. ADR-0015 was
-written because the obvious remedy for a dead branch — delete it — would have been exactly wrong there.
-Writing a design that manufactures the same shape, one slice after ratifying that record, would be
-hard to defend at review and harder to defend in the retro.
+That is precisely finding R-01-4 at slice 01: a correct, measured artefact rendered inert by the
+design of its consumer, whose mutants then propped up a score. ADR-0015 exists because the obvious
+remedy for a dead branch — delete it — was exactly wrong there. Manufacturing the same shape one slice
+after ratifying that record would be hard to defend. **arc42 already says which way this goes** and
+arc42 is the source of truth: §6.6 and §8.6 both name the composite FK as the decider. This ADR adds
+the step arc42 does not name — how one constraint name becomes two problem types — and moves nothing.
 
-**arc42 already says which way this goes**, and arc42 is the source of truth (`CLAUDE.md` §4). §6.6:
-*"Vehicle not owned by the named customer | **composite FK (`23503`)** | reference data | `422`"*.
-§8.6: *"`/problems/vehicle-not-owned` | The vehicle is not the named customer's | **Composite FK,
-`23503`**"*. The FK is specified as the decider. This ADR adds the step arc42 does not currently name
-— how one constraint name becomes two problem types — and does not move the decision elsewhere.
-
-### One consequence that must be recorded because it constrains the tests
+### One consequence that constrains the tests
 
 Measured: an insert violating **both** the ownership FK and an exclusion constraint raises **`23P01`,
 not `23503`**. Exclusion constraints are enforced at index insertion during the tuple insert; the
 composite FK is an `AFTER ROW` trigger at end of statement. **The exclusion always wins.**
 
 So a contended booking for an unknown vehicle is a `409`, not a `422`. That is not a QS-11 collision —
-each failure still has exactly one status and one `type` — it is a **precedence** between two
-co-occurring failures. AC-9's and AC-10's fixtures must therefore be **uncontended**, or the contract
-test asserts on the wrong one and passes or fails for a reason unrelated to what it names.
+each failure still has one status and one `type` — it is a **precedence** between co-occurring
+failures. **AC-9's and AC-10's fixtures must therefore be uncontended**, or the contract test asserts
+on the wrong one and passes or fails for a reason unrelated to what it names.
 
 ## Consequences
 
-**Good**
+**Good.** AC-9 and AC-10 become distinguishable and QS-11 survives. The database stays the decider
+exactly as §6.6 and §8.6 specify: the classification read explains a refusal, it authorises nothing.
+The happy path pays nothing — the statement runs only after a `23503` on one constraint. The FK's arm
+stays live and its mutants killable, and `OwnershipVerdict`'s missing `'ok'` is what stops this
+becoming a pre-flight check by accretion.
 
-- AC-9 and AC-10 become distinguishable, which is the requirement, and QS-11's "no two rows collide"
-  survives.
-- The database stays the decider for ownership, exactly as §6.6 and §8.6 specify. The classification
-  read explains a refusal; it does not authorise anything.
-- The happy path pays nothing. The extra statement runs only when an insert has already failed with a
-  `23503` on one specific constraint — a client error, not a hot path.
-- The composite FK's arm stays live and its mutants stay killable, so the ownership constraint keeps
-  earning its place in the mutation report.
-- `OwnershipVerdict`'s three-member type is itself a small structural guard: the absence of `'ok'` is
-  what stops this becoming a pre-flight check by accretion.
-
-**Bad, or deferred**
-
-- **A refusal costs two round trips.** Acceptable here, deliberately: it is a `4xx` path, and §1.2
-  ranks performance last with QS-14 as the only budget, which measures the *uncontended booking*.
-- **It is a read on the booking path**, and every read on this path has to be argued about rather than
-  waved through. That cost is real and recurring — the argument above will have to be rerun by every
-  reviewer who meets this code for the first time, which is why it is written here rather than in a
-  comment.
-- **A concurrent delete between the insert and the classification** would produce a verdict describing
-  a world that has already moved on: a vehicle deleted in that window classifies as `unknown-vehicle`
-  when the real cause was `not-owned`. Both are `422`, both are client errors, and neither can produce
-  a wrong booking — but the `type` can be the less accurate of the two. Reference data is seeded and
-  not managed through the API (A-7), so the window is theoretical today; it becomes real the day a
-  reference-data API exists, and §11 should carry it.
-- The classification statement is a **fourth** place that names `customer` and `vehicle`, after the
-  migration, the schema interface and the seed loader. Nothing forces the four to agree — R-6, which
-  this slice makes live for the first time.
-
-## Pros and cons of the options
-
-### Option A — validate ownership before the insert
-
-- Good, because it is the simplest and most familiar shape, and it gives a `422` in one round trip.
-- Good, because it matches how opening hours are already handled — a validation read before the loop —
-  so it needs no new argument about §2.1.
-- Bad, because it makes the composite FK's `23503` arm unreachable, which is R-01-4's exact shape and
-  the thing ADR-0015 exists to stop being repeated.
-- Bad, because the FK would then be defence-in-depth only, and defence-in-depth that never fires is
-  indistinguishable from defence that does not work.
-- **Bad, decisively:** it moves the decision away from where arc42 §6.6 and §8.6 both put it, and
-  arc42 is the source of truth. Moving it is a supersession of those sections, not an implementation
-  choice — and it would need to be argued as one, which this option does not do.
-
-### Option B — classify after the failure
-
-- Good, for the three reasons in **Decision**: after the write, cannot permit, reference data only.
-- Good, because the FK stays live, so the constraint the migration argued for keeps doing work.
-- Good, because it costs the happy path nothing.
-- Bad, because it adds a branch to a failure path and a read that has to be justified every time
-  someone reads it.
-- Bad, because of the theoretical concurrent-delete misclassification above.
-
-### Option C — add singleton foreign keys on `customer_id` and `vehicle_id`
-
-- Good, because the database would then report three distinct constraint names and no extra read would
-  be needed at all — the most direct answer to the problem as posed.
-- Good, because it needs no application logic: `err.constraint` would map straight to a problem type.
-- Bad, because slice 00's migration explicitly rejected exactly this, on exactly this reasoning:
-  *"Adding the singleton foreign keys for tidiness would be redundant AND would make the REPORTED
-  constraint non-deterministic when two are violable at once."* An unknown customer would violate both
-  the singleton `customer_id` FK and the composite, and which one PostgreSQL names is then index
-  order — the same undefined ordering measured for the two exclusion constraints at slice 02.
-- Bad, because it is a migration in a slice whose data-model delta is otherwise zero, changing a table
-  whose constraint set was argued at length one slice ago.
-- **Bad, decisively:** it trades a deterministic problem (three failures, one name) for a
-  non-deterministic one (some failures, an unpredictable name). That is the wrong direction.
-
-### Option D — collapse the rows; return `unknown-reference` for all three
-
-- Good, because it needs no read, no branch and no ADR, and the client still gets a `422`.
-- Good, because arguably "the vehicle is not the customer's" *is* an unknown (vehicle, customer) pair.
-- **Bad, decisively:** AC-10 requires `/problems/vehicle-not-owned` and AC-9 requires
-  `/problems/unknown-reference`, and acceptance criteria are the human's. This option is a scope
-  change wearing a design decision's clothes.
-- Bad, because ADR-0002 makes the ownership rule a *named* validation failure on purpose — it is the
-  rule that would become an authorisation boundary if GC-2 ever arrives, and erasing its identity now
-  is precisely the retrofit ADR-0002 warns is not additive.
-- Bad, because it degrades the API for a service advisor, who can act on "that vehicle is not that
-  customer's" and cannot act on "one of these four ids is wrong".
-
-### Option E — parse the error's `DETAIL` line
-
-- Good, because the information genuinely is there — `Key (vehicle_id, customer_id)=(…) is not present
-  in table "vehicle"` names the failing pair — and it needs no extra round trip.
-- Bad, because `DETAIL` is localised prose. It changes with `lc_messages`, and it is not a documented
-  interface in the way SQLSTATE and `constraint` are.
-- Bad, because it still cannot separate the three cases: all three produce the same *sentence*, with
-  only the key values differing, so the parse would tell you which pair failed and not which half of
-  it was wrong.
-- **Bad, decisively:** it would put string-parsing of a driver's human-readable output inside
-  `pgError.ts`, the one module this architecture asks a reviewer to trust completely.
+**Bad, or deferred.** A refusal costs two round trips — deliberately acceptable on a `4xx` path, with
+§1.2 ranking performance last and QS-14 measuring the *uncontended* booking. It is a read on the
+booking path, so the argument above is rerun by every reviewer meeting this code, which is why it is
+written here and not in a comment. **A concurrent delete between the insert and the classification**
+would produce a verdict describing a world that has moved on: a vehicle deleted in that window
+classifies as `unknown-vehicle` when the cause was `not-owned`. Both are `422` client errors and
+neither can produce a wrong booking, but the `type` is the less accurate — theoretical while reference
+data is seeded rather than managed through the API (A-7), real the day a reference-data API exists,
+and §11 should carry it. Finally, the statement is a **fourth** place naming `customer` and `vehicle`,
+after the migration, the schema interface and the seed loader, with nothing forcing the four to
+agree — R-6, live here for the first time.
