@@ -22,12 +22,7 @@ import { checkHealth } from './application/checkHealth.js';
 import { readAppointment } from './application/readAppointment.js';
 import { buildServer } from './http/server.js';
 import { closeDb, createDb } from './persistence/db.js';
-import {
-  ConfigError,
-  DEFAULT_ATTEMPT_CAP,
-  configWarnings,
-  loadConfig,
-} from './platform/config.js';
+import { ConfigError, configWarnings, loadConfig } from './platform/config.js';
 import { createLogger } from './platform/logger.js';
 
 function loadConfigOrExit(): ReturnType<typeof loadConfig> {
@@ -64,7 +59,7 @@ const bookDeps = {
   // ADR-0021: `BOOKING_SEED`, when set, IS the seed for every request. Unset — the default and
   // the only production setting — each request draws its own.
   seed: (): number => config.bookingSeed ?? crypto.getRandomValues(new Uint32Array(1))[0] ?? 0,
-  attemptCap: DEFAULT_ATTEMPT_CAP,
+  attemptCap: config.attemptCap,
   logger,
 };
 const app = buildServer({

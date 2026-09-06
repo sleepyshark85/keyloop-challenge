@@ -27,6 +27,7 @@ describe('loadConfig', () => {
       databaseUrl: 'postgresql://keyloop:keyloop@127.0.0.1:5432/keyloop',
       port: 3000,
       logLevel: 'warn',
+      attemptCap: 16,
     });
   });
 
@@ -149,8 +150,40 @@ describe('BOOKING_SEED — ADR-0021, unset by default and announced when it is n
   });
 });
 
-describe('DEFAULT_ATTEMPT_CAP — ADR-0009\'s cap, at its shipped value', () => {
-  it('is 16', () => {
+describe('BOOKING_ATTEMPT_CAP — ADR-0009\'s cap, ADR-0022\'s name', () => {
+  it('defaults to the shipped cap when it is unset', () => {
+    expect(loadConfig(VALID).attemptCap).toBe(DEFAULT_ATTEMPT_CAP);
+    expect(loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '' }).attemptCap).toBe(DEFAULT_ATTEMPT_CAP);
+  });
+
+  it('reads an integer in range', () => {
+    expect(loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '40' }).attemptCap).toBe(40);
+    expect(loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: ' 1 ' }).attemptCap).toBe(1);
+    expect(loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '1000' }).attemptCap).toBe(1000);
+  });
+
+  it('REFUSES ZERO, and that bound is load-bearing (I-04-7)', () => {
+    // ADR-0020 puts the cap's test inside the 23P01 arm, so it is reached only after a
+    // classification: there is no refusal exit before the first attempt, and a cap of 0 would
+    // behave EXACTLY as 1. An operator setting it to zero to mean "attempt nothing" would get
+    // one attempt and a refusal, with nothing anywhere saying so.
+    expect(() => loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '0' })).toThrowError(
+      /BOOKING_ATTEMPT_CAP must be between 1 and 1000/,
+    );
+  });
+
+  it('refuses a value past the upper rail, and a malformed one', () => {
+    expect(() => loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '1001' })).toThrowError(
+      /BOOKING_ATTEMPT_CAP/,
+    );
+    for (const raw of ['sixteen', '-1', '1.5', '16 attempts']) {
+      expect(() => loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: raw }), raw).toThrowError(
+        /BOOKING_ATTEMPT_CAP must be an integer/,
+      );
+    }
+  });
+
+  it('is 16 by default — the CONSTANT, asserted unconditionally', () => {
     // Unconditional, and deliberately duplicated with the acceptance suite (I-04-7, T-04-2): the
     // loop test guards the BEHAVIOUR at the cap and this guards the CONSTANT, and they fail to
     // different regressions. A cap that quietly became 32 would still pass a test that read the
