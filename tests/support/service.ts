@@ -123,6 +123,24 @@ async function freePort(): Promise<number> {
 export async function startService(options: {
   databaseUrl: string;
   logLevel?: string;
+  /**
+   * `BOOKING_SEED` — ADR-0021, granted at slice 04 step 2 (objection T-04-1).
+   *
+   * Unset is the default and the only production setting: every request draws its own seed.
+   * Set, every request in the spawned process uses THIS one, which is what makes AC-5's
+   * "the same seed, the same choices" assertable end to end rather than only over the pure
+   * ordering function.
+   *
+   * IT MUST NOT BE SET IN A CONCURRENCY CASE. A constant seed gives every racer the same
+   * permutation, which IS ADR-0009's Order-A — the degeneracy the shuffle exists to remove —
+   * so setting it in QS-3 would make the scenario that proves the shuffle spreads contention
+   * test the opposite. `tests/concurrency/no-spurious-refusal.test.ts` passes nothing here.
+   *
+   * NARROW ON PURPOSE. This is not a general `env` escape hatch: a helper that forwarded an
+   * arbitrary environment would let a later test override `DATABASE_URL` or `NODE_ENV` from a
+   * call site, and the harness's job is to make the spawned artifact the shipped one.
+   */
+  bookingSeed?: number;
 }): Promise<StartAttempt> {
   const cwd = process.cwd();
   const entrypoint = resolve(cwd, ENTRYPOINT);
@@ -134,6 +152,7 @@ export async function startService(options: {
     `  cwd          ${cwd}`,
     `  PORT         ${port}`,
     `  DATABASE_URL ${options.databaseUrl}`,
+    `  BOOKING_SEED ${options.bookingSeed === undefined ? '(unset — a seed per request)' : String(options.bookingSeed)}`,
     `  entrypoint   ${entrypoint} (${existsSync(entrypoint) ? 'exists' : 'DOES NOT EXIST'})`,
   ].join('\n');
 
@@ -151,6 +170,12 @@ export async function startService(options: {
         PORT: String(port),
         LOG_LEVEL: options.logLevel ?? 'silent',
         NODE_ENV: 'test',
+        // Spread rather than `BOOKING_SEED: undefined`: `spawn` renders an undefined value
+        // as the literal string "undefined" on some platforms, and "unset" is a distinct
+        // configuration from "set to garbage" — ADR-0021 turns on exactly that difference.
+        ...(options.bookingSeed === undefined
+          ? {}
+          : { BOOKING_SEED: String(options.bookingSeed) }),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

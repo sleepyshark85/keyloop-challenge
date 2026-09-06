@@ -515,3 +515,135 @@ export function describeServiceOutput(service: StartedService): string {
           .join('\n');
   return `  stdout\n${indent(stdout)}\n  stderr\n${indent(stderr)}`;
 }
+
+// ─────────────────────────────────────────── slice 04: the refusal line, and the fixtures ──
+
+/**
+ * The `booking.refused` records of `docs/slices/04-design.md` §4 — one structured line at
+ * EACH of the loop's two refusal exits, carrying `exit`, `resource`, `attempts` and `seed`.
+ *
+ * It is the only observation that distinguishes AC-4's two exits. Both render identically at
+ * the HTTP edge on purpose — `exhausted` and `capped` are both `409 /problems/no-capacity`
+ * carrying the same `resource`, and arc42 §8.6 gains no row for the second — so the response
+ * cannot tell them apart and neither can the table. §4 puts the difference on stdout, which
+ * is the third and last thing an outside-in test may read (I-02-6).
+ *
+ * `attempts` and `seed` are left `unknown` rather than coerced: a MISSING field must fail an
+ * assertion with "undefined" in the message, not be silently rendered as the string
+ * "undefined" and compared against a number that never matches for a second reason.
+ */
+export const BOOKING_REFUSED_EVENT = 'booking.refused';
+
+export interface RefusalRecord {
+  /** `'exhausted'` — a candidate list emptied — or `'capped'` — ADR-0009's attempt cap. */
+  readonly exit: string;
+  readonly resource: string;
+  readonly attempts: unknown;
+  readonly seed: unknown;
+}
+
+export function refusalRecords(
+  records: readonly Record<string, unknown>[],
+): readonly RefusalRecord[] {
+  const out: RefusalRecord[] = [];
+  for (const record of records) {
+    const named =
+      record['event'] === BOOKING_REFUSED_EVENT || record['msg'] === BOOKING_REFUSED_EVENT;
+    if (!named) continue;
+    out.push({
+      exit: String(record['exit']),
+      resource: String(record['resource']),
+      attempts: record['attempts'],
+      seed: record['seed'],
+    });
+  }
+  return out;
+}
+
+/** Both slice-04 log shapes, rendered for a failure message. */
+export function describeLoopLines(records: readonly Record<string, unknown>[]): string {
+  const conflicts = conflictRecords(records);
+  const refusals = refusalRecords(records);
+  return [
+    `  booking.conflict (${String(conflicts.length)})`,
+    ...conflicts.map(
+      (c, i) =>
+        `      [${String(i)}] attempt=${String(c.attempt)} constraint=${c.constraint} resource=${c.resource}`,
+    ),
+    `  booking.refused (${String(refusals.length)})`,
+    ...refusals.map(
+      (r, i) =>
+        `      [${String(i)}] exit=${r.exit} resource=${r.resource} attempts=${String(r.attempts)} seed=${String(r.seed)}`,
+    ),
+  ].join('\n');
+}
+
+/**
+ * Every non-cancelled `appointment` row in one dealership overlapping `[startsAt, endsAt)`.
+ *
+ * QS-3 is a claim about a DEALERSHIP's capacity, not about one bay, so it is counted here
+ * over the whole subtree and the range predicate is the exclusion constraint's own `&&`.
+ * Counting rows with an EQUAL interval would pass over a system that booked `min(N, M)`
+ * overlapping-but-unequal appointments, which is the defect §2.1 makes unrepresentable.
+ */
+export async function confirmedOverlapping(
+  client: Client,
+  dealershipId: string,
+  startsAt: Date,
+  endsAt: Date,
+): Promise<readonly StoredAppointment[]> {
+  const { rows } = await client.query<Record<string, unknown>>(
+    `${SELECT_APPOINTMENT}
+      where dealership_id = $1
+        and status <> 'cancelled'
+        and tstzrange(starts_at, ends_at) && tstzrange($2, $3)
+      order by starts_at, id`,
+    [dealershipId, startsAt.toISOString(), endsAt.toISOString()],
+  );
+  return rows.map(toStored);
+}
+
+/**
+ * Occupy `count` (bay[i], technician[i]) pairs over one interval, i ascending.
+ *
+ * THE STRUCTURAL FACT THIS ENCODES, and it is why slice 04's fixtures are shaped the way
+ * they are (ADR-0021, "Context"): `appointment` carries an exclusion constraint on BOTH
+ * `bay_id` and `technician_id`, plus the two dealership foreign keys. So an appointment that
+ * blocks a technician necessarily blocks a bay at the same dealership, and **blocking K
+ * technicians costs K bays**. A fixture cannot make technicians scarce without making that
+ * many bays scarce too, and resources cannot be borrowed from a neighbouring dealership.
+ *
+ * Every blocking row uses customer 0's vehicle. There is no exclusion constraint on
+ * `vehicle_id` (arc42 §8.2 names exactly two), so seventeen of them over disjoint bays at one
+ * interval is representable — and the alternative, seventeen customers, would make the
+ * fixture larger for no assertion's sake.
+ */
+export async function blockPairs(
+  client: Client,
+  scenario: Scenario,
+  count: number,
+  startsAt: Date,
+  endsAt: Date,
+): Promise<readonly string[]> {
+  const blocked: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const bayId = scenario.bayIds[i];
+    const technicianId = scenario.technicianIds[i];
+    if (bayId === undefined || technicianId === undefined) {
+      throw new Error(
+        `blockPairs(${String(count)}) needs ${String(count)} bays and ${String(count)} technicians; ` +
+          `the scenario has ${String(scenario.bayIds.length)} and ${String(scenario.technicianIds.length)}`,
+      );
+    }
+    blocked.push(
+      await occupy(client, scenario, {
+        label: `pair-${String(i).padStart(3, '0')}`,
+        bayId,
+        technicianId,
+        startsAt,
+        endsAt,
+      }),
+    );
+  }
+  return blocked;
+}
