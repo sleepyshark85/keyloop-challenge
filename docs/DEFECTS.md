@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **267** |
-| Severity | 12 blocking · 140 major · 115 minor |
-| Verdicts | 17 narrowed · 90 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 60 · reviewer 60 · architect 49 · orchestrator 47 · implementer 44 · scribe 5 · human 2 |
-| Awaiting a ruling | **134** |
-| Mean escape distance | 1.73 step(s) |
+| Findings recorded | **269** |
+| Severity | 12 blocking · 141 major · 116 minor |
+| Verdicts | 18 narrowed · 93 accepted · 3 escalated · 23 deferred · 1 rejected |
+| Raised by | test-engineer 60 · reviewer 60 · architect 49 · orchestrator 49 · implementer 44 · scribe 5 · human 2 |
+| Awaiting a ruling | **131** |
+| Mean escape distance | 1.72 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1710,17 +1710,19 @@ rather than narrated.*
 | **O-51** | MAJOR | 3 *(+0)* | orchestrator | Three of the four acceptance criteria PASSED at the red commit, so only AC-4 is driven by this slice and the other three have never been observed failing | **open** |
 | **I-07-4** | MINOR | 4 *(+2)* | implementer | The change is 105 src/ lines against the implementer own 22-to-26 estimate, and the overage is almost entirely the docblock work the dispatch asked for | **open** |
 | **I-07-5** | MINOR | 4 *(+4)* | implementer | A pre-existing booking-only concurrency test failed once on a full-suite run and passed clean in isolation | **open** |
-| **R-07-1** | MAJOR | 5 *(+1)* | reviewer | ADR-0030 leave pair is read OUTSIDE the transaction and never re-validated, so a concurrent reschedule of the same appointment locks a pair the row no longer occupies and vacates one it never locked — breaking ADR-0030 own rule on the very path it was written for | **open** |
-| **R-07-2** | MAJOR | 5 *(+1)* | reviewer | The docblock calls a FALSE statement the load-bearing symmetry, and this slice OWN AC-4 fixture falsifies it | **open** |
+| **R-07-1** | MAJOR | 5 *(+1)* | reviewer | ADR-0030 leave pair is read OUTSIDE the transaction and never re-validated, so a concurrent reschedule of the same appointment locks a pair the row no longer occupies and vacates one it never locked — breaking ADR-0030 own rule on the very path it was written for | accepted |
+| **R-07-2** | MAJOR | 5 *(+1)* | reviewer | The docblock calls a FALSE statement the load-bearing symmetry, and this slice OWN AC-4 fixture falsifies it | accepted |
 | **R-07-3** | MAJOR | 5 *(+2)* | reviewer | succeededCount is computed and never asserted, so the file header structural claim that neither move can ever succeed is ARGUED AND NOT MEASURED | **open** |
-| **R-07-4** | MAJOR | 5 *(+2)* | reviewer | AC-4 releases 40 concurrent requests against a 10-client pool with a 1000ms acquire bound, 40 times, and reports the resulting 500 as a deadlock it is not | **open** |
+| **R-07-4** | MAJOR | 5 *(+2)* | reviewer | AC-4 releases 40 concurrent requests against a 10-client pool with a 1000ms acquire bound, 40 times, and reports the resulting 500 as a deadlock it is not | narrowed |
 | **R-07-5** | MINOR | 5 *(+2)* | reviewer | The positive witness asserts a MAXIMUM and a FLOOR while the file and the step-3 report claim ALL 1600 movers reach attempt 2 | **open** |
 | **R-07-6** | MINOR | 5 *(+2)* | reviewer | The 0.034 percent false-pass figure is a POINT ESTIMATE that propagates no uncertainty in p, and p is machine-dependent and unmeasured on the machine that runs the test | **open** |
-| **R-07-7** | MINOR | 5 *(+5)* | reviewer | RESOURCE_BY_CONSTRAINT lookup reaches Object.prototype, so classify can mint a resource for a constraint the map does not define — contradicting the invariant pgError.test.ts:55 asserts | **open** |
+| **R-07-7** | MINOR | 5 *(+5)* | reviewer | RESOURCE_BY_CONSTRAINT lookup reaches Object.prototype, so classify can mint a resource for a constraint the map does not define — contradicting the invariant pgError.test.ts:55 asserts | accepted |
 | **R-07-8** | MINOR | 5 *(+1)* | reviewer | A comment says a booking statement parameters are byte-for-byte what slice 06 sent and its own assertion five lines below contradicts it | **open** |
 | **R-07-9** | MINOR | 5 *(+5)* | reviewer | T-07-5 SWEEP RESULT: no assertion was made vacuous by ADR-0029, but one raw-SQLSTATE check has ALWAYS been half-blind for a different reason | **open** |
-| **R-07-10** | MINOR | 5 *(+4)* | reviewer | O-44 and O-50 entered this branch as a slice:check guard and appear in no acceptance criterion, no inherits ref and no In-scope bullet of slice 07 | **open** |
+| **R-07-10** | MINOR | 5 *(+4)* | reviewer | O-44 and O-50 entered this branch as a slice:check guard and appear in no acceptance criterion, no inherits ref and no In-scope bullet of slice 07 | rejected |
 | **R-07-11** | MINOR | 5 *(+2)* | reviewer | service.logRecords() is read with no drain wait, unlike no-spurious-refusal awaitLogRecords, so the final trials lines may not be in the buffer yet | **open** |
+| **O-52** | MINOR | 5 *(+0)* | orchestrator | A commit message on the pushed branch lost a word to shell interpolation, and the correction is appended rather than amended | **open** |
+| **O-53** | MAJOR | 5 *(+0)* | orchestrator | D-07-1 was routed to SLICE 11, a tombstone Gate D folded into 09 — the THIRD routing to a folded slice, and the second by the same role | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1794,11 +1796,13 @@ rather than narrated.*
 
 - *scenario:* Two PATCHes of appointment A, at bay0 and tech0, arrive together. BOTH read existing on the pool at :121 and set incumbent to (bay0, tech0). Request 1 wins the advisory locks and commits a move to (bay1, tech1). Request 2 then runs attempt 1 with take = leave = (bay0, tech0) — two keys — and rescheduleAppointmentById guards only on id and status = confirmed at appointmentRepository.ts:424-425, SO ITS UPDATE SUCCEEDS AND VACATES bay1 AND tech1 INDEX ENTRY WHILE HOLDING NO LOCK ON EITHER. A booking contending bay1 waits on that entry, request 2 waits on the booking, 40P01 and a 500. THE DOCBLOCK JUSTIFICATION IS THE TELL: incumbent is CONSTANT across every attempt, because every prior attempt aborted — TRUE OF ONE REQUEST ATTEMPTS AND SILENT ABOUT A SECOND REQUEST COMMIT. That is the same shape as the slice-06 discharge ruling this slice exists to correct: a statement true within one transaction offered as though it were true across them.
 - *file:* `src/application/rescheduleAppointment.ts`
+- *accepted* by architect — UPHELD, AND IT IS AGAINST THE DESIGN RATHER THAN THE BUILD. THIRD OCCURRENCE OF ONE SHAPE, named as such: the slice-06 discharge ruling, ADR-0030 symmetry claim, and this — EACH STATES SOMETHING TRUE WITHIN ONE TRANSACTION AS THOUGH IT WERE TRUE ACROSS THEM. The diagnosis of the premise is accepted in full. THE SKETCHED DEADLOCK CHAIN IS NOT ACCEPTED: one stale mover plus a booking CANNOT close, because a transaction only tuple-waits inside its own take pair scope and every path that locks what it is in flight against is already queued behind that pair advisory lock. TWO STALE MOVERS CLOSE IT, one per edge — T moves A at bay2/tech1, read as bay9/tech9, to bay0/tech0; T-prime moves A-prime at bay0/tech3, read as bay8/tech8, to bay2/tech2; advisory sets disjoint, both reach their writes, each waits on the other xmax, 40P01. That construction is written into ADR-0031 BECAUSE A REVIEWER RIGHT FOR THE WRONG REASON SHOULD BE TOLD WHICH HALF WAS WHICH. Remedy: ADR-0031, lockAppointmentRow reads the vacated pair INSIDE the transaction under the row own FOR UPDATE lock. Cost against ADR-0027 ordering: NONE — correctness needs leave current, not take; attempt 1 still coincides and dedupes to two keys in the common case, and where the row moved underneath it locks four instead of two, bounded and rare and correct. One extra statement per attempt; bookings untouched.
 
 **R-07-2** — The docblock calls a FALSE statement the load-bearing symmetry, and this slice OWN AC-4 fixture falsifies it
 
 - *scenario:* At AC-4 attempt 2, mover A sends take (bay1, tA) and leave (bay0, tA), giving keys bay0, bay1, tA; mover B sends take (bay0, tB) and leave (bay1, tB), giving bay0, bay1, tB. THOSE ARE NOT THE SAME MULTISET — yet the test header calls this fixture the mutual cross-vacate ADR-0030 measurement is built on. The claim holds ONLY for a full-pair swap, which is the ADR own fixture. NO BEHAVIOUR IS WRONG: the total order on (cl, hashtext(key)) is what prevents the cycle and the docblock states that too. But a reader who believed the symmetry were load-bearing WOULD CONCLUDE THE ORDER BY IS REMOVABLE FOR SYMMETRIC CASES AND THAT AN ASYMMETRIC MUTUAL VACATE LIKE AC-4 IS UNPROTECTED. Both conclusions are wrong. appointmentRepository.test.ts:110 asserts the same over-general claim in its test name from a full-pair-swap instance. THE ORCHESTRATOR CARRIED THIS CLAIM INTO THE STEP-4 DISPATCH AS the load-bearing one, so it is in the dispatch record too.
 - *file:* `src/persistence/appointmentRepository.ts`
+- *accepted* by architect — UPHELD IN FULL. DEADLOCK FREEDOM RESTS ON TWO MECHANISMS AND THE DOCBLOCK COLLAPSED THEM INTO ONE: the total order makes the ADVISORY waits acyclic; ADR-0030 completeness makes the TUPLE waits acyclic. SYMMETRY IS NEITHER NECESSARY NOR SUFFICIENT FOR EITHER. The replacement docblock must state the two-key argument — a cycle needs k1 < k2 with one holder each, impossible when every transaction acquires in one globally ordered statement — that DISTINCT is over the same tuple the sort is on so no two rows tie and a hashtext collision collapses to one lock rather than an ambiguous order, that the tuple-wait half is ADR-0030 completeness now computed inside the transaction under ADR-0031, and EXPLICITLY that AC-4 fixture is NOT symmetric and is protected regardless. appointmentRepository.test.ts:110 name must stop asserting the over-general claim.
 
 **R-07-3** — succeededCount is computed and never asserted, so the file header structural claim that neither move can ever succeed is ARGUED AND NOT MEASURED
 
@@ -1809,6 +1813,7 @@ rather than narrated.*
 
 - *scenario:* releaseFromBarrier with 40 movers against createPool with NO max — pg default 10 — and CONNECTION_TIMEOUT_MS of 1000 at src/persistence/db.ts:41 and :56, on the ONE SHARED CONTAINER that 19 db-project files hit in parallel. pg-pool applies that bound to QUEUED ACQUIRES, not only new connections. A queued acquire past 1000ms rejects with a CODELESS Error, classifies as other, is rethrown and surfaces as 500 — and badAnswers then fails with 500 above all: an unresolved 40P01 surfacing at the edge WHILE deadlocks.length IS ZERO. That is TWICE the racer count of no-spurious-refusal.test.ts, the file I-07-5 reports already flaked. The reschedule.deadlock assertion is what tells the two apart, so this is a FALSE FAILURE rather than a false pass — but it is the failure that will be blamed on ADR-0030.
 - *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
+- *narrowed* by architect — UPHELD WITH THE REMEDY RE-AIMED, AND THE RE-AIMING IS THE POINT. NOT fewer racers to dodge a flake: 40 in flight against a 10-client pool does two things and THE SECOND IS WORSE — it SERIALISES THE SIMULTANEITY AC-4 MEASURES, because a pair two movers can be queued apart and never race at all. That is a likelier reading of this fixture 41 of 7800 against ADR-0030 117 of 1000 than the extra-round-trip explanation the file header gives, SO BOUNDING IN-FLIGHT REQUESTS TO THE POOL SHOULD MAKE THE MUTANT CONTROL STRONGER RATHER THAN WEAKER. AC-4 amended under mid-slice authority, provisional until the gate: at least 1000 contended attempts, in-flight requests bounded by the pool, pairs traded for trials. RE-MEASURE THE UNFIXED-BUILD RATE AT THE NEW SHAPE, AND IF IT DOES NOT RISE, SAY SO — that would falsify this reading and the low rate would need another explanation. The production half is booked as D-07-1 and NOT fixed here: createPool sets no max so pg default 10 is in force BY OMISSION, and CONNECTION_TIMEOUT_MS — decided for AC-2 unreachable database — silently ALSO bounds queue waits. ONE TIMER, TWO JOBS, ONE OF THEM CHOSEN.
 
 **R-07-5** — The positive witness asserts a MAXIMUM and a FLOOR while the file and the step-3 report claim ALL 1600 movers reach attempt 2
 
@@ -1824,6 +1829,7 @@ rather than narrated.*
 
 - *scenario:* VERIFIED BY EXECUTION rather than read: classify with code 23P01 and constraint constructor returns kind conflict with resource set to THE OBJECT CONSTRUCTOR and constraint constructor. Same for toString, valueOf, hasOwnProperty and __proto__. No live input reaches it — the migrations define only no_bay_overlap and no_technician_overlap — so this is A LATENT HOLE IN A TOTALITY CLAIM rather than a bug. Object.create(null) or Object.hasOwn closes it. Pre-existing, and noted because A-05-6 made hardening these two guards this slice OWN INHERITED OBLIGATION.
 - *file:* `src/persistence/pgError.ts`
+- *accepted* by architect — UPHELD AND IN SCOPE BY THE SLICE FILE OWN WORDS — A-05-6 said if a production change is needed, THAT IS THE FINDING, and one is. Replace the Record literal with a Map and .get(constraint). Object.hasOwn also works; the Map is preferred BECAUSE IT REMOVES THE PROTOTYPE PATH RATHER THAN GUARDING IT, which is section 2.1 own habit — make the bad state unrepresentable rather than check for it. Plus a directed unit case asserting classify with constraint constructor returns kind other.
 
 **R-07-8** — A comment says a booking statement parameters are byte-for-byte what slice 06 sent and its own assertion five lines below contradicts it
 
@@ -1839,11 +1845,22 @@ rather than narrated.*
 
 - *scenario:* grep for O-44 and O-50 across docs/slices/07 returns NOTHING. THE SLICE WHOSE READY GATE WAS STRENGTHENED BY O-41 COMPLETENESS GUARD IS ITSELF CARRYING UNDECLARED SCOPE. Orchestrator-authored, tooling-only and low risk — and the check it added is the one currently reporting the reviewer own dispatch as unaccounted. Raised against the orchestrator by the reviewer.
 - *file:* `tools/slice/check.mjs`
+- *rejected* by architect — NO DECLARATION NEEDED, AND THE BOUNDARY IS NOW WRITTEN DOWN RATHER THAN ASSUMED. PRODUCT scope is declared; REPOSITORY GOVERNANCE TOOLING IS OUT-OF-BAND — it has no acceptance criterion because THERE IS NO BEHAVIOUR TO ACCEPT, and forcing it into inherits turns front matter into a changelog of the harness. OUT-OF-BAND IS NOT UNRECORDED: it owes its own commit carrying its ref, which f757baf met, plus the log. Whether this belongs in CLAUDE.md section 10 is the GATE decision on A-06-6 ground, since the architect cannot amend the constitution by ruling.
 
 **R-07-11** — service.logRecords() is read with no drain wait, unlike no-spurious-refusal awaitLogRecords, so the final trials lines may not be in the buffer yet
 
 - *scenario:* A reschedule.deadlock emitted by trial 39 can still be in the child stdout pipe when logRecords() is called, leaving deadlocks.length at zero. The badAnswers 500 check covers it independently, so the claim survives on two observers — but the log-based assertion completeness floor has 50 PERCENT SLACK, 3200 conflicts expected against at least 1600 asserted, and the file does not say why it diverges from the drain convention.
 - *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
+
+**O-52** — A commit message on the pushed branch lost a word to shell interpolation, and the correction is appended rather than amended
+
+- *scenario:* Commit 56a7bec reads ADR-0030 s IS READ OUTSIDE THE TRANSACTION with the word missing: the message was passed with git commit -m and a double-quoted string containing backticked leave, so the shell executed it as a command substitution and dropped it. Every other commit this session used -F - with a quoted heredoc, which is immune; this one did not. NOT AMENDED, ON THE PROJECT OWN O-36 PRECEDENT: the branch is pushed and PR 16 is open, so this is an artifact under assessment, and O-36 ruled that rewriting the history of one to tidy a defect in a message is THE WORSE ACT. The correction is therefore appended here and the record reads correctly in both places — the missing word is leave, and the sentence is ADR-0030 leave IS READ OUTSIDE THE TRANSACTION AND NEVER RE-VALIDATED. The lesson is mechanical rather than judgemental: pass commit messages by heredoc, never by -m with a string that can contain backticks.
+- *file:* `docs/team-log/events.jsonl`
+
+**O-53** — D-07-1 was routed to SLICE 11, a tombstone Gate D folded into 09 — the THIRD routing to a folded slice, and the second by the same role
+
+- *scenario:* CAUGHT BY THE WRITE-PATH GUARD BUILT FOR O-42, which is the third time it has had this job and the first time it was already in place when the mistake was made. docs/slices/11-performance-budget.md carries folded_into 09, folded_at 2026-09-04, folded_by gate-D, and slice 09 declares absorbs 10 and 11. THE PRIOR TWO WERE OQ-05-2 TO SLICE 10 AND A-06-2 TO SLICE 10, the latter also the architect and also caught by this guard. THE REASONING IS NOT IN DISPUTE AND NEVER HAS BEEN in any of the three: what a saturated pool should answer, whether max becomes prefixed config, and the CONNECTION_TIMEOUT_MS double duty are genuinely performance-budget work. Only the label is stale. D-07-1 IS THEREFORE LOGGED WITH NO deferred_to, exactly as A-06-2 was, because a destination the architect did not name is not a destination and the orchestrator does not silently correct an architect ruling. THE PATTERN IS NOW THE FINDING RATHER THAN THE INSTANCE: three occurrences, one guard that catches them at the write path every time, and a folded slice that is still being reached for by its old number five days after Gate D folded it. For the gate: whether tombstone files should be RENAMED or carry a louder marker, since the evidence is that reading folded_into is not what a role does when it reaches for a slice number from memory.
+- *file:* `docs/adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md`
 
 </details>
 

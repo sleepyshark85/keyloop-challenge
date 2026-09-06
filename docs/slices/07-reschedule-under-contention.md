@@ -4,10 +4,10 @@ title: Rescheduling under contention — a refused move changes nothing, and nev
 status: ready
 depends_on: ["06"]
 arc42: ["§5.2", "§6.1", "§6.3", "§8.6", "§10", "§11"]
-adr: [3, 18, 23, 26, 27, 29, 30]
+adr: [3, 18, 23, 26, 27, 29, 30, 31]
 quality_scenarios: [QS-4, QS-5]
 inherits: ["F-02-9", "A-05-6", "A-06-3", "O-41"]   # deferred here by ruling; slice:check enforces it (A-05-5)
-loopbacks: 0
+loopbacks: 1
 ---
 
 ## Goal

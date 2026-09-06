@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| Last commit | `f63f887 test(07): A-05-6 — pgError.ts's two guards, directed; classify's stale premise corrected` |
+| Last commit | `42d9097 docs(07): AC-5 — ADR-0031 owes a control, and pg_locks is the deterministic one` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 143 |
-| ADRs accepted | 25 |
+| Agent runs recorded | 145 |
+| ADRs accepted | 26 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
@@ -141,6 +141,7 @@
 | [0028](adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | The lock carries the transaction it was taken on | proposed | — |
 | [0029](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) | A deadlock event names the write path it happened on; a conflict event does not | accepted | — |
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
+| [0031](adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md) | A move reads the pair it leaves inside its own transaction | accepted | — |
 
 ## Agent runs
 
@@ -289,7 +290,9 @@
 | 2026-09-06 18:23 | test-engineer | 37m11 | 388 / 65,103 / 45,550,489 | `derived` |
 | 2026-09-06 18:37 | implementer | 15m12 | 286 / 21,012 / 20,104,146 | `derived` |
 | 2026-09-06 19:15 | reviewer | 36m53 | 240 / 7,900 / 13,792,485 | `derived` |
-| | **total** | **5759m33** | **36,034 / 2,688,035 / 3,000,096,157** | |
+| 2026-09-06 19:28 | test-engineer | 9m44 | 170 / 22,763 / 7,156,037 | `derived` |
+| 2026-09-06 19:33 | architect | 14m58 | 148 / 19,719 / 8,107,627 | `derived` |
+| | **total** | **5784m15** | **36,352 / 2,730,517 / 3,015,359,821** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
