@@ -609,12 +609,23 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
         // trial's final lines, including a `reschedule.deadlock` this file most needs to see.
         // `no-spurious-refusal.test.ts` already adopts this convention; this file diverged
         // from it at the red commit with no stated reason, and is brought in line with it here
-        // rather than justified as an exception. The predicate waits for the `conflicts.length`
-        // floor asserted below (RACE_COUNT * TRIAL_COUNT * 2) — a bound a correct OR a
-        // defective build both owe, unlike `deadlocks.length`, which a correct build must hold
-        // at zero and so can never be the thing polled for.
+        // rather than justified as an exception.
+        //
+        // THE FLOOR IS RACE_COUNT * TRIAL_COUNT * 4, NOT * 2: on a build where neither move
+        // ever succeeds nor deadlocks (this file's own structural claim, asserted above and
+        // below), every one of the RACE_COUNT * TRIAL_COUNT * 2 attempts owes TWO
+        // booking.conflict lines — attempt 1 against its own bay's blocker, attempt 2 against
+        // the cross-vacate — so the full drain is RACE_COUNT * TRIAL_COUNT * 4 conflict lines,
+        // not the RACE_COUNT * TRIAL_COUNT * 2 the attempt-1 population alone already
+        // satisfies. Polling for only * 2 would let the predicate resolve on trial 0-38's
+        // attempt-1 lines alone and return before trial 39's attempt-2 or deadlock lines ever
+        // arrived — passing the drain call without draining the one trial R-07-11 is about. A
+        // build that regresses into deadlocks or successes never reaches * 4 (a deadlocked or
+        // successful attempt produces no attempt-2 conflict line), so that case spends the
+        // full bound as a passive wait instead — the same trade-off
+        // `no-spurious-refusal.test.ts` accepts for its own `expectedRefusals === 0` branch.
         const allRecords = await service.awaitLogRecords(
-          (rs) => conflictRecords(rs).length >= RACE_COUNT * TRIAL_COUNT * 2,
+          (rs) => conflictRecords(rs).length >= RACE_COUNT * TRIAL_COUNT * 4,
           10_000,
         );
         const conflicts = conflictRecords(allRecords);
