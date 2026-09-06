@@ -21,9 +21,9 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 |---|---|
 | Findings recorded | **205** |
 | Severity | 10 blocking · 107 major · 88 minor |
-| Verdicts | 10 narrowed · 74 accepted · 3 escalated · 14 deferred |
+| Verdicts | 10 narrowed · 77 accepted · 3 escalated · 15 deferred |
 | Raised by | test-engineer 49 · reviewer 44 · architect 38 · implementer 35 · orchestrator 32 · scribe 5 · human 2 |
-| Awaiting a ruling | **104** |
+| Awaiting a ruling | **100** |
 | Mean escape distance | 2.04 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -1180,10 +1180,10 @@ rather than narrated.*
 | **I-05-3** | MINOR | 2 *(+1)* | implementer | AC-3 binding half is unfalsifiable as scoped, by the design own argument | accepted |
 | **I-05-4** | MINOR | 2 *(+1)* | implementer | The wiring line slice 05 adds to main.ts is guarded by the acceptance test or by nothing | **open** |
 | **A-05-4** | MINOR | 2 *(+2)* | orchestrator | Two consecutive adjudication rounds have produced zero DISAGREE verdicts on findings | **open** |
-| **T-05-7** | MAJOR | 3 *(+3)* | test-engineer | AC-12, section 8.6 totality sweep, is GREEN in the same run over the very build AC-5 proves is broken | **open** |
+| **T-05-7** | MAJOR | 3 *(+3)* | test-engineer | AC-12, section 8.6 totality sweep, is GREEN in the same run over the very build AC-5 proves is broken | accepted |
 | **T-05-8** | MINOR | 3 *(+0)* | test-engineer | Two sub-assertions are green at the red and would be green over a wrong build | **open** |
 | **I-05-5** | MAJOR | 4 *(+3)* | implementer | freeResources does not exist in src/, so AC-1 named mutant is unreachable today and the design inference is not yet true of this repository | **open** |
-| **I-05-6** | MAJOR | 4 *(+4)* | implementer | AC-5 closed two of three content-type-parser holes; the third is live after this slice and is T-05-7 next instance | **open** |
+| **I-05-6** | MAJOR | 4 *(+4)* | implementer | AC-5 closed two of three content-type-parser holes; the third is live after this slice and is T-05-7 next instance | accepted |
 | **I-05-7** | MINOR | 4 *(+3)* | implementer | The cancellation route publishes two response schemas it can never produce | **open** |
 | **R-05-1** | MAJOR | 5 *(+4)* | reviewer | An accepted ADR deferral INTO this slice went unbuilt and unnoticed | accepted |
 | **R-05-2** | MAJOR | 5 *(+4)* | reviewer | Slice 05 is repeating the same mechanism prospectively: its three deferrals are recorded only in its own documents | accepted |
@@ -1191,10 +1191,10 @@ rather than narrated.*
 | **R-05-4** | MAJOR | 5 *(+4)* | reviewer | The remedy accepted for I-05-5 does not fix the sentence it was accepted to fix — the narrowed premise is also false | accepted |
 | **R-05-5** | MINOR | 5 *(+4)* | reviewer | AC-1 central failure message names a module that does not exist as the diagnosis | accepted |
 | **R-05-6** | MINOR | 5 *(+4)* | reviewer | additionalProperties false does not reject unknown body properties; Fastify removeAdditional strips them silently | **open** |
-| **R-05-7** | MAJOR | 5 *(+5)* | reviewer | problem.ts sits at exactly section 10 threshold with three survivors, and slice 06 is the slice that touches it | **open** |
+| **R-05-7** | MAJOR | 5 *(+5)* | reviewer | problem.ts sits at exactly section 10 threshold with three survivors, and slice 06 is the slice that touches it | deferred |
 | **R-05-8** | MINOR | 5 *(+5)* | reviewer | Two surviving guard mutants sit inside ADR-0016 single sanctioned cast site | **open** |
 | **T-05-9** | MINOR | 5 *(+0)* | test-engineer | A defect in the remedy itself, found by FORCING the assertion rather than reading the diff | **open** |
-| **A-05-5** | MAJOR | 5 *(+5)* | architect | ADR-0019 misidentified its own mutant, and one of slice 05 own deferral destinations was a tombstone two days before the design named it | **open** |
+| **A-05-5** | MAJOR | 5 *(+5)* | architect | ADR-0019 misidentified its own mutant, and one of slice 05 own deferral destinations was a tombstone two days before the design named it | accepted |
 | **O-36** | MAJOR | 5 *(+0)* | orchestrator | An orchestrator chore(log) commit swept another role in-flight architecture work into itself, and pathspec pinning did not prevent it | **open** |
 | **A-05-6** | MINOR | 5 *(+5)* | orchestrator | Forward debt with a named destination: two unkilled guards inside ADR-0016 sole sanctioned cast site | **open** |
 | **R-05-10** | MINOR | 5 *(+5)* | reviewer | The response-whitelist control already exists on two of three routes; GET is the sole gap and 210:19 is its residue | **open** |
@@ -1279,6 +1279,7 @@ rather than narrated.*
 
 - *scenario:* Seven rows observed, set equality satisfied, no collision — and the taxonomy totality claim passed for three slices while a live input produced 500 /problems/internal where 8.6 promises 400. THE SWEEP ONLY EVER VISITS INPUTS AN AUTHOR ENUMERATED. Raised unprompted at step 3, and it is the general form of the defect both roles found independently at step 2: a totality claim asserted over a hand-written input set is a claim about the author imagination rather than about the taxonomy.
 - *file:* `tests/contract/error-taxonomy.test.ts`
+- *accepted* by architect — ACCEPTED AND REFRAMED, by the reviewer rather than by its author. As written T-05-7 said a totality sweep over enumerated inputs is a claim about the author imagination. The reviewer established the sharper form: section 8.6 500 row is BOTH a described failure class AND an unrestricted catch-all, so the taxonomy is total BY CONSTRUCTION and the 415 case is conformant — AC-12 asserts for-all-rows there-exists-an-input while the property at risk is for-all-responses there-exists-a-row, and NO REACHABILITY SWEEP CAN FALSIFY A CATCH-ALL FITNESS. So T-05-7 as written could never block. ADR-0024 is the remedy: it replaces the catch-all with a falsifiable invariant, and QS-11 now records the direction its sweep runs. The conformance corpus that would discharge the invariant is slice 06 work, inherited there.
 
 **T-05-8** — Two sub-assertions are green at the red and would be green over a wrong build
 
@@ -1294,6 +1295,7 @@ rather than narrated.*
 
 - *scenario:* Measured on the BUILT ARTIFACT after this slice, through buildServer from dist/: POST /appointments with content-type application/xml and a body returns 500 /problems/internal. The error is FST_ERR_CTP_INVALID_MEDIA_TYPE, statusCode 415, no validation — identical shape to the two AC-5 named, falling to the same catch-all. Same for x-www-form-urlencoded and multipart/form-data. The design argument for naming by code cites 415 as a code with no 8.6 row; that is true, and the measurement shows the absence is NOT NEUTRAL — with no row it lands on 500 Anything else, precisely the inversion AC-5 exists to correct, because the client sent a header it can see and can fix and is told the system broke. The implementer did NOT widen the predicate: a 415 row is a taxonomy change the architect owns, and widening to statusCode under 500 is the move server.ts already records being deleted after mutation. It added a unit test staging a different error carrying statusCode 400 and asserting it is STILL a 500, so the predicate cannot be widened silently. Third concrete instance of T-05-7, and evidence that T-05-7 is a live defect rather than a methodological worry.
 - *file:* `src/http/server.ts`
+- *accepted* by architect — ACCEPTED. Section 8.6 as-built now describes TODAY code rather than ADR-0024 future: application/xml renders 500 because a status with no row falls to the RESIDUAL rather than being refused by it, and the 400 malformed-request row Decided-by column was wrong as built. The implementer restraint was correct and is on the record — it did not widen the predicate to reach 415, because a 415 row is a taxonomy change the architect owns, and it added a unit test asserting a statusCode-400 error is STILL a 500 so the predicate cannot be widened silently. The 415 row itself lands with ADR-0024 at slice 06.
 
 **I-05-7** — The cancellation route publishes two response schemas it can never produce
 
@@ -1339,6 +1341,7 @@ rather than narrated.*
 
 - *scenario:* 75.00 against a threshold of 0.75 — ONE SURVIVOR AWAY from failing the Definition of Done on any slice that changes it. Out of scope for slice 05, which does not touch it, but it is the module the entire section 8.6 taxonomy renders through and slice 06 extends that taxonomy with /problems/appointment-not-confirmed. Found only because the reviewer re-ran the full suite to check its own provenance caveat rather than reading the scoped report.
 - *file:* `src/http/problem.ts`
+- *deferred* by architect — ROUTED TO SLICE 06 AS A NAMED WARNING RATHER THAN A SURPRISE, which is R-05-2 practice applied. problem.ts sits at exactly 0.75 with three survivors — one away from failing the Definition of Done — and slice 06 changes it twice, extending the taxonomy with /problems/appointment-not-confirmed and /problems/route-not-found. Written into slice 06 file. This satisfies ADR-0019 properly: slice 06 is where the work is cheaper, because the module is being opened there anyway.
 
 **R-05-8** — Two surviving guard mutants sit inside ADR-0016 single sanctioned cast site
 
@@ -1354,6 +1357,7 @@ rather than narrated.*
 
 - *scenario:* Section 2.6 argued from the status union, whose three mutants at line 111 are all KILLED; what actually survives is the whole response map, which the producibility of cancelled never reached. So the criterion is 1-for-2 on OUTCOMES and 0-for-2 on PREMISES. Worse, and this is the strongest available evidence that the criterion is unenforced rather than wrong: slice 05 deferred OQ-05-2 to SLICE 10, which has been a TOMBSTONE since 2026-09-04, folded into slice 09 at gate D — two days BEFORE slice 05 design named it as the slice that makes the work cheaper or stronger. The orchestrator grep read the silence at slice 10 as not-written-into-the-target; the fact underneath is that the target does not exist. Re-routed to slice 09. Slice 08 inherited item is also sharper than what was deferred: its advisory pre-filter makes the candidate path read appointment, which DELETES AC-1 second ground, because a 201 after a cancel could then come from a changed candidate order — so slice 08 owes AC-1 a RE-DERIVATION rather than a deletion.
 - *file:* `docs/adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md`
+- *accepted* by architect — ACCEPTED, and the reviewer corrected it UPWARD to 0-for-3 on premises. The criterion is ruled SOUND and the ENFORCEMENT MISSING. All three of slice 05 deferrals are now written into their destination files, and the enforcement check is specified in four parts for the orchestrator: deferred_to on every deferred ruling; an inherits list in each slice front matter; slice:check failing READY when refs deferred to that id are not a subset of inherits and DONE when an inherited ref has no ruling in that slice spans; and docs:adr-check refusing an ADR whose Decision names a slice destination with no matching deferred_to event, because AN ADR MAY NEVER BE THE ONLY PLACE A DESTINATION IS RECORDED. The architect stated that if the check is not built, the honest next step is an ADR SUPERSEDING 0019 rather than a third repetition — and O-37 has since made it a fourth.
 
 **O-36** — An orchestrator chore(log) commit swept another role in-flight architecture work into itself, and pathspec pinning did not prevent it
 

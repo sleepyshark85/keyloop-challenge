@@ -1,7 +1,7 @@
 ---
 id: "05"
 title: Cancellation — and the proof at the edge that both constraints release
-status: ready
+status: done
 depends_on: ["04"]
 arc42: ["§5.2", "§6.1", "§6.4", "§6.6", "§8.6", "§10", "§11"]
                      # §6.6 and §8.6 amended at step 2; §6.1 at step 7, R-02-2 having been
