@@ -271,5 +271,15 @@
    "Option E \u2014 Test the cap inside the conflict arm, immediately after pruning"
   ],
   "decision": "Chosen option: E \u2014 the cap is tested inside the conflict arm of the classification switch, beside"
+ },
+ "0021-the-booking-seed-is-overridable-by-environment.md": {
+  "options": [
+   "Option A \u2014 No seam. Accept probabilistic coverage",
+   "Option B \u2014 BOOKINGSEED in platform/config.ts, unset by default, plus one startup warn",
+   "Option C \u2014 B, but honoured only when NODEENV=test",
+   "Option D \u2014 Carry the seed on the request \u2014 a header or a body field",
+   "Option E \u2014 Derive the seed from deps.newId(), already injected"
+  ],
+  "decision": "Chosen option: B. loadConfig reads BOOKINGSEED into bookingSeed?: number. Unset \u2014 the"
  }
 }

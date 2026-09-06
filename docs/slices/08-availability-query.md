@@ -44,8 +44,13 @@ it reports free is exactly what the constraint accepts.
 
 - **Any freshness guarantee.** §10 deliberately has no scenario for it: asserting freshness would be
   asserting the property the whole design gives up on purpose.
-- Using the query to drive allocation. A-5 fixed booking as "can I have 09:00?", not "find me
-  something Tuesday"; making availability authoritative would reintroduce check-then-act.
+- Using the query as an **authoritative** allocator — deciding from the read whether a booking may
+  proceed. A-5 fixed booking as "can I have 09:00?", not "find me something Tuesday", and making
+  availability authoritative would reintroduce check-then-act. **An advisory pre-filter on the
+  booking path's candidate list is in scope and is not that**: it changes only which candidate is
+  attempted first, every attempt is still adjudicated by the `INSERT`, a refusal still requires a
+  verdict (ADR-0016), and it is only trustworthy because AC-1's QS-8 property holds. It closes
+  **D-04-1** (slice 04) and unblocks slice 09's AC-13.
 - Deleting `docs/slices/99-availability.md`, the synthetic board fixture — that happens at phase 6.
 
 ## Definition of done
