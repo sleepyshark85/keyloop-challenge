@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **242** |
-| Severity | 11 blocking · 128 major · 103 minor |
+| Findings recorded | **243** |
+| Severity | 11 blocking · 129 major · 103 minor |
 | Verdicts | 17 narrowed · 86 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 56 · reviewer 49 · architect 47 · orchestrator 44 · implementer 39 · scribe 5 · human 2 |
-| Awaiting a ruling | **113** |
+| Raised by | test-engineer 56 · reviewer 49 · architect 47 · orchestrator 45 · implementer 39 · scribe 5 · human 2 |
+| Awaiting a ruling | **114** |
 | Mean escape distance | 1.76 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -1470,6 +1470,7 @@ rather than narrated.*
 | **O-46** | MAJOR | 5 *(+0)* | orchestrator | The implementer changed an OBSERVABLE EVENT NAME during a remediation pass scoped to killing survivors — it decided a taxonomy question rather than raising it | **open** |
 | **O-47** | MINOR | 5 *(+0)* | orchestrator | The approximately 91.3 prediction is NOW genuinely falsified, on the correct measurement rather than the suppressed one — which is the opposite of what O-45 could conclude at the time | **open** |
 | **O-48** | MINOR | 5 *(+0)* | orchestrator | The disable-next-line remedy under-covers the exhaustiveness arms by half — 8 more unkillable mutants sit on the adjacent default line | **open** |
+| **O-49** | MAJOR | 5 *(+0)* | orchestrator | An orchestrator test asserted a TRANSIENT PROJECT STATE and turned CI red when the project correctly advanced | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1681,6 +1682,11 @@ rather than narrated.*
 
 - *scenario:* The R-05-9 remedy said each arm two mutants sit on ONE line, so one disable next-line above the throw covers it. MEASURED: 8 mutants are now correctly ignored on the four throw lines, AND 8 MORE SURVIVE at L224, L263, L313 and L414 — a ConditionalExpression and a BlockStatement on each default: { line, which is the same structurally unkillable exhaustiveness construct one line up. The architect own earlier analysis said exactly this — the three survivors per arm sit on two lines, default: { carrying a ConditionalExpression and a BlockStatement, the throw carrying the template literal — and the remedy then specified a single-line directive anyway. NOT PROPOSED FOR FIXING AND DELIBERATELY SO: under-suppressing is the safe direction, the file clears 0.75 with them counted, and widening a suppression to raise a passing score is the move R-05-9 original ruling exists to prevent. Recorded so the number is understood rather than improved: of 37 survivors in that file, roughly 14 are the schema-options and description class the slice forbade disabling, 8 are these default-line twins, and the remainder are in the response-shaping region.
 - *file:* `src/http/routes/appointments.ts`
+
+**O-49** — An orchestrator test asserted a TRANSIENT PROJECT STATE and turned CI red when the project correctly advanced
+
+- *scenario:* Two cases in the A-05-5 suite read the LIVE slice 06 rather than a fixture: that it declared every ref deferred to it, and that it had NOT YET DISCHARGED THEM. The second was true when written and FALSE FOUR HOURS LATER, the moment the architect ruled F-02-9, F-05-1, R-05-7 and R-05-9 — so a correct advance of the project turned CI red on run 34043707926, on a DOCS-ONLY commit that changed no tool and no test. A TEST THAT ASSERTS A TRANSIENT PROJECT STATE IS NOT TESTING THE TOOL, IT IS PINNING THE CALENDAR. Fixed by moving both to the fixtures that already assert the same two conditions in both directions; what is kept from the live run is only that the two criteria APPEAR, which is a property of the tool and cannot go stale. Raised against the orchestrator by the orchestrator: the same suite whose docblock says every case is written in the direction that can fail contained a case that could only fail by the project succeeding. The failure was contained — the db suite and red-proof both passed on that run, so nothing about the slice code was in doubt — but it cost a red CI on a branch under review and it would have blocked the gate.
+- *file:* `tools/test/deferrals.test.mjs`
 
 </details>
 

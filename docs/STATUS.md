@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `ebb6e37 test(06): R-06-C — close 27 killable survivors, and R-06-E's event-name collision` |
+| Last commit | `cbc29e3 chore(log): the re-run settles it — 70.00 to 92.50, and 93 ignored down to 8` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
 | Agent runs recorded | 133 |
 | ADRs accepted | 23 |
