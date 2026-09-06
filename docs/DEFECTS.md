@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **191** |
-| Severity | 10 blocking · 103 major · 78 minor |
-| Verdicts | 10 narrowed · 68 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 45 · reviewer 42 · implementer 34 · architect 34 · orchestrator 29 · scribe 5 · human 2 |
-| Awaiting a ruling | **97** |
-| Mean escape distance | 1.97 step(s) |
+| Findings recorded | **194** |
+| Severity | 10 blocking · 105 major · 79 minor |
+| Verdicts | 10 narrowed · 72 accepted · 3 escalated · 13 deferred |
+| Raised by | test-engineer 45 · reviewer 42 · architect 35 · implementer 34 · orchestrator 31 · scribe 5 · human 2 |
+| Awaiting a ruling | **96** |
+| Mean escape distance | 1.99 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1185,15 +1185,18 @@ rather than narrated.*
 | **I-05-5** | MAJOR | 4 *(+3)* | implementer | freeResources does not exist in src/, so AC-1 named mutant is unreachable today and the design inference is not yet true of this repository | **open** |
 | **I-05-6** | MAJOR | 4 *(+4)* | implementer | AC-5 closed two of three content-type-parser holes; the third is live after this slice and is T-05-7 next instance | **open** |
 | **I-05-7** | MINOR | 4 *(+3)* | implementer | The cancellation route publishes two response schemas it can never produce | **open** |
-| **R-05-1** | MAJOR | 5 *(+4)* | reviewer | An accepted ADR deferral INTO this slice went unbuilt and unnoticed | **open** |
-| **R-05-2** | MAJOR | 5 *(+4)* | reviewer | Slice 05 is repeating the same mechanism prospectively: its three deferrals are recorded only in its own documents | **open** |
-| **R-05-3** | MAJOR | 5 *(+4)* | reviewer | A whole response class is outside the taxonomy, and the docblock this slice rewrote claims otherwise | **open** |
-| **R-05-4** | MAJOR | 5 *(+4)* | reviewer | The remedy accepted for I-05-5 does not fix the sentence it was accepted to fix — the narrowed premise is also false | **open** |
+| **R-05-1** | MAJOR | 5 *(+4)* | reviewer | An accepted ADR deferral INTO this slice went unbuilt and unnoticed | accepted |
+| **R-05-2** | MAJOR | 5 *(+4)* | reviewer | Slice 05 is repeating the same mechanism prospectively: its three deferrals are recorded only in its own documents | accepted |
+| **R-05-3** | MAJOR | 5 *(+4)* | reviewer | A whole response class is outside the taxonomy, and the docblock this slice rewrote claims otherwise | accepted |
+| **R-05-4** | MAJOR | 5 *(+4)* | reviewer | The remedy accepted for I-05-5 does not fix the sentence it was accepted to fix — the narrowed premise is also false | accepted |
 | **R-05-5** | MINOR | 5 *(+4)* | reviewer | AC-1 central failure message names a module that does not exist as the diagnosis | accepted |
 | **R-05-6** | MINOR | 5 *(+4)* | reviewer | additionalProperties false does not reject unknown body properties; Fastify removeAdditional strips them silently | **open** |
 | **R-05-7** | MAJOR | 5 *(+5)* | reviewer | problem.ts sits at exactly section 10 threshold with three survivors, and slice 06 is the slice that touches it | **open** |
 | **R-05-8** | MINOR | 5 *(+5)* | reviewer | Two surviving guard mutants sit inside ADR-0016 single sanctioned cast site | **open** |
 | **T-05-9** | MINOR | 5 *(+0)* | test-engineer | A defect in the remedy itself, found by FORCING the assertion rather than reading the diff | **open** |
+| **A-05-5** | MAJOR | 5 *(+5)* | architect | ADR-0019 misidentified its own mutant, and one of slice 05 own deferral destinations was a tombstone two days before the design named it | **open** |
+| **O-36** | MAJOR | 5 *(+0)* | orchestrator | An orchestrator chore(log) commit swept another role in-flight architecture work into itself, and pathspec pinning did not prevent it | **open** |
+| **A-05-6** | MINOR | 5 *(+5)* | orchestrator | Forward debt with a named destination: two unkilled guards inside ADR-0016 sole sanctioned cast site | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1290,21 +1293,25 @@ rather than narrated.*
 
 - *scenario:* ADR-0019 names slice 05 by name as the destination for R-02-2 and R-02-3 on a stated criterion, and its Consequences read: two rows in arc42 section 11 until slice 05 reaches done. Neither is mentioned in either slice-05 document; both are still deferred. The branch NEVER TOUCHES tests/integration/exclusion-constraints.test.ts — and ADR-0019 stated reason for choosing slice 05 was that it reopens that same file anyway. No file under tests/ combines a pg_advisory lock with a dropped exclusion constraint, so R-02-2 fourth cell (the lock cannot replace the constraint) is still prose. R-02-3 mutant survives in this slice own run at routes/appointments.ts:210:19, unchanged from slice 02 203:19. RESIDUE THE REVIEWER VERIFIED AND WHICH CHANGES THE REMEDY: R-02-3 is unkillable without a production change, so the right outcome is to CLOSE it with that reason rather than build it — which means ADR-0019 slice-05-makes-it-stronger premise was false for one of the two and went untested.
 - *file:* `docs/slices/05-cancellation.md`
+- *accepted* by architect — AGREE on the finding; R-02-2 and R-02-3 are BUILT IN SLICE 05 rather than deferred a fourth time. ADR-0019 cheaper premise was true of the FILE and untrue of the BRANCH: slice 05 never opened the file the ADR said it reopens anyway. At that point the ADR own criterion applies to itself — a deferral that cannot name a cheaper or stronger slice is an omission, to be built now. R-02-2 is phase 4 of the exclusion-constraint file, test-engineer owned; R-02-3 is one unit case, implementer owned. DISAGREES WITH THE REVIEWER ON R-02-3 RESIDUE AND MEASURED IT: probed against dist/ through the real buildServer, a stubbed found view carrying two extra members renders as exactly the ten schema members, and a Fastify route with NO response schema emits them — so 210:19 is killable by one unit case with NO production change, asserting a real property, that the response schema is an output whitelist rather than merely a document. Under section 6.4 the reviewer may answer once, and the orchestrator has opened that round.
 
 **R-05-2** — Slice 05 is repeating the same mechanism prospectively: its three deferrals are recorded only in its own documents
 
 - *scenario:* Slice 05 defers F-05-1 to slice 06, OQ-05-2 to slice 10, and AC-1 claim to slice 08. grep finds none of F-05-1, ResourceLock, ADR-0023, ADR-0019, OQ-05-2 or the AC-1 claim in slices 06, 10 or 08. This is the exact mechanism that lost R-02-2 and R-02-3. ADR-0019 own Consequences record the pattern that WORKS — slice 04 routed D-04-1 to slice 08 and slice 08 was amended at 4d172cc — and none of the three followed it. ADR-0019 criterion is now 0 for 2 at its first destination.
 - *file:* `docs/slices/06-reschedule-atomic-move.md`
+- *accepted* by architect — ROUTED: F-05-1 to slice 06, AC-1 second ground to slice 08, OQ-05-2 to SLICE 09 rather than the tombstoned slice 10. The criterion is ruled SOUND and the ENFORCEMENT MISSING, with the check specified in three parts for the orchestrator to build: every finding.ruled with verdict deferred carries deferred_to; each slice front matter gains inherits; and slice:check fails READY when refs deferred to that id are not a subset of inherits, and DONE when an inherited ref has no ruling in that slice spans. Plus the part that would have caught this case: docs:adr-check rejects an ADR whose Decision names a slice as a destination with no matching deferred_to event — AN ADR MAY NEVER BE THE ONLY PLACE A DESTINATION IS RECORDED. If the check is not built, the architect says the honest next step is an ADR SUPERSEDING 0019 rather than a third repetition.
 
 **R-05-3** — A whole response class is outside the taxonomy, and the docblock this slice rewrote claims otherwise
 
 - *scenario:* Measured against the real buildServer: GET /nope returns 404 application/json with NO type member at all — Fastify default not-found handler, no setNotFoundHandler registered, so it never reaches setErrorHandler. Section 8.6 opens: errors are RFC 9457 application/problem+json with a stable type per failure; section 10 indexes QS-11 as every failure has one status and one problem type. A URL typo falsifies both, and it COLLIDES ON 404 with /problems/appointment-not-found with no type to disambiguate. This slice own rewrite of the server.ts docblock asserts that section 8.6 totality IS KEPT there; there is a second exit that file does not keep.
 - *file:* `src/http/server.ts`
+- *accepted* by architect — ADR-0024. The section 8.6 500 row becomes a DESCRIBED CLASS and the residual becomes a STATED INVARIANT — every response at or above 400 is application/problem+json with a type from the closed set — which is falsifiable where a catch-all is not, and which is exactly the direction-reversal the reviewer argued for. setNotFoundHandler gains a 404 /problems/route-not-found row. Section 8.6 is corrected NOW, because arc42 overstating what the system does is a defect today. THE HANDLER ITSELF LANDS AT SLICE 06 AND NOT ON COST: cancel-appointment.test.ts:247 closes AC-4 vacuous-green trap by discriminating on the media type AND the type member, PRECISELY BECAUSE Fastify default 404 carries neither, and its comment quotes that body verbatim — so registering the handler now would BREAK THE MEDIA-TYPE HALF OF AN ASSERTION THIS SLICE COMMITTED RED, at a step with no test-engineer round left to re-derive it. Fixing a defect by silently degrading a red-committed test is the worse trade. It is also the sharpest form of the finding: a defect a test depends on.
 
 **R-05-4** — The remedy accepted for I-05-5 does not fix the sentence it was accepted to fix — the narrowed premise is also false
 
 - *scenario:* D4 clause 2 MAJOR was re-based onto: AC-1 is the sole guard on the allocator re-deriving over a cancelled row. candidateResources reads only service_bay and technician plus technician_qualification — IT NEVER READS appointment — so there is no re-derivation over a cancelled row and no two-copy seam. The severity has now been justified TWICE on premises that do not hold in this repository. What AC-1 does prove, established by the reviewer and better than either stated reason: the fixture is 1x1 so no_technician_overlap predicate must ALSO release, and slice 00 AC-4 keeps techB free deliberately so nothing else asserts the technician side behaviourally; and because the candidate list carries no availability filter it is IDENTICAL before and after the cancel, so the only thing that moved between the 409 and the 201 is the constraint verdict on ADR-0004 retry attempts. AC-1 is a proof at the edge that D1 UPDATE removes the row from BOTH constraints scope.
 - *file:* `docs/slices/05-design.md`
+- *accepted* by architect — ACCEPTED, section 1 rewritten to the reviewer account verbatim. Severity stands; the reason was wrong twice and is now measured rather than argued. The test-engineer sharpened it further: per arc42 6.5 freeResources serves GET /availability, which is slice 08 endpoint, and AC-1 never calls it — so the premise was not early but about the wrong code path.
 
 **R-05-5** — AC-1 central failure message names a module that does not exist as the diagnosis
 
@@ -1331,6 +1338,21 @@ rather than narrated.*
 
 - *scenario:* The first draft of the new failure message told the reader to consult the stored-row assertions at the END of the case. Those sit BELOW the failing line, so vitest aborts the body and they never run — a 2am reader would have been pointed at evidence that does not exist. The shipped version says so explicitly and interpolates a runnable SELECT instead. The role reported that forcing the failure is what caught it and that reading the diff would not have.
 - *file:* `tests/acceptance/cancel-appointment.test.ts`
+
+**A-05-5** — ADR-0019 misidentified its own mutant, and one of slice 05 own deferral destinations was a tombstone two days before the design named it
+
+- *scenario:* Section 2.6 argued from the status union, whose three mutants at line 111 are all KILLED; what actually survives is the whole response map, which the producibility of cancelled never reached. So the criterion is 1-for-2 on OUTCOMES and 0-for-2 on PREMISES. Worse, and this is the strongest available evidence that the criterion is unenforced rather than wrong: slice 05 deferred OQ-05-2 to SLICE 10, which has been a TOMBSTONE since 2026-09-04, folded into slice 09 at gate D — two days BEFORE slice 05 design named it as the slice that makes the work cheaper or stronger. The orchestrator grep read the silence at slice 10 as not-written-into-the-target; the fact underneath is that the target does not exist. Re-routed to slice 09. Slice 08 inherited item is also sharper than what was deferred: its advisory pre-filter makes the candidate path read appointment, which DELETES AC-1 second ground, because a 201 after a cancel could then come from a changed candidate order — so slice 08 owes AC-1 a RE-DERIVATION rather than a deletion.
+- *file:* `docs/adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md`
+
+**O-36** — An orchestrator chore(log) commit swept another role in-flight architecture work into itself, and pathspec pinning did not prevent it
+
+- *scenario:* Commit 151fa46, subject "R-05-5 fixed", contains docs/adr/0024 at 118 lines, docs/arc42/08-crosscutting-concepts.md and 40 lines of docs/slices/06 — none of it log or defect-register content, all of it the architect uncommitted work at the moment the orchestrator ran git add -A docs/. THE RULE PROTECTS THE COMMITTER, NOT THE BYSTANDER: the architect pathspec-pins every commit as required and it did not help, because a role committing docs/ broadly captures whatever another role has in the worktree. C2 is measured from git history, and that history now shows the architect ADR landing under the orchestrator name in a log commit. Raised by the architect against the orchestrator. REMEDY, applied immediately and symmetric to the existing rule: log commits pin docs/team-log/ and docs/DEFECTS.md and nothing else. History deliberately NOT rewritten — the branch is pushed with an open PR, the content is correct where it sits, and rewriting the history of an artifact under assessment to tidy an attribution error is a worse act than recording it.
+- *file:* `docs/team-log/events.jsonl`
+
+**A-05-6** — Forward debt with a named destination: two unkilled guards inside ADR-0016 sole sanctioned cast site
+
+- *scenario:* ConditionalExpression survivors at 80:9 and 103:39. The architect applied ADR-0019 properly to its own forward debt and named SLICE 07 as the destination, because that is where 23P01 classification on the UPDATE path becomes live rather than historical. Logged against that destination rather than unrouted, which is the practice R-05-2 exists to enforce.
+- *file:* `src/persistence/pgError.ts`
 
 </details>
 
