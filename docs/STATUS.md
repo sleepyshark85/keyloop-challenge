@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `70f7fa7 docs(04): slice 04 design — the capped refusal holds a verdict, measured` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process |
-| Agent runs recorded | 89 |
+| Last commit | `0e3e5d0 chore(04): step 2 AGREE — nine objections across both roles, all measured` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process |
+| Agent runs recorded | 91 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -91,6 +91,10 @@
 
 > Ruled 2026-09-06: 'make sure we have rules to always keep docs concise from now on', after noticing the new documents were as long as the ones the concision pass had shortened. O-32 measured it: 2,698 words over became 18,607 in one slice. THREE THINGS, AND ONLY THE THIRD IS NEW. (1) The ratchet, npm run docs:budget:check, in CI and test:tools - nothing grows past max(budget, current size) and a new file must meet its budget outright. (2) The rule written down in METHODOLOGY §4 as a marked source block. (3) THE RULE IS INJECTED INTO EVERY ROLE DEFINITION by tools/agents/generate.mjs, under a new '## Writing anything down' heading, from that single source. The third is the one that matters and the reason is in O-32's own history: every role that wrote a document this week learned the budget existed because the orchestrator mentioned it in a prompt. A rule delivered by briefing is a rule enforced by whoever remembers to brief it, which is the failure mode this project has catalogued seven times. Now agents:check fails if a role definition drifts from the rule, so the delivery is verified rather than intended. THE RULE PAID FOR ITSELF UNDER ITS OWN TERMS, which is the part worth keeping. Adding it pushed METHODOLOGY 148 words past its ceiling and the ratchet refused the change - the guard working on the person who built it. 44 words were recovered from genuine duplication in the same pass; the rule itself was then cut from 160 words to 135, because a rule about concision that is too long is a poor advertisement. The remaining ~91 words raised the budget 3,800 -> 3,900 WITH THE ENUMERATION STATED IN THE TOOL, which is the escape clause the rule itself prescribes: a budget is not raised to fit a document, but one that gains a rule the human just added shows the count. Rebaselining was available and was NOT used - it would have been ratcheting the wrong way.
 
+**Gate process** · 2026-09-06 · never-idle-and-decide-without-the-human
+
+> Ruled 2026-09-06: 'don't ever let the team (or you) go idle. don't wait for me for opinion if I'm not here, let the architect (or you) decide them. I will catch up later.' This EXTENDS the two standing delegations rather than replacing them: the architect already rules scope, acceptance criteria and quality goals mid-slice, and the orchestrator already holds Gate E under a mechanical bar. What is new is that NOTHING MAY BE QUEUED FOR THE HUMAN AS A REASON TO STOP - decisions previously parked for their opinion are now the architect's or the orchestrator's, and the record shows who took each. Prompted by a real failure the orchestrator caused: after slice 04's step 1 it reported 'next: step 2, both roles in parallel' and did not dispatch it, so the team sat idle between two human messages. The human noticed by asking 'anything still going on now?'. Announcing the next step is not taking it. TWO THINGS THAT DO NOT CHANGE, because the delegation is about who decides rather than about what is recorded. A gate the human did not see is still logged with actor: orchestrator and decision approved-under-delegated- authority, never actor: human. And every ruling made in their absence is still listed by slice:check at the gate, which is the whole counterweight - they catch up by reading a list rather than by being asked. IMMEDIATE EFFECT ON THE THREE ITEMS THAT WERE PARKED. ADR-0018, ADR-0019 and ADR-0020 are `proposed` and were being held for the human; ratification is the architect's to take, since §4 makes docs/adr its own and §6 gives it architecture. The orchestrator will route it rather than flipping status on the architect's files itself. AND THE IDLE CAPACITY WAS USED RATHER THAN REPORTED: the scribe had never run, README.md did not exist at all despite §4 making it a required deliverable carrying the AI Collaboration Narrative the assessment grades, and arc42 §13 was 144 words. Dispatched, on files that touch nothing slice 04 is using. Its budget was set to 1,500 words BEFORE the file existed, which is the lesson from 02-design.md reaching 13,566 and needing 12,366 cut back.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -115,6 +119,7 @@
 | [0018](adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | proposed | — |
 | [0019](adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | Defer a control only to the slice that makes it cheaper or stronger | proposed | — |
 | [0020](adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md) | Test the attempt cap inside the conflict arm, so a capped refusal still carries a database verdict | proposed | — |
+| [0021](adr/0021-the-booking-seed-is-overridable-by-environment.md) | The booking seed is overridable by environment, unset by default, and announces itself | proposed | — |
 
 ## Agent runs
 
@@ -209,7 +214,9 @@
 | 2026-09-05 22:29 | architect | 14m27 | 202 / 6,211 / 12,722,777 | `derived` |
 | 2026-09-06 02:59 | architect | 17m29 | 230 / 14,588 / 15,995,983 | `derived` |
 | 2026-09-06 05:01 | architect | 14m55 | 192 / 3,170 / 11,575,252 | `derived` |
-| | **total** | **4765m50** | **22,438 / 1,952,224 / 1,767,726,212** | |
+| 2026-09-06 05:38 | test-engineer | 7m18 | 50 / 6,685 / 1,297,597 | `derived` |
+| 2026-09-06 05:40 | implementer | 9m36 | 94 / 7,526 / 3,458,482 | `derived` |
+| | **total** | **4782m44** | **22,582 / 1,966,435 / 1,772,482,291** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

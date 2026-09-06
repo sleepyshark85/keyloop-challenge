@@ -50,6 +50,7 @@ const BASELINE = resolve(flag('baseline', 'tools/docs/budget-baseline.json'));
 // and METHODOLOGY — so the tool that enforces the concision rule could not be tested
 // without the repository leaking into the fixture, and it had no tests at all.
 const CLAUDE = resolve(flag('claude', 'CLAUDE.md'));
+const README = resolve(flag('readme', 'README.md'));
 const METHODOLOGY = resolve(flag('methodology', 'docs/METHODOLOGY.md'));
 const SLICES = resolve(flag('slices', 'docs/slices'));
 
@@ -106,6 +107,13 @@ export const BUDGETS = {
   // METHODOLOGY is the opposite case: 5,307 words, much of it restating CLAUDE.md, with a
   // unique contribution — the role model, the phase model, the reasoning behind the
   // process — that is smaller than the document.
+  // README is a deliverable for a human reader and was not surveyed at all — a gap in
+  // this tool's own coverage, found when the scribe was first dispatched to write it.
+  // 1,500 is an ESTIMATE and says so; if the narrative genuinely needs more it shows the
+  // enumeration, exactly as arc42 §8 and METHODOLOGY did. Setting it BEFORE the document
+  // exists is the whole point: 02-design.md reached 13,566 words and had to be cut by
+  // 12,366 because nothing measured it while it was being written.
+  readme: 1500,
   claude: 1500,
   // 2,500 was a guess, made from this file on the estimate that METHODOLOGY's unique
   // contribution "is smaller than the document". That was true before the pass and is
@@ -180,6 +188,7 @@ export function countWords(raw, { file = '' } = {}) {
 }
 
 function budgetFor(file, fm) {
+  if (file === 'README.md') return BUDGETS.readme;
   if (file === 'CLAUDE.md') return BUDGETS.claude;
   if (file.endsWith('METHODOLOGY.md')) return BUDGETS.methodology;
   if (file.startsWith('adr/')) return fm.contested ? BUDGETS.adrContested : BUDGETS.adr;
@@ -232,7 +241,7 @@ export function survey({ arc42 = ARC42, adr = ADR, slices = SLICES } = {}) {
   read(arc42, 'arc42');
   read(adr, 'adr');
   read(slices, 'slices');
-  for (const [path, key] of [[CLAUDE, 'CLAUDE.md'], [METHODOLOGY, 'docs/METHODOLOGY.md']]) {
+  for (const [path, key] of [[CLAUDE, 'CLAUDE.md'], [METHODOLOGY, 'docs/METHODOLOGY.md'], [README, 'README.md']]) {
     if (!existsSync(path)) continue;
     const raw = readFileSync(path, 'utf8');
     rows.push({ file: key, words: countWords(raw, { file: key }), budget: budgetFor(key, {}), contested: false });
