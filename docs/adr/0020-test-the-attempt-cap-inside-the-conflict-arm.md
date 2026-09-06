@@ -7,6 +7,13 @@ supersedes: null
 superseded_by: null
 arc42: ["§5.2", "§6.2", "§11"]
 
+# Amended at slice 04 step 2 under I-04-2, which reopened the option set and corrected the framing.
+# `contested: true` because the record is the only home for six trees' worth of `tsc` evidence and
+# for a trade-off that runs in BOTH directions — the type guarantee E buys and the structural
+# liveness bound E gives up. The 700-word version is the one whose option table has lost a row, and
+# a rejected option is the evidence that the decision was a choice.
+contested: true
+
 # AI provenance — evidence for the assessment's verification criterion.
 proposed-by: architect
 decided-by: architect
@@ -27,18 +34,15 @@ ai-input: >
 
 ## Context and problem statement
 
-ADR-0016 makes `BookOutcome`'s `no-capacity.resource` a `ContendedResource`, mintable only by
-`pgError.classify` from `err.constraint`: a capacity refusal must be *constructed from* a database
-verdict. Slice 02 shipped one refusal exit — the candidate list that emptied — and it holds a value
-the classification that emptied it minted.
-
-ADR-0009's cap of 16 adds a second exit, reached with candidates remaining. **Is a minted value in
-scope there, and if not, what does the capped refusal say?**
+ADR-0016 makes `no-capacity.resource` a `ContendedResource`, mintable only by `pgError.classify`: a
+capacity refusal must be *constructed from* a database verdict. Slice 02's one refusal exit — the
+candidate list that emptied — holds a value the classification that emptied it minted. ADR-0009's cap
+adds a second exit, reached with candidates remaining. **Is a minted value in scope there, and if
+not, what does the capped refusal say?**
 
 ## Considered options
 
-Four trees, `typescript` 6.0.3 under this repository's `compilerOptions` (`strict`,
-`noUncheckedIndexedAccess`, `noImplicitReturns`).
+Five trees, `typescript` 6.0.3 under this repository's `compilerOptions`.
 
 | | Option | `tsc` | Verdict |
 |---|---|---|---|
@@ -47,6 +51,7 @@ Four trees, `typescript` 6.0.3 under this repository's `compilerOptions` (`stric
 | **C** | B plus `'bay' as ContendedResource` to discharge the null branch | **exit 0** | Rejected. The escape hatch, landing in `src/application` — outside the one file `contended-resource-cast` permits a cast in, so the marker catches it. That it is B's path of least resistance is why B is rejected too |
 | **D** | A second `BookOutcome` variant for the capped exit, carrying no resource | — | Rejected. AC-4 fixes the client rendering at `409 /problems/no-capacity`, so this splits one §8.6 row in two and drops `resource` from one of the two refusals for no reason a client can act on |
 | **E** | **Test the cap inside the `conflict` arm**, immediately after pruning | **exit 0**, no cast | **Chosen** |
+| **F** | E **plus** a bounded `for` header with a `throw` at its tail | **exit 0**, no cast | **Chosen with E.** Raised at step 2 (I-04-2), and it exposes an assumption in A–E: the table read as though bound and placement were *alternatives*, because it assumed the tail had to return a `BookOutcome`. It only has to be **unreachable**, and a `throw` discharges `noImplicitReturns` without minting anything |
 
 ## Decision
 
@@ -57,6 +62,11 @@ the exhaustion check, and never as the loop's bound.**
 if (next === null)          return { kind: 'no-capacity', resource: o.resource, attempts, exit: 'exhausted' };
 if (attempts >= attemptCap) return { kind: 'no-capacity', resource: o.resource, attempts, exit: 'capped' };
 ```
+
+**The header carries Bound-2's bound, not the cap.** I-04-2 offered `attempts <= cap`; that states
+one number twice, and two encodings of one number drift. `bays.length + technicians.length` is a
+*structural* liveness bound doing a different job from the *policy* cap, and it leaves the tail
+unreachable because the arm's exhaustion check fires by `|B| + |T| − 1`.
 
 **The hazard dissolves rather than being conceded.** The loop `continue`s on `conflict` and returns on
 every other classification and on success, so the cap exit is reachable **only from a classification** —
@@ -72,13 +82,17 @@ stronger statement is true.
 
 ## Consequences
 
-**Good.** The most-argued sentence of ADR-0016 — *you cannot refuse a booking for capacity reasons
-without holding a value PostgreSQL produced* — survives the cap unqualified, and slice 04 adds no
-taxonomy row, no ADR-0016 exception and no cast. The guard is `tsc`, at the exact line, and
-`contended-resource-cast` stands behind it: two mechanisms in series.
+**Good.** ADR-0016's most-argued sentence — *you cannot refuse a booking for capacity reasons without
+holding a value PostgreSQL produced* — survives the cap unqualified, and slice 04 adds no taxonomy
+row, no exception and no cast. The guard is `tsc` at the exact line, with `contended-resource-cast`
+behind it: two mechanisms in series.
 
 **Bad, or deferred.** It is a **placement** rule, and nothing states it structurally: `tsc` only objects
-once someone moves the cap *and* tries to refuse from outside the arm, which is the whole failure and
-also the whole detection. §11 carries that. `exit` is a field slice 09 will duplicate as
-`booking_conflicts_total{outcome}`; it stays because the metric does not exist yet and an outside-in test
-may read only the response, the database and stdout.
+once someone moves the cap *and* tries to refuse from outside the arm. **And the guarantee is
+one-directional, which the step-1 record did not say.** Moving the cap out of the arm is loud; adding
+a retried `PgOutcome` variant — a second `continue` — leaves the loop **unbounded** with no `tsc`
+error, no test and a hang. Option A made that unrepresentable and E alone gives it up, which is why F
+is taken with E: the tail's `throw` converts that hang into a loud fault. An outside-in test cannot
+distinguish a capped refusal minted inside the arm from one cast outside it, because AC-4 requires
+both to render identically. §11 carries all of it. `exit` is a field slice 09 will duplicate as `booking_conflicts_total{outcome}`; it stays because the
+metric does not exist yet.

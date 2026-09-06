@@ -22,8 +22,8 @@ There are no other neighbours; §3.1.2 argues that omission rather than leaving 
 
 ## 5.2 Level 2 — components
 
-Whitebox of the scheduler service. Five modules, one permitted dependency direction, and a composition
-root. The direction is enforced, not described: every forbidden edge below is a rule in
+Whitebox of the scheduler service: five modules, one permitted dependency direction, a composition
+root. The direction is enforced, not described — every forbidden edge below is a rule in
 [`.dependency-cruiser.js`](../../.dependency-cruiser.js) and a CI failure (§5.3).
 
 ```
@@ -49,7 +49,7 @@ a module that cannot import a database client cannot consult one.
 | `interval.ts` *(built)* | The `Instant` and `Interval` types, `instant(epochMillis)`, `appointmentInterval(startsAt, durationMillis)`, and **`occupancyInterval(interval)` — "the interval the constraint sees"**. `instant()` refuses anything outside ±8 640 000 000 000 000 ms, so an `Instant` is renderable by construction (ADR-0014) | **A-4.** `occupancyInterval` is the identity today, which is the statement that there is no buffer. A buffer changes this function and the constraint's range expression, nothing else |
 | `duration.ts` *(built)* | The `DurationMinutes` type, `serviceDuration(serviceType)`, `durationMillis(duration)` — the only place minutes become milliseconds | **A-1.** If duration varies by vehicle this function gains a parameter; the interval arithmetic above it takes a number and does not change |
 | `openingHours.ts` *(built)* | `withinOpeningHours(startsAtMillis, endsAtMillis, ianaZone, weekly)`, returning the `OpeningHoursVerdict` union rather than a boolean. It carries the same epoch bound (ADR-0014) and normalises an end rendering as local `00:00:00` on the next date to 86 400 seconds-of-day (ADR-0015) | **ADR-0001 / GC-1.** The only place that reasons in wall-clock time (A-8). Breaks, holidays and one-off closures land here |
-| `candidates.ts` *(slice 04)* | `orderCandidates(bays, technicians, seed)` and `prune(order, resource, id)` return `CandidateOrder \| null`, where `null` *is* a list emptied; `nextCandidate(order)` is total, a `CandidateOrder` being **non-empty by construction** | **A-10 / ADR-0009.** Seeded Fisher–Yates, importing nothing, so ordering is pure in *(candidates, seed)*. `prune` takes the **unbranded** union, to which a `ContendedResource` is assignable: no cast in, nothing branded out |
+| `candidates.ts` *(slice 04)* | `orderCandidates(bays, technicians, seed)` and `prune(order, resource, id)` return `CandidateOrder \| null`, `null` *being* a list emptied; `nextCandidate(order)` is total, a `CandidateOrder` being **non-empty by construction** — both lists are `readonly [string, ...string[]]`, since a brand on the object leaves `noUncheckedIndexedAccess` in place and would merely *relocate* the assertion (I-04-3) | **A-10 / ADR-0009.** Seeded Fisher–Yates, pure and importing nothing. `prune` takes the **unbranded** union, to which a `ContendedResource` is assignable: no cast in, none out |
 | `appointment.ts` *(slice 05)* | The status model: `confirmed`/`cancelled`, and which transitions are legal | **ADR-0003.** Cancellation is terminal and idempotent; only a confirmed appointment may be moved |
 
 `occupancyInterval` deserves its name: what A-4 moves is the span the exclusion constraint compares,
@@ -59,9 +59,8 @@ between a one-function change and an archaeology exercise.
 ### `src/application` — the use cases
 
 `bookAppointment`, `readAppointment`, `rescheduleAppointment`, `cancelAppointment`,
-`queryAvailability`. This layer owns the ADR-0004 retry loop, the span boundaries of §8.4, and
-nothing else. It has no business rules of its own: every decision it makes is either delegated to
-`domain` or adjudicated by the database. `deriveInterval.ts` is §6.2 steps 3–4's composition order as
+`queryAvailability`. It owns the ADR-0004 retry loop and the span boundaries of §8.4, and has no
+business rules of its own: every decision is delegated to `domain` or adjudicated by the database. `deriveInterval.ts` is §6.2 steps 3–4's composition order as
 a pure function — no handle, no clock — so what the literal AC-6 ruling took from the type system
 (D-01-1) is held by a module Stryker can mutate without a container.
 
@@ -87,7 +86,8 @@ staying apart so the `switch` and the log line can name them apart.
 
 **One attempt is one transaction: ADR-0018's two advisory-lock acquisitions, then one `INSERT`**, so
 `db.transaction()` sits inside the loop body and nowhere outside it (§6.1). Pruning is **per resource
-value**, bounding the loop at `|bays| + |technicians| − 1` attempts rather than their product.
+value**, bounding the loop at `|bays| + |technicians| − 1` rather than their product; the loop header
+carries it, so the cap is stated once, in the arm (ADR-0020).
 
 **This layer depends on `src/persistence` concretely. There is no repository port**, and that is a
 decision rather than an omission ([ADR-0008](../adr/0008-module-decomposition.md)): a port that can be
@@ -141,10 +141,9 @@ call site rather than a serialisation failure at the client.
 
 ### `src/platform` — the leaf
 
-Config (`ATTEMPT_CAP`, ADR-0009's cap, default 16), the `pino` logger, the OpenTelemetry bootstrap and the
-metric registry. Importable by everyone, imports nothing from `src/`. That shape is also exactly the
-shape of a junk drawer; the leaf rule keeps it from acquiring behaviour, but only a reviewer keeps it
-from acquiring *contents*.
+Config (`ATTEMPT_CAP`, default 16, and `BOOKING_SEED`, unset — ADR-0009, ADR-0021), the `pino` logger, the OpenTelemetry bootstrap and the
+metric registry. Importable by everyone, imports nothing from `src/`. That shape is also a junk drawer's: the leaf rule
+keeps it from acquiring behaviour, only a reviewer from acquiring *contents*.
 
 ### `src/main.ts` — the composition root
 

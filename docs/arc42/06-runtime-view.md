@@ -132,16 +132,18 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
  │                                                           any booking, so no window
  ├─ 5. span availability.candidates
  │     candidateResources(dealership, serviceType) → bays[], technicians[]        ADVISORY
- │       reference data only; the availability filter arrives at slice 08 (§6.5)
- │       no bay ..................................... → 500  ┐ two different failures,
- │       no qualified technician ..................... → 422  ┘ and NEVER a fabricated
- │                                                              409: there is no verdict
- │                                                              to build one from (§8.6,
- │                                                              ADR-0016)
+ │       reference data only; the availability filter arrives after slice 08 (D-04-1)
  ├─ 6. orderCandidates(bays, technicians, deps.seed())       domain/candidates.ts    (ADR-0009)
- │        seeded, pure, injected — never a global RNG
+ │        seeded, pure, injected — never a global RNG; BOOKING_SEED overrides (ADR-0021)
+ │        null → THE ONLY empty-candidate branch, and it is REACHABLE:
+ │             no bay .................................. → 500  ┐ two different failures,
+ │             no qualified technician .................. → 422  ┘ and NEVER a fabricated
+ │                                                                 409 — there is no verdict
+ │                                                                 to build one from (§8.6,
+ │                                                                 ADR-0016)
  │
- └─ 7. loop: ONE transaction per attempt, NONE around the loop (ADR-0018):
+ └─ 7. for attempts = 1 .. |bays| + |technicians|   ← Bound-2's STRUCTURAL bound, not the cap
+        ONE transaction per attempt, NONE around the loop (ADR-0018):
         ┌─────────────────────────────────────────────────────────────────┐
         │ (bay, tech) = nextCandidate(set)                                │
         │ span appointment.insert                                         │
@@ -158,17 +160,23 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
         │     23503   → 422 unknown reference (never retried)             │
         │     other   → rethrow → 500                                     │
         └─────────────────────────────────────────────────────────────────┘
+        tail: UNREACHABLE — a list empties by attempt |bays| + |technicians| - 1, so the
+        arm has returned. It THROWS rather than refusing: nothing is minted there, and a
+        future retried PgOutcome variant meets a loud fault instead of a hang (ADR-0020 F).
+
         Both refusals are 409 /problems/no-capacity and both carry the resource this
         arm's own classification minted — ADR-0020: the cap is tested INSIDE the 23P01
         arm, never as the loop's bound, so no refusal exit can be reached without a
-        verdict. `exhausted` wins a tie. A non-zero "capped" in production means the
-        cap (ATTEMPT_CAP, default 16) is wrong, which is why the two are counted apart.
+        verdict. `exhausted` wins a tie. ATTEMPT_CAP's default of 16 sits BELOW the
+        bound above at §1.1 scale, which is D-04-1 — so a non-zero "capped" is expected
+        today rather than the signal ADR-0009 intended, and §11 carries it.
 ```
 
 Three details that a reviewer should check any implementation against:
 
 - **Steps 2–4 run once**, and step 6 once: the loop varies only the candidate. Opening hours and
-  reference integrity are properties of the request (ADR-0004).
+  reference integrity are properties of the request (ADR-0004). The empty-candidate answers live in
+  step 6's `null` branch rather than in front of it, so every branch on this path is reachable.
 - **`23503` is never retried.** A foreign-key violation means a bad reference (A-6), which is a client
   error and not contention. Swallowing it in the loop would turn a `422` into a `409` after sixteen
   pointless attempts.
