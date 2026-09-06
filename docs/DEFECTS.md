@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **196** |
-| Severity | 10 blocking · 105 major · 81 minor |
-| Verdicts | 10 narrowed · 72 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 45 · reviewer 44 · architect 35 · implementer 34 · orchestrator 31 · scribe 5 · human 2 |
-| Awaiting a ruling | **98** |
-| Mean escape distance | 2.02 step(s) |
+| Findings recorded | **202** |
+| Severity | 10 blocking · 106 major · 86 minor |
+| Verdicts | 10 narrowed · 72 accepted · 3 escalated · 14 deferred |
+| Raised by | test-engineer 49 · reviewer 44 · implementer 35 · architect 35 · orchestrator 32 · scribe 5 · human 2 |
+| Awaiting a ruling | **103** |
+| Mean escape distance | 2.03 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1199,6 +1199,12 @@ rather than narrated.*
 | **A-05-6** | MINOR | 5 *(+5)* | orchestrator | Forward debt with a named destination: two unkilled guards inside ADR-0016 sole sanctioned cast site | **open** |
 | **R-05-10** | MINOR | 5 *(+5)* | reviewer | The response-whitelist control already exists on two of three routes; GET is the sole gap and 210:19 is its residue | **open** |
 | **R-05-11** | MINOR | 5 *(+5)* | reviewer | ADR-0019 criterion is 0-for-3 on premises, not 0-for-2 | **open** |
+| **I-05-8** | MINOR | 5 *(+5)* | implementer | The two sibling whitelist cases carry as-unknown-as casts the widened-const form makes unnecessary | deferred |
+| **T-05-10** | MAJOR | 5 *(+5)* | test-engineer | Phase 4 closes a reading of phase 2 that nobody had closed, and it is the reading that reintroduces check-then-act | **open** |
+| **T-05-11** | MINOR | 5 *(+5)* | test-engineer | race() had no simultaneity measurement and the file headline claim rested on the word | **open** |
+| **T-05-12** | MINOR | 5 *(+0)* | test-engineer | Control 2 margin is thin and the test-engineer refused to hide it | **open** |
+| **O-37** | MINOR | 5 *(+0)* | orchestrator | The orchestrator dispatch named a file that does not have the structure it described — the same unverified-destination mechanism a third time | **open** |
+| **T-05-13** | MINOR | 5 *(+0)* | test-engineer | A defect nearly reported, checked instead, and withdrawn | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1365,6 +1371,37 @@ rather than narrated.*
 
 - *scenario:* The reviewer measured the premise directly: a cancelled view carrying exactly ten members renders BYTE-IDENTICAL under baseline and mutant, so the producibility of cancelled never touched 210:19, and the status-union mutants ADR-0019 actually argued from at 111:24, 111:38 and 111:65 are all KILLED. Then it corrected the architect upward: slice 05 own deferral named slice 10, and docs/slices/10 carries folded_into 09, folded_at 2026-09-04, folded_by gate-D — a tombstone two days before the design named it. That is the same premise failure a THIRD time, committed by the criterion own author while applying it. Its conclusion: the criterion is sound and unenforced, the enforcement spec is the remedy, and the fact that the spec is unbuilt and tools/ has no owner in this slice is the open risk rather than the criterion.
 - *file:* `docs/adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md`
+
+**I-05-8** — The two sibling whitelist cases carry as-unknown-as casts the widened-const form makes unnecessary
+
+- *scenario:* Both :422 (added this slice) and :730 reach for as unknown as CancelOutcome / BookOutcome to stage their undeclared member. The form used for R-02-3 needs neither, so those two casts are removable. The implementer left them because they touch the cancellation and POST cases rather than R-02-3, and offered it rather than doing it.
+- *file:* `tests/unit/http/appointments.test.ts`
+- *deferred* by orchestrator — DEFERRED BY THE ORCHESTRATOR, AND ADR-0019 SAYS THAT IS WRONG — recorded as an override rather than dressed up as a routing. The criterion is that a control is deferred only to a slice that makes it cheaper or stronger, and that a deferral which cannot name one IS AN OMISSION, to be built now. I cannot name one: removing two casts from tests the implementer already owns is no cheaper at slice 06 or 07 than it is today. By the criterion it should be built now. I am choosing not to, because step 5 is closed and the reviewer has approved, and widening scope after approval costs more than the casts do. That is an override of an accepted ADR by the orchestrator and it is logged as one. It is also a data point the retro should weigh: some debt genuinely has no cheaper-or-stronger destination, and ADR-0019 as written forces every such item to be built immediately or overridden — which may be the criterion working exactly as intended, or may be why it is 0-for-3 on premises.
+
+**T-05-10** — Phase 4 closes a reading of phase 2 that nobody had closed, and it is the reading that reintroduces check-then-act
+
+- *scenario:* Phase 2 twenty rows are equally consistent with: the overlap follows from the writes being UNSERIALISED, so mutual exclusion over the bay would have prevented it and the constraint is belt-and-braces. ADR-0018 own Consequences name that belief when they say a per-resource lock makes check-then-act correct rather than merely harmless. Phase 4 grants PERFECT mutual exclusion over exactly the bay — max in flight 1 against phase 2 20 — and the same twenty rows land, one at a time, with not one refusal. THE LOCK BUYS LIVENESS; ONLY THE CONSTRAINT MAKES OVERLAP UNREPRESENTABLE. Section 2.1 has never had that as measured fact.
+- *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
+
+**T-05-11** — race() had no simultaneity measurement and the file headline claim rested on the word
+
+- *scenario:* The docblock has said twenty SIMULTANEOUS inserts since slice 02 and nothing measured that they ever were — the barrier arranges it, no assertion observed it. Now recorded in every phase and ASSERTED ONLY IN PHASE 4, where 1 is the claim. The test-engineer deliberately did NOT assert it in phases 1 to 3 because the value is nondeterministic there and an assertion would trade evidence for flake, and stated explicitly that whether phases 1 to 3 should assert it is a DESIGN CALL and not its own. Routed to the architect at step 7.
+- *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
+
+**T-05-12** — Control 2 margin is thin and the test-engineer refused to hide it
+
+- *scenario:* The mutant that takes the locks and releases them before the write was caught at 2 against 1. It caught it, but only just. Reported as a caveat rather than omitted from the report.
+- *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
+
+**O-37** — The orchestrator dispatch named a file that does not have the structure it described — the same unverified-destination mechanism a third time
+
+- *scenario:* I wrote tests/integration/exclusion-constraints.test.ts, which is slice 00 file and has no phases and no race() helper. The architect ruling and docs/slices/05-cancellation.md name exclusion-constraint-adjudicates.test.ts. The test-engineer caught it only because I had told it to treat the slice file as the ruling rather than my paraphrase. Its own framing: ADR-0019 named a slice that never opened the file, and the instruction to fix that named a file that never had phases — a destination nobody verified, again. THE REMEDY IS THE SAME ENFORCEMENT CHECK R-05-2 SPECIFIES, which is mine to build and is not built.
+- *file:* `docs/team-log/prompts/s05-test-engineer-4.md`
+
+**T-05-13** — A defect nearly reported, checked instead, and withdrawn
+
+- *scenario:* The first captured run showed phase 1 with 19 x 23P01 and ZERO 40P01, against ADR-0018 measured 108 deadlocks at N=20 — which would have put the liveness half of ADR-0018 case in doubt. Three further runs gave 40P01 19, 23P01 19, 40P01 19: it is all-or-nothing per race at roughly the frequency T-02-9 recorded. ADR-0018 REPRODUCES AND THERE IS NO FINDING. Reported because the single observation would have been a wrong and expensive claim.
+- *file:* `tests/integration/exclusion-constraint-adjudicates.test.ts`
 
 </details>
 
