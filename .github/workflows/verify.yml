@@ -133,6 +133,14 @@ jobs:
           added=$(git diff --unified=0 "$BASE_SHA...HEAD" -- "$log" | grep -c '^+[^+]' || true)
           echo "append-only: ok (${added:-0} record(s) added, 0 removed)"
 
+      - name: no document grows past its ceiling
+        # A RATCHET, not a level. `docs:budget --check` alone stayed out of CI because
+        # documents were over budget when it was written, so the guard existed and never
+        # ran — and one slice later the corpus had gone from 2,698 words over to 18,607.
+        # This can be turned on today: nothing may grow, a new file must meet its budget,
+        # and the legacy overage is paid down at whatever pace the work allows.
+        run: npm run docs:budget:check
+
       - name: every event-log record validates against the schema
         # append.mjs validates on the write path, so this catches the one way round it:
         # a line edited by hand.

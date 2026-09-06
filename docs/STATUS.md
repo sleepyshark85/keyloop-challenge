@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `959cbc9 chore(02): slice 02 done — arc42 reconciled, and the register stops lying` |
+| Last commit | `56936c7 fix: a process ruling is not a phase gate (O-31)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E |
 | Agent runs recorded | 87 |
 | ADRs accepted | 13 |

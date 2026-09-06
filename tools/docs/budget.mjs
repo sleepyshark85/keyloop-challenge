@@ -32,16 +32,19 @@
  * in the record, visible in a diff and reviewable — not a silent exemption. ADR-0013,
  * 0016 and 0017 are the shape it exists for.
  */
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve, join, basename } from 'node:path';
 import { frontmatter } from '../lib/frontmatter.mjs';
 
 const argv = process.argv.slice(2);
 const CHECK = argv.includes('--check');
+const RATCHET = argv.includes('--ratchet');
+const REBASELINE = argv.includes('--rebaseline');
 const flag = (n, d) => { const i = argv.indexOf(`--${n}`); return i === -1 ? d : argv[i + 1]; };
 
 const ARC42 = resolve(flag('arc42', 'docs/arc42'));
 const ADR = resolve(flag('adr', 'docs/adr'));
+const BASELINE = resolve(flag('baseline', 'tools/docs/budget-baseline.json'));
 const SLICES = resolve(flag('slices', 'docs/slices'));
 
 /** Budgets in words of authored prose. */
@@ -218,8 +221,43 @@ export function survey({ arc42 = ARC42, adr = ADR, slices = SLICES } = {}) {
   return rows.sort((a, b) => b.over - a.over);
 }
 
+/**
+ * THE RATCHET — why `--check` alone was never going to hold.
+ *
+ * The concision pass took the corpus to 2,698 words over. One slice later it was 18,607,
+ * and the meter had been reporting that the whole time. The reason is not discipline: it
+ * is that `docs:budget --check` was deliberately kept OUT of CI, because documents were
+ * over budget when it was written and wiring in a red guard would have been committing a
+ * broken build. So the guard existed and never ran — this project's signature defect,
+ * committed by the tool built to prevent it.
+ *
+ * A guard that demands everything be under budget on the day it lands can only be turned
+ * on after another big cleanup, which is how it stayed off. A RATCHET can be turned on
+ * today: every file must be under `max(budget, whatever it already was)`, so nothing may
+ * grow and a new file must meet its budget outright. Legacy overage is then paid down at
+ * whatever pace the work allows, and the direction is enforced even while the level is
+ * not.
+ *
+ * `--rebaseline` records current sizes. It exists for shrinking the baseline after a
+ * genuine reduction, and it shows up in a diff, so ratcheting the wrong way is visible
+ * rather than silent.
+ */
 const rows = survey();
-const over = rows.filter((r) => r.over > 0);
+const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
+for (const r of rows) {
+  r.was = baseline[r.file];
+  r.ceiling = Math.max(r.budget, r.was ?? 0);
+  r.grew = r.words > r.ceiling;
+}
+
+if (REBASELINE) {
+  const out = Object.fromEntries(rows.map((r) => [r.file, r.words]));
+  writeFileSync(BASELINE, `${JSON.stringify(out, null, 1)}\n`);
+  console.log(`baselined ${rows.length} document(s) → ${BASELINE}`);
+  process.exit(0);
+}
+
+const over = rows.filter((r) => (RATCHET ? r.grew : r.over > 0));
 
 if (!CHECK || over.length) {
   const show = CHECK ? over : rows;
@@ -239,7 +277,10 @@ if (!CHECK || over.length) {
 
 if (CHECK && over.length) {
   console.error(
-    `\n${over.length} document(s) over budget. Prose that argues a decision belongs in the ADR; `
+    `\n${over.length} document(s) ${RATCHET ? 'GREW past their ceiling' : 'over budget'}. `
+    + (RATCHET ? 'A document already over budget may shrink or hold; it may not grow. A new one must '
+      + 'meet its budget outright. ' : '')
+    + `Prose that argues a decision belongs in the ADR; `
     + 'narrative and measurement belong in the event log and on the PR; arc42 says what the '
     + 'system IS. An ADR that is genuinely contested may declare `contested: true`.',
   );
