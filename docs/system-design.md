@@ -88,6 +88,7 @@ without taking anyone's word for it.
 - [**ADR-0021**](adr/0021-the-booking-seed-is-overridable-by-environment.md) — The booking seed is overridable by environment, unset by default, and announces itself *(accepted)*
 - [**ADR-0022**](adr/0022-application-configuration-is-prefixed-booking.md) — Prefix this application's own configuration with `BOOKING_`, and make §7.3's table the contract *(accepted)*
 - [**ADR-0023**](adr/0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md) — A write that leaves the exclusion constraints' scope takes no advisory lock — narrow F-02-9 to an iff *(accepted)*
+- [**ADR-0024**](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) — The error taxonomy's residual is a property, not a row *(accepted)*
 
 ---
 

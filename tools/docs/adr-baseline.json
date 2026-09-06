@@ -300,5 +300,14 @@
    "Option D \u2014 Narrow F-02-9 to an iff on the constraints' scope"
   ],
   "decision": "Chosen option: D."
+ },
+ "0024-the-error-taxonomys-residual-is-a-property-not-a-row.md": {
+  "options": [
+   "A \u2014 keep the catch-all, and close T-05-7 as misframed.",
+   "B \u2014 split the row, register a not-found handler, and assert the residual in the falsifiabl",
+   "C \u2014 reuse /problems/appointment-not-found for an unrouted path.",
+   "D \u2014 widen the 400 predicate in server.ts to statusCode < 500."
+  ],
+  "decision": "Chosen option: B, in four parts."
  }
 }

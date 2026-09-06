@@ -66,10 +66,15 @@ Chosen option: **B**, in four parts.
    asserted `application/problem+json` with a `type` in the closed set. `tests/contract/`, the
    test-engineer's.
 
-**It lands at slice 06 step 1, not here.** §8.6 is already in slice 06's declared arc42 scope, slice
-06 grows the taxonomy anyway with `/problems/appointment-not-confirmed`, and its new route is a fifth
-corpus member. That satisfies ADR-0019's criterion — and, this being the finding that produced
-R-05-2, the deferral is written into `06-reschedule-atomic-move.md` rather than only into this record.
+**It lands at slice 06 step 1, not here** — and the decisive reason is not cost. `setNotFoundHandler`
+**breaks an assertion this slice committed red.** `cancel-appointment.test.ts:247` closes AC-4's
+vacuous-green trap by discriminating on the media type *and* the `type` member, precisely because
+Fastify's default `404` carries neither; its comment quotes that body verbatim. Register the handler
+and the media-type half stops discriminating — only `route-not-found` ≠ `appointment-not-found` still
+does. Doing that at step 5, with no test-engineer round left, would silently degrade an acceptance
+test by fixing a defect. Slice 06 has that round, already declares §8.6, and grows the taxonomy
+anyway. That satisfies ADR-0019's criterion — and, this being the finding that produced R-05-2, the
+deferral is written into `06-reschedule-atomic-move.md` rather than only into this record.
 
 ## Consequences
 
@@ -88,6 +93,13 @@ R-05-2, the deferral is written into `06-reschedule-atomic-move.md` rather than 
   the only place it exists. Deliberate: a taxonomy row with no handler behind it is the inversion this
   ADR is about.
 - The corpus is still a list somebody wrote. What changed is its direction, not its completeness.
+- **AC-4's vacuity guard must be re-derived when the handler lands**, per the Decision. The gap this
+  record closes is not unknown to `tests/` — it is *load-bearing* there, as a discriminator. That is
+  the sharpest form of the finding: a defect a test depends on.
+- `src/http/problem.ts` renders every row and sits at **exactly §10's 0.75 threshold**, three
+  survivors. Slice 06 changes it twice — this row and `appointment-not-confirmed` — so one new
+  survivor fails its Definition of Done. Named in slice 06's inherited scope as a warning rather than
+  left as a surprise.
 
 ## Pros and cons of the options
 
