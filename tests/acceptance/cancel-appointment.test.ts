@@ -37,15 +37,26 @@ import {
  *
  * What is unproven, and what this file is for, is one step further out:
  *
- *   **candidate allocation RE-DERIVES a free pair over a cancelled row.**
+ *   **a cancelled row leaves BOTH exclusion constraints, proved through the booking API.**
  *
- * arc42 §6.5 records that the constraint's predicate and `freeResources`'s overlap predicate
- * live in two files with nothing forcing them to agree. QS-8 holds that seam under quiescence;
- * this is a second, cheaper hold on it — and unlike the `.sql` predicate, the allocator's copy
- * is TypeScript, where Stryker reaches it.
+ * Slice 00 proves the bay side over two hand-written INSERTs. This fixture is 1×1, so the
+ * contender's `201` requires `no_technician_overlap`'s predicate to release as well — and slice
+ * 00's AC-4 (`exclusion-constraints.test.ts:605`) puts its neighbour on `techB` so that only
+ * `no_bay_overlap` is ever violated there. Nothing else asserts the technician side behaviourally.
+ *
+ * NOT YET — corrected here, after I-05-5. An earlier draft of this header claimed AC-1 also holds
+ * the seam arc42 §6.5 names: the constraint's predicate and `freeResources`'s overlap predicate as
+ * two copies with nothing forcing them to agree. **There is no second copy at this slice.**
+ * `freeResources` serves `GET /availability`, which is slice 08, and §6.5 describes the finished
+ * system; the candidate read on the booking path carries no availability filter yet. That absence
+ * is load-bearing below — it is *why* the candidate pair offered before and after the cancel is
+ * identical. This case will hold §6.5's seam once the second copy exists. Today it holds the
+ * constraint, which is the stronger of the two claims anyway.
  *
  * THE MUTANT, MEASURED BEFORE THIS FILE WAS WRITTEN so the assertion is aimed rather than
- * hopeful. `postgres:16`, this repository's own migrations, one bay, A cancelled:
+ * hopeful. It was measured against a STUB of the slice-08 filter, not against shipped code, so it
+ * is evidence that this case will catch that mutant when it becomes reachable — not a diagnosis
+ * available today. `postgres:16`, this repository's own migrations, one bay, A cancelled:
  *
  *   free bays, predicate as designed  (`and a.status <> 'cancelled'`)   1
  *   free bays, predicate dropped      (the mutant)                      0
@@ -188,14 +199,20 @@ describe('slice 05 — cancelling an appointment frees its slot through the allo
       expect(
         after.status,
         `AC-1 IS THE SLICE, and this is its assertion.\n\n` +
-          `A 409 /problems/no-capacity here is the mutant docs/slices/05-design.md §1 names: ` +
-          `\`freeResources\`'s overlap predicate has dropped \`status <> 'cancelled'\`, so ` +
-          `candidate allocation still counts a CANCELLED row's bay and technician as occupied ` +
-          `and the list is empty before an insert is ever attempted. Measured on postgres:16 ` +
-          `against this repository's own migrations, one bay, A cancelled: the predicate as ` +
-          `designed reports 1 free bay and the mutant reports 0. arc42 §6.5 records that this ` +
-          `predicate and the constraint's are two copies with nothing forcing them to agree; ` +
-          `this assertion is the second hold on that seam.\n\n` +
+          `A 409 /problems/no-capacity here means the cancellation did NOT take A's row out of ` +
+          `the exclusion constraints' scope. Exactly two places can do that, and this message ` +
+          `names both because the assertions that would separate them are BELOW this line and ` +
+          `will not have run: either D1's UPDATE did not move the stored row (the 200 above ` +
+          `asserted the RESPONSE says 'cancelled', which is not the same claim), or the ` +
+          `\`WHERE (status <> 'cancelled')\` predicate on no_bay_overlap / no_technician_overlap ` +
+          `still counts a cancelled row. \`SELECT status FROM appointment WHERE id = '${aId}'\` ` +
+          `decides between them in one query.\n\n` +
+          `Nothing else in the sequence can have moved. One bay and one technician means a ` +
+          `single candidate pair, and as of this slice the candidate read carries no ` +
+          `availability filter (I-05-5), so that identical pair is offered before and after the ` +
+          `cancel. The only thing that changed between the 409 above and the 201 here is the ` +
+          `database's verdict on ADR-0004's retry attempts — which makes this a proof AT THE ` +
+          `EDGE that a cancelled row leaves BOTH constraints, the technician side included.\n\n` +
           `A 404 here would instead mean the booking route has gone missing, which is a ` +
           `different failure entirely.\n${describeAnswer(after)}${where}`,
       ).toBe(201);
