@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **246** |
-| Severity | 12 blocking · 131 major · 103 minor |
+| Findings recorded | **251** |
+| Severity | 12 blocking · 133 major · 106 minor |
 | Verdicts | 17 narrowed · 90 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 56 · architect 49 · reviewer 49 · orchestrator 46 · implementer 39 · scribe 5 · human 2 |
-| Awaiting a ruling | **113** |
-| Mean escape distance | 1.74 step(s) |
+| Raised by | test-engineer 58 · architect 49 · reviewer 49 · orchestrator 46 · implementer 42 · scribe 5 · human 2 |
+| Awaiting a ruling | **118** |
+| Mean escape distance | 1.73 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1700,6 +1700,11 @@ rather than narrated.*
 | **O-50** | MAJOR | 1 *(+1)* | orchestrator | Three agent runs across slices 04 and 05 produced a prompt AND a report and NO agent.finish event — the run counter and the section 13 evidence base are undercounted | **open** |
 | **A-07-1** | BLOCKING | 1 *(+0)* | architect | MERGED CODE HAS A REAL DEADLOCK: 11.7 percent of contended move attempts return 40P01 and therefore 500, with every ADR-0018 lock correctly taken | accepted |
 | **A-07-2** | MAJOR | 1 *(+0)* | architect | Two src/ sites repeat the now-falsified deadlock premise verbatim, and one comment reads as attempt 1 is unlocked in the file F-02-9 exists to protect | **open** |
+| **I-07-1** | MINOR | 2 *(+1)* | implementer | The ADR-0030 change is about 22 to 26 lines, not about 15 — the estimate omits the type and the docblock upkeep | **open** |
+| **I-07-2** | MAJOR | 2 *(+2)* | implementer | A-05-6 two surviving guards look like EQUIVALENT MUTANTS — no unit test can kill them without a production change, and this is predicted BEFORE the tests are written | **open** |
+| **I-07-3** | MINOR | 2 *(+1)* | implementer | ADR-0030 adds a leave argument that nothing encodes or checks against the row actual current pair — the same residual shape ADR-0026 already documents for take | **open** |
+| **T-07-1** | MINOR | 2 *(+1)* | test-engineer | AC-4 does catch a lock-ordering mistake, verified empirically rather than accepted — with a precision the design does not state | **open** |
+| **T-07-2** | MAJOR | 2 *(+1)* | test-engineer | AC-4 absence-assertions are VACUOUS without a positive witness that both racers actually reached the union-lock path | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1718,6 +1723,31 @@ rather than narrated.*
 
 - *scenario:* THIRD OCCURRENCE OF D-06-4 SHAPE — the architect cannot edit src/ and the correction must therefore be carried by someone else. pgError.ts classify docblock and rescheduleAppointment.ts no-verdict arm BOTH repeat the premise A-07-1 just falsified, word for word. SEPARATELY AND WORSE: rescheduleAppointment.ts:13 says ATTEMPT 1 IS THE APPOINTMENT OWN bay_id, technician_id, TRIED DIRECTLY — NO LOCK/23P01 FOR IT, while line 201 takes the locks on EVERY attempt. Whatever was meant, it READS AS ATTEMPT 1 IS UNLOCKED, in the one file F-02-9 exists to protect, and a future reader acting on it would reintroduce exactly the defect ADR-0018 prevents. Lands in the implementer A-05-6 pass, which is already opening pgError.ts.
 - *file:* `src/persistence/pgError.ts`
+
+**I-07-1** — The ADR-0030 change is about 22 to 26 lines, not about 15 — the estimate omits the type and the docblock upkeep
+
+- *scenario:* Sized by writing it out rather than by agreeing with it: a ResourcePair interface at 4 to 5 lines, lockResources signature at 3 lines touched, the lock statement rewritten to a DISTINCT with ORDER BY subquery over a canonical 4-tuple at 12 to 15 against today 7, the return rename at 1, and one argument each at bookAppointment.ts and rescheduleAppointment.ts. Plus 4 to 8 lines of docblock correction, because the existing lockResources docblock says classes rather than a SORTED PAIR and states the two-lock count, both of which ADR-0030 falsifies. SAME ORDER OF MAGNITUDE AND STILL ONE SMALL GREEN COMMIT well under the 150-line guidance; recorded because an estimate that quietly grows is how a slice stops being small, and the implementer offered to say so again if it runs long enough to need splitting.
+- *file:* `docs/slices/07-design.md`
+
+**I-07-2** — A-05-6 two surviving guards look like EQUIVALENT MUTANTS — no unit test can kill them without a production change, and this is predicted BEFORE the tests are written
+
+- *scenario:* THE VALUE OF THIS FINDING IS ITS TIMING: it is a falsifiable prediction made at step 2, before the work, rather than an explanation offered at step 5 after the tests fail to move the number. Both paths ARE ALREADY EXERCISED — pgError.test.ts already has a 23P01 with no constraint name is other, and an .each block covering a non-string code and a non-string constraint — and the mutants survive anyway. Reading fieldsOf and classify closely: forcing typeof code === string to true lets a non-string code through fieldsOf, but EVERY DOWNSTREAM COMPARISON IS === AGAINST A STRING LITERAL, so a non-string can never match and there is no observable difference; forcing constraint !== undefined to true lets RESOURCE_BY_CONSTRAINT[undefined] execute, but that lookup is undefined too and THE INNER resource !== undefined GUARD ALREADY RETURNS other for it — again no observable difference. If that holds, no unit test however designed can kill them and the honest expectation is that the two cases will be written as directed, will pass, and Stryker will still report both surviving. The slice file already anticipated exactly this — no production change is expected, AND IF ONE IS NEEDED THAT IS THE FINDING — so the prediction is now on the record where step 5 can hold it against the measurement.
+- *file:* `src/persistence/pgError.ts`
+
+**I-07-3** — ADR-0030 adds a leave argument that nothing encodes or checks against the row actual current pair — the same residual shape ADR-0026 already documents for take
+
+- *scenario:* THE RESOURCE LOCK BRAND SHOULD STAY take-ONLY AND THE IMPLEMENTER ARGUED WHY, which is the useful half: leave is never written anywhere, the row existing bay_id and technician_id is what is being SUPERSEDED rather than a value any write function constructs, and MINTING THE BRAND FROM A UNION WOULD BE ACTIVELY WRONG because insertAppointment and rescheduleAppointmentById write lock.bayId and lock.technicianId into the row, so a leave value baked into that same brand would hand a write a plausible-looking field it must never touch. THE RESIDUAL IS THE MIRROR OF THAT: nothing encodes or checks leave against the row current pair, so a future call site that captured a stale or wrong incumbent — re-reading existing mid-loop instead of once — would COMPILE AND SILENTLY UNDER-LOCK, which is precisely the defect ADR-0030 exists to close. rescheduleAppointment.ts avoids it today by reading existing.bayId and technicianId ONCE before the loop and reusing them, correct under ADR-0027 because the row pair cannot change until a successful attempt commits, at which point the loop has already returned. Not a blocker and not something ADR-0030 claims to close; named beside the Db-mismatch residual ADR-0028 already tracks.
+- *file:* `src/persistence/appointmentRepository.ts`
+
+**T-07-1** — AC-4 does catch a lock-ordering mistake, verified empirically rather than accepted — with a precision the design does not state
+
+- *scenario:* THE CLAIM WAS PUT TO THE TEST-ENGINEER TO ATTACK AND IT TESTED IT INSTEAD OF REASONING ABOUT IT. Two sessions against a disposable postgres:16-alpine, no repo schema involved: transaction A takes key 100 then waits for key 200, transaction B takes 200 then waits for 100 — each side locking ITS OWN PAIR BEFORE THE OTHER, which is exactly what a call-lockResources-once-for-target-once-for-incumbent mistake produces instead of ADR-0030 single statement ordered over the union. RESULT 15 OF 15 TRIALS DEADLOCKED WITH 40P01. Since AC-4 mutual-vacate fixture is precisely that shape — A take is B leave and the mirror — a take-then-leave ordering bug reproduces the identical failure AC-4 already asserts against. THE PRECISION THE DESIGN DOES NOT STATE: AC-4 would NOT discriminate a substitution of one valid canonical order for another, say hashtext-then-class instead of class-then-hashtext — BUT THAT IS NOT A BUG, since any single consistent total order over the union prevents cycling regardless of which field sorts first. So AC-4 covers ADR-0018 ordering requirement EXACTLY TO THE EXTENT THAT REQUIREMENT IS LOAD-BEARING, and no further.
+- *file:* `docs/slices/07-design.md`
+
+**T-07-2** — AC-4 absence-assertions are VACUOUS without a positive witness that both racers actually reached the union-lock path
+
+- *scenario:* ON THE PRINCIPLE no-spurious-refusal.test.ts ALREADY NAMES EXPLICITLY AS T-04-4: an absence assertion needs a positive witness. ZERO OF 1000 40P01 IS VACUOUSLY TRUE of a fixture where both movers attempt 1 — their own pair — simply succeeds, because the union-lock code path is then never reached and the test is evidence about an inert race rather than about ADR-0030. Remedy, inside the test-engineer own step-3 latitude and flagged now because it shapes the FIXTURE rather than the wording: witness both racers reaching ATTEMPT >= 2 TARGETING THE OTHER PAIR, via the existing booking.conflict attempt field, which is the same observable no-spurious-refusal.test.ts already reads — before trusting the absence of 40P01 as evidence about anything.
+- *file:* `docs/slices/07-design.md`
 
 </details>
 
