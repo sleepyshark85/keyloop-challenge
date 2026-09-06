@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **172** |
-| Severity | 10 blocking · 93 major · 69 minor |
+| Findings recorded | **176** |
+| Severity | 10 blocking · 95 major · 71 minor |
 | Verdicts | 8 narrowed · 60 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 42 · architect 34 · reviewer 34 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
-| Awaiting a ruling | **88** |
-| Mean escape distance | 1.88 step(s) |
+| Raised by | test-engineer 42 · architect 34 · reviewer 34 · implementer 31 · orchestrator 28 · scribe 5 · human 2 |
+| Awaiting a ruling | **92** |
+| Mean escape distance | 1.86 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1175,6 +1175,10 @@ rather than narrated.*
 | **T-05-4** | MINOR | 2 *(+1)* | test-engineer | OQ-05-1 is an acceptance-criterion question, not a step-3 detail | **open** |
 | **T-05-5** | MINOR | 2 *(+1)* | test-engineer | D3 "still honestly red" is true in letter and empty in substance, and the test-engineer cannot verify its premise | **open** |
 | **T-05-6** | MAJOR | 2 *(+1)* | test-engineer | AC-3 cannot be a contract assertion, and D1 CASE guard has exactly one guard in the whole system which is a line nobody has written | **open** |
+| **I-05-1** | MAJOR | 2 *(+1)* | implementer | A bodyless POST with Content-Type application/json returns 500 /problems/internal today, and that is the cancel route normal client shape | **open** |
+| **I-05-2** | MAJOR | 2 *(+1)* | implementer | F-05-1 only mitigation is a docblock, and ADR-0023 Consequences contradict themselves | **open** |
+| **I-05-3** | MINOR | 2 *(+1)* | implementer | AC-3 binding half is unfalsifiable as scoped, by the design own argument | **open** |
+| **I-05-4** | MINOR | 2 *(+1)* | implementer | The wiring line slice 05 adds to main.ts is guarded by the acceptance test or by nothing | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1207,6 +1211,26 @@ rather than narrated.*
 
 - *scenario:* findStoredAppointment returns a FIXED PROJECTION that does not include updated_at, so "no column of the row changes" needs to_jsonb(appointment) equality before and after or AC-3 asserts only over columns the author happened to pick. More: updatedAt appears nowhere in tests/ and on the evidence is not in the response body, so A-05-1 second half — "and the response body is identical" — is satisfied EQUALLY by D1 CASE and by the plain updated_at = now() alternative, doing no discriminating work. The entire observable difference between the two options is SQL-side. Stryker will not produce a targeted CASE-removal mutant either: the statement is one string literal and mutating it to empty fails everything loudly rather than isolating the CASE.
 - *file:* `tests/support/booking.ts`
+
+**I-05-1** — A bodyless POST with Content-Type application/json returns 500 /problems/internal today, and that is the cancel route normal client shape
+
+- *scenario:* Measured on Fastify 5.12.1 against server.ts handler verbatim: no content-type and no body gives 200; content-type json with no payload gives 500 /problems/internal; content-type json with an empty string payload gives 500; a bad uuid param correctly gives 400 /problems/malformed-request. FST_ERR_CTP_EMPTY_JSON_BODY carries statusCode 400 but validation undefined, so it misses the validation arm and falls to the catch-all. FST_ERR_CTP_INVALID_JSON_BODY does the same on the EXISTING booking route; the contract test only ever sends parseable JSON of the wrong shape, which is why neither was caught. At stake is arc42 8.6 400 malformed-request row and the 500 row own rationale — a 4xx would tell a service advisor to correct something they did not send and cannot see — which is exactly inverted here, because the client did send it and can correct it. tests/support/booking.ts:442 postBooking sets that header, so the test-engineer will copy it. CONVERGES WITH T-05-4 FROM THE OPPOSITE DIRECTION: the test-engineer reached it from 8.6 closed-taxonomy claim, the implementer from a measurement of the running server, independently and without seeing each other reports.
+- *file:* `src/http/server.ts`
+
+**I-05-2** — F-05-1 only mitigation is a docblock, and ADR-0023 Consequences contradict themselves
+
+- *scenario:* The ADR says F-02-9 becomes a rule with a TEST rather than an instruction to remember, and also that the rule is ENFORCED BY REVIEW. The scoped concurrency test measures this cancel path liveness and says nothing about the rule next application. The house answer to an unenforceable claim has been a scan marker or a compile-time witness — and THE MARKER ROUTE IS UNAVAILABLE, which is the part the implementer would not have known without looking: markers are FILE-granular, PERMITTED_FILE asserts exactly one file under src/, and both write functions live in appointmentRepository.ts, so splitting it would break appointment-table-access, which is AC-5 own mechanism. The only function-granular mechanism left is the type system. Proposed: lockResources returns a branded ResourceLock that insertAppointment takes as a parameter — type-only, erased at runtime, one cast at one site, the ADR-0016 shape; forgot-the-lock becomes a compile error and correctly-exempt becomes a signature that does not ask for one, which is the structural difference F-05-1 says does not exist. Residue stated honestly rather than overclaimed: it does not prove the lock keys match the row. Named failure if the rule is next applied wrongly: an in-scope write skipping the locks reproduces ADR-0018 measured 285 of 400 deadlocks, which classify maps to no-verdict and the route to 500, breaking slice 02 AC-3 and AC-4 which require 409.
+- *file:* `docs/adr/0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md`
+
+**I-05-3** — AC-3 binding half is unfalsifiable as scoped, by the design own argument
+
+- *scenario:* A-05-1 rules AC-3 to mean no column of the row changes AND the response body is identical. The body half is satisfied by ANY implementation including the plain now() the design rejected, because updated_at is in neither AppointmentRow nor AppointmentView and never reaches the client. The no-column-changes half is what the CASE exists for and nothing in scope reads it. A compiled-SQL unit test can kill the mutant but asserts the implementation back at itself; only the container can show PostgreSQL leaves the column alone, and a single step-2 measurement is not evidence that survives under 2.4. THIS IS THE ARGUMENT SECTION 4 USED TO EXCLUDE src/domain/appointment.ts, APPLIED TO THE CASE. Either remedy accepted: state that the integration test reads updated_at before and after the replay, or rule AC-3 to mean the response body only and ship the plain now(), in which case the CASE is complexity with nothing to justify it. What is objected to is the CASE plus nothing that can distinguish it from its alternative.
+- *file:* `docs/slices/05-design.md`
+
+**I-05-4** — The wiring line slice 05 adds to main.ts is guarded by the acceptance test or by nothing
+
+- *scenario:* ServerDeps and AppointmentRouteDeps gain a third bound use case and main.ts gains a line. main.ts is excluded from mutation, so that line falls into exactly the class stryker.config.mjs comment now names as this project most-counted defect shape. The acceptance test does reach it over HTTP. Named by the implementer rather than left for someone to claim otherwise — the same disclosure T-04-8 made one slice earlier.
+- *file:* `src/main.ts`
 
 </details>
 
