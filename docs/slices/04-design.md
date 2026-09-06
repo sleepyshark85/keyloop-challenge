@@ -75,10 +75,10 @@ the **global** `crypto.getRandomValues(new Uint32Array(1))[0] ?? 0` — not `nod
 
 ## 4. The rest of the delta
 
-- `src/platform/config.ts` — `attemptCap`, from `ATTEMPT_CAP`, default **16**, an integer in
+- `src/platform/config.ts` — `attemptCap`, from `BOOKING_ATTEMPT_CAP`, default **16**, an integer in
   `1…1000`. ADR-0009 put it here. It reaches the use case as `BookDeps.attemptCap`. **The lower
   bound of 1 is load-bearing, not taste** (I-04-7): the arm-placed check is reached only after a
-  classification, so there is no refusal exit before the first attempt and `ATTEMPT_CAP=0` would
+  classification, so there is no refusal exit before the first attempt and `BOOKING_ATTEMPT_CAP=0` would
   behave silently as 1. `config.ts` records that, or someone relaxes it.
 - `src/platform/config.ts` — `bookingSeed?: number` from `BOOKING_SEED`, **unset by default and
   unset in production**, with one startup `warn` when it is set (ADR-0021).
@@ -133,8 +133,8 @@ incorrect or unsafe, which is what step 2 is for.
   needs no concurrency. Reproduced: **16 bays all blocked → 16 attempts, `exhausted`** (both
   conditions true, so the tie-break is exercised); **17 bays all blocked → 16 attempts, `capped`**.
   One fixture pair pins three things — the cap is exactly 16, the two exits are distinguishable, and
-  ADR-0020's tie resolves to `exhausted` — none of which `ATTEMPT_CAP=3` pins. **AC-4's red runs at
-  the shipped default.** `ATTEMPT_CAP` stays configurable because ADR-0009 put it there, and
+  ADR-0020's tie resolves to `exhausted` — none of which `BOOKING_ATTEMPT_CAP=3` pins. **AC-4's red runs at
+  the shipped default.** `BOOKING_ATTEMPT_CAP` stays configurable because ADR-0009 put it there, and
   I-04-7's unconditional `loadConfig` unit assertion on the default stays too: the loop test guards
   the behaviour, the config test guards the constant, and they fail to different regressions.
 - **I-04-2 — the finding is accepted and a different remedy is taken.** ADR-0020's *"Bad"* named one
@@ -189,7 +189,7 @@ incorrect or unsafe, which is what step 2 is for.
     and QS-14 budgets only the **uncontended** booking, so nothing in the suite measures the thing
     the cap protects.
   Two remedies, and **neither is chosen here**: land the advisory pre-filter after slice 08's QS-8,
-  or raise `ATTEMPT_CAP` above the additive bound. The cap's value is ADR-0009's and human-decided,
+  or raise `BOOKING_ATTEMPT_CAP` above the additive bound. The cap's value is ADR-0009's and human-decided,
   so choosing is flagged at the gate rather than ruled mid-slice. Its **spurious-refusal leg is not
   deterministically assertable** until one of those lands or `BOOKING_SEED` forces the free resource
   past position 16 (T-04-3: 0.35 % to 46.7 % per fixture, every one a coin flip) — so it does not
@@ -240,7 +240,7 @@ incorrect or unsafe, which is what step 2 is for.
 other ways) and the guards move into step 6's `null` branch; step 7's header replaces the stale
 *"OUTSIDE any transaction"* with ADR-0018's one-transaction-per-attempt and carries Bound-2's
 structural bound; the box's refusal rows become `exit`. **§5.2** — `candidates.ts`'s row takes the
-tuple carrier, `BookOutcome` gains `exit`, `src/platform` names `ATTEMPT_CAP` and `BOOKING_SEED`.
+tuple carrier, `BookOutcome` gains `exit`, `src/platform` names `BOOKING_ATTEMPT_CAP` and `BOOKING_SEED` (ADR-0022).
 **§11** — D-04-1 and D-04-2.
 
 ## 8. Routing — the slice-08 edit this design cannot make

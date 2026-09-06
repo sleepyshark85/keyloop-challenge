@@ -167,8 +167,8 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
         Both refusals are 409 /problems/no-capacity and both carry the resource this
         arm's own classification minted — ADR-0020: the cap is tested INSIDE the 23P01
         arm, never as the loop's bound, so no refusal exit can be reached without a
-        verdict. `exhausted` wins a tie. ATTEMPT_CAP's default of 16 sits BELOW the
-        bound above at §1.1 scale, which is D-04-1 — so a non-zero "capped" is expected
+        verdict. `exhausted` wins a tie. BOOKING_ATTEMPT_CAP's default of 16 sits BELOW
+        the bound above at §1.1 scale, which is D-04-1 — so a non-zero "capped" is expected
         today rather than the signal ADR-0009 intended, and §11 carries it.
 ```
 

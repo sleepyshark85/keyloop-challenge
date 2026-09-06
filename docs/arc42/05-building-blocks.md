@@ -141,7 +141,7 @@ call site rather than a serialisation failure at the client.
 
 ### `src/platform` — the leaf
 
-Config (`ATTEMPT_CAP`, default 16, and `BOOKING_SEED`, unset — ADR-0009, ADR-0021), the `pino` logger, the OpenTelemetry bootstrap and the
+Config (`BOOKING_ATTEMPT_CAP` 16, `BOOKING_SEED` unset — ADR-0009, ADR-0021, ADR-0022), the `pino` logger, the OpenTelemetry bootstrap and the
 metric registry. Importable by everyone, imports nothing from `src/`. That shape is also a junk drawer's: the leaf rule
 keeps it from acquiring behaviour, only a reviewer from acquiring *contents*.
 

@@ -19,10 +19,9 @@ npm start                                  # the scheduler, on the HOST
 ```
 
 **The service is not in compose, by ruling rather than oversight**: containerising it would cost a
-Dockerfile, a build stage and an image-caching story maintained across twelve slices for no demo
-benefit. Compose provides the *dependencies*; the process runs on the host against them, and
+Dockerfile, a build stage and an image-caching story for no demo benefit. Compose provides the *dependencies*; the process runs on the host against them, and
 `docker-compose.yml` says so in its own header so the file and this section cannot drift. Nothing here
-is on the test path — §7.2's Testcontainers starts its own `postgres:16`.
+is on the test path (§7.2).
 
 | Node | Runs | Notes |
 |---|---|---|
@@ -149,12 +148,13 @@ missing or malformed value fails the process rather than surfacing as a request 
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `PORT` | HTTP listener |
-| `BOOKING_ATTEMPT_CAP` | ADR-0009's cap; default 16 |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector; unset disables export without disabling instrumentation |
 | `LOG_LEVEL` | `pino` level |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector; unset disables export without disabling instrumentation |
+| `BOOKING_ATTEMPT_CAP` | ADR-0009's cap; default 16 |
+| `BOOKING_SEED` | ADR-0021's ordering seed; unset in production, and it warns when set |
 
-There are no secrets, because there is nothing to authenticate to (ADR-0002) — which is a fact about
-the scope, not a security posture, and §11.3 says so.
+**This table is the contract; `BOOKING_` marks what this application invented** (ADR-0022). There are
+no secrets: nothing to authenticate to (ADR-0002, §11.3).
 
 ## 7.4 The pipeline
 
