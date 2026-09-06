@@ -133,6 +133,41 @@ describe('classify — 40P01 deadlock_detected (T-02-9, ADR-0018)', () => {
   });
 });
 
+describe('classify — A-05-6: the two guards inside classify/fieldsOf, directed', () => {
+  it('a `code` that is not a string primitive never satisfies ANY SQLSTATE branch, even one shaped like a match', () => {
+    // pgError.ts:80:9 — `typeof code === 'string'`. Every branch below tests the extracted
+    // `code` with `===` against a string LITERAL (`DEADLOCK_DETECTED`, `EXCLUSION_VIOLATION`,
+    // `FOREIGN_KEY_VIOLATION`), and `===` never coerces — so a value that fails this guard
+    // cannot be confused with one that passes it by any comparison downstream, whether or not
+    // it is spread into the record. That is also why this guard's one remaining mutant (the
+    // ternary forced to its `true` branch) is very likely EQUIVALENT rather than merely
+    // unkilled (I-07-2): a `code` that is not a string primitive cannot strict-equal a string
+    // literal either way, so no input reaches `classify`'s public contract and distinguishes
+    // the two builds. A `String` OBJECT is used here rather than a primitive specifically
+    // because its `typeof` is `'object'`, not `'string'`, while its printed form still reads as
+    // a SQLSTATE — the case most likely to tempt a loose (`==`) comparison into matching.
+    const boxed = Object.assign(new Error('boxed code'), {
+      code: new String('40P01'),
+      constraint: 'no_bay_overlap',
+    });
+    expect(classify(boxed)).toEqual({ kind: 'other', cause: boxed });
+  });
+
+  it('a `23P01` whose constraint is the literal string "undefined" is `other`, the same as one with no constraint at all', () => {
+    // pgError.ts:103:39 — `constraint !== undefined`. `RESOURCE_BY_CONSTRAINT` has no entry for
+    // any key JS would coerce an absent `constraint` to, so skipping this guard when
+    // `constraint` genuinely is `undefined` reaches the identical lookup result the guard
+    // exists to short-circuit around — which is also why this guard's one remaining mutant is
+    // very likely EQUIVALENT (I-07-2). The one input that COULD separate the two builds is a
+    // constraint whose string value coincides with a key the map actually holds under
+    // `undefined`'s coercion — `'undefined'` is exactly that candidate, and the map holds no
+    // such key, so both builds land on `other` here too. Making this non-equivalent would mean
+    // inventing a constraint this migration does not define, which design §2.1 forbids — this
+    // pins the boundary rather than assuming it.
+    expect(classify(pgError('23P01', 'undefined')).kind).toBe('other');
+  });
+});
+
 describe('classify — totality', () => {
   it('carries the original error as `cause` on the `other` arm', () => {
     const error = pgError('42703', undefined);

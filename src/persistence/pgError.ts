@@ -88,8 +88,12 @@ function fieldsOf(error: unknown): { code?: string; constraint?: string } {
  * `40P01` is `no-verdict` and `no-verdict` is `40P01` ALONE. It carries no constraint, no
  * resource and no cause, because a deadlock reports none — and that absence is the point. It is
  * the one variant a capacity refusal cannot be built from, which is ADR-0016 doing its job at the
- * moment it was most likely to be argued around: under ADR-0018's locks a deadlock can only mean
- * a write path skipped them, so it is an internal fault and not contention.
+ * moment it was most likely to be argued around: under ADR-0018/ADR-0030's locks a deadlock can
+ * only mean some write path did not lock every resource it was in flight against — its own pair,
+ * and, where it also vacates one (a move past attempt 1), that pair too — so it is an internal
+ * fault and not contention. (ADR-0018 alone was not sufficient for this: a move is in flight
+ * against two pairs at once, and locking only one of them still deadlocks — measured at slice 07,
+ * ADR-0030.)
  *
  * `40001` (serialization_failure) is deliberately NOT included: at READ COMMITTED it cannot arise
  * here, and adding an unmeasured SQLSTATE to the one classifier this design calls total is how a
