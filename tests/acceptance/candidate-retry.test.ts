@@ -94,14 +94,15 @@ describe('slice 04 — pruning, the attempt cap, and the seeded shuffle', () => 
    * `failure` string is handed to the caller, which asserts on it inside its own test body.
    */
   async function withService<T>(
-    options: { readonly bookingSeed?: number },
+    options: { readonly bookingSeed?: number; readonly logLevel?: string | null },
     body: (service: StartedService) => Promise<T>,
   ): Promise<{ readonly failure?: string; readonly value?: T }> {
     const attempt = await startService({
       databaseUrl: inject('databaseUrl'),
       // The two loop lines ARE the observation for AC-3 and AC-4; `silent` would make both
-      // criteria unassertable from outside (I-02-6).
-      logLevel: 'trace',
+      // criteria unassertable from outside (I-02-6). `null` — R-7a's case only — sets no
+      // LOG_LEVEL at all, so the child runs at the level a deployment that sets nothing does.
+      logLevel: options.logLevel === undefined ? 'trace' : options.logLevel,
       ...(options.bookingSeed === undefined ? {} : { bookingSeed: options.bookingSeed }),
     });
     if (attempt.service === undefined) {
@@ -483,7 +484,162 @@ describe('slice 04 — pruning, the attempt cap, and the seeded shuffle', () => 
         `passing on an implementation that logs a random number it never used.\n${constant.loop}\n${fixture}`,
     ).toEqual([FIXED, FIXED]);
   });
+
+  // ──────────────────────────────────────────────────── R-7a — the mitigation itself ──
+  //
+  // ADR-0021 bought a production configuration surface to make AC-5 assertable, and arc42
+  // §11 R-7a names exactly ONE thing as the mitigation for the risk it created: "a startup
+  // `warn` when `BOOKING_SEED` is set, plus an assertion that two refusals log two different
+  // seeds". OQ-04-1 above is the second half. This is the first, and until now it was held
+  // by nothing an outside-in run could see — so a build that simply never emitted the line
+  // was green, and `BOOKING_SEED` would run Order-A in production unannounced.
+  //
+  // WHAT IS PINNED, AND WHY ONLY THIS MUCH. Pinning a sentence is how the next rewording
+  // becomes a false failure; pinning nothing is what R-7a already had. So this asserts the
+  // OBLIGATIONS an operator's line has to meet, each independently defeasible:
+  //
+  //   1. exactly one such record, and only when the variable is set — a line on every run
+  //      is noise an operator learns to filter, and one per request is worse;
+  //   2. at `warn` or above, AT THE LEVEL A DEPLOYMENT THAT CONFIGURES NOTHING RUNS AT —
+  //      a warning only reachable under `LOG_LEVEL=trace` is not a mitigation, and this is
+  //      the only assertion in the suite that starts the artifact without a LOG_LEVEL;
+  //   3. it names `BOOKING_SEED` — which knob; a contract fixed by ADR-0022 and §7.3, not
+  //      prose, so no rewording moves it;
+  //   4. it carries the seed's VALUE — ADR-0021's whole point is that the run is
+  //      reproducible, and a warning that omits the value hands back a label, not a handle;
+  //   5. it says `production` — the operator-actionable half. That is `config.ts:213`,
+  //      Stryker's one non-equivalent survivor: the sentence telling the reader what to DO
+  //      could be deleted with the suite green.
+  //
+  // DELIBERATELY LOOSE: the wording, the sentence order, WHICH FIELD carries any of it (the
+  // record is read whole, so moving the seed from the message into a structured field is not
+  // a failure — the information is what the operator needs, not its position), and ADR-0009's
+  // "Order-A" jargon. That last one is an argument for the decision rather than an
+  // instruction to the operator, it is already killed by a mutant inside `config.ts` —
+  // which IS in Stryker's scope — and duplicating it here would buy a second brittle pin
+  // and no new obligation.
+
+  it('R-7a — BOOKING_SEED set warns once at startup, visibly, naming the variable, its value and production; unset warns not at all', async () => {
+    const SEEDED = 987_654_321;
+
+    const seeded = await withService(
+      { bookingSeed: SEEDED, logLevel: null },
+      async (service) =>
+        // The warning is a startup line, so it needs no traffic: `loadConfig` supplies the
+        // PORT the server binds (§7.3), so it has already run by the time /health answers.
+        // The wait is for stdout delivery to this process, not for the service to act.
+        await service.awaitLogRecords((rs) => configWarnings(rs).length >= 1, 5_000),
+    );
+    expect(
+      failureOf(seeded),
+      `the service did not start with BOOKING_SEED=${String(SEEDED)}.\n${failureOf(seeded)}`,
+    ).toBe('started');
+    const announced = seeded.value as readonly Record<string, unknown>[];
+    const warnings = configWarnings(announced);
+    const heard = `\nwhat the process said at its DEFAULT log level:\n${describeRecords(announced)}`;
+
+    expect(
+      warnings.length,
+      `R-7a — exactly one \`${CONFIG_WARNING_EVENT}\` record. Zero is the mitigation missing ` +
+        `entirely — the risk ADR-0021 knowingly created, realised, with every other test in ` +
+        `this repository still green. More than one is a per-request line, which is noise ` +
+        `rather than a startup announcement.${heard}`,
+    ).toBe(1);
+    const warning = warnings[0] as StartupWarning;
+
+    expect(
+      warning.level,
+      `R-7a — the line must be at \`warn\` (${String(WARN_LEVEL)}) or above AND at the level ` +
+        `an unconfigured deployment runs at. Below it the mitigation exists only for whoever ` +
+        `already knew to look, which is nobody.${heard}`,
+    ).toBeGreaterThanOrEqual(WARN_LEVEL);
+    expect(
+      warning.text,
+      `R-7a — the line must name the variable, so the operator knows which knob to unset.${heard}`,
+    ).toContain('BOOKING_SEED');
+    expect(
+      warning.text,
+      `R-7a — and its VALUE (${String(SEEDED)}): ADR-0021 exists so a run can be REPRODUCED, ` +
+        `and a warning without the seed is the label that ADR called insufficient.${heard}`,
+    ).toContain(String(SEEDED));
+    expect(
+      warning.text.toLowerCase(),
+      `R-7a — and it must tell the operator this is not a production setting. This is the ` +
+        `only assertion anywhere on the actionable half of the text: \`config.ts:213\` is ` +
+        `Stryker's one non-equivalent survivor precisely because that sentence could be ` +
+        `deleted with the whole suite green. The word is pinned, not the sentence.${heard}`,
+    ).toContain('production');
+
+    // The mirror, and it is what stops the assertion above being satisfied by a build that
+    // warns unconditionally: such a build announces nothing, it just always complains, and
+    // an operator who sees the line on every boot has been given no signal at all.
+    const unset = await withService({ logLevel: null }, async (service) =>
+      // Nothing to wait FOR — the claim is an absence — so this drains rather than waits.
+      // It is not vacuous: the seeded run above was heard at this same level, in this same
+      // way, so silence here is the service's and not the harness's.
+      await service.awaitLogRecords(() => false, 1_500),
+    );
+    expect(failureOf(unset), `the service did not start.\n${failureOf(unset)}`).toBe('started');
+    const quiet = unset.value as readonly Record<string, unknown>[];
+    expect(
+      configWarnings(quiet).map((w) => w.text),
+      `R-7a — with BOOKING_SEED UNSET — the default, and the only production setting — there ` +
+        `must be no such warning at all. A line on every boot is one an operator filters, and ` +
+        `a filtered warning is the silent degradation ADR-0009 named.\n${describeRecords(quiet)}`,
+    ).toEqual([]);
+  });
 });
+
+/**
+ * ADR-0021's startup line: `loadConfig` emits ONE of these when `BOOKING_SEED` is set, and it
+ * is the whole of arc42 §11 R-7a's mitigation. Both of `pino`'s renderings of an event name
+ * are accepted, exactly as `conflictRecords` accepts them — which of `event` and `msg` carries
+ * the string is a calling convention and R-7a asserts nothing about it.
+ */
+const CONFIG_WARNING_EVENT = 'config.warning';
+
+/** `pino`'s numeric levels: 30 is `info`, 40 is `warn`, 50 is `error`. */
+const WARN_LEVEL = 40;
+
+interface StartupWarning {
+  readonly level: number;
+  /** Everything the record says, joined — see `renderedText`. */
+  readonly text: string;
+}
+
+function configWarnings(
+  records: readonly Record<string, unknown>[],
+): readonly StartupWarning[] {
+  const out: StartupWarning[] = [];
+  for (const record of records) {
+    const named =
+      record['event'] === CONFIG_WARNING_EVENT || record['msg'] === CONFIG_WARNING_EVENT;
+    if (!named) continue;
+    out.push({ level: Number(record['level']), text: renderedText(record) });
+  }
+  return out;
+}
+
+/**
+ * Every value the record carries, joined into one string, minus `pino`'s own envelope.
+ *
+ * The record is read WHOLE on purpose: the four content obligations above are about what an
+ * operator is told, not about where the line puts it, so moving the seed out of the message
+ * and into a structured field must not fail this test — and dropping it entirely must.
+ */
+function renderedText(record: Record<string, unknown>): string {
+  const envelope = ['level', 'time', 'pid', 'hostname'];
+  return Object.entries(record)
+    .filter(([key]) => !envelope.includes(key))
+    .map(([, value]) => (typeof value === 'string' ? value : JSON.stringify(value)))
+    .join(' ');
+}
+
+/** The raw NDJSON, one line each, for a failure that can be diagnosed from CI output alone. */
+function describeRecords(records: readonly Record<string, unknown>[]): string {
+  if (records.length === 0) return '      (the process wrote nothing to stdout)';
+  return records.map((record) => `      ${JSON.stringify(record)}`).join('\n');
+}
 
 /** `'started'` when the service came up, otherwise the harness's diagnosis. */
 function failureOf(attempt: { readonly failure?: string }): string {

@@ -122,7 +122,19 @@ async function freePort(): Promise<number> {
  */
 export async function startService(options: {
   databaseUrl: string;
-  logLevel?: string;
+  /**
+   * `LOG_LEVEL` for the child. Omitted, it is `silent` — a test that asserts nothing about
+   * stdout should not have to read past it.
+   *
+   * **`null` means DO NOT SET IT AT ALL**, and it is not a synonym for a level name. The
+   * child then runs at the level the artifact itself defaults to, which is the level a
+   * deployment that configures nothing runs at. R-7a's mitigation is a line an OPERATOR
+   * sees, so the only honest place to assert it is there: a `warn` that is only reachable
+   * at `trace` is not a mitigation, and asserting it at `trace` would not notice. Any
+   * `LOG_LEVEL` inherited from this process is deleted rather than forwarded, so the
+   * child's level is the artifact's own default and never the runner's environment.
+   */
+  logLevel?: string | null;
   /**
    * `BOOKING_SEED` — ADR-0021, granted at slice 04 step 2 (objection T-04-1).
    *
@@ -152,6 +164,7 @@ export async function startService(options: {
     `  cwd          ${cwd}`,
     `  PORT         ${port}`,
     `  DATABASE_URL ${options.databaseUrl}`,
+    `  LOG_LEVEL    ${options.logLevel === null ? "(unset — the artifact's own default)" : (options.logLevel ?? 'silent')}`,
     `  BOOKING_SEED ${options.bookingSeed === undefined ? '(unset — a seed per request)' : String(options.bookingSeed)}`,
     `  entrypoint   ${entrypoint} (${existsSync(entrypoint) ? 'exists' : 'DOES NOT EXIST'})`,
   ].join('\n');
@@ -161,14 +174,18 @@ export async function startService(options: {
   // streams. It is written out rather than asserted so that changing the tuple below is a
   // compile error here instead of a lie the compiler was told to believe.
   let child: ChildProcessByStdio<null, Readable, Readable>;
+  // `logLevel: null` asks for no LOG_LEVEL in the child at all, so the inherited one is
+  // removed first: spreading `process.env` after it would put the runner's level back.
+  const inherited = { ...process.env };
+  if (options.logLevel === null) delete inherited['LOG_LEVEL'];
   try {
     child = spawn(argv[0] as string, argv.slice(1), {
       cwd,
       env: {
-        ...process.env,
+        ...inherited,
         DATABASE_URL: options.databaseUrl,
         PORT: String(port),
-        LOG_LEVEL: options.logLevel ?? 'silent',
+        ...(options.logLevel === null ? {} : { LOG_LEVEL: options.logLevel ?? 'silent' }),
         NODE_ENV: 'test',
         // Spread rather than `BOOKING_SEED: undefined`: `spawn` renders an undefined value
         // as the literal string "undefined" on some platforms, and "unset" is a distinct
