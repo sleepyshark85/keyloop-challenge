@@ -323,6 +323,38 @@ describe('GET /appointments/:id — AC-2', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().status).toBe('cancelled');
   });
+
+  it('a member the 200 schema does not declare is STRIPPED — the schema is a WHITELIST', async () => {
+    // The same control the 201 and the cancellation 200 already carry; the GET was the one route
+    // without it. Emptying this route's `response` map changes nothing else observable — the 200
+    // still renders and the 404 sets its own media type — so without this case an internal field
+    // added to `AppointmentView` (a retry count, a lock key, an id from another table) would
+    // reach every client of this route silently and become the contract by use.
+    //
+    // No cast and no production change: TypeScript's excess-property check fires on FRESH
+    // literals at the use site, so a widened const assigns to `AppointmentView` cleanly.
+    const internalNote = 'seeded by the reconciliation job';
+    const WITH_EXTRA = { ...VIEW, internalNote, retryCount: 3 };
+
+    const app = serverAnswering({ read: { kind: 'found', appointment: WITH_EXTRA } });
+    const response = await app.inject({ method: 'GET', url: `/appointments/${APPOINTMENT_ID}` });
+
+    expect(response.statusCode).toBe(200);
+    // Sorted deliberately: key ORDER differs between the serialiser the schema compiles and the
+    // fallback, and pinning it would assert an incidental fact about `fast-json-stringify`.
+    expect(Object.keys(response.json() as object).sort()).toEqual([
+      'bayId',
+      'customerId',
+      'dealershipId',
+      'endsAt',
+      'id',
+      'serviceTypeId',
+      'startsAt',
+      'status',
+      'technicianId',
+      'vehicleId',
+    ]);
+  });
 });
 
 describe('POST /appointments/:id/cancellation — AC-3, AC-4', () => {
