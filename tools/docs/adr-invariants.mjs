@@ -40,6 +40,13 @@ import { resolve, join } from 'node:path';
 
 const argv = process.argv.slice(2);
 const REBASELINE = argv.includes('--rebaseline');
+// `--pin 0023-….md [more…]` — add ONE new ADR without touching any existing pin.
+const PIN = (() => {
+  const i = argv.indexOf('--pin');
+  if (i === -1) return null;
+  const names = argv.slice(i + 1).filter((a) => !a.startsWith('--'));
+  return names.length ? names : null;
+})();
 const flag = (n, d) => { const i = argv.indexOf(`--${n}`); return i === -1 ? d : argv[i + 1]; };
 
 const ADR = resolve(flag('adr', 'docs/adr'));
@@ -177,18 +184,56 @@ export function check(adrDir, baseline) {
   return problems;
 }
 
+/**
+ * ONE SERIALISER, so writing the baseline can never reformat it — F-04-1.
+ *
+ * This tool told you not to run `--rebaseline` because it rewrites every pin, and then left
+ * you no way to add one ADR except by hand. The hand-edit had a trap of its own: the
+ * committed file escapes every non-ASCII codepoint (`—` and friends, 215 of them) and
+ * `JSON.stringify` emits them raw, so the obvious fix silently reformats 198 of 294 lines —
+ * a 398-line diff on the exact file whose own error message warns against exactly that.
+ *
+ * It recurred four slices running (F-02-10, F-04-1 twice, A-04-4) and cost an architect a
+ * commit outside its brief, which is the point at which "known trap" stops being an
+ * acceptable answer. Both writers now go through here, so the encoding is a property of the
+ * tool rather than of whoever last remembered it.
+ */
+const serialise = (obj) => `${JSON.stringify(obj, null, 1)
+  .replace(/[-￿]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}\n`;
+
+const pinOf = (file) => {
+  const t = readFileSync(join(ADR, file), 'utf8');
+  return { options: [...optionsIn(t)].sort(), decision: chosenIn(t) };
+};
+
 if (!existsSync(BASELINE) && !REBASELINE) {
   console.error(`no baseline at ${BASELINE} — capture one with --rebaseline before condensing`);
   process.exit(2);
 }
 
+if (PIN) {
+  // A TARGETED APPEND. It reads the existing file, adds or replaces exactly the named
+  // entries, and rewrites through the same serialiser — so the diff is the new ADR and
+  // nothing else, and the pre-condensation evidence for every other ADR survives.
+  const current = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
+  const missing = PIN.filter((f) => !existsSync(join(ADR, f)));
+  if (missing.length) {
+    console.error(`not in ${ADR}: ${missing.join(', ')}`);
+    process.exit(2);
+  }
+  const before = serialise(current);
+  for (const f of PIN) current[f] = pinOf(f);
+  const next = serialise(Object.fromEntries(Object.keys(current).sort().map((k) => [k, current[k]])));
+  writeFileSync(BASELINE, next);
+  const churn = before.split('\n').filter((l, i) => l !== next.split('\n')[i]).length;
+  console.log(`pinned ${PIN.join(', ')} → ${BASELINE} (${churn} line(s) changed)`);
+  process.exit(0);
+}
+
 if (REBASELINE) {
   const out = {};
-  for (const f of readdirSync(ADR).filter((x) => /^\d{4}-.*\.md$/.test(x))) {
-    const t = readFileSync(join(ADR, f), 'utf8');
-    out[f] = { options: [...optionsIn(t)].sort(), decision: chosenIn(t) };
-  }
-  writeFileSync(BASELINE, `${JSON.stringify(out, null, 1)}\n`);
+  for (const f of readdirSync(ADR).filter((x) => /^\d{4}-.*\.md$/.test(x))) out[f] = pinOf(f);
+  writeFileSync(BASELINE, serialise(out));
   console.log(`rebaselined ${Object.keys(out).length} ADR(s) → ${BASELINE}`);
   process.exit(0);
 }
@@ -203,7 +248,12 @@ if (!problems.length) {
 
 for (const p of problems) console.log(`  ${p.file}\n    ${p.kind}: ${p.detail}`);
 if (problems.some((p) => p.kind === 'unpinned')) {
-  console.log('\n  Pin a new ADR by adding its entry; do NOT run --rebaseline, which rewrites every existing pin.');
+  const unpinned = problems.filter((p) => p.kind === 'unpinned').map((p) => p.file);
+  console.log(
+    `\n  Pin it:  npm run docs:adr-check -- --pin ${unpinned.join(' ')}\n`
+    + '  Do NOT run --rebaseline: it rewrites every existing pin, discarding the\n'
+    + '  pre-condensation evidence for every other ADR to register one new file.',
+  );
 }
 console.error(
   `\n${problems.length} ADR(s) lost content a condensation may not remove. Shortening may merge `
