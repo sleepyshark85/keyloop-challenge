@@ -44,6 +44,21 @@ every test in slice 06.
   booking is the first execution reaching that arm from a second call site. Two unit cases, the
   implementer's; no production change is expected, and if one is needed that is the finding.
 
+- **A concurrency test for racing moves** (ref `A-06-3`, deferred here at slice 06 step 1; the
+  obligation originates in §8.2, where it was for a while the only record). Slice 00's AC-10 fixes
+  the **single-threaded** `UPDATE` semantics; [ADR-0003](../adr/0003-cancellation-and-rescheduling-in-scope.md)
+  claims two racing reschedules behave like two racing bookings — one commits, the other gets
+  `23P01` — and **no scenario and no test asserts it**. QS-4 and QS-5 cover what a *refused* move
+  leaves behind, QS-6 the self-overlap; the mirror of QS-1 on the `UPDATE` path is named by
+  nothing. A `BEFORE UPDATE` trigger that passes everything slice 00 asserts and fails only under
+  simultaneity is the proof the gap is real, and is the mutant control this test owes.
+  **Why here rather than slice 06:** ADR-0019's criterion, and both halves are re-measurable on
+  arrival (D-05-3's remedy). *Cheaper* — AC-2 already builds the barrier harness for a move racing
+  *N* bookings, and racing moves is that harness with `UPDATE` on both sides. *Stronger* — it can
+  assert alongside AC-1 that the loser's original is untouched, which is what makes *"one commits,
+  one is refused"* mean something rather than count to one. **If either premise is false on
+  arrival, say so in the PR**; that is what D-05-3 asked for.
+
 ## In scope
 
 - `tests/concurrency/refused-move-leaves-original.test.ts` and

@@ -93,6 +93,20 @@ is a goal nobody can fail.
 - **AC-15** — Given the measured write throughput for a single contended resource, when it is recorded
   in §11, then the figure and the dealership scale at which it would become binding are both stated.
 
+## Inherited scope — written here, not only where it was deferred
+
+- **F-06-1 — two attempt loops, one design.** `bookAppointment` and `rescheduleAppointment` each
+  carry ADR-0004's retry loop: the same pruning, the same attempt cap, the same `booking.conflict`
+  line, in two files. Slice 06 duplicated it deliberately rather than refactor the project's
+  most-measured code path inside its largest slice, and deferred the extraction here under
+  ADR-0019. **Slice 09 is the destination because it must instrument both loops anyway** —
+  `appointment.insert` and `appointment.update` spans, `booking_attempts`, and
+  `booking_conflicts_total` (§8.4) — so it opens both files regardless; *cheaper* there, and
+  *stronger*, because an extracted loop is instrumented once instead of twice with a chance to
+  differ. Both premises are re-measurable on arrival: if slice 09 turns out to open only one file,
+  say so in the PR (D-05-3).
+- **OQ-05-2** — deferred here at slice 05; already written up as AC-6b above.
+
 ## In scope
 
 - OpenTelemetry spans and metrics per §8.4, `pino` structured logging, and

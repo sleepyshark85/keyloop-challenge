@@ -309,5 +309,34 @@
    "D \u2014 widen the 400 predicate in server.ts to statusCode < 500."
   ],
   "decision": "Chosen option: B, in four parts."
+ },
+ "0025-existence-is-the-reads-legality-is-the-statements.md": {
+  "options": [
+   "Bad, because a guard spread over five CASEs is discoverable only by reading all of them",
+   "Bad, because it makes a refusal write \u2014 a rejected move takes the row lock and leaves a",
+   "Bad, because status then has two adjudicators, and the cheaper one is a read",
+   "Bad, because the read exists only to disambiguate a result the design chose to make",
+   "Good, because a doomed request skips the opening-hours derivation",
+   "Good, because one statement still does the writing",
+   "Good, because one statement's output decides both, unambiguously",
+   "Option A \u2014 guarded UPDATE, plus a follow-up read on zero rows. \u00a76.3 as designed.",
+   "Option B \u2014 unguarded UPDATE, the status guard moved into the SET, slice 05's CASE",
+   "Option C \u2014 the read decides existence; the guarded UPDATE decides legality. Chosen.",
+   "Option D \u2014 Option C, and the read short-circuits on cancelled too."
+  ],
+  "decision": "Chosen option: C."
+ },
+ "0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md": {
+  "options": [
+   "Bad, because both are file-granular, and the two functions this is about are in one file \u2014",
+   "Bad, because it leaves a residue slice 05 named and accepted: the token proves a lock was",
+   "Good, because \"forgot the lock\" becomes a compile error and \"correctly exempt\" becomes a",
+   "Good, because it needs no signature change",
+   "Option A \u2014 keep the docblock. Good, because it costs nothing. Bad, because the defect it",
+   "Option B \u2014 a branded ResourceLock token: lockResources returns it, the writes take it",
+   "Option C \u2014 Option B, and the lock carries the keys it took, the write reading bay and",
+   "Option D \u2014 an ambiguity-containment marker or a dependency-cruiser rule."
+  ],
+  "decision": "Chosen option: C."
  }
 }
