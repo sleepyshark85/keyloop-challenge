@@ -389,5 +389,16 @@
    "Option D \u2014 Lock the whole dealership for a move"
   ],
   "decision": "Chosen option: C. A write acquires a pgadvisoryxactlock for every resource it is in"
+ },
+ "0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md": {
+  "options": [
+   "Option A",
+   "Option A \u2014 Re-read the pair inside the transaction, under the row's own lock",
+   "Option B",
+   "Option B \u2014 Carry the expected pair in the UPDATE's WHERE",
+   "Option C",
+   "Option C \u2014 Book it; four concurrent moves on two rows is rare"
+  ],
+  "decision": ""
  }
 }

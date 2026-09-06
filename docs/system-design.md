@@ -95,6 +95,7 @@ without taking anyone's word for it.
 - [**ADR-0028**](adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) — The lock carries the transaction it was taken on *(proposed)*
 - [**ADR-0029**](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) — A deadlock event names the write path it happened on; a conflict event does not *(accepted)*
 - [**ADR-0030**](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) — A move locks the pair it leaves as well as the pair it takes *(accepted)*
+- [**ADR-0031**](adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md) — A move reads the pair it leaves inside its own transaction *(accepted)*
 
 ---
 
