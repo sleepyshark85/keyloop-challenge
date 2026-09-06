@@ -315,19 +315,23 @@ export async function bookAppointment(
     try {
       const row = await db.transaction().execute(async (trx) => {
         // ADR-0018. Two lock acquisitions that read no table and decide nothing, then ONE
-        // INSERT. AC-5's amended wording is exactly this transaction's contents.
-        await lockResources(trx, bayId, technicianId);
-        return await insertAppointment(trx, {
-          id: appointmentId,
-          dealershipId: command.dealershipId,
-          customerId: command.customerId,
-          vehicleId: command.vehicleId,
-          serviceTypeId: command.serviceTypeId,
-          technicianId,
-          bayId,
-          startsAt,
-          endsAt,
-        });
+        // INSERT. AC-5's amended wording is exactly this transaction's contents. ADR-0026: the
+        // lock is a value the insert takes, carrying the pair it locked — there is no second
+        // copy of `bayId`/`technicianId` on `NewAppointment` for it to disagree with.
+        const lock = await lockResources(trx, bayId, technicianId);
+        return await insertAppointment(
+          trx,
+          {
+            id: appointmentId,
+            dealershipId: command.dealershipId,
+            customerId: command.customerId,
+            vehicleId: command.vehicleId,
+            serviceTypeId: command.serviceTypeId,
+            startsAt,
+            endsAt,
+          },
+          lock,
+        );
       });
 
       return { kind: 'confirmed', appointment: toAppointmentView(row) };

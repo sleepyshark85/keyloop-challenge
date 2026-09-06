@@ -41,17 +41,41 @@ export interface AppointmentRow {
   readonly status: 'confirmed' | 'cancelled';
 }
 
-/** What one attempt writes. There is NO `endsAt` the client can supply — AC-6, structurally. */
+/**
+ * What one attempt writes. There is NO `endsAt` the client can supply — AC-6, structurally.
+ *
+ * NO `bayId` AND NO `technicianId` — ADR-0026 decision C. Both are read off the {@link
+ * ResourceLock} the write takes, so a caller cannot construct one and separately choose what to
+ * lock: there is exactly one value in scope naming the pair, and it is the one `lockResources`
+ * minted.
+ */
 export interface NewAppointment {
   readonly id: string;
   readonly dealershipId: string;
   readonly customerId: string;
   readonly vehicleId: string;
   readonly serviceTypeId: string;
-  readonly technicianId: string;
-  readonly bayId: string;
   readonly startsAt: Date;
   readonly endsAt: Date;
+}
+
+/**
+ * ADR-0026 — a value the write takes, carrying the keys it took.
+ *
+ * `lockResources` is the ONLY minting site: a write cannot be called without one, and there is
+ * no shape that declines to name it (the parameter is required). This forecloses two things
+ * between the lock and the write — "forgot the lock" (a compile error) and "locked the wrong
+ * keys" (there is no second copy of `bayId`/`technicianId` for the write to disagree with) —
+ * and leaves ONE thing open, recorded rather than hidden: the brand is erased at runtime, and
+ * nothing here proves the write runs in the SAME transaction the lock was taken on
+ * (`pg_advisory_xact_lock` is transaction-scoped). Both parameters take the same `Db` at every
+ * call site today, so a mismatch is one expression rather than a compiler fact — ADR-0028,
+ * `proposed`, would close that; it is not built here.
+ */
+export interface ResourceLock {
+  readonly bayId: string;
+  readonly technicianId: string;
+  readonly __brand: 'ResourceLock';
 }
 
 /** The terminal status. ADR-0003: cancellation is a transition, never a delete. */
@@ -89,12 +113,19 @@ const TECHNICIAN_LOCK_CLASS = 2;
  * F-02-9, inherited by slice 06 and slice 07: EVERY write path to `appointment` must take these
  * two locks in this order. One that skips them reintroduces the deadlock against a booking — and
  * because a `40P01` is not retried, it surfaces as a `500` rather than as a latency blip.
+ *
+ * ── IT RETURNS THE LOCK IT TOOK, AND THAT IS ADR-0026 RATHER THAN A CONVENIENCE ───────────────
+ *
+ * This is the ONLY minting site for {@link ResourceLock}. F-05-1: this file held two write
+ * functions, one locking and one not (ADR-0023), and "correctly exempt" read identically to
+ * "forgot the lock". A write that needs the lock now cannot be called without a value only this
+ * function produces, so the mistake is a compile error rather than a docblock.
  */
 export async function lockResources(
   db: Db,
   bayId: string,
   technicianId: string,
-): Promise<void> {
+): Promise<ResourceLock> {
   await sql`
     select pg_advisory_xact_lock(c, k)
       from unnest(
@@ -102,6 +133,10 @@ export async function lockResources(
              array[hashtext(${bayId}), hashtext(${technicianId})]
            ) as t(c, k)
   `.execute(db);
+
+  // The ONE cast this brand costs, confined to this function — the ADR-0016 shape one layer
+  // down, and the same house pattern `candidates.ts`'s three casts already use.
+  return { bayId, technicianId } as ResourceLock;
 }
 
 /**
@@ -112,7 +147,11 @@ export async function lockResources(
  * **3 of 10 trials produced no appointment at all**. It converts a deadlock into a silent total
  * loss of capacity and returns no `err.constraint` for AC-3 and AC-4 to assert on.
  */
-export async function insertAppointment(db: Db, values: NewAppointment): Promise<AppointmentRow> {
+export async function insertAppointment(
+  db: Db,
+  values: NewAppointment,
+  lock: ResourceLock,
+): Promise<AppointmentRow> {
   const row = await db
     .insertInto('appointment')
     .values({
@@ -121,8 +160,9 @@ export async function insertAppointment(db: Db, values: NewAppointment): Promise
       customer_id: values.customerId,
       vehicle_id: values.vehicleId,
       service_type_id: values.serviceTypeId,
-      technician_id: values.technicianId,
-      bay_id: values.bayId,
+      // ADR-0026: off the LOCK, never a second copy of the pair carried on `values`.
+      technician_id: lock.technicianId,
+      bay_id: lock.bayId,
       starts_at: values.startsAt,
       ends_at: values.endsAt,
     })
@@ -214,13 +254,11 @@ function toAppointmentRow(row: {
  * uncommitted cancel and then gets its `201`; the cancel never waits on an exclusion check; the
  * wait is one-directional, and a one-directional wait cannot cycle.
  *
- * F-05-1, stated where it can be read: this file now holds two write functions, one locking and
- * one not, and "correctly exempt" reads identically to "forgot the lock". This docblock is a
- * MITIGATION ONLY IN THE SENSE THAT A COMMENT IS. The remedy is slice 06's — `lockResources`
- * returns a branded `ResourceLock` that {@link insertAppointment} takes as a parameter, so
- * "forgot the lock" becomes a compile error and this signature becomes one that does not ask for
- * one. Nothing here has to change when it lands: this function already takes a plain {@link Db}
- * and no lock, which is exactly the shape the brand leaves it in.
+ * F-05-1, RESOLVED at slice 06 by ADR-0026: `lockResources` returns a branded {@link
+ * ResourceLock} that {@link insertAppointment} takes as a parameter (and the reschedule write
+ * about to land beside it will too), so "forgot the lock" is a compile error and this function's
+ * signature — a plain {@link Db} and no lock parameter — is now itself the readable statement of
+ * "correctly exempt", with no docblock required to tell the two apart.
  *
  * ── ONE STATEMENT, NO GUARD, AND §2.1 NEVER ARISES ────────────────────────────────────────────
  *

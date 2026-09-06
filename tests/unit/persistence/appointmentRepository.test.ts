@@ -5,6 +5,7 @@ import {
   insertAppointment,
   lockResources,
 } from '../../../src/persistence/appointmentRepository.js';
+import type { ResourceLock } from '../../../src/persistence/appointmentRepository.js';
 import { scriptedDb } from '../helpers/stub-db.js';
 
 /**
@@ -32,17 +33,19 @@ const IDS = {
 const STARTS_AT = new Date('2026-09-08T09:00:00.000Z');
 const ENDS_AT = new Date('2026-09-08T10:00:00.000Z');
 
+/** ADR-0026: no `bayId`/`technicianId` here — the write reads them off the LOCK. */
 const NEW_APPOINTMENT = {
   id: IDS.appointment,
   dealershipId: IDS.dealership,
   customerId: IDS.customer,
   vehicleId: IDS.vehicle,
   serviceTypeId: IDS.serviceType,
-  technicianId: IDS.technician,
-  bayId: IDS.bay,
   startsAt: STARTS_AT,
   endsAt: ENDS_AT,
 };
+
+/** A `ResourceLock` a test can hand a write directly, without going through `lockResources`. */
+const LOCK = { bayId: IDS.bay, technicianId: IDS.technician } as ResourceLock;
 
 const RETURNED_ROW = {
   id: IDS.appointment,
@@ -75,6 +78,12 @@ describe('lockResources — ADR-0018', () => {
     expect(recorded[0]?.parameters).toEqual([IDS.bay, IDS.technician]);
   });
 
+  it('ADR-0026 — returns a lock carrying the pair it took, not the values a caller could disagree with', async () => {
+    const { db } = scriptedDb([{ rows: [{}] }]);
+    const lock = await lockResources(db, IDS.bay, IDS.technician);
+    expect(lock).toEqual({ bayId: IDS.bay, technicianId: IDS.technician });
+  });
+
   it('is the TRANSACTION-scoped lock, never the session-scoped one', async () => {
     // `pg_advisory_lock` would survive the attempt and be held across the next candidate, which
     // turns the retry loop into a lock accumulator and deadlocks on the second attempt. The two
@@ -99,7 +108,7 @@ describe('lockResources — ADR-0018', () => {
 describe('insertAppointment', () => {
   it('is ONE statement, an INSERT, with no ON CONFLICT and no pre-read (AC-5)', async () => {
     const { db, recorded } = scriptedDb([{ rows: [RETURNED_ROW] }]);
-    await insertAppointment(db, NEW_APPOINTMENT);
+    await insertAppointment(db, NEW_APPOINTMENT, LOCK);
 
     expect(recorded).toHaveLength(1);
     const sql = recorded[0]?.sql ?? '';
@@ -113,7 +122,7 @@ describe('insertAppointment', () => {
     // has two sources of truth for the enum, and slice 05's cancellation would then have to
     // agree with both.
     const { db, recorded } = scriptedDb([{ rows: [RETURNED_ROW] }]);
-    await insertAppointment(db, NEW_APPOINTMENT);
+    await insertAppointment(db, NEW_APPOINTMENT, LOCK);
     // The INSERT's column list, not the RETURNING clause — which does read `status` back, and
     // must, because the 201 body carries it.
     const columnList = (recorded[0]?.sql ?? '').split(' values ')[0] ?? '';
@@ -141,7 +150,7 @@ describe('insertAppointment', () => {
       constraint: 'no_bay_overlap',
     });
     const { db } = scriptedDb([{ error: refusal }]);
-    await expect(insertAppointment(db, NEW_APPOINTMENT)).rejects.toBe(refusal);
+    await expect(insertAppointment(db, NEW_APPOINTMENT, LOCK)).rejects.toBe(refusal);
   });
 
   it('is EXACTLY this statement — the columns written and the columns returned', async () => {
@@ -149,7 +158,7 @@ describe('insertAppointment', () => {
     // from. A dropped column there is a member missing from `AppointmentView`, which the response
     // schema then strips rather than rejects.
     const { db, recorded } = scriptedDb([{ rows: [RETURNED_ROW] }]);
-    await insertAppointment(db, NEW_APPOINTMENT);
+    await insertAppointment(db, NEW_APPOINTMENT, LOCK);
     expect(recorded[0]?.sql).toBe(
       'insert into "appointment" ("id", "dealership_id", "customer_id", "vehicle_id", ' +
         '"service_type_id", "technician_id", "bay_id", "starts_at", "ends_at") ' +
@@ -162,7 +171,7 @@ describe('insertAppointment', () => {
   it('maps the returned row to camelCase, leaving the instants as Date', async () => {
     // DA-02-2 puts the ISO-8601 rendering in the use case, not here: a mapper that rendered
     // would be a second place the wire format is decided, and nobody reads a mapper.
-    expect(await insertAppointment(scriptedDb([{ rows: [RETURNED_ROW] }]).db, NEW_APPOINTMENT)).toEqual({
+    expect(await insertAppointment(scriptedDb([{ rows: [RETURNED_ROW] }]).db, NEW_APPOINTMENT, LOCK)).toEqual({
       id: IDS.appointment,
       dealershipId: IDS.dealership,
       customerId: IDS.customer,
@@ -180,7 +189,7 @@ describe('insertAppointment', () => {
     // The distinction AC-1's word "allocated" is about. If this returned `values` the response
     // could name a bay the row does not hold, and every assertion on the body would still pass.
     const elsewhere = { ...RETURNED_ROW, bay_id: 'a-different-bay' };
-    const row = await insertAppointment(scriptedDb([{ rows: [elsewhere] }]).db, NEW_APPOINTMENT);
+    const row = await insertAppointment(scriptedDb([{ rows: [elsewhere] }]).db, NEW_APPOINTMENT, LOCK);
     expect(row.bayId).toBe('a-different-bay');
   });
 });
