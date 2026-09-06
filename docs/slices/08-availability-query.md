@@ -60,22 +60,18 @@ fixture widens. Its AC-4 above is the availability-side mirror and does not subs
   backwards.* So the ordering is the point — QS-8 is this slice's, and the pre-filter arrives behind
   it rather than in front of it. The ruling also distinguished an **authoritative allocator**
   (excluded, correctly) from an **advisory pre-filter** (in scope, after QS-8), and that wording was
-  applied to this file at the time. D-04-1's other half — whether the remedy is the filter or a cap
-  above the additive bound — is the half the architect **declined to rule**, and the cap of 16 is a
-  number the human accepted at Gate B; it is not this slice's to settle.
+  applied to this file at the time. D-04-1's other half — filter or a higher cap — the architect
+  **declined to rule**; not this slice's to settle.
 
 - **A-06-4 — whether slice 09 has become the place work goes, and this slice's gate must rule it.**
   Raised by the architect at slice 06 step 2 *against its own pattern of rulings*: ADR-0019's
   cheaper-or-stronger criterion is **per-item and has no aggregate**, and slice 09 now holds
   OQ-05-2, F-06-1, A-06-2 and T-06-5 — every one individually correct, three ruled in slice 06
-  alone — on top of fifteen acceptance criteria and slices 10 and 11 absorbed by Gate D. Its file
-  went 653 → 793 of 800 words in a single run. The architect refused to rule it because it owns
-  ADR-0019; the orchestrator declined to re-cut the backlog on a merge delegation. **Slice 08's gate
-  is the last moment the decision is still free** — slice 09 is next, and a cut made here costs
-  nothing while the same cut made later costs the slice. Three questions: split slice 09, exempt a
-  slice that has absorbed two folded slices from receiving further deferrals, or accept it is the
-  close-out and will be large. **The aggregate-clause question goes to the retro whichever way the
-  scope question falls**, because it will recur on the next close-out slice.
+  alone — on top of fifteen ACs and slices 10 and 11 absorbed by Gate D. The architect refused to
+  rule it because it owns ADR-0019; the orchestrator declined to re-cut the backlog on a merge
+  delegation. **This slice's gate is the last moment the decision is free.** Split slice 09, exempt
+  a slice that absorbed two folded slices from receiving deferrals, or accept it is the close-out
+  and will be large — and the aggregate-clause question goes to the retro either way.
 
 ## In scope
 

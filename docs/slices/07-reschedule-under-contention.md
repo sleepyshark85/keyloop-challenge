@@ -59,31 +59,20 @@ every test in slice 06.
   one is refused"* mean something rather than count to one. **If either premise is false on
   arrival, say so in the PR**; that is what D-05-3 asked for.
 
-- **F-02-9 — the second half: ADR-0018's two locks in bay-then-technician order, *raced* rather
-  than argued.** Slice 06 discharged its half and did it with a stronger mechanism than the
-  obligation asked for — `lockResources` is the only minting site for a value both writes require,
-  so the order is not merely taken correctly, it is **not expressible at a call site at all** and
-  *"skipped the locks"* is a compile error. What slice 06 could not do is *race* it. The architect's
-  discharge ruling surfaced one fact by reading the merged loop that §3's deadlock argument never
-  stated, and it is this slice's to test rather than to accept: **on attempts ≥ 2 a move vacates its
-  incumbent pair while holding only the target pair's locks.** No cycle is possible — each writer
-  waits only on its own target's class-1/class-2 keys, and vacating writes no index entry another
-  transaction waits on — so ADR-0023's M3 argument extends by one path. That extension is an
-  argument today. Here it meets two `UPDATE`s at once.
+- **F-02-9 — the second half: ADR-0018's two locks *raced* rather than argued.** Slice 06
+  discharged its half with a stronger mechanism than the obligation asked for — `lockResources` is
+  the only minting site for a value both writes require, so *"skipped the locks"* is a compile
+  error. What it could not do is race it. Its discharge ruling surfaced one fact §3's deadlock
+  argument never stated: **on attempts ≥ 2 a move vacates its incumbent pair while holding only the
+  target pair's locks.** That is an argument today; here it meets two `UPDATE`s at once.
 
-- **O-41 — the `Inherited scope` guard becomes bidirectional, and this file is where it first
-  bites.** A-05-5's check is a *subset* guard (every ref deferred here appears in `inherits:`) and
-  not a *completeness* guard: slice 06 listed five obligations in prose while three of its four
-  `inherits:` refs appeared nowhere but the front-matter line, so a silent drop would have left
-  `slice:check` green. Ruled at slice 06 step 2 with **one correction to the proposed remedy**:
-  requiring every bullet to carry a ref is false against slice 06 today, because the retired
-  `appointment.ts` bullet is a §5.2 prediction that was never a logged finding and has no ref to
-  carry — a rule demanding one would invent a false ref to satisfy a rule that exists to stop false
-  refs. So the guard runs **both ways**: every ref in `inherits:` appears in a body bullet, and
-  every body bullet carries a ref **or** an explicit no-ref-with-reason escape. Bare bullets fail;
-  escaped bullets pass and are visible. **Built at this slice's dispatch, before it reaches Ready**,
-  so a Definition-of-Ready rule first bites on a file written under it rather than on one already
-  declared ready. The tool is `tools/slice/check.mjs` and the edit is the orchestrator's.
+- **O-41 — the `Inherited scope` guard, built before this slice reached Ready.** A-05-5's check was
+  a *subset* guard, not a *completeness* guard: slice 06 listed five obligations in prose while
+  three of its four `inherits:` refs appeared nowhere but the front-matter line. The guard now runs
+  **both ways**, with an explicit no-ref escape so it cannot demand an invented ref. Ruled at slice
+  06 step 2 to land at this slice's dispatch so a Definition-of-Ready rule first bites on a file
+  written under it — **it did, on this file, for `F-02-9`.** Nothing to build; the ruling and
+  `tools/slice/check.mjs` carry the reasoning.
 
 ## In scope
 
