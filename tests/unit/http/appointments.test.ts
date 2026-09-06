@@ -493,6 +493,84 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
     );
   });
 
+  it.each<[string, string | undefined]>([
+    ['an EMPTY body (FST_ERR_CTP_EMPTY_JSON_BODY)', undefined],
+    ['an UNPARSEABLE body (FST_ERR_CTP_INVALID_JSON_BODY)', '{oops'],
+  ])(
+    'AC-5 — %s with content-type: application/json is 400 /problems/malformed-request, on BOTH routes',
+    async (_label, payload) => {
+      // §8.6 CLAIMS TOTALITY, AND THIS IS THE CLAIM BEING KEPT. Measured on the pinned
+      // fastify@5.12.1 — by the architect, the implementer and the test-engineer independently —
+      // both errors carry `statusCode: 400` and NEITHER sets `validation`, so before this they
+      // missed the validation arm and fell to the catch-all: `500 /problems/internal`, live on
+      // the already-merged booking route. §8.6 justifies its 500 row with "a 4xx would tell a
+      // service advisor to correct something they did not send and cannot see" — here the client
+      // sent exactly that, can see it, and can correct it. The row was inverted.
+      //
+      // The content-type parser runs BEFORE the router (measured: even an unrouted path raises
+      // it), which is why the cancellation route is included: a route reads no body and still
+      // answers this.
+      for (const url of [
+        '/appointments',
+        `/appointments/${APPOINTMENT_ID}/cancellation`,
+      ]) {
+        const response = await serverAnswering({}).inject({
+          method: 'POST',
+          url,
+          headers: { 'content-type': 'application/json' },
+          ...(payload === undefined ? {} : { payload }),
+        });
+
+        expect(response.statusCode, url).toBe(400);
+        expect(response.statusCode, `${url} — the row that was inverted`).not.toBe(500);
+        expect(response.headers['content-type']).toMatch(/application\/problem\+json/);
+        expect(response.json().type).toBe('/problems/malformed-request');
+        expect(response.json().status).toBe(400);
+        // The client is told what to fix, which is the entire argument for moving this off the
+        // 500 row. Both Fastify messages name the header that made the body mandatory.
+        expect(String(response.json().detail)).toContain('content-type');
+      }
+    },
+  );
+
+  it('AC-5 — and a malformed body is NOT logged as an unhandled fault', async () => {
+    // It is the client's mistake, not the system's. If it reached `request.failed` the one line
+    // an operator greps for a genuine fault would fire on every mistyped curl.
+    const lines: string[] = [];
+    const capturing = pino({ level: 'error' }, { write: (line: string): void => void lines.push(line) });
+    const app = serverAnswering({ logger: capturing });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/appointments',
+      headers: { 'content-type': 'application/json' },
+      payload: '{oops',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(lines.join('\n')).not.toContain('request.failed');
+  });
+
+  it('AC-5 is named BY CODE — a DIFFERENT error carrying statusCode 400 is still a 500', async () => {
+    // The predicate is two named codes, never `statusCode < 500`. This file already records that
+    // a broader disjunction was deleted after mutation because no input reached its second arm;
+    // widening it here would be the same mistake with a worse consequence — Fastify's other 4xx
+    // codes have no §8.6 row, so the taxonomy would have to grow to meet the predicate rather
+    // than the other way round. This is the case that fails if someone widens it.
+    const app = serverAnswering({
+      book: () => {
+        throw Object.assign(new Error('some other 4xx'), {
+          code: 'FST_ERR_SOMETHING_ELSE',
+          statusCode: 400,
+        });
+      },
+    });
+
+    const response = await post(app, VALID_BODY);
+    expect(response.statusCode).toBe(500);
+    expect(response.json().type).toBe('/problems/internal');
+  });
+
   it('renders through the SAME builder the routes use, so the taxonomy cannot escape itself', async () => {
     // I-02-5: an error handler that hand-rolls its own body is a second place the taxonomy is
     // written, and the one place a mistyped `type` reaches the client as
