@@ -61,27 +61,77 @@ const RETURNED_ROW = {
   status: 'confirmed',
 };
 
-describe('lockResources — ADR-0018', () => {
-  it('is ONE statement taking both locks, bay in class 1 and technician in class 2', async () => {
-    // The classes are the whole mechanism: disjoint key spaces make bay-then-technician a total
-    // order no attempt can take in reverse, so there is no sort for anyone to keep sorted. A
-    // mutant that swaps 1 and 2 leaves the order total and is harmless; one that makes both
-    // classes the same collapses the two key spaces into one, and THAT is what this pins.
+const OTHER_BAY = 'bbbbbbbb-1111-4111-8111-111111111111';
+const OTHER_TECHNICIAN = 'tttttttt-1111-4111-8111-111111111111';
+
+describe('lockResources — ADR-0018, extended by ADR-0030', () => {
+  it('booking (leave: null) is ONE statement, DISTINCT-collapsed to the same two keys ADR-0018 always locked', async () => {
+    // `vacated = leave ?? { bayId, technicianId }` — a booking's `leave: null` folds `vacated`
+    // back onto `take`, so the four-key array degenerates to two DISTINCT pairs and the
+    // statement's parameters are byte-for-byte what slice 06 sent. This is the pin that a
+    // booking is UNCHANGED by ADR-0030, not merely compatible with it.
     const { db, recorded } = scriptedDb([{ rows: [{ pg_advisory_xact_lock: null }] }]);
-    await lockResources(db, IDS.bay, IDS.technician);
+    await lockResources(db, IDS.bay, IDS.technician, null);
 
     expect(recorded).toHaveLength(1);
     const sql = (recorded[0]?.sql ?? '').replace(/\s+/g, ' ').trim();
     expect(sql).toBe(
-      'select pg_advisory_xact_lock(c, k) from unnest( array[1, 2], ' +
-        'array[hashtext($1), hashtext($2)] ) as t(c, k)',
+      'select pg_advisory_xact_lock(cl, k) from ( select distinct cl, hashtext(key) as k ' +
+        'from unnest( array[1, 2, 1, 2], array[$1, $2, $3, $4] ) as t(cl, key) ' +
+        'order by cl, hashtext(key) ) o',
     );
-    expect(recorded[0]?.parameters).toEqual([IDS.bay, IDS.technician]);
+    expect(recorded[0]?.parameters).toEqual([IDS.bay, IDS.technician, IDS.bay, IDS.technician]);
   });
 
-  it('ADR-0026 — returns a lock carrying the pair it took, not the values a caller could disagree with', async () => {
+  it('a move (leave: the incumbent pair) locks the union — up to four keys, classes repeated 1, 2, 1, 2', async () => {
+    // ADR-0030's whole mechanism: the pair the write TAKES and the pair it LEAVES both go in,
+    // in that order, and `DISTINCT ... ORDER BY (class, hashtext(key))` is what turns that into
+    // a total order rather than a coin flip between two racers who took the two pairs in
+    // opposite roles.
+    const { db, recorded } = scriptedDb([{ rows: [{}] }]);
+    await lockResources(db, IDS.bay, IDS.technician, {
+      bayId: OTHER_BAY,
+      technicianId: OTHER_TECHNICIAN,
+    });
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.parameters).toEqual([
+      IDS.bay,
+      IDS.technician,
+      OTHER_BAY,
+      OTHER_TECHNICIAN,
+    ]);
+    const sql = (recorded[0]?.sql ?? '').replace(/\s+/g, ' ').trim();
+    expect(sql).toContain('array[1, 2, 1, 2]');
+    expect(sql).toContain('distinct');
+    expect(sql).toContain('order by cl, hashtext(key)');
+  });
+
+  it('the two racers of a mutually-vacating pair send the SAME multiset of keys, take and leave swapped', async () => {
+    // ADR-0030's symmetry argument, exercised against the real call rather than restated in
+    // prose: racer 1 takes P1 and leaves P2; racer 2 takes P2 and leaves P1. Neither statement
+    // sorts its own parameters in JS — the four keys arrive in call order and it is the SQL's
+    // `DISTINCT ... ORDER BY (class, hashtext(key))` that turns them into one sequence, so the
+    // only claim a unit test can pin is that both calls hand the database the SAME multiset.
+    const p1 = { bayId: IDS.bay, technicianId: IDS.technician };
+    const p2 = { bayId: OTHER_BAY, technicianId: OTHER_TECHNICIAN };
+
+    const racer1 = scriptedDb([{ rows: [{}] }]);
+    await lockResources(racer1.db, p1.bayId, p1.technicianId, p2);
+    const racer2 = scriptedDb([{ rows: [{}] }]);
+    await lockResources(racer2.db, p2.bayId, p2.technicianId, p1);
+
+    const keysOf = (recorded: typeof racer1.recorded): unknown[] =>
+      [...((recorded[0]?.parameters ?? []) as unknown[])].sort();
+    expect(keysOf(racer1.recorded)).toEqual(keysOf(racer2.recorded));
+  });
+
+  it('ADR-0026 — returns a lock carrying the pair it TOOK, never the pair it left', async () => {
     const { db } = scriptedDb([{ rows: [{}] }]);
-    const lock = await lockResources(db, IDS.bay, IDS.technician);
+    const lock = await lockResources(db, IDS.bay, IDS.technician, {
+      bayId: OTHER_BAY,
+      technicianId: OTHER_TECHNICIAN,
+    });
     expect(lock).toEqual({ bayId: IDS.bay, technicianId: IDS.technician });
   });
 
@@ -90,17 +140,17 @@ describe('lockResources — ADR-0018', () => {
     // turns the retry loop into a lock accumulator and deadlocks on the second attempt. The two
     // functions differ by one word, so the word is asserted.
     const { db, recorded } = scriptedDb([{ rows: [{}] }]);
-    await lockResources(db, IDS.bay, IDS.technician);
+    await lockResources(db, IDS.bay, IDS.technician, null);
     expect(recorded[0]?.sql).toContain('pg_advisory_xact_lock');
     expect(recorded[0]?.sql).not.toMatch(/pg_advisory_lock\b/);
   });
 
   it('reads no table — the lock decides nothing (§4.5, ADR-0018)', async () => {
-    // The keys are `hashtext` of two REFERENCE ids. If this statement ever grew a read of
+    // The keys are `hashtext` of REFERENCE ids. If this statement ever grew a read of
     // `appointment` the lock would stop being liveness and start being correctness, which is
     // precisely the reading ADR-0018's two controls exist to keep true.
     const { db, recorded } = scriptedDb([{ rows: [{}] }]);
-    await lockResources(db, IDS.bay, IDS.technician);
+    await lockResources(db, IDS.bay, IDS.technician, null);
     expect(recorded[0]?.sql).not.toMatch(/appointment/i);
     expect(recorded[0]?.sql).not.toMatch(/\bselect\b[\s\S]*\bfrom\b\s+"/);
   });

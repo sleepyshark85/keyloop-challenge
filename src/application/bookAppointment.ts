@@ -318,7 +318,9 @@ export async function bookAppointment(
         // INSERT. AC-5's amended wording is exactly this transaction's contents. ADR-0026: the
         // lock is a value the insert takes, carrying the pair it locked — there is no second
         // copy of `bayId`/`technicianId` on `NewAppointment` for it to disagree with.
-        const lock = await lockResources(trx, bayId, technicianId);
+        // ADR-0030: `leave: null` — a booking vacates nothing, so `lockResources` locks only
+        // the pair it takes.
+        const lock = await lockResources(trx, bayId, technicianId, null);
         return await insertAppointment(
           trx,
           {

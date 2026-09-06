@@ -89,6 +89,18 @@ export interface ResourceLock {
   readonly __brand: 'ResourceLock';
 }
 
+/**
+ * ADR-0030 — the pair a write is ALSO in flight against, when it also vacates one. Unbranded,
+ * unlike {@link ResourceLock}: this names a pair to lock, not a value a write is entitled to
+ * write from — `leave` is never read back by an INSERT or UPDATE, only handed to
+ * {@link lockResources}, so it earns none of the brand's guarantees and should not look like it
+ * does.
+ */
+export interface ResourcePair {
+  readonly bayId: string;
+  readonly technicianId: string;
+}
+
 /** The terminal status. ADR-0003: cancellation is a transition, never a delete. */
 const CANCELLED = 'cancelled';
 
@@ -97,7 +109,8 @@ const BAY_LOCK_CLASS = 1;
 const TECHNICIAN_LOCK_CLASS = 2;
 
 /**
- * ADR-0018 — take the bay lock and then the technician lock, in one statement, before the insert.
+ * ADR-0018, extended by ADR-0030 — take a lock for every resource the write is IN FLIGHT
+ * against, in one statement, before the write.
  *
  * WHY THIS EXISTS AT ALL. Measured on this repository's migrations, `postgres:16-alpine`, 20
  * racers on one bay released from a hard barrier over 20 trials: 20 confirmed, 95 `23P01` and
@@ -109,20 +122,38 @@ const TECHNICIAN_LOCK_CLASS = 2;
  * inserters never falls to one.
  *
  * WHY IT IS NOT A CORRECTNESS MECHANISM, WHICH IS THE PART THAT MATTERS. The lock reads no table
- * and decides no outcome; it only stops two inserters being in flight against the same bay or the
+ * and decides no outcome; it only stops two writers being in flight against the same bay or the
  * same technician at once. Measured both ways, and the pair is what turns that from a claim into
  * a reading: drop the CONSTRAINTS and keep the lock, and 20 overlapping rows are written — it
  * prevents nothing; drop the LOCK and keep the constraints, and there is still exactly one row
  * (with 108 deadlocks) — it decides nothing. Correctness is entirely the constraint's; liveness is
  * entirely the lock's. `tests/integration/exclusion-constraint-adjudicates.test.ts` runs both.
  *
- * ONE STATEMENT, not two, and classes rather than a sorted pair: class 1 is bays and class 2 is
- * technicians, so the key spaces are disjoint by construction and *bay-then-technician* is a total
- * order no attempt can take in reverse. There is no sort for anyone to keep sorted, which is a
- * whole category of lock-ordering bug that cannot be written here.
+ * ── ADR-0030: NOT ALWAYS TWO LOCKS, AND NOT MERELY CLASSES ────────────────────────────────────
  *
- * F-02-9, inherited by slice 06 and slice 07: EVERY write path to `appointment` must take these
- * two locks in this order. One that skips them reintroduces the deadlock against a booking — and
+ * Class 1 is bays and class 2 is technicians, disjoint by construction — but a move past attempt
+ * 1 is in flight against BOTH the pair it takes (`bayId`/`technicianId`) and the pair it is
+ * leaving (`leave`), because the row it is about to supersede still occupies that pair until this
+ * transaction commits (ADR-0023's own M1: a conflicting writer waits on an uncommitted vacated
+ * entry, not merely on a live one). So up to FOUR keys go in. `vacated = leave ?? take` folds a
+ * booking's absent `leave` back onto its own pair, so `take` and `vacated` are identical and
+ * `DISTINCT` collapses the statement to today's two keys — the SQL TEXT is one static string for
+ * both writes, and booking's behaviour is unchanged rather than merely compatible.
+ *
+ * The result is `DISTINCT`-ed and `ORDER BY (class, hashtext(key))` — a total order over a
+ * shared key space computed FROM A VALUE, inside the statement, rather than maintained by a
+ * caller: there is no sort for a human to keep sorted, and no call-site fact (which pair a racer
+ * happened to pass as `take` versus `leave`) enters the order at all. That last part is the
+ * load-bearing symmetry: for a MUTUALLY-VACATING pair, both racers' {take, leave} sets are THE
+ * SAME MULTISET of four keys, so both compute the identical ordered lock sequence regardless of
+ * which one calls `take` on which pair — which is what stops the enlarged lock set from cycling
+ * on itself. Measured (ADR-0030): 20 mutually-vacating pairs, 25 trials, `23P01` 883/1000 and
+ * `40P01` 117/1000 locking the target pair alone; `23P01` 1000/1000 and `40P01` 0 locking the
+ * union.
+ *
+ * F-02-9, inherited by slice 06 and slice 07 and corrected by ADR-0030: EVERY write path to
+ * `appointment` must lock every resource it is in flight against, in this order — not merely the
+ * pair it takes. One that skips a resource it is in flight against reintroduces a deadlock — and
  * because a `40P01` is not retried, it surfaces as a `500` rather than as a latency blip.
  *
  * ── IT RETURNS THE LOCK IT TOOK, AND THAT IS ADR-0026 RATHER THAN A CONVENIENCE ───────────────
@@ -130,19 +161,34 @@ const TECHNICIAN_LOCK_CLASS = 2;
  * This is the ONLY minting site for {@link ResourceLock}. F-05-1: this file held two write
  * functions, one locking and one not (ADR-0023), and "correctly exempt" read identically to
  * "forgot the lock". A write that needs the lock now cannot be called without a value only this
- * function produces, so the mistake is a compile error rather than a docblock.
+ * function produces, so the mistake is a compile error rather than a docblock. The returned lock
+ * NEVER carries `leave` — a write reads bay and technician off the pair it TOOK, never off the
+ * pair it left, so there is no field here for one to be confused with the other.
  */
 export async function lockResources(
   db: Db,
   bayId: string,
   technicianId: string,
+  /**
+   * ADR-0030 — REQUIRED so omission is `TS2554`, and `null` only where the write vacates
+   * nothing (booking). A move passes the pair its row already occupies, constant across
+   * attempts because every prior attempt aborted.
+   */
+  leave: ResourcePair | null,
 ): Promise<ResourceLock> {
+  const vacated = leave ?? { bayId, technicianId };
+
   await sql`
-    select pg_advisory_xact_lock(c, k)
-      from unnest(
-             array[${sql.lit(BAY_LOCK_CLASS)}, ${sql.lit(TECHNICIAN_LOCK_CLASS)}],
-             array[hashtext(${bayId}), hashtext(${technicianId})]
-           ) as t(c, k)
+    select pg_advisory_xact_lock(cl, k)
+      from (
+        select distinct cl, hashtext(key) as k
+          from unnest(
+                 array[${sql.lit(BAY_LOCK_CLASS)}, ${sql.lit(TECHNICIAN_LOCK_CLASS)},
+                       ${sql.lit(BAY_LOCK_CLASS)}, ${sql.lit(TECHNICIAN_LOCK_CLASS)}],
+                 array[${bayId}, ${technicianId}, ${vacated.bayId}, ${vacated.technicianId}]
+               ) as t(cl, key)
+          order by cl, hashtext(key)
+      ) o
   `.execute(db);
 
   // The ONE cast this brand costs, confined to this function — the ADR-0016 shape one layer

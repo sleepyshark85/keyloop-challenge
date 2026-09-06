@@ -174,9 +174,10 @@ describe('rescheduleAppointment — the happy path', () => {
     const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
     expect(outcome.kind).toBe('moved');
     // The lock statement (the first query after the six reference reads) must lock bay-0 and
-    // tech-0 — the row's own pair — not a drawn candidate.
+    // tech-0 — the row's own pair — not a drawn candidate. ADR-0030: attempt 1's `leave` is the
+    // same incumbent pair as `take`, so all four positional parameters name it.
     const lockCall = recorded[6];
-    expect(lockCall?.parameters).toEqual(['bay-0', 'tech-0']);
+    expect(lockCall?.parameters).toEqual(['bay-0', 'tech-0', 'bay-0', 'tech-0']);
   });
 
   it('ADR-0027 — on the incumbent pair\'s 23P01, the SHUFFLE runs over all candidates for the remainder', async () => {

@@ -11,7 +11,10 @@
  * case must not silently change another's exhaustiveness check.
  *
  * ADR-0027: ATTEMPT 1 IS THE APPOINTMENT'S OWN `(bay_id, technician_id)`, tried directly — no
- * lock/`23P01` for it. On that pair's `23P01`, ADR-0009 applies unchanged from attempt 2 onward:
+ * SHUFFLE and no seed draw for it, not no lock: it is locked exactly like every other attempt
+ * (line 201 below is unconditional), and ADR-0030 locks it against itself, so `lockResources`'
+ * `DISTINCT` collapses the statement back to today's two keys. On that pair's `23P01`, ADR-0009
+ * applies unchanged from attempt 2 onward:
  * a full seeded shuffle is drawn over ALL candidates (the incumbent pair among them, so it may
  * be re-tried paired with a different partner — bounded at one extra attempt, ADR-0027
  * "Consequences"), with Bound-2 pruning and the same attempt cap. The structural bound is
@@ -53,7 +56,7 @@ import {
   lockResources,
   rescheduleAppointmentById,
 } from '../persistence/appointmentRepository.js';
-import type { Move } from '../persistence/appointmentRepository.js';
+import type { Move, ResourcePair } from '../persistence/appointmentRepository.js';
 import { candidateResources } from '../persistence/candidateRepository.js';
 import { findDealership, findServiceType } from '../persistence/referenceRepository.js';
 import { classify } from '../persistence/pgError.js';
@@ -190,6 +193,9 @@ export async function rescheduleAppointment(
   // outside the shuffle; attempts 2.. traverse the full candidate lists exactly as booking's
   // loop does, bounded at |bays| + |technicians|.
   const structuralBound = 1 + candidates.bays.length + candidates.technicians.length;
+  // ADR-0030's `leave` — the pair this row is IN FLIGHT AGAINST until this move commits.
+  // CONSTANT across every attempt, because every prior attempt aborted and left the row here.
+  const incumbent: ResourcePair = { bayId: existing.bayId, technicianId: existing.technicianId };
   let order: CandidateOrder | null = null;
   let bayId = existing.bayId;
   let technicianId = existing.technicianId;
@@ -198,7 +204,7 @@ export async function rescheduleAppointment(
   for (let attempts = 1; attempts <= structuralBound; attempts += 1) {
     try {
       const row = await db.transaction().execute(async (trx) => {
-        const lock = await lockResources(trx, bayId, technicianId);
+        const lock = await lockResources(trx, bayId, technicianId, incumbent);
         return await rescheduleAppointmentById(trx, move, lock);
       });
 
@@ -273,8 +279,11 @@ export async function rescheduleAppointment(
         }
 
         case 'no-verdict': {
-          // T-02-9 / ADR-0018, extended to this path (ADR-0026's deadlock argument): a
-          // `40P01` under the locks can only mean a write path skipped them. Not retried.
+          // T-02-9 / ADR-0018 and ADR-0030. NOT a write path skipping a lock — a move past
+          // attempt 1 is legitimately in flight against TWO pairs (the one it holds, the one
+          // it is trying to take), and `lockResources`' `leave` argument above locks both. A
+          // `40P01` reaching here means a resource this move was in flight against went
+          // unlocked, which under ADR-0030's rule is an internal fault either way. Not retried.
           deps.logger.error(
             { event: DEADLOCK_EVENT, bayId, technicianId, attempt: attempts },
             DEADLOCK_EVENT,
