@@ -179,6 +179,20 @@ Do not take these from prose; this is the list.
   nothing. AC-4 catches it, since that is a `40P01` too. Measured 0 / 1000.
 - **A move past attempt 1 serialises against four keys**, up to twice ADR-0018's ceiling. Bookings
   are the volume and are untouched; QS-14's budget is a booking budget.
-- **`docs:budget --check --ratchet` reported this slice file at 893 / 800 once, then green three
-  runs in a row on an unchanged tree.** Not reproduced; recorded because a flaky ratchet is worse
-  than a red one, and the orchestrator owns that tool.
+
+## 10 · Open questions
+
+- **`OQ-07-1` — the 893 / 800 budget report was not a flake, and the tool was right every time.
+  RESOLVED.** The first `docs:budget --check --ratchet` run of this step reported
+  `slices/07-reschedule-under-contention.md` at 893 / 800 and *"1 document GREW past its ceiling"*;
+  four later runs exited 0. The architect recorded it as unexplained. The cause was the
+  orchestrator adding inherited-scope bullets to slices 07 and 08 to satisfy O-41's new guard —
+  07 to 893, 08 to 802 — and trimming both back under at `33d2e52`, **between the two runs**. The
+  tree changed under a running agent. The tool reported what was true when it ran, twice.
+
+  Kept rather than deleted for two reasons. An unreproducible failure that nobody explains is how
+  a real one gets dismissed the second time it appears, and this one was one run away from being
+  filed as tool flakiness in a repository whose most important guarantees are measurements. And
+  the shape is worth naming beside `A-07-1`: **a shared file edited while an agent is reading it
+  produces an observation that is correct and unrepeatable**, which is indistinguishable from a
+  bad tool right up until someone finds the commit.
