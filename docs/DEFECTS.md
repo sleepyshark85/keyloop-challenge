@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **182** |
-| Severity | 10 blocking · 98 major · 74 minor |
+| Findings recorded | **190** |
+| Severity | 10 blocking · 103 major · 77 minor |
 | Verdicts | 10 narrowed · 67 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 44 · implementer 34 · architect 34 · reviewer 34 · orchestrator 29 · scribe 5 · human 2 |
-| Awaiting a ruling | **89** |
-| Mean escape distance | 1.88 step(s) |
+| Raised by | test-engineer 44 · reviewer 42 · implementer 34 · architect 34 · orchestrator 29 · scribe 5 · human 2 |
+| Awaiting a ruling | **97** |
+| Mean escape distance | 1.98 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1185,6 +1185,14 @@ rather than narrated.*
 | **I-05-5** | MAJOR | 4 *(+3)* | implementer | freeResources does not exist in src/, so AC-1 named mutant is unreachable today and the design inference is not yet true of this repository | **open** |
 | **I-05-6** | MAJOR | 4 *(+4)* | implementer | AC-5 closed two of three content-type-parser holes; the third is live after this slice and is T-05-7 next instance | **open** |
 | **I-05-7** | MINOR | 4 *(+3)* | implementer | The cancellation route publishes two response schemas it can never produce | **open** |
+| **R-05-1** | MAJOR | 5 *(+4)* | reviewer | An accepted ADR deferral INTO this slice went unbuilt and unnoticed | **open** |
+| **R-05-2** | MAJOR | 5 *(+4)* | reviewer | Slice 05 is repeating the same mechanism prospectively: its three deferrals are recorded only in its own documents | **open** |
+| **R-05-3** | MAJOR | 5 *(+4)* | reviewer | A whole response class is outside the taxonomy, and the docblock this slice rewrote claims otherwise | **open** |
+| **R-05-4** | MAJOR | 5 *(+4)* | reviewer | The remedy accepted for I-05-5 does not fix the sentence it was accepted to fix — the narrowed premise is also false | **open** |
+| **R-05-5** | MINOR | 5 *(+4)* | reviewer | AC-1 central failure message names a module that does not exist as the diagnosis | **open** |
+| **R-05-6** | MINOR | 5 *(+4)* | reviewer | additionalProperties false does not reject unknown body properties; Fastify removeAdditional strips them silently | **open** |
+| **R-05-7** | MAJOR | 5 *(+5)* | reviewer | problem.ts sits at exactly section 10 threshold with three survivors, and slice 06 is the slice that touches it | **open** |
+| **R-05-8** | MINOR | 5 *(+5)* | reviewer | Two surviving guard mutants sit inside ADR-0016 single sanctioned cast site | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1276,6 +1284,46 @@ rather than narrated.*
 
 - *scenario:* Design section 4 prescribes the shared PROBLEM_RESPONSES, which carries 400, 404, 409 and 422; this route can produce 400 and 404 only. Harmless at runtime, but ADR-0005 emits it as the OpenAPI document at slice 10, so the published contract advertises two statuses the endpoint cannot return. Implemented as designed rather than trimmed, because narrowing a shared constant at one call site is how it forks. Worth a per-route response set at slice 10.
 - *file:* `src/http/routes/appointments.ts`
+
+**R-05-1** — An accepted ADR deferral INTO this slice went unbuilt and unnoticed
+
+- *scenario:* ADR-0019 names slice 05 by name as the destination for R-02-2 and R-02-3 on a stated criterion, and its Consequences read: two rows in arc42 section 11 until slice 05 reaches done. Neither is mentioned in either slice-05 document; both are still deferred. The branch NEVER TOUCHES tests/integration/exclusion-constraints.test.ts — and ADR-0019 stated reason for choosing slice 05 was that it reopens that same file anyway. No file under tests/ combines a pg_advisory lock with a dropped exclusion constraint, so R-02-2 fourth cell (the lock cannot replace the constraint) is still prose. R-02-3 mutant survives in this slice own run at routes/appointments.ts:210:19, unchanged from slice 02 203:19. RESIDUE THE REVIEWER VERIFIED AND WHICH CHANGES THE REMEDY: R-02-3 is unkillable without a production change, so the right outcome is to CLOSE it with that reason rather than build it — which means ADR-0019 slice-05-makes-it-stronger premise was false for one of the two and went untested.
+- *file:* `docs/slices/05-cancellation.md`
+
+**R-05-2** — Slice 05 is repeating the same mechanism prospectively: its three deferrals are recorded only in its own documents
+
+- *scenario:* Slice 05 defers F-05-1 to slice 06, OQ-05-2 to slice 10, and AC-1 claim to slice 08. grep finds none of F-05-1, ResourceLock, ADR-0023, ADR-0019, OQ-05-2 or the AC-1 claim in slices 06, 10 or 08. This is the exact mechanism that lost R-02-2 and R-02-3. ADR-0019 own Consequences record the pattern that WORKS — slice 04 routed D-04-1 to slice 08 and slice 08 was amended at 4d172cc — and none of the three followed it. ADR-0019 criterion is now 0 for 2 at its first destination.
+- *file:* `docs/slices/06-reschedule-atomic-move.md`
+
+**R-05-3** — A whole response class is outside the taxonomy, and the docblock this slice rewrote claims otherwise
+
+- *scenario:* Measured against the real buildServer: GET /nope returns 404 application/json with NO type member at all — Fastify default not-found handler, no setNotFoundHandler registered, so it never reaches setErrorHandler. Section 8.6 opens: errors are RFC 9457 application/problem+json with a stable type per failure; section 10 indexes QS-11 as every failure has one status and one problem type. A URL typo falsifies both, and it COLLIDES ON 404 with /problems/appointment-not-found with no type to disambiguate. This slice own rewrite of the server.ts docblock asserts that section 8.6 totality IS KEPT there; there is a second exit that file does not keep.
+- *file:* `src/http/server.ts`
+
+**R-05-4** — The remedy accepted for I-05-5 does not fix the sentence it was accepted to fix — the narrowed premise is also false
+
+- *scenario:* D4 clause 2 MAJOR was re-based onto: AC-1 is the sole guard on the allocator re-deriving over a cancelled row. candidateResources reads only service_bay and technician plus technician_qualification — IT NEVER READS appointment — so there is no re-derivation over a cancelled row and no two-copy seam. The severity has now been justified TWICE on premises that do not hold in this repository. What AC-1 does prove, established by the reviewer and better than either stated reason: the fixture is 1x1 so no_technician_overlap predicate must ALSO release, and slice 00 AC-4 keeps techB free deliberately so nothing else asserts the technician side behaviourally; and because the candidate list carries no availability filter it is IDENTICAL before and after the cancel, so the only thing that moved between the 409 and the 201 is the constraint verdict on ADR-0004 retry attempts. AC-1 is a proof at the edge that D1 UPDATE removes the row from BOTH constraints scope.
+- *file:* `docs/slices/05-design.md`
+
+**R-05-5** — AC-1 central failure message names a module that does not exist as the diagnosis
+
+- *scenario:* Line 192. When AC-1 fails the reader is told a 409 means freeResources overlap predicate has dropped status <> cancelled, and is directed AWAY from the two places the failure can actually be: the cancel statement and the constraint predicate. Lines 42 and 45 carry the same claim as narrative and go to step 7 with slice 08 named; line 192 is a diagnostic and the reviewer argued specifically that it be fixed before merge.
+- *file:* `tests/acceptance/cancel-appointment.test.ts`
+
+**R-05-6** — additionalProperties false does not reject unknown body properties; Fastify removeAdditional strips them silently
+
+- *scenario:* POST /appointments with a valid body plus an extra technicianId returns 201 naming a different, allocated technician, with no signal the field was discarded. Pre-existing from slice 02 and no AC requires rejection. Recorded because IT IS THE EXPLANATION for five of the nineteen survivors being inert rather than debt — the reviewer had drafted a MAJOR claiming the opposite, MEASURED IT, WITHDREW IT, and turned the measurement into the explanation.
+- *file:* `src/http/routes/appointments.ts`
+
+**R-05-7** — problem.ts sits at exactly section 10 threshold with three survivors, and slice 06 is the slice that touches it
+
+- *scenario:* 75.00 against a threshold of 0.75 — ONE SURVIVOR AWAY from failing the Definition of Done on any slice that changes it. Out of scope for slice 05, which does not touch it, but it is the module the entire section 8.6 taxonomy renders through and slice 06 extends that taxonomy with /problems/appointment-not-confirmed. Found only because the reviewer re-ran the full suite to check its own provenance caveat rather than reading the scoped report.
+- *file:* `src/http/problem.ts`
+
+**R-05-8** — Two surviving guard mutants sit inside ADR-0016 single sanctioned cast site
+
+- *scenario:* ConditionalExpression survivors at 80:9 (typeof code === string) and 103:39 (constraint !== undefined). Pre-existing and out of scope; noted because ADR-0016 is the record asserting that file is the only place a ContendedResource may be minted, and two unkilled guards sit inside that claim.
+- *file:* `src/persistence/pgError.ts`
 
 </details>
 
