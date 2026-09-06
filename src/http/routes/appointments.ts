@@ -222,14 +222,16 @@ export function registerAppointmentRoutes(
           return await sendProblem(reply, INTERNAL);
 
         default: {
-          // Stryker disable all : an exhaustive switch's `never` arm is unreachable by
-          // construction (every real member is handled above) and structurally unkillable —
-          // there is no input that reaches it, so no mutant here can ever be observed by a
-          // test (design §2.4, reviewer slice 05). Restored immediately below so nothing
-          // else in this switch loses coverage.
           const unhandled: never = outcome;
+          // Stryker disable next-line all : an exhaustive switch's `never` arm is unreachable
+          // by construction (every real member is handled above) and structurally unkillable
+          // — there is no input that reaches it, so no mutant on this line can ever be
+          // observed by a test (design §2.4, reviewer slice 05/06 — R-06-A). `disable
+          // next-line` binds to this line only, so nothing else in this switch loses
+          // coverage; a `disable all`/`restore all` pair does NOT restore here because the
+          // instrumenter's directive bookkeeping reads leading comments only, and `restore
+          // all` written as a block's last statement is a trailing comment of nothing.
           throw new Error(`unhandled booking outcome ${JSON.stringify(unhandled)}`);
-          // Stryker restore all
         }
       }
     },
@@ -259,14 +261,11 @@ export function registerAppointmentRoutes(
           );
 
         default: {
-          // Stryker disable all : an exhaustive switch's `never` arm is unreachable by
-          // construction (every real member is handled above) and structurally unkillable —
-          // there is no input that reaches it, so no mutant here can ever be observed by a
-          // test (design §2.4, reviewer slice 05). Restored immediately below so nothing
-          // else in this switch loses coverage.
           const unhandled: never = outcome;
+          // Stryker disable next-line all : see the identical arm above (R-06-A) — unreachable
+          // by construction, structurally unkillable, and a single-line directive so nothing
+          // else in this switch loses coverage.
           throw new Error(`unhandled read outcome ${JSON.stringify(unhandled)}`);
-          // Stryker restore all
         }
       }
     },
@@ -312,14 +311,11 @@ export function registerAppointmentRoutes(
           );
 
         default: {
-          // Stryker disable all : an exhaustive switch's `never` arm is unreachable by
-          // construction (every real member is handled above) and structurally unkillable —
-          // there is no input that reaches it, so no mutant here can ever be observed by a
-          // test (design §2.4, reviewer slice 05). Restored immediately below so nothing
-          // else in this switch loses coverage.
           const unhandled: never = outcome;
+          // Stryker disable next-line all : see the identical arm above (R-06-A) — unreachable
+          // by construction, structurally unkillable, and a single-line directive so nothing
+          // else in this switch loses coverage.
           throw new Error(`unhandled cancel outcome ${JSON.stringify(unhandled)}`);
-          // Stryker restore all
         }
       }
     },
@@ -416,14 +412,11 @@ export function registerAppointmentRoutes(
           return await sendProblem(reply, INTERNAL);
 
         default: {
-          // Stryker disable all : an exhaustive switch's `never` arm is unreachable by
-          // construction (every real member is handled above) and structurally unkillable —
-          // there is no input that reaches it, so no mutant here can ever be observed by a
-          // test (design §2.4, reviewer slice 05). Restored immediately below so nothing
-          // else in this switch loses coverage.
           const unhandled: never = outcome;
+          // Stryker disable next-line all : see the identical arm above (R-06-A) — unreachable
+          // by construction, structurally unkillable, and a single-line directive so nothing
+          // else in this switch loses coverage.
           throw new Error(`unhandled reschedule outcome ${JSON.stringify(unhandled)}`);
-          // Stryker restore all
         }
       }
     },
