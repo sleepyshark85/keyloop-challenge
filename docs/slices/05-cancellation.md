@@ -3,7 +3,10 @@ id: "05"
 title: Cancellation — and the proof at the edge that both constraints release
 status: ready
 depends_on: ["04"]
-arc42: ["§5.2", "§6.4", "§6.6", "§8.6", "§10", "§11"]   # §6.6 and §8.6 amended at step 2
+arc42: ["§5.2", "§6.1", "§6.4", "§6.6", "§8.6", "§10", "§11"]
+                     # §6.6 and §8.6 amended at step 2; §6.1 at step 7, R-02-2 having been
+                     # built in this slice. §6.2, §6.3 and §6.5 took pointer-only edits to
+                     # pay the ratchet for the additions — one home per fact, no fact lost.
 adr: [3, 23, 24]
 quality_scenarios: [QS-7]
 loopbacks: 0
@@ -88,11 +91,12 @@ Beyond `CLAUDE.md` §10:
 - The freed-slot assertion books **through the API** rather than inserting directly, so it proves the
   released slot over the whole path — allocation, ADR-0004's retry, and the constraint's verdict —
   rather than at the SQL level slice 00 already covers.
-- **Step-7 arc42 edits, ruled now so step 7 executes rather than decides:** §6.4 takes D1's statement
-  and the sentence that a replay advances `xmin` while changing no column; §6.6 gains one sentence on
-  its **two** rows reading *"the `UPDATE`'s 0 rows"* — slice 05 makes the first unambiguous, and the
-  second is slice 06's, where a guarded `WHERE id = $1 AND status = 'confirmed'` reproduces exactly
-  the ambiguity D1 rejects and needs the follow-up read §6.3 already names; §5.2 loses its prediction
-  of `src/domain/appointment.ts`; §11 gains F-05-1, OQ-05-2, F-02-9's narrowed wording, ADR-0024's
-  shipped second exit, and **ADR-0019's criterion measured 0-for-2 on its own premises at its first
-  destination** — the row that decides whether it is superseded or enforced.
+- **Step-7 arc42 edits, ruled at step 5 so step 7 executed rather than decided — all done.** §6.4
+  takes D1's statement, the `CASE`, and the sentence that a replay advances `xmin` while changing no
+  column; §6.6 says the two *"`UPDATE`'s 0 rows"* rows are not equally decided; §5.2 loses its
+  prediction of `src/domain/appointment.ts` and gains `cancelAppointment.ts`, `CancelOutcome` and the
+  no-lock `cancelAppointmentById`; §8.6's `400` row and its residual paragraph say what the code does
+  today; §10 corrects QS-7's false reason and QS-11's direction; §11 gains F-05-1, D-05-1 and D-05-3,
+  narrows F-02-9 to ADR-0023's *iff*, and updates R-10 and R-12. **§6.1 was added to the declaration
+  at step 7**, R-02-2 having been built here — the four-cell control it claimed as measured from slice
+  02 was only argued until this slice ran it.
