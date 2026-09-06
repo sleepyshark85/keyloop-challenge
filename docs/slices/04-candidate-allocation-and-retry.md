@@ -3,7 +3,7 @@ id: "04"
 title: Candidate allocation and retry — no refusal while capacity remains
 status: ready
 depends_on: ["02"]
-arc42: ["§6.2", "§5.2", "§11"]
+arc42: ["§6.2", "§5.2", "§7.3", "§11", "§13"]
 adr: [4, 9]
 quality_scenarios: [QS-3]
 loopbacks: 0
@@ -89,3 +89,25 @@ Four files carry stale premise **prose** with sound assertions — `no-bay-overl
 `tests/unit/persistence/candidateRepository.test.ts` (implementer, `ORDER BY` is now the shuffle's
 stable *input*, which is a better reason than the one recorded). Non-blocking, but fixed this slice:
 I-02-9 ruled the false comment the more dangerous half.
+
+## A-04-13 — the declaration is amended, and the gate had already said so
+
+Frontmatter `arc42:` gains **§7.3** and **§13**. Both moved on this branch; neither was declared.
+
+- **§7.3** — `9dfde0d`, the environment table and its contract sentence (T-04-5, ADR-0022). Mine.
+- **§13** — `4d172cc`, scoped `chore(04)`, +139 lines, and `ee868c3`. Scribe-owned prose, but the
+  declaration governs the **branch**, not the author, so §13 is declared rather than exempted —
+  I-04-12's rule, that nobody silences a guard by writing a name into it.
+
+Ruled **(a)**: the content of both edits is correct and only the declaration was missing, so no AC,
+QS or §2 clause fails either way. No loopback (0 of 2).
+
+**The derivation the finding asks for exists and had already fired.** `npm run slice:check 04`
+prints `FAIL · arc42 edits match the declaration · hand-edited but not declared:
+07-deployment-view.md, 13-ai-collaboration.md`. It has been red since `4d172cc` at 13:15 — 98
+minutes before step 5 — because R-01-7 asked for exactly this and O-14 built it, branch-selected
+so a subject line cannot hide a mid-slice edit. The reviewer re-derived it by reading the diff and
+found one of the two files; the tool had both. **What is missing is the reading, not the
+derivation**: `check.run` records CI job outcomes only, so no artifact carries this verdict and
+nothing failed loudly. Carrying the `slice:check` grid into `check.run` is a `tools/` change and
+not the architect's (F-02-10, F-04-1, A-04-4 — the fourth slice running).
