@@ -26,32 +26,31 @@ another role's staged files and briefly recorded the architect committing `src/`
 ## 13.2 Verification — what it caught
 
 **The red commit is observed, not asserted.** Every slice has a collected failing run and a passing
-one after it, from the GitHub API rather than from the workflow:
+one after it, collected from the GitHub API rather than the workflow:
 
-| Slice | red | green | mutation on changed files |
+| Slice | red | green | mutation as logged (§10 gates changed files, 0.75) |
 |---|---|---|---|
 | 00a | 33831214774 | 33844632820 | 0.9577 |
 | 00 | 33856015886 | 33862313022 | ruled **N/A** — no mutable file changed |
 | 01 | 33911942612 | 33913702060 | 0.9806 (155 mutants, 152 killed, 3 survivors) |
 | 02 | 33984418682 | 33994990813 | 0.9595 (790 mutants, 747 killed, 11 timeout, 32 survived) |
 
-`N/A` exists because the alternative was a gate passing on a score measuring the previous slice.
-`depcruise` reports a third value, `not-run`, for the same reason: an absent check must not read as
-a pass.
+`N/A`, and `depcruise`'s third value `not-run`, exist for one reason: an absent check must never
+read as a pass.
 
 **Mutation is an audit, not a target.** At slice 01 the implementer *reported* its three survivors
 rather than writing tests shaped to kill them. At slice 02 the reviewer re-ran Stryker
 independently, reproduced 747/11/32 with a **byte-identical survivor set**, and re-measured
-ADR-0018's three cells itself on `postgres:16-alpine`, finding the ADR honest.
+ADR-0018's three cells on `postgres:16-alpine`, finding it honest.
 
-**The register is generated from the log**, so it cannot drift: 130 findings — 10 blocking, 71
-major, 49 minor — raised by test-engineer 32, reviewer 28, orchestrator 26, implementer 23,
-architect 19, human 2. Mean escape distance 1.66 steps.
+**The register is generated from the log** and cannot drift: 130 findings — 10 blocking, 71 major,
+49 minor — from test-engineer 32, reviewer 28, orchestrator 26, implementer 23, architect 19,
+human 2. Mean escape distance 1.66 steps.
 
 ## 13.3 Where the human overrode the agents
 
-Each ADR carries an `ai-input` provenance block. Of 21: one **overridden**, one **modified**, the
-rest accepted as recommended or still proposed.
+Each ADR carries an `ai-input` provenance block. Of 21, one is **overridden** and one
+**modified**; the rest were accepted as recommended or are still proposed.
 
 - **ADR-0001** — the architect recommended *"time is unbounded"*. The human rejected the conclusion,
   kept the reasoning, and took a third option the architect had not separated out.
@@ -66,35 +65,36 @@ rest accepted as recommended or still proposed.
   alone.
 - **Slice 00** — AC-10 added at step 5, recovering the UPDATE property ADR-0003 rests on, which
   arc42 named in three places and carried in none.
-- **Gate D** — C6's remedy is a disjunction, *cut slices or reduce agent count*. The human ruled the
-  first and **refused the second** on the record: the reviewer produced 17 of 56 findings and the
-  architect's runs were adjudication.
+- **Gate D** — C6's remedy is a disjunction, *cut slices or reduce agent count*. The human ruled
+  the first and **refused the second** on the record: the reviewer produced 17 of 56 findings, and
+  the architect's runs were adjudication.
 - **Concision** — overriding §4's ADR immutability *for length only*, on the argument that what
   immutability protects is the decision a later reader gets, which a meaning-preserving
   condensation does not touch.
 
 ## 13.4 Design changes, and the supersession chain that does not exist
 
-Two DCRs, two loopbacks, both ruled **(c) design defect** — and §6 requires naming the criterion
-that would fail, which is what makes (c) unreachable on preference:
+Two loopbacks, each from a **(c) design defect** — and §6 requires naming the criterion that would
+fail, which is what makes (c) unreachable on preference:
 
 - **T-01-2** — the test-engineer measured that a Docker failure aborts the whole invocation and
   writes zero tests, so the red could still arrive as a crash. The architect ruled against **its own
   design**, naming §2.4: *"§8.3 reason 2 is not imprecise, it is false."* Remedy accepted and
-  *extended* — merging two project results would let a run that never happened merge as zero
+  *extended*: merging two project results would let a run that never happened merge as zero
   failures. Result: `tools/ci/run-tests.mjs`.
 - **T-02-9** — the architect re-ran the finding before ruling and it was **worse than reported**:
   285 of 400 losers deadlocked, not one race in three. It noted that had it ruled from the reported
   number, retry would have looked survivable — and retry livelocks, measured five ways. Result:
   ADR-0018.
 
-The counterweight is that (b) must be ruled when no criterion can be named. The architect did so
-explicitly against its own view: *"it is (b), and I would rule the same way if I disliked the
-answer."*
+The second DCR raised was ruled **(a) clarification**, consuming no loopback. The counterweight is
+that (b) must be ruled when no criterion can be named, and the
+architect did so explicitly against its own view: *"it is (b), and I would rule the same way if I
+disliked the answer."*
 
 **What is not here.** All 21 ADRs carry `supersedes: null`. §6 says a (c) ruling supersedes the
 ADR; neither (c) did — T-01-2 had no ADR to supersede, and T-02-9 produced a new one. There is no
-supersession chain to show, and that is recorded rather than dressed up.
+supersession chain to show, and that is recorded rather than dressed up as one.
 
 ## 13.5 What the process cost
 
@@ -117,20 +117,20 @@ all 216 assertions still passed (R-5) — so a cost derived from it would be the
 project spent two slices cataloguing. C6, *the budget is real*, **failed**: 45 minutes and $8 were
 agreed in advance for slice 00; the most favourable honest reading gives 299 minutes.
 
-The figures also moved after the fact. The light-gate ruling read slice 01 at 9.5 h / 8.30 Mtok
-over 15 runs; the log now reads 19 runs / 11.1 h / 10.69 Mtok, because a stale scope marker filed
-four slice-02 runs under slice 01 (O-20).
+The figures moved after the fact: the light-gate ruling read slice 01 at 9.5 h / 8.30 Mtok over 15
+runs, and the log now reads 19 runs / 11.1 h / 10.69 Mtok, because a stale scope marker filed four
+slice-02 runs under slice 01 (O-20).
 
 ## 13.6 What did not work
 
-**One defect shape, found twenty-five times: a mechanism that reports success over work it never
-did.** The retro catalogued eight in the pilot. Since then, by reference: R-5, R-10, T-01-2, O-14,
+**One defect shape, twenty-five times: a mechanism that reports success over work it never did.**
+The retro catalogued eight in the pilot. Since then, by reference: R-5, R-10, T-01-2, O-14,
 O-17, O-19, O-20, O-24, O-25, O-27, O-31, O-32, O-33, R-02-1, AB-01-5, AB-01-7, and the ADR guard
 that printed *"every considered option and chosen option survives"* over a decision record it had
 never opened — and could not have read anyway, because its options were in the table form the
-concision ruling encourages. The project's own running counters say *five*, *seven*, *eight* and
-*nine* in four different files, because each counts a different set. That disagreement is left
-standing rather than reconciled to a number nobody measured.
+concision ruling encourages. The project's own counters say *five*, *seven*, *eight* and *nine*
+across four files, each counting a different set — a disagreement left standing rather than
+reconciled to a number nobody measured.
 
 Not one was found by reading code; every one came from asking *what would happen if this were
 removed?* Hence the rule, first written by the architect against its own work at slice 00 and now
@@ -150,8 +150,7 @@ bookkeeping: the architect adjudicated eleven objections **without the reports**
 ruled from a relay. Both hooks warn when that marker is absent, never when it is wrong.
 
 **Two things the record must not soften.** Slice 02's Gate E was taken by the **orchestrator, not
-the human**, under an explicit delegation, and is logged `actor: orchestrator` with decision
-`approved-under-delegated-authority` — a gate the human did not see must never read later as one
-they did. The orchestrator named the conflict itself: it routed that work and then gated it. And
-**67 of 130 findings are still awaiting a ruling**, which is the honest shape of a project that
-logs more than it closes.
+the human**, under explicit delegation, and is logged `actor: orchestrator` with decision
+`approved-under-delegated-authority`: a gate the human did not see must never read later as one
+they did. The orchestrator named the conflict itself — it routed that work and then gated it. And
+**67 of 130 findings await a ruling** — the shape of a project logging more than it closes.
