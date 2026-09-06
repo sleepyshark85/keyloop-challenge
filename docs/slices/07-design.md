@@ -129,6 +129,18 @@ provisional until the gate:
   and every refused move's row is unchanged including its `xmin`. *(QS-4, QS-5; ADR-0003's
   never-asserted claim; ADR-0030's control)*
 
+- **AC-5 (new, step 5) — the lock set is derived from state the transaction itself observed.**
+  Given a confirmed appointment at pair *P*, when a move of it is in flight between `lockResources`
+  and its `UPDATE`, then the transaction holds advisory locks on ***P* as the row currently
+  stands** — never on a pair read before the transaction opened. Asserted **deterministically off
+  `pg_locks`** (`classid`/`objid` against `hashtext`), not by racing four movers into the stale
+  interleaving: a probabilistic witness for a rule is the thing ADR-0030 exists to replace, and
+  ADR-0031's claim is about where a value is read, which `pg_locks` reads directly. A mechanism
+  witness under QS-4's scenario, so §10 gains no row. *(QS-4;
+  [ADR-0031](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md)'s control.)*
+  <br>**Mutant control:** restore the pre-loop read and relocate the row between it and the
+  attempt — the transaction then holds the old pair's keys, which the same assertion reads.
+
 **AC-4's mutant control is already measured**: reverting `lockResources` to lock the target pair
 only produces ~117 `40P01` in 1000 attempts, so the criterion discriminates rather than passing
 vacuously. A `40P01` from a *lock-ordering* mistake is caught by the same assertion.
