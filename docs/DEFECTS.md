@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **216** |
-| Severity | 10 blocking · 113 major · 93 minor |
+| Findings recorded | **218** |
+| Severity | 10 blocking · 115 major · 93 minor |
 | Verdicts | 10 narrowed · 77 accepted · 3 escalated · 17 deferred |
-| Raised by | test-engineer 54 · reviewer 44 · architect 40 · orchestrator 36 · implementer 35 · scribe 5 · human 2 |
-| Awaiting a ruling | **109** |
+| Raised by | test-engineer 54 · reviewer 44 · architect 40 · implementer 37 · orchestrator 36 · scribe 5 · human 2 |
+| Awaiting a ruling | **111** |
 | Mean escape distance | 1.89 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -1444,6 +1444,8 @@ rather than narrated.*
 | **T-06-4** | MINOR | 2 *(+1)* | test-engineer | A-06-2 is real, is not the test-engineer, and cannot be closed by any test at the boundary this role owns | **open** |
 | **T-06-5** | MINOR | 2 *(+1)* | test-engineer | ADR-0026 transaction-identity hole is real and no black-box test can observe it | **open** |
 | **O-41** | MAJOR | 2 *(+1)* | orchestrator | The A-05-5 check is a SUBSET guard over logged deferrals, not a COMPLETENESS guard over obligations — and slice 06 is the case that shows the gap | **open** |
+| **I-06-1** | MAJOR | 2 *(+1)* | implementer | The problem.ts mutation arithmetic is wrong as measured — the two new taxonomy rows add ZERO mutants, not two, and the file stays exactly at threshold | **open** |
+| **I-06-2** | MAJOR | 2 *(+1)* | implementer | Candidate ORDER on the reschedule loop is specified nowhere, and the plausible default silently reassigns a move that did not need reassigning | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1503,6 +1505,16 @@ rather than narrated.*
 
 - *scenario:* Named by the architect in its step 1 report, then measured. Slice 06 Inherited scope section lists five obligations; inherits carries four refs; and grep shows F-02-9, R-05-7 and R-05-9 APPEAR NOWHERE IN THE FILE EXCEPT THE FRONT MATTER LINE THE ORCHESTRATOR WROTE. Only F-05-1 and the newly minted A-06-3 are named in the prose. The SUBSTANCE of each is present — the ADR-0024 bullet discusses problem.ts margin which is R-05-7, and the Stryker bullet IS R-05-9 — so no work was dropped; what is missing is any link between a bullet and the ruling that put it there. Two of the five obligations had no ref in the event log AT ALL when the slice started, which is O-39, so a silent drop of either would have left slice:check green. PROPOSED REMEDY, the architect: require every bullet under a slice Inherited scope heading to carry a ref id, and cross-check that set against inherits — converting prose into refs at the point where prose is written. NOT BUILT NOW, deliberately: it would fail slice 06 READY and force body edits to a file two step-2 agents are holding, and the orchestrator building a check that changes the slice under review mid-round is the shape this project keeps catching. Routed for the architect to rule its destination at step 5, which is the mechanism A-05-5 just installed being used rather than described.
 - *file:* `tools/slice/check.mjs`
+
+**I-06-1** — The problem.ts mutation arithmetic is wrong as measured — the two new taxonomy rows add ZERO mutants, not two, and the file stays exactly at threshold
+
+- *scenario:* THE ONE OBJECTION OF THE ROUND, and it is a measurement rather than an argument. The design claims the margin is already prevented: two new StringLiteral mutants killed by the set-equality assertion at tests/unit/http/appointments.test.ts:799, giving 11/14 = 78.57. The implementer ran Stryker scoped to src/http/problem.ts TWICE with a clean revert between runs — once at HEAD, reproducing 9/12 = 75.00 with all three survivors on line 78 exactly as the design cites, and once with both new rows added to PROBLEM_TYPES and the unit assertion extended. BOTH RUNS INSTRUMENTED 12 MUTANTS, NOT 14: Stryker generates no StringLiteral mutants for the elements of this as const array at all. Reproduced twice; no certain root cause offered, which is the honest form. So the file stays 9/12 = 75.00 with the same three survivors and there is NO NEW MARGIN. The underlying finding is AGREED — extending the assertion from seven members to nine is not optional and is what keeps the taxonomy honest — but the remedy claimed arithmetic is not a measured fact and must not reach arc42 section 11 or 8.6 at step 7 as one. Threshold is still met; nothing blocks step 3 or 4.
+- *file:* `docs/slices/06-design.md`
+
+**I-06-2** — Candidate ORDER on the reschedule loop is specified nowhere, and the plausible default silently reassigns a move that did not need reassigning
+
+- *scenario:* Not in the slice file, not in 06-design.md, not in ADR-0025 or ADR-0026. ADR-0003 own text — where the move needs a different bay or technician, candidate selection and retry apply — reads as: try the appointment CURRENT (bayId, technicianId) first, and fall into the seeded-shuffle candidate search only on a 23P01 for that pair. If the loop instead shuffles from the first attempt, a move can be silently and needlessly reassigned to a different bay or technician WHILE THE ORIGINAL PAIR WAS STILL FREE, and NO ACCEPTANCE CRITERION CATCHES THAT TODAY. The implementer intends to build current-resources-first with shuffled fallback on conflict only, and flagged it before committing around it rather than after. It is a real behavioural choice and the architect owns it.
+- *file:* `docs/slices/06-design.md`
 
 </details>
 
