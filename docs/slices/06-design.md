@@ -114,13 +114,12 @@ generates** is one the mechanism protects.
 
 ### 2.3 AC-2 — "exactly one statement modified it", made falsifiable
 
-The slice's own Definition of Done has the reviewer read the generated SQL. That stays, as a second
-and independent check, but it is not the primary one: §10's rule is that a criterion be mappable to
-an executable test, and *"the reviewer looked"* is not.
+The Definition of Done's reviewer read stays as a second, independent check; §10 requires the
+primary one to be executable, and *"the reviewer looked"* is not.
 
 **The instrument is a pair of audit triggers, installed and dropped by the test**, in
-`tests/integration/reschedule-is-one-statement.test.ts` (test-engineer's — it asserts a database
-invariant). Both are `AFTER`: they block nothing and change no semantics.
+`tests/integration/reschedule-is-one-statement.test.ts` (test-engineer's). Both are `AFTER`: they
+block nothing and change no semantics.
 
 - **Row level** — `AFTER INSERT OR UPDATE OR DELETE … FOR EACH ROW`, recording `TG_OP`,
   `txid_current()` and `statement_timestamp()` into a scratch table.
@@ -129,14 +128,13 @@ invariant). Both are `AFTER`: they block nothing and change no semantics.
   the row-level trigger cannot.
 
 **The discriminator is a statement-level row with `affected = 0`, not a count of firings.** Zero
-firings is unsound against this harness: `vitest.config.ts`'s `db` project runs six directories
-against one container on one `databaseUrl` without `fileParallelism: false`, and a statement-level
-trigger has no `NEW` to filter by id — so a concurrent file's `UPDATE` would count, flaky toward
-**false failures**. That `UPDATE` matches rows. **Two record zero** — Option A's unknown id and AC-4's cancelled row
+firings is unsound here: the `db` project runs six directories against one container without
+`fileParallelism: false`, and a statement-level trigger has no `NEW` to filter by — so a concurrent
+file's `UPDATE` counts, flaky toward **false failures**. That `UPDATE` matches rows. **Two record zero** — Option A's unknown id and AC-4's cancelled row
 (T-06-7) — so the residual is false-failure only, never a false pass, and a strict subset of the
 rejected predicate's. Bounded to the call under test; §11 at step 7.
 
-| Implementation | Audit rows | Verdict |
+| Implementation | Audit rows in the window | Verdict |
 |---|---|---|
 | One `UPDATE` | `UPDATE` × 1 | pass |
 | `DELETE` then `INSERT`, same id | `DELETE`, `INSERT` | **fails** |
@@ -147,19 +145,23 @@ rejected predicate's. Bounded to the call under test; §11 at step 7.
 | Unknown id, rejected Option A | none, but **one statement row, `affected = 0`** | **fails** |
 | A discarded candidate | `UPDATE` × 1 | pass |
 
+**The window opens after the fixture's arrange** — `R-06-1`, ruled (a) at step 4: the read was
+filtered by id alone, so a correct build audited `INSERT, UPDATE` and line one was unreachable. The
+arrange writes the same row through the same trigger. Scope the read past it — a mark, or a second
+truncate — never by filtering `op`, which lets cancel-then-book pass.
+
 **The discarded-candidate case is where a stray row would leak** (T-06-3): the original slot
-contended, forcing a second candidate. Only constructible under ADR-0027, and it reuses §2.2's
-bay-control fixture, so the marginal cost is one query and one assertion. No hole is found — a
+contended, forcing a second candidate. No hole is found — a
 failed attempt's `UPDATE` raises `23P01` before its row triggers fire at end of statement, and even
 then the write rolls back with the attempt's savepoint (ADR-0004). It is asserted because the loop
 is new, and the obviousness is exactly what nobody checks.
 
-Rejected, and independently confirmed by the test-engineer: `pg_stat_user_tables` (table-wide,
-stats-lagged, so flaky against a shared container) and `xmin` (per transaction, cannot count to two).
+Rejected, independently confirmed: `pg_stat_user_tables` (table-wide, stats-lagged, so flaky here)
+and `xmin` (per transaction, cannot count to two).
 
 **No new quality scenario**, recorded so the gate is not left to notice the absence: §10 has zero
-ratchet headroom (§4), AC-2 now has two executable falsifiers of its own, and QS-5 at slice 07 is
-the scenario that makes *one statement* matter under concurrency.
+ratchet headroom (§4), AC-2 now has two executable falsifiers, and QS-5 at slice 07 makes *one
+statement* matter under concurrency.
 
 ### 2.4 ADR-0024's two warnings
 

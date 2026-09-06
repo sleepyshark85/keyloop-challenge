@@ -35,8 +35,10 @@ without being obvious.
   bay with the *same* technician, so under a shuffle-from-first candidate order `[09:00,10:00) →
   [09:15,10:15)` could be satisfied by allocating bay 2 and **AC-1 could not fail**. ADR-0027 fixes
   the order; this clause makes the criterion able to observe it.
-- **AC-2** — Given A is moved, when the database is inspected, then exactly one statement modified it:
-  a single `UPDATE`. A `DELETE`-then-`INSERT`, or a cancel-then-book, fails this criterion.
+- **AC-2** — Given A is moved, when the database is inspected, then exactly one statement modified it
+  **in the course of that move**: a single `UPDATE`. A `DELETE`-then-`INSERT`, or a cancel-then-book,
+  fails this criterion. The window is the request, not the row's lifetime: the fixture's own arrange
+  writes the same row and is not counted (`R-06-1`).
 - **AC-3** — Given A is moved to an interval outside the dealership's opening hours, then `400` with
   `type=/problems/outside-opening-hours` — the same domain rule as booking, not a second copy of it.
 - **AC-4** — Given A is `cancelled`, when it is rescheduled, then `409` with
