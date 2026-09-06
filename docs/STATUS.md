@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `e030f52 test(07): rescheduling under contention — refused-unchanged (xmin/ctid), the transient-release barrier, and racing moves never deadlock (red)` |
+| Last commit | `f63f887 test(07): A-05-6 — pgError.ts's two guards, directed; classify's stale premise corrected` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 141 |
+| Agent runs recorded | 143 |
 | ADRs accepted | 25 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -287,7 +287,9 @@
 | 2026-09-06 17:45 | test-engineer | 7m52 | 148 / 44,489 / 6,247,403 | `derived` |
 | 2026-09-06 18:19 | test-engineer | 33m20 | 384 / 59,074 / 44,871,947 | `derived` |
 | 2026-09-06 18:23 | test-engineer | 37m11 | 388 / 65,103 / 45,550,489 | `derived` |
-| | **total** | **5707m28** | **35,508 / 2,659,123 / 2,966,199,526** | |
+| 2026-09-06 18:37 | implementer | 15m12 | 286 / 21,012 / 20,104,146 | `derived` |
+| 2026-09-06 19:15 | reviewer | 36m53 | 240 / 7,900 / 13,792,485 | `derived` |
+| | **total** | **5759m33** | **36,034 / 2,688,035 / 3,000,096,157** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
