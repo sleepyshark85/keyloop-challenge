@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `684ddfa docs(07): step 1 — the race F-02-9 asked for came back negative` |
+| Last commit | `c1e2709 docs(07): OQ-07-1 — the budget report was right, the tree moved` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 136 |
+| Agent runs recorded | 137 |
 | ADRs accepted | 25 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -282,7 +282,8 @@
 | 2026-09-06 17:03 | architect | 19m06 | 278 / 3,146 / 20,927,858 | `derived` |
 | 2026-09-06 17:06 | architect | 21m30 | 280 / 3,147 / 21,155,552 | `derived` |
 | 2026-09-06 17:32 | architect | 22m53 | 212 / 6,591 / 11,685,535 | `derived` |
-| | **total** | **5597m42** | **34,306 / 2,459,851 / 2,855,240,076** | |
+| 2026-09-06 17:35 | architect | 25m57 | 230 / 6,650 / 12,959,899 | `derived` |
+| | **total** | **5623m38** | **34,536 / 2,466,501 / 2,868,199,975** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

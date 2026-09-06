@@ -23,13 +23,27 @@ every test in slice 06.
 
 - **AC-1** — Given A confirmed `[09:00, 10:00)` and the dealership fully booked at `[11:00, 12:00)`,
   when A is rescheduled to 11:00, then the request is refused **and** A is still `confirmed` at
-  `[09:00, 10:00)` with the same id, bay and technician. Asserted by reading the row, not the
-  response. *(QS-4)*
+  `[09:00, 10:00)` with the same id, bay and technician, **and the same `xmin` and `ctid`**.
+  Asserted by reading the row, not the response. *(QS-4)*
+  <br>`xmin` was added at step 1 and it is what makes *"unchanged"* mean **not written** rather than
+  *no column differs*: a compensating cancel-then-restore passes column equality and fails this,
+  `xmin` is not forgeable by application code, and an aborted attempt correctly leaves it untouched.
 - **AC-2** — Given A holds the only bay at `[09:00, 10:00)`, when a reschedule of A to a fully-booked
-  interval races *N* fresh bookings for `[09:00, 10:00)`, then **no fresh booking is ever confirmed**
-  — at every moment, under every interleaving, A's slot is occupied. *(QS-5)*
+  interval races *N* fresh bookings for `[09:00, 10:00)` **from a recorded seed**, then **no fresh
+  booking is ever confirmed** — at every moment, under every interleaving, A's slot is occupied.
+  *(QS-5)*
 - **AC-3** — Given the racing scenario of AC-2, when it is run repeatedly with recorded seeds, then
   the result is stable across runs and a failure names the seed that produced it.
+- **AC-4** — *(added at step 1)* Given A and B confirmed on **different** incumbent pairs, each
+  contended at its own pair, so that each move's remaining candidate is the pair the other occupies
+  over an overlapping interval, when both are rescheduled simultaneously from a barrier at *P* = 20
+  independent pairs over ≥ 25 trials, then **every attempt receives a database verdict — `23P01`,
+  never `40P01`** — no response is `500`, no two confirmed rows overlap on a bay or a technician,
+  and every refused move's row is unchanged including its `xmin`. *(QS-4, QS-5; ADR-0003's
+  never-asserted claim; [ADR-0030](../adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md)'s control)*
+  <br>**Its mutant control is already measured**: reverting `lockResources` to lock the target pair
+  only produces ~117 `40P01` in 1000 attempts, so the criterion discriminates rather than passing
+  vacuously. A `40P01` from a *lock-ordering* mistake is caught by the same assertion.
 
 ## Inherited scope — written here, not only where it was deferred
 
