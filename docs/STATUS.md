@@ -15,18 +15,19 @@
 
 | | |
 |---|---|
-| Last commit | `cbc29e3 chore(log): the re-run settles it — 70.00 to 92.50, and 93 ignored down to 8` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 133 |
-| ADRs accepted | 23 |
+| Last commit | `659186d docs(06): two sentences in §6 still described the table they had just changed` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
+| Agent runs recorded | 135 |
+| ADRs accepted | 24 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Slice [`06`](slices/06-reschedule-atomic-move.md) is in flight** — Rescheduling — one atomic UPDATE, and a row that does not conflict with itself.
-- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
-- 4 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
+- **Next: slice [`07`](slices/07-reschedule-under-contention.md) — Rescheduling under contention — a refused move changes nothing, and never opens a window**
+- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
+- It claims QS-4, QS-5.
+- 3 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
 ## Gate decisions
@@ -103,6 +104,10 @@
 
 > LIGHT GATE, AUTO-APPROVED UNDER THE HUMAN OWN COST RULING OF 2026-09-05 — not under the orchestrator delegated Gate E. The slice file declares gate: light, revoked by any open MAJOR/BLOCKING; slice:check now reports Definition of Ready and Definition of Done fully green with every MAJOR ruled or resolved, so the condition the human attached is met on its own terms. Evidence: CI 34030951881 green on all three jobs at the merge head; mutation 0.9122 on changed files against a 0.75 threshold, with the ONE real survivor killed and the remaining eighteen matching the reviewer four inert classes line for line; depcruise clean; test ownership verified per-commit in both directions; all commits typecheck. The reviewer outcome is APPROVED after a section 6.4 round it lost and conceded. SIXTEEN ARCHITECT RULINGS were made in the human absence, all provisional and printed by slice:check. WHAT THIS IS NOT: no human exploratory testing was performed. The architect named the three things it would spend gate attention on — AC-5 predicate on the already-merged POST route, GET /nope, and application/xml — and those are recorded for the human to run rather than claimed as done.
 
+**Gate E** · 2026-09-06 · approved
+
+> APPROVED BY THE ORCHESTRATOR AND THE ARCHITECT JOINTLY, under the human delegation of 2026-09-06 — you and the architect decide if the PR is good to go — which is a WIDER GRANT THAN THE gate: light RULING AND IS NOT THAT RULING: slice 06 never declared light. WHAT THIS IS NOT: no human exploratory testing was performed on any of it. EVIDENCE, all collected rather than narrated: test-first proven with red ec37a20 at 13:56 and green after, both source derived; CI run 34047340059 green on all three jobs at merge head 659186d; mutation 0.8933 aggregate AND EVERY CHANGED FILE CLEARING 0.75 ON THE PER-FILE READING the architect and reviewer ruled independently — repository 100.00, booking 96.80, reschedule 92.50, server 90.91, routes 76.13, problem 75.00; depcruise clean over both roots; arc42 reconciled across ten sections with every addition paid for by a named deletion; four inherited obligations discharged; ZERO LOOPBACKS OF A MAXIMUM TWO across one DCR ruled (a) and twenty-nine architect rulings. THE ARCHITECT WAS ASKED THE (c) QUESTION DIRECTLY and answered I CANNOT NAME ONE — no acceptance criterion, no QS, no section 2 invariant that what merged would fail — and section 6 requires exactly that naming to block. THE STRONGEST THING IN THE SLICE, in the architect words: AC-5 was found unimplementable BY TRYING TO WRITE THE STATEMENT rather than by preferring a different shape, and the amendment is stricter than what it replaced. THE WEAKEST, also its words and recorded as owed rather than closed: SLICE 06 SHIPS THE MOVE WITH ZERO CONCURRENCY EVIDENCE FOR THE MOVE — QS-4 and QS-5 are argued from statement atomicity and asserted by nothing, deferred to slice 07 as A-06-3. If slice 07 slips, that is the debt that matters. FIVE THINGS NO TEST COVERS, recorded VERBATIM AS NOT CHECKED RATHER THAN AS PASSED: QS-4 and QS-5 asserted by nothing; updated_at advancing neither asserted nor on the wire, so no human tester could see it either; OQ-06-1, a move to the same instant is a 200 that rewrites the row, ruled out of scope and a reasonable person could want a 400; ADR-0025 ruled consequence that a CANCELLED appointment moved OUT OF HOURS answers 400 outside-opening-hours rather than 409, because the domain rule runs before the status is consulted; and content-type application/xml still returning 500 rather than 415, which means a client-caused error renders as a server fault. THE TEN-MINUTE MANUAL THE ARCHITECT ASKED A HUMAN TO RUN AND NOBODY HAS: in a two-bay dealership book A and B at different times, then move A onto B interval — it should land in the OTHER BAY with a booking.conflict line, not a 409. That re-allocation path is the largest new behaviour and only tests have seen its responses. A-06-4 IS DEFERRED TO THE HUMAN, NOT ABSORBED: slice 09 now holds four deferrals and ADR-0019 has no aggregate criterion, and re-cutting the backlog is a Gate C decision a merge delegation does not reach. Slices 07 and 08 come first, so it can be overruled at either gate without costing work.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -135,6 +140,7 @@
 | [0026](adr/0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md) | The lock is a value the write takes, and it carries the keys it took | accepted | — |
 | [0027](adr/0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md) | A move attempts the pair it already holds before it shuffles | accepted | — |
 | [0028](adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | The lock carries the transaction it was taken on | proposed | — |
+| [0029](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) | A deadlock event names the write path it happened on; a conflict event does not | accepted | — |
 
 ## Agent runs
 
@@ -273,7 +279,9 @@
 | 2026-09-06 15:49 | architect | 13m37 | 210 / 10,958 / 10,716,699 | `derived` |
 | 2026-09-06 15:49 | reviewer | 14m21 | 192 / 5,853 / 10,695,764 | `derived` |
 | 2026-09-06 16:03 | implementer | 11m01 | 294 / 20,657 / 17,395,424 | `derived` |
-| | **total** | **5534m13** | **33,536 / 2,446,967 / 2,801,471,131** | |
+| 2026-09-06 17:03 | architect | 19m06 | 278 / 3,146 / 20,927,858 | `derived` |
+| 2026-09-06 17:06 | architect | 21m30 | 280 / 3,147 / 21,155,552 | `derived` |
+| | **total** | **5574m49** | **34,094 / 2,453,260 / 2,843,554,541** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

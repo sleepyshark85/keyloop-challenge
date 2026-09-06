@@ -1,7 +1,7 @@
 ---
 id: "06"
 title: Rescheduling — one atomic UPDATE, and a row that does not conflict with itself
-status: ready
+status: done
 depends_on: ["05"]
 arc42: ["§5.2", "§6.3", "§6.6", "§8.2", "§8.6", "§10", "§11"]   # §5.2 added at slice 05 step 7 — appointment.ts; §6.6/§10/§11 declared at step 5, design §4 planned them and QS-6 was already corrected under T-06-6
 adr: [3, 24, 25, 26, 27, 28]
