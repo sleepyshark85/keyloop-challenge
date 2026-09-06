@@ -45,6 +45,62 @@
  */
 
 /**
+ * THE SLICE INDEX, AND WHY A DESTINATION MUST BE RESOLVED RATHER THAN MATCHED.
+ *
+ * `isSliceId` says a string is SHAPED like a slice id. It does not say the slice exists, and
+ * it certainly does not say the slice is still alive — Gate D folded five of them into their
+ * successors, leaving tombstones that carry `folded_into` precisely so references do not
+ * dangle.
+ *
+ * The distinction is not theoretical. OQ-05-2 was routed to slice 10, folded two days
+ * earlier, and that defect is the origin of R-05-2. It then happened AGAIN at slice 06's
+ * adjudication: A-06-2 was routed to slice 10 for a check over the OpenAPI document, which
+ * slice 09 has carried since Gate D folded 10 into it. The reasoning was right both times
+ * and the label was stale both times.
+ *
+ * So the guard lives on the WRITE PATH as well as in `log:check`. `tools/team-log/check.mjs`
+ * has a docblock about the last time this project learned that lesson: a guard that only
+ * fires after the push costs a round trip every time, and the round trip is the whole of its
+ * cost. A destination that cannot be resolved is refused at append, where the mistake is
+ * made.
+ */
+export function sliceIndex(sliceDir, { readFileSync, readdirSync, existsSync }, frontmatter) {
+  const out = new Map();
+  if (!existsSync(sliceDir)) return out;
+  for (const f of readdirSync(sliceDir).filter((x) => x.endsWith('.md') && !x.startsWith('_'))) {
+    const fm = frontmatter(readFileSync(`${sliceDir}/${f}`, 'utf8'));
+    if (fm.id) out.set(String(fm.id).padStart(2, '0'), { ...fm, file: f });
+    else if (fm.folded_into) {
+      const m = f.match(/^(\d{2}[a-z]?)-/);
+      if (m) out.set(m[1], { folded_into: String(fm.folded_into).padStart(2, '0'), file: f });
+    }
+  }
+  return out;
+}
+
+/**
+ * Follow `folded_into` to the slice that actually holds the work. Returns the surviving id
+ * and how it was reached, or `null` when the chain leads nowhere — a fold to a slice that
+ * does not exist, or a cycle.
+ */
+export function resolveSlice(index, id) {
+  const hops = [];
+  let cur = String(id).padStart(2, '0');
+  let node = index.get(cur);
+  while (node?.folded_into) {
+    if (hops.includes(cur)) return { ok: false, hops, reason: 'fold cycle' };
+    hops.push(cur);
+    cur = node.folded_into;
+    node = index.get(cur);
+  }
+  if (!node) {
+    return { ok: false, hops, resolved: cur,
+      reason: hops.length ? `folded to ${cur}, which does not exist` : 'no such slice' };
+  }
+  return { ok: true, hops, resolved: cur, slice: node };
+}
+
+/**
  * Destinations that are not a slice. Deliberately small: every member is a place that
  * actually decides things and can be pointed at.
  *

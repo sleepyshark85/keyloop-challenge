@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `7216cbc chore(log): step 2 — the test-engineer's five findings, and O-41` |
+| Last commit | `419b1d1 chore(log): step 2 closes — one objection, backed by a measurement, and O-40 resolved` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 120 |
+| Agent runs recorded | 121 |
 | ADRs accepted | 22 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -258,7 +258,8 @@
 | 2026-09-06 12:47 | architect | 17m41 | 184 / 10,091 / 12,399,790 | `derived` |
 | 2026-09-06 12:54 | test-engineer | 5m18 | 42 / 488 / 868,778 | `derived` |
 | 2026-09-06 12:58 | implementer | 8m31 | 140 / 18,278 / 6,556,780 | `derived` |
-| | **total** | **5257m37** | **28,236 / 2,185,644 / 2,105,691,419** | |
+| 2026-09-06 13:08 | architect | 8m10 | 68 / 6,110 / 1,850,910 | `derived` |
+| | **total** | **5265m47** | **28,304 / 2,191,754 / 2,107,542,329** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

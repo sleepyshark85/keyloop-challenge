@@ -24,7 +24,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validate } from '../team-log/schema.mjs';
 import { refsDeferredTo, deferralMap, destinations, isDestination } from '../lib/deferrals.mjs';
-import { checkDestinations } from '../docs/adr-destinations.mjs';
+import { checkDestinations as checkAdrDestinations } from '../docs/adr-destinations.mjs';
+import { checkDestinations } from '../team-log/write.mjs';
 
 const CHECK = fileURLToPath(new URL('../slice/check.mjs', import.meta.url));
 let pass = 0; let fail = 0;
@@ -136,37 +137,66 @@ const deferralTo = (id) => [{ event: 'finding.ruled', verdict: 'deferred', ref: 
 
 let d = adrWorld('The handler lands at slice 06.', { '06-x.md': live('06', 'ready') });
 ok('an ADR routing to a live slice with no deferral logged is refused',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), []).some((p) => p.kind === 'destination-unrecorded'));
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), []).some((p) => p.kind === 'destination-unrecorded'));
 ok('...and passes once the log records the routing',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), deferralTo('06')).length === 0);
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), deferralTo('06')).length === 0);
 
 d = adrWorld('This was settled at slice 02.', { '02-x.md': live('02', 'done') });
 ok('an ADR citing a DONE slice is history, not a routing',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), []).length === 0);
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), []).length === 0);
 
 d = adrWorld('It is added at slice 10.',
   { '10-x.md': tomb('09'), '09-x.md': live('09', 'ready') });
 ok('a fold is followed rather than failed — §4 forbids editing an accepted ADR',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), deferralTo('09')).length === 0);
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), deferralTo('09')).length === 0);
 ok('...and the successor is the slice actually checked',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), deferralTo('10'))
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), deferralTo('10'))
     .some((p) => /slice 09/.test(p.detail)));
 
 d = adrWorld('It is added at slice 10.', { '10-x.md': tomb('88') });
 ok('a redirect that leads nowhere is still a failure',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), []).some((p) => p.kind === 'destination-unknown'));
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), []).some((p) => p.kind === 'destination-unknown'));
 
 d = adrWorld('It is added at slice 77.', {});
 ok('a slice id that was never real is a failure — the OQ-05-2 defect',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), []).some((p) => p.kind === 'destination-unknown'));
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), []).some((p) => p.kind === 'destination-unknown'));
 
 d = adrWorld('It is added at slice 10.', { '10-x.md': tomb('11'), '11-x.md': tomb('10') });
 ok('a fold cycle resolves nowhere rather than hanging',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), []).some((p) => p.kind === 'destination-unknown'));
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), []).some((p) => p.kind === 'destination-unknown'));
 
 d = adrWorld('nothing here', { '99-x.md': live('99', 'ready') });
 ok('a slice named only in Context is not a destination',
-  checkDestinations(join(d, 'adr'), join(d, 'slices'), []).length === 0);
+  checkAdrDestinations(join(d, 'adr'), join(d, 'slices'), []).length === 0);
+
+// ------------------------------------------------- destination liveness (O-42) --
+console.log('\ndestinations must resolve to a live slice — the write path refuses a tombstone');
+{
+  const dir = mkdtempSync(join(tmpdir(), 'dest-'));
+  mkdirSync(join(dir, 'slices'), { recursive: true });
+  const w = (f, body) => writeFileSync(join(dir, 'slices', f), body);
+  w('07-x.md', '---\nid: "07"\nstatus: ready\n---\n\nbody\n');
+  w('09-x.md', '---\nid: "09"\nstatus: ready\n---\n\nbody\n');
+  w('10-x.md', '---\nfolded_into: "09"\n---\n\nbody\n');
+  w('88-x.md', '---\nfolded_into: "77"\n---\n\nbody\n');
+  const sd = join(dir, 'slices');
+  const errs = (to) => checkDestinations({ deferred_to: to }, sd);
+
+  ok('a live slice passes', errs(['07']).length === 0);
+  ok('a FOLDED slice is refused — the A-06-2 and OQ-05-2 defect', errs(['10']).length === 1);
+  ok('...and the message names the surviving slice, not just the problem',
+    /folded into 09/.test(errs(['10'])[0]), errs(['10'])[0]);
+  ok('a fold to a slice that does not exist is refused', errs(['88']).length === 1);
+  ok('a slice id that was never real is refused', errs(['77']).length === 1);
+  ok('one bad destination among good ones is still caught', errs(['07', '10']).length === 1);
+  ok('a non-slice destination is not checked for liveness', errs(['retro']).length === 0);
+  ok('no destination, nothing to check', errs(undefined).length === 0);
+
+  // MUST NOT FIRE: with no slice directory the guard says nothing rather than guessing —
+  // otherwise every test fixture and every checkout without docs/slices fails to log.
+  ok('an absent slice directory is silence, not a failure',
+    checkDestinations({ deferred_to: ['07'] }, join(dir, 'nope')).length === 0);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
