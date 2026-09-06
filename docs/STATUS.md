@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| Last commit | `804dca5 docs(07): the F-02-9 bullet the O-41 guard demanded, and slice 07 opens` |
+| Last commit | `684ddfa docs(07): step 1 — the race F-02-9 asked for came back negative` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 135 |
-| ADRs accepted | 24 |
+| Agent runs recorded | 136 |
+| ADRs accepted | 25 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
@@ -140,6 +140,7 @@
 | [0027](adr/0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md) | A move attempts the pair it already holds before it shuffles | accepted | — |
 | [0028](adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | The lock carries the transaction it was taken on | proposed | — |
 | [0029](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) | A deadlock event names the write path it happened on; a conflict event does not | accepted | — |
+| [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
 
 ## Agent runs
 
@@ -280,7 +281,8 @@
 | 2026-09-06 16:03 | implementer | 11m01 | 294 / 20,657 / 17,395,424 | `derived` |
 | 2026-09-06 17:03 | architect | 19m06 | 278 / 3,146 / 20,927,858 | `derived` |
 | 2026-09-06 17:06 | architect | 21m30 | 280 / 3,147 / 21,155,552 | `derived` |
-| | **total** | **5574m49** | **34,094 / 2,453,260 / 2,843,554,541** | |
+| 2026-09-06 17:32 | architect | 22m53 | 212 / 6,591 / 11,685,535 | `derived` |
+| | **total** | **5597m42** | **34,306 / 2,459,851 / 2,855,240,076** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

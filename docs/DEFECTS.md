@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **244** |
-| Severity | 11 blocking · 130 major · 103 minor |
-| Verdicts | 17 narrowed · 89 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 56 · reviewer 49 · architect 47 · orchestrator 46 · implementer 39 · scribe 5 · human 2 |
-| Awaiting a ruling | **112** |
-| Mean escape distance | 1.75 step(s) |
+| Findings recorded | **246** |
+| Severity | 12 blocking · 131 major · 103 minor |
+| Verdicts | 17 narrowed · 90 accepted · 3 escalated · 23 deferred |
+| Raised by | test-engineer 56 · architect 49 · reviewer 49 · orchestrator 46 · implementer 39 · scribe 5 · human 2 |
+| Awaiting a ruling | **113** |
+| Mean escape distance | 1.74 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1698,6 +1698,8 @@ rather than narrated.*
 | ref | sev | step | raised by | claim | verdict |
 |---|---|---|---|---|---|
 | **O-50** | MAJOR | 1 *(+1)* | orchestrator | Three agent runs across slices 04 and 05 produced a prompt AND a report and NO agent.finish event — the run counter and the section 13 evidence base are undercounted | **open** |
+| **A-07-1** | BLOCKING | 1 *(+0)* | architect | MERGED CODE HAS A REAL DEADLOCK: 11.7 percent of contended move attempts return 40P01 and therefore 500, with every ADR-0018 lock correctly taken | accepted |
+| **A-07-2** | MAJOR | 1 *(+0)* | architect | Two src/ sites repeat the now-falsified deadlock premise verbatim, and one comment reads as attempt 1 is unlocked in the file F-02-9 exists to protect | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1705,6 +1707,17 @@ rather than narrated.*
 
 - *scenario:* FOUND BY THE O-44 CHECK ON ITS FIRST RUN, and NOT the defect it was built to catch. O-44 remedy reconciles captured prompts against the log to catch a role dispatching a role behind the orchestrator back. Slice 06 passes it, 14 captures each with an event. Slices 04 and 05 FAIL: s04-test-engineer-3 (I-04-10 remedy — remove the flaky claim), s05-test-engineer-3 (Fix AC-1 misleading diagnostic) and s05-implementer-3 (Build R-02-3 — the response whitelist) each have a prompt file AND a report file on disk, so THE AGENTS DEMONSTRABLY RAN AND RETURNED, and the ordinal sequence in the log skips them — implementer-4 exists where implementer-3 does not, test-engineer-4 where -3 does not. So this is not a self-dispatch: it is THREE LOST agent.finish EVENTS, the log-agent-finish hook not firing or its write being lost, in runs the orchestrator itself dispatched. CONSEQUENCES: STATUS.md agent-runs-recorded figure is undercounted by three; arc42 section 13 rests on that count; and any per-role invocation analysis in the retro is wrong by the same amount. The three runs are recoverable — prompt and report are both on disk with timestamps — but backfilling agent.finish would be the orchestrator asserting source derived for a measurement it did not make, which write.mjs refuses BY DESIGN. THE HONEST FORMS ARE a reported reconstruction that says what it is, or leaving the gap visible now that a check reports it. Recorded rather than fixed, because slices 04 and 05 are merged and gated and O-36 precedent says rewriting the history of an artifact under assessment is the worse act.
 - *file:* `docs/team-log/events.jsonl`
+
+**A-07-1** — MERGED CODE HAS A REAL DEADLOCK: 11.7 percent of contended move attempts return 40P01 and therefore 500, with every ADR-0018 lock correctly taken
+
+- *scenario:* THE ARCHITECT RACED F-02-9 AT STEP 1 INSTEAD OF DESIGNING AROUND IT, AND IT CAME BACK NEGATIVE. Two moves past attempt 1, each targeting the pair the other occupies over an overlapping interval, each holding ADR-0018 locks ON ITS TARGET PAIR ONLY. Each UPDATE exclusion check finds the other VACATED BUT UNCOMMITTED index entry, whose xmax is a live transaction, and waits on it. BOTH WAIT. 40P01. Measured on postgres:16-alpine with this repo constraint definitions, 20 mutually-vacating pairs from one barrier, 25 trials: AS MERGED AT SLICE 06, 883 of 1000 give 23P01 and 117 give 40P01, which is 11.7 percent; taking the UNION of incumbent and target gives 1000 of 1000 and ZERO. Deadlock detail is a MUTUAL TRANSACTION WAIT — Process 162 waits for ShareLock on transaction 8424, blocked by process 161, and the mirror — NOT an advisory key, so no path skipped anything. Uncontended cost unchanged: 600 moves, p50 2.25ms to 1.90ms, one statement either way. THE FALSIFIED SENTENCE IS THE ARCHITECT OWN SLICE-06 DISCHARGE RULING, in the exact words the orchestrator quoted back at it: vacating writes no index entry another transaction waits on. It writes no NEW entry; THE OLD ONE STAYS LIVE UNTIL COMMIT — and ADR-0023 own M1 had already measured a conflicting writer waiting on precisely that. A move is BOTH A WAITER AND A WAIT-UPON, so it can close a cycle; booking never can, cancel never can. THE GATE RECORD FOR SLICE 06 NAMED THIS EXPOSURE AS THE WEAKEST THING IN THE SLICE — ships the move with zero concurrency evidence for the move — AND IT WAS HIDING A LIVE DEFECT.
+- *file:* `src/application/rescheduleAppointment.ts`
+- *accepted* by architect — ACCEPTED AND FIXED BY ADR-0030: a write locks every resource it is IN FLIGHT AGAINST — the pair it takes, and, where it also runs an exclusion check, THE PAIR IT LEAVES. Booking, cancel and move now fall out of ONE RULE instead of three cases. NO LOOPBACK IS OWED and this is not a (c): nothing had been built to loop back to, so it is a step-1 ruling on a design that does not yet exist. ADR-0018 and ADR-0029 falsified premise is corrected IN ADR-0030 rather than by editing either, because accepted ADRs are immutable; ADR-0029 DECISION is unaffected and is RE-GROUNDED — a 40P01 names the path in flight against more than it locked, which is a better reason for the split name than the one it was originally given. Slice 07 is therefore NOT PROOF-ONLY, which Gate C had accepted as a possible outcome: about fifteen lines of production code, lockResources signature and lock statement plus one argument at each of two call sites. No migration, no data-model delta, no dependency-cruiser change, no endpoint or field.
+
+**A-07-2** — Two src/ sites repeat the now-falsified deadlock premise verbatim, and one comment reads as attempt 1 is unlocked in the file F-02-9 exists to protect
+
+- *scenario:* THIRD OCCURRENCE OF D-06-4 SHAPE — the architect cannot edit src/ and the correction must therefore be carried by someone else. pgError.ts classify docblock and rescheduleAppointment.ts no-verdict arm BOTH repeat the premise A-07-1 just falsified, word for word. SEPARATELY AND WORSE: rescheduleAppointment.ts:13 says ATTEMPT 1 IS THE APPOINTMENT OWN bay_id, technician_id, TRIED DIRECTLY — NO LOCK/23P01 FOR IT, while line 201 takes the locks on EVERY attempt. Whatever was meant, it READS AS ATTEMPT 1 IS UNLOCKED, in the one file F-02-9 exists to protect, and a future reader acting on it would reintroduce exactly the defect ADR-0018 prevents. Lands in the implementer A-05-6 pass, which is already opening pgError.ts.
+- *file:* `src/persistence/pgError.ts`
 
 </details>
 
