@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **208** |
-| Severity | 10 blocking · 109 major · 89 minor |
-| Verdicts | 10 narrowed · 77 accepted · 3 escalated · 15 deferred |
-| Raised by | test-engineer 49 · reviewer 44 · architect 38 · implementer 35 · orchestrator 35 · scribe 5 · human 2 |
+| Findings recorded | **210** |
+| Severity | 10 blocking · 110 major · 90 minor |
+| Verdicts | 10 narrowed · 77 accepted · 3 escalated · 17 deferred |
+| Raised by | test-engineer 49 · reviewer 44 · architect 40 · implementer 35 · orchestrator 35 · scribe 5 · human 2 |
 | Awaiting a ruling | **103** |
-| Mean escape distance | 1.94 step(s) |
+| Mean escape distance | 1.92 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1436,6 +1436,8 @@ rather than narrated.*
 | **O-38** | MINOR | 1 *(+-4)* | orchestrator | A-05-5 specified deferred_to on EVERY deferred ruling, and six of fifteen open deferrals have no slice to name | **open** |
 | **O-39** | MAJOR | 1 *(+-6)* | orchestrator | Two obligations this slice inherits have no finding.raised record anywhere in the log, so the register and every check were blind to them | **open** |
 | **O-40** | MAJOR | 1 *(+-5)* | orchestrator | STATUS.md reported PHASE 4 with Gate D open and undecided, six slices after Gate D was decided — the fourth recurrence of one shape | **open** |
+| **A-06-3** | MAJOR | 1 *(+0)* | architect | The racing-moves concurrency test is the mirror of QS-1 on the UPDATE path and is named by no scenario and no test | deferred |
+| **F-06-1** | MINOR | 1 *(+0)* | architect | The candidate allocation loop is duplicated by the reschedule path rather than extracted | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1453,6 +1455,18 @@ rather than narrated.*
 
 - *scenario:* Slice 05 gate was recorded with gate: light, a name invented for the human own-cost ruling. generate.mjs held a DENYLIST of gate names known not to close a phase (E, process), so any name invented later defaulted to CLOSES A PHASE. light matched no phase closing gate, completedPhase came back null, and the position fell through to the last event carrying a phase field — phase 4, because every event since has been slice-scoped. FOUND BY REGENERATING THE FILE AND READING IT at the start of this session, which is the same way the third one was found; the committed STATUS.md had said Phase 5 and slice 04 in flight, and the regeneration was a REGRESSION, not a stale file catching up. The file own header tells a resuming session to trust it over narration. FIXED BY INVERTING THE SET: PHASE_CLOSING_GATES is derived from the PHASES table, so a gate nobody claims closes nothing, which is the correct default and cannot regress on a fifth name. Gate E stays an explicit exception because phase 5 does name it and it fires per slice. Three regression cases added to tools/test/status.test.mjs, written with an INVENTED gate name rather than light so the suite does not recreate the denylist; verified failing against the old behaviour before the fix was kept. O-8, O-11 and O-18 are the same defect and each was fixed by extending the denylist.
 - *file:* `tools/status/generate.mjs`
+
+**A-06-3** — The racing-moves concurrency test is the mirror of QS-1 on the UPDATE path and is named by no scenario and no test
+
+- *scenario:* ADR-0003 claims two racing reschedules behave like two racing bookings — one commits, the other takes 23P01 — and slice 06 ships on that claim with nothing asserting it. QS-4 and QS-5 cover what a REFUSED move leaves behind and QS-6 the self-overlap; the simultaneity case itself is unclaimed. A BEFORE UPDATE trigger passing everything slice 00 asserts and failing only under simultaneity is the proof the gap is real.
+- *file:* `docs/slices/06-reschedule-atomic-move.md`
+- *deferred* by architect — RE-DEFERRED, and the ground is a measurable inconsistency in the slice file own reasoning rather than a preference. The file argued this one assertion cannot wait BECAUSE ADR-0003 claim is what slice 06 ships on — which is equally true of QS-4 and QS-5, already slice 07 and deferred without complaint. ADR-0019 criterion is met on both premises and both are RE-MEASURABLE ON ARRIVAL, which is D-05-3 remedy applied: CHEAPER, because slice 07 AC-2 already builds the barrier harness for a move racing N bookings; STRONGER, because it can then assert alongside AC-1 that the loser original row is untouched, which a slice-06 version could not. Written into 07-reschedule-under-contention.md, not only recorded here.
+
+**F-06-1** — The candidate allocation loop is duplicated by the reschedule path rather than extracted
+
+- *scenario:* ADR-0003 requires a move needing a different bay or technician to re-run ADR-0004 candidate loop. Ruling re-allocation OUT was considered and rejected: it makes PATCH refuse while capacity exists, which is the one behaviour this system is about. So the loop is duplicated in slice 06 and the extraction is the debt.
+- *file:* `docs/slices/06-design.md`
+- *deferred* by architect — DEFERRED to slice 09 under ADR-0019, which must instrument BOTH loops anyway — so the extraction is cheaper there and the instrumentation is the forcing function that makes a single loop the obvious shape rather than a tidiness argument. Recorded as the cost of the scope ADDITION rather than hidden inside it: re-allocation on the move path is larger than either obligation ruled out of this slice, and the honest record is that slice 06 grew here rather than shrank.
 
 </details>
 

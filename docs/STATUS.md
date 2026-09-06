@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `7a7e7f0 fix(06): the phase set is an allowlist — O-40, the fourth name to rewind the resume point` |
+| Last commit | `c410577 docs(06): step 1 — two obligations ruled out, and AC-5 was unimplementable` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 117 |
+| Agent runs recorded | 118 |
 | ADRs accepted | 22 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -255,7 +255,8 @@
 | 2026-09-06 11:00 | implementer | 2m54 | 56 / 150 / 1,221,213 | `derived` |
 | 2026-09-06 11:09 | test-engineer | 12m32 | 146 / 3,768 / 6,967,316 | `derived` |
 | 2026-09-06 11:39 | architect | 28m54 | 334 / 15,229 / 29,014,234 | `derived` |
-| | **total** | **5226m08** | **27,870 / 2,156,787 / 2,085,866,071** | |
+| 2026-09-06 12:47 | architect | 17m41 | 184 / 10,091 / 12,399,790 | `derived` |
+| | **total** | **5243m49** | **28,054 / 2,166,878 / 2,098,265,861** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
