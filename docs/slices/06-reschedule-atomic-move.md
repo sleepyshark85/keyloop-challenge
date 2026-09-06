@@ -3,7 +3,7 @@ id: "06"
 title: Rescheduling — one atomic UPDATE, and a row that does not conflict with itself
 status: ready
 depends_on: ["05"]
-arc42: ["§6.3", "§8.2", "§8.6"]
+arc42: ["§5.2", "§6.3", "§8.2", "§8.6"]   # §5.2 added at slice 05 step 7 — appointment.ts
 adr: [3, 24]
 quality_scenarios: [QS-6, QS-11]
 loopbacks: 0
@@ -36,7 +36,7 @@ without being obvious.
 
 ## Inherited scope — written here, not only where it was deferred
 
-Four obligations were ruled elsewhere and name this slice. They are recorded here so slice 06's
+Five obligations were ruled elsewhere and name this slice. They are recorded here so slice 06's
 Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
 
 - **A concurrency test for racing moves** (from §8.2, where this used to be the only record). AC-10
@@ -65,6 +65,12 @@ Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
   it; and `src/http/problem.ts`, which renders every row, sits at **exactly §10's 0.75 threshold with
   three survivors**, so this slice's two taxonomy changes put one new survivor between it and its
   Definition of Done.
+- **`src/domain/appointment.ts`, predicted by §5.2 at phase 2 and not built at slice 05.** Under slice
+  05's unconditional `UPDATE`, idempotency is a property of the statement and there was no caller for
+  a status model, so it would have shipped as dead code with free survivors. Slice 06 supplies the
+  caller: *only a `confirmed` appointment may be moved* is this slice's AC-4, and it is a domain rule
+  rather than a SQL predicate. **§5.2's as-built cell names slice 06 as the owner, so a slice 06 that
+  does not build it must correct §5.2 rather than leave the pointer dangling.**
 - **The Stryker exhaustiveness disables.** ~13 structurally unkillable mutants cap
   `routes/appointments.ts` near 88%, so 83.04 has stopped discriminating (reviewer, slice 05).
   `// Stryker disable next-line` on each `const unhandled: never` arm, with the reason on the line —
