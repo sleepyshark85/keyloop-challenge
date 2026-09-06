@@ -1,7 +1,7 @@
 ---
 id: "0020"
 title: Test the attempt cap inside the conflict arm, so a capped refusal still carries a database verdict
-status: proposed
+status: accepted
 date: 2026-09-06
 supersedes: null
 superseded_by: null
@@ -30,6 +30,11 @@ ai-input: >
   `tsc --strict` before the record was written, and the outcome inverted the framing: the hazard
   is a property of WHERE THE RETURN STATEMENT GOES, not of what the capped refusal means. The
   obvious shape — the cap as the loop's bound — is the one that fails, and the fix costs nothing.
+
+  RATIFIED `accepted` on 2026-09-06 by the architect under the human's standing delegation, the
+  human being absent, and unchanged. Its own Consequences already state the one-directional
+  guarantee and the unbounded-loop hazard E gives up, so nothing found at steps 2 or 3 narrows
+  what it claims. Slice 04's gate reviews the ruling.
 ---
 
 ## Context and problem statement

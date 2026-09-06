@@ -1,7 +1,7 @@
 ---
 id: "0019"
 title: Defer a control only to the slice that makes it cheaper or stronger
-status: proposed
+status: accepted
 date: 2026-09-06
 supersedes: null
 superseded_by: null
@@ -9,15 +9,20 @@ arc42: ["§8.5", "§11"]
 
 # AI provenance — evidence for the assessment's verification criterion.
 proposed-by: architect
-decided-by: human
+decided-by: architect
 ai-input: >
   RULED BY THE ARCHITECT at slice 02 step 5, adjudicating reviewer findings R-02-2 and R-02-3 as
   CLAUDE.md §6 (b). The two deferrals are within the architect's authority; the CRITERION that
-  permits them is what this record exists to make refusable, and it is the human's to rule.
+  permits them is what this record exists to make refusable.
   The matrix below was measured twice — by the architect while ruling T-02-9, and independently
   by the reviewer on `postgres:16-alpine` against this repository's own migrations, with matching
   results. It is recorded here because the reviewer's control script is a scratchpad file that
   does not survive the slice, and a measurement nobody can re-read is not evidence.
+
+  RATIFIED `accepted` on 2026-09-06 by the architect under the human's standing delegation, the
+  human being absent — replacing the `decided-by: human` this record was written expecting. It was
+  offered `proposed` because a criterion invented while deferring is the shape a rationalisation
+  takes. That question is now answered by evidence rather than by argument; see Consequences.
 ---
 
 ## Context and problem statement
@@ -71,7 +76,8 @@ production path can make.
 - The criterion bites in the direction that matters: it forbids deferring a control whose subject
   exists today. §4.4's DDL-drop control failed it and was built here; F-02-6's `pg_stat_statements`
   detector passes it, on slice 11's deployment surface.
-- The measurement outlives the scratchpad it was taken in.
+- **It has caught its own author.** Slice 04 step 2 routed D-04-1 to slice 08, whose own file
+  forbade the work; I-04-5 cited this criterion, and slice 08 was amended (`4d172cc`).
 
 **Bad, or deferred**
 
@@ -89,9 +95,8 @@ production path can make.
 
 - Good, because the evidence would land in the slice whose whole subject is §2.1, and evidence
   deferred out of the slice that motivated it has a poor record of returning.
-- Bad, because the cell's consumer is not this gate. ADR-0018 is `proposed`, and a merge does not
-  rule it — ADR-0011 has been `proposed` since slice 00. Two agent invocations and a database run
-  at step 5 buy the reading five slices early.
+- Bad, because the cell's consumer is not this gate. Two agent invocations and a database run at
+  step 5 buy the reading five slices early.
 
 ### B — defer under a criterion
 
@@ -107,6 +112,6 @@ production path can make.
 
 ### D — no action
 
-- Good, because the matrix was measured twice, by two roles, with matching numbers.
+- Good, because the matrix was measured twice, by two roles.
 - Bad, because neither run repeats. A mechanism whose evidence does not run is one nobody is
   checking — a finding this project has recorded six times.

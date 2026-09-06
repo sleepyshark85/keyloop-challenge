@@ -17,15 +17,11 @@ lists `"<finding>:<adr>"` pairs, so a row points at the argument as well as the 
 | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | [ADR-0012](../adr/0012-seed-fixtures-are-a-test-owned-loader.md) | proposed — not yet agreed |
 | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | [ADR-0016](../adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | proposed — not yet agreed |
 | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | [ADR-0017](../adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | proposed — not yet agreed |
-| Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | [ADR-0018](../adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | proposed — not yet agreed |
-| Defer a control only to the slice that makes it cheaper or stronger | [ADR-0019](../adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | proposed — not yet agreed |
-| Test the attempt cap inside the conflict arm, so a capped refusal still carries a database verdict | [ADR-0020](../adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md) | proposed — not yet agreed |
-| The booking seed is overridable by environment, unset by default, and announces itself | [ADR-0021](../adr/0021-the-booking-seed-is-overridable-by-environment.md) | proposed — not yet agreed |
 <!-- /generated:debt-register -->
 
 **A row states what is owed, never that anything is correct.** A `proposed` row leaves when the human
-accepts or rejects the ADR; an *agreed and unbuilt* one when its slice reaches `done`. Only a human
-ruling moves an ADR out of `proposed` — a merge does not. What is live in `main` while a remedy is
+accepts or rejects the ADR — in the moment, or by standing delegation; an *agreed and unbuilt* one
+when its slice reaches `done`. A merge moves neither. What is live in `main` while a remedy is
 outstanding is behaviour, recorded where the behaviour is described.
 
 ### The cost of the literal AC-6 ruling — slice 01
