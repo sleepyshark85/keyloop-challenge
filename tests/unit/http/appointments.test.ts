@@ -634,6 +634,27 @@ describe('PATCH /appointments/:id — slice 06, the exhaustive status mapping', 
   });
 });
 
+describe('setNotFoundHandler — ADR-0024, the second handler §8.6\'s totality is kept in', () => {
+  it('a genuinely unmatched route is 404 /problems/route-not-found, not Fastify\'s bare default 404', async () => {
+    const response = await serverAnswering({}).inject({ method: 'GET', url: '/nope-such-route-exists' });
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toMatch(/application\/problem\+json/);
+    expect(response.json().type).toBe('/problems/route-not-found');
+    expect(response.json().status).toBe(404);
+  });
+
+  it('a real resource prefix with no matching sub-route is ALSO route-not-found, not a domain 404', async () => {
+    // The control ADR-0024's warning names: this must not collide with `appointment-not-found`.
+    const response = await serverAnswering({}).inject({
+      method: 'GET',
+      url: `/appointments/${APPOINTMENT_ID}/not-a-real-sub-resource`,
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().type).toBe('/problems/route-not-found');
+    expect(response.json().type).not.toBe('/problems/appointment-not-found');
+  });
+});
+
 describe('a 500 the route KNOWS about is not an unhandled fault', () => {
   /**
    * `no-verdict` and `reference-data-invalid` render the same document as an escaped exception,
