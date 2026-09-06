@@ -25,7 +25,7 @@ re-sequenced so it costs one pass rather than two.
 | **F-05-1 — `ResourceLock`** | **Kept, and strengthened.** ADR-0026. A third deferral is D-05-3's pattern, and slice 06 is the path it was deferred *to* |
 | **ADR-0024 — `setNotFoundHandler`, the `route-not-found` row, the hostile corpus** | **Kept, and merged into one taxonomy change.** See §2.4 |
 | **`src/domain/appointment.ts`** | **Retired, not deferred** — ADR-0025 decision 6; §5.2 records it at step 7 |
-| **The Stryker exhaustiveness disables** | **Kept.** Four comment pairs; measured effect in §2.4 |
+| **The Stryker exhaustiveness disables** | **Kept**, and over-applied as built — §2.4 |
 
 **One item was added, and it is larger than anything removed.** ADR-0003 requires that a move
 needing a different bay or technician re-runs ADR-0004's candidate selection and retry — a second
@@ -203,10 +203,10 @@ drops the file below threshold.
 `PROBLEM_TYPES` goes 7 → 9 in one step and §8.6 is edited once — answering the warning by removing
 the second change rather than budgeting for it.
 
-**Stryker exhaustiveness disables.** Measured: `routes/appointments.ts` scores 83.93 with 18
-survivors, **nine** of them the three `const unhandled: never` arms. Effect of a
-`// Stryker disable all` … `restore all` pair around each arm — four after this slice, those arms
-only — holding this slice's new mutants aside: 94 of 103, **91.3**, which discriminates again.
+**Stryker exhaustiveness disables.** Narrowly: the four `const unhandled: never` arms.
+**As built it over-applied and the 91.3 prediction was wrong** — `restore all` on a block's last
+line is a trailing comment the instrumenter never reads, so 93 mutants are suppressed where 8
+were ruled. R-05-9's ruling carries the cause and the replacement.
 
 ## 3. Interfaces and the delta
 

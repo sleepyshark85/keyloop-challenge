@@ -3,7 +3,7 @@ id: "06"
 title: Rescheduling — one atomic UPDATE, and a row that does not conflict with itself
 status: ready
 depends_on: ["05"]
-arc42: ["§5.2", "§6.3", "§8.2", "§8.6"]   # §5.2 added at slice 05 step 7 — appointment.ts
+arc42: ["§5.2", "§6.3", "§6.6", "§8.2", "§8.6", "§10", "§11"]   # §5.2 added at slice 05 step 7 — appointment.ts; §6.6/§10/§11 declared at step 5, design §4 planned them and QS-6 was already corrected under T-06-6
 adr: [3, 24, 25, 26, 27, 28]
 quality_scenarios: [QS-6, QS-11]
 inherits: ["F-02-9", "F-05-1", "R-05-7", "R-05-9"]   # deferred here by ruling; slice:check enforces it (A-05-5)
@@ -67,7 +67,8 @@ Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
   ADR-0016 shape: *"forgot the lock"* becomes a compile error and *"correctly exempt"* (ADR-0023's
   cancel path) becomes a signature that does not ask for one. Slice 06 is the destination **because it
   writes `rescheduleAppointment`, a newly written locking path** — the first moment the mistake is live
-  rather than historical. Residue: it does not prove the keys match the row.
+  rather than historical. Residue: it does not prove the keys match the row. **`F-02-9`'s slice-06
+  half rides on the same signature**: one minting site, so no call site can skip or reorder them.
 - **ADR-0024 — `setNotFoundHandler`, the `404 /problems/route-not-found` row, and the hostile-request
   corpus.** Measured today: `GET /nope` returns `404 application/json` with no `type`, and
   `content-type: application/xml` returns `500`. `server.ts`'s docblock asserts §8.6's totality *"is
@@ -78,23 +79,25 @@ Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
   guard** in `cancel-appointment.test.ts:247`, which discriminates on Fastify's default body — the
   `type` member still discriminates, and the test-engineer re-derives that case rather than deleting
   it; and `src/http/problem.ts`, which renders every row, sits at **exactly §10's 0.75 threshold with
-  three survivors**, so this slice's two taxonomy changes put one new survivor between it and its
-  Definition of Done.
-- **`src/domain/appointment.ts` — RETIRED at step 1, not deferred**, by
+  three survivors** (`R-05-7`). *Corrected by `I-06-1`, confirmed on the merged report:
+  `PROBLEM_TYPES` is `as const`, which the instrumenter skips, so the file is immune rather than
+  one survivor from failing.*
+- **`src/domain/appointment.ts` — RETIRED at step 1, not deferred** *(no ref — a §5.2 prediction,
+  never a logged finding)*, by
   [ADR-0025](../adr/0025-existence-is-the-reads-legality-is-the-statements.md) decision 6: under
   that ruling transition legality is a database verdict on ADR-0016's ground, so a module holding
   one allowlist whose only consumer is a SQL predicate is a relocation of a literal. §5.2's
   as-built cell records the retirement and its reason at step 7, so the pointer does not dangle.
   The residue — the constraints' denylist against the move's allowlist — goes to §11.
-- **The Stryker exhaustiveness disables.** ~13 structurally unkillable mutants cap
+- **The Stryker exhaustiveness disables** (`R-05-9`). ~13 structurally unkillable mutants cap
   `routes/appointments.ts` near 88%, so 83.04 has stopped discriminating (reviewer, slice 05).
   A `// Stryker disable all : <reason>` … `// Stryker restore all` pair around each
-  `const unhandled: never` arm — `disable next-line` cannot cover one, measured — **those arms
-  only**, not the schema-options or description mutants, which are inert for reasons that change
+  `const unhandled: never` arm — **those arms only**, not the schema-options or description mutants, which are inert for reasons that change
   when Fastify's config or slice 09's OpenAPI assertion does. Slice 06 adds the fourth route
   and therefore the fourth arm, so doing it once here costs one pass instead of two. The *decision* is
   the architect's, on the same ground as `stryker.config.mjs`'s `mutate` list; the *edit* is in `src/`
-  and is the implementer's.
+  and is the implementer's. *The pair suppressed 93 mutants where 8 were ruled;
+  ruled at step 5 under `R-05-9`.*
 
 ## In scope
 
