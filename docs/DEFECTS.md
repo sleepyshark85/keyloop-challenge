@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **176** |
-| Severity | 10 blocking · 95 major · 71 minor |
-| Verdicts | 8 narrowed · 60 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 42 · architect 34 · reviewer 34 · implementer 31 · orchestrator 28 · scribe 5 · human 2 |
-| Awaiting a ruling | **92** |
+| Findings recorded | **177** |
+| Severity | 10 blocking · 95 major · 72 minor |
+| Verdicts | 10 narrowed · 67 accepted · 3 escalated · 13 deferred |
+| Raised by | test-engineer 42 · architect 34 · reviewer 34 · implementer 31 · orchestrator 29 · scribe 5 · human 2 |
+| Awaiting a ruling | **84** |
 | Mean escape distance | 1.86 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -1169,16 +1169,17 @@ rather than narrated.*
 
 | ref | sev | step | raised by | claim | verdict |
 |---|---|---|---|---|---|
-| **T-05-1** | MAJOR | 2 *(+1)* | test-engineer | Section 1 central claim is false, measured: the predicate already has TWO committed guards | **open** |
-| **T-05-2** | MAJOR | 2 *(+1)* | test-engineer | The new concurrency file cannot fail for the reason it exists — its assertion set is invariant under the mutation it is meant to detect | **open** |
-| **T-05-3** | MAJOR | 2 *(+1)* | test-engineer | ADR-0023 iff outruns its evidence, and slice 06 inherits it | **open** |
-| **T-05-4** | MINOR | 2 *(+1)* | test-engineer | OQ-05-1 is an acceptance-criterion question, not a step-3 detail | **open** |
-| **T-05-5** | MINOR | 2 *(+1)* | test-engineer | D3 "still honestly red" is true in letter and empty in substance, and the test-engineer cannot verify its premise | **open** |
-| **T-05-6** | MAJOR | 2 *(+1)* | test-engineer | AC-3 cannot be a contract assertion, and D1 CASE guard has exactly one guard in the whole system which is a line nobody has written | **open** |
-| **I-05-1** | MAJOR | 2 *(+1)* | implementer | A bodyless POST with Content-Type application/json returns 500 /problems/internal today, and that is the cancel route normal client shape | **open** |
-| **I-05-2** | MAJOR | 2 *(+1)* | implementer | F-05-1 only mitigation is a docblock, and ADR-0023 Consequences contradict themselves | **open** |
-| **I-05-3** | MINOR | 2 *(+1)* | implementer | AC-3 binding half is unfalsifiable as scoped, by the design own argument | **open** |
+| **T-05-1** | MAJOR | 2 *(+1)* | test-engineer | Section 1 central claim is false, measured: the predicate already has TWO committed guards | accepted |
+| **T-05-2** | MAJOR | 2 *(+1)* | test-engineer | The new concurrency file cannot fail for the reason it exists — its assertion set is invariant under the mutation it is meant to detect | accepted |
+| **T-05-3** | MAJOR | 2 *(+1)* | test-engineer | ADR-0023 iff outruns its evidence, and slice 06 inherits it | narrowed |
+| **T-05-4** | MINOR | 2 *(+1)* | test-engineer | OQ-05-1 is an acceptance-criterion question, not a step-3 detail | accepted |
+| **T-05-5** | MINOR | 2 *(+1)* | test-engineer | D3 "still honestly red" is true in letter and empty in substance, and the test-engineer cannot verify its premise | accepted |
+| **T-05-6** | MAJOR | 2 *(+1)* | test-engineer | AC-3 cannot be a contract assertion, and D1 CASE guard has exactly one guard in the whole system which is a line nobody has written | accepted |
+| **I-05-1** | MAJOR | 2 *(+1)* | implementer | A bodyless POST with Content-Type application/json returns 500 /problems/internal today, and that is the cancel route normal client shape | accepted |
+| **I-05-2** | MAJOR | 2 *(+1)* | implementer | F-05-1 only mitigation is a docblock, and ADR-0023 Consequences contradict themselves | narrowed |
+| **I-05-3** | MINOR | 2 *(+1)* | implementer | AC-3 binding half is unfalsifiable as scoped, by the design own argument | accepted |
 | **I-05-4** | MINOR | 2 *(+1)* | implementer | The wiring line slice 05 adds to main.ts is guarded by the acceptance test or by nothing | **open** |
+| **A-05-4** | MINOR | 2 *(+2)* | orchestrator | Two consecutive adjudication rounds have produced zero DISAGREE verdicts on findings | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1186,51 +1187,65 @@ rather than narrated.*
 
 - *scenario:* The design says one acceptance criterion is the entire guard on WHERE (status <> cancelled) and that the mutant lives in a .sql file Stryker cannot reach. tests/integration/exclusion-constraints.test.ts already holds a DEFINITIONAL guard comparing pg_get_constraintdef by EQUALITY per constraint name, including the predicate for both no_bay_overlap and no_technician_overlap, so every drop-one and drop-both variant dies there with no behavioural inference; and a BEHAVIOURAL guard on the bay side, case AC-4, whose own title is "the predicate is live and not decorative". The design misnames the mutant and points step 3 at the wrong target. What AC-1 uniquely adds is narrower and better: a behavioural TECHNICIAN-side guard (slice 00 AC-4 deliberately keeps the technician free), and — the one that matters — proof the predicate is live THROUGH THE ALLOCATOR, since slice 00 inserts a hand-chosen pair while AC-1 proves candidate allocation re-derives a pair over a cancelled row. That mutant lives in TypeScript where Stryker CAN reach it. Also load-bearing for the gate: revocation clause 2 rates AC-1 passing vacuously as gate-revoking MAJOR because AC-1 is claimed to be the sole guard, and on a false premise that severity is unearned.
 - *file:* `docs/slices/05-design.md`
+- *accepted* by architect — AGREE, and the architect RE-MEASURED THE OBJECTION AGAINST ITS OWN DESIGN rather than taking it: confirmed at exclusion-constraints.test.ts:105-112 (definitional, string equality, both predicates), :362 (compared) and :605 (behavioural before/after). Section 1 misnamed the mutant and pointed step 3 at a target already dead twice over; rewritten to the test-engineer better frame. Then added the connection nobody had made: section 6.5 ALREADY records that the constraint predicate and freeResources overlap predicate live in two files with nothing forcing them to agree, so AC-1 is a second hold on that seam, in TypeScript. NARROWER REMEDY on the knock-on: D4 clause 2 keeps MAJOR but on a rewritten reason — the premise was false, the severity is still earned, for the allocator rather than for the predicate.
 
 **T-05-2** — The new concurrency file cannot fail for the reason it exists — its assertion set is invariant under the mutation it is meant to detect
 
 - *scenario:* Section 5 asserts zero booking.deadlock, zero 500s, every request a verdict, exactly one confirmed row. In slice 05 fixture the BOOKINGS still take the locks; only the cancel is exempt. Run the same file against ADR-0023 REJECTED Option A and the cancels queue behind the bookings on the bay advisory lock: zero deadlocks, zero 500s, every request a verdict, one confirmed row. Identical observable. The file measures ADR-0018 already-tested property, not ADR-0023 decision. It does discriminate catastrophically unsafe from safe, but F-05-1 predicts the LIKELIER regression — someone adds lockResources to the cancel for uniformity because correctly-exempt reads identically to forgot-the-lock — and nothing in the designed file goes red for that. This is no-spurious-refusal.test.ts own documented standard turned on the new file: an absence assertion needs a positive witness, and this one has none. Remedy proposed: hold the bay advisory lock in a second session with keys derived exactly as ADR-0018 specifies and require the cancel to return 200 within a deadline — not timing-flaky, because the gap is 2ms versus blocks-indefinitely — PLUS the non-optional control that a BOOKING for that bay must block under the same held lock, without which a changed key derivation makes the cancel assertion pass vacuously.
 - *file:* `docs/slices/05-design.md`
+- *accepted* by architect — AGREE, remedy accepted AND EXTENDED. The held-lock probe and its non-optional booking control are taken as proposed, and the architect added a third step: a RELEASE WITNESS, so that "blocked" is witnessed rather than inferred from a timeout. An absence assertion needed a positive witness; a blocking assertion needed one too, and the objection had not asked for it.
 
 **T-05-3** — ADR-0023 iff outruns its evidence, and slice 06 inherits it
 
 - *scenario:* M1 to M3 measure ONE statement in ONE transactional shape: a single UPDATE, alone in its transaction, waiting on nothing. The rule they license is universally quantified over statements. The safety argument that actually carries M1 is that the wait is one-directional, inserter onto canceller — a property of the TRANSACTION, not of the row version. A statement outside the constraints scope sitting inside a transaction that also waits on something else is exempt by the rule and can close a cycle; the rule does not exclude it and the measurements do not cover it. Named risk and it is the NEXT slice: if slice 06 atomic move is written as UPDATE old to cancelled plus INSERT new confirmed in one transaction, the rule exempts the first half and locks on the second — harmless today because the transaction holds the locks anyway, but the rule invites reasoning about halves, and the ADR assurance that slice 06 inherits ADR-0018 exactly rests on the insert half rather than on the rule it just shipped. The failure mode reopened is ADR-0018 own, measured at 285 of 400. Separately, "the row version it writes" is ambiguous for an UPDATE, which writes a new version and supersedes an old one that WAS indexed — and all of M1 is about the old version disappearance being what the inserter waits on, while the rule names only the new one. The forward direction is fine and ADR-0018 measured it; the objection is on the converse generality only.
 - *file:* `docs/adr/0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md`
+- *narrowed* by architect — AGREE. ADR-0023 narrowed inside its provisional window on ADR-0021 precedent: the unit of the rule moves from STATEMENT to TRANSACTION, and "into the constraint scope" is disambiguated from "out of" — which was the ambiguity the objection found in "the row version it writes", since all of M1 is about the OLD version disappearance. Second time this project has narrowed an accepted-but-provisional ADR before its gate rather than freezing an overclaim.
 
 **T-05-4** — OQ-05-1 is an acceptance-criterion question, not a step-3 detail
 
 - *scenario:* Fastify with content-type application/json and a zero-length body raises FST_ERR_CTP_EMPTY_JSON_BODY in the content-type parser, BEFORE the route schema and therefore before slice 03 malformed-request path, which arc42 8.6 attributes to TypeBox before any handler. If that reaches the client as Fastify own error shape it is a client-reachable error response outside 8.6 CLOSED taxonomy, against 8.6 own claim. The natural client call is exactly that header, and slice 10 harness will emit it, so the finding does not stay in a test file — it lands on the contract and it decides AC-4.
 - *file:* `docs/slices/05-design.md`
+- *accepted* by architect — AGREE, and ruled BEFORE step 3 as the objection demanded rather than left as an open question for the test-engineer to absorb.
 
 **T-05-5** — D3 "still honestly red" is true in letter and empty in substance, and the test-engineer cannot verify its premise
 
 - *scenario:* Two parts, separated. On the premise: D3 asserts three things about src/ and the test-engineer is FORBIDDEN to read src/, so agreeing to them is not verification but DEFERENCE WEARING VERIFICATION CLOTHES — flagged rather than agreed. On the red: AC-2 fails at step 3 because the cancel route 404s at its arrange step, the same reason AC-1, AC-3 and AC-4 fail, so 2.4 letter is met but AC-2 has never failed FOR ITS OWN REASON and at green it will pass without a line written for it. Same objection as a test failing on a missing import proves nothing. The role explicitly DISAGREES WITH THE CLAIM AND AGREES WITH THE DESIGN: AC-2 is worth having as a regression guard on slice 02 read path, newly reachable, and it kills the Type.Literal substitution mutant.
 - *file:* `docs/slices/05-design.md`
+- *accepted* by architect — AGREE ON BOTH HALVES, and the architect calls the deference point the round best PROCESS finding: a role asked to sign off on claims about a directory it is forbidden to read is being asked for deference wearing verification clothes. D3 src/ premises are now implementer-verifiable with the test-engineer excused. "Still honestly red" is WITHDRAWN — the objection separated the claim from the design, agreed with the second and disagreed with the first, and the ruling follows it exactly.
 
 **T-05-6** — AC-3 cannot be a contract assertion, and D1 CASE guard has exactly one guard in the whole system which is a line nobody has written
 
 - *scenario:* findStoredAppointment returns a FIXED PROJECTION that does not include updated_at, so "no column of the row changes" needs to_jsonb(appointment) equality before and after or AC-3 asserts only over columns the author happened to pick. More: updatedAt appears nowhere in tests/ and on the evidence is not in the response body, so A-05-1 second half — "and the response body is identical" — is satisfied EQUALLY by D1 CASE and by the plain updated_at = now() alternative, doing no discriminating work. The entire observable difference between the two options is SQL-side. Stryker will not produce a targeted CASE-removal mutant either: the statement is one string literal and mutating it to empty fails everything loudly rather than isolating the CASE.
 - *file:* `tests/support/booking.ts`
+- *accepted* by architect — AGREE, and the test-engineer to_jsonb(appointment) form taken over the implementer narrower one, because a fixed projection asserts only over columns the author happened to pick.
 
 **I-05-1** — A bodyless POST with Content-Type application/json returns 500 /problems/internal today, and that is the cancel route normal client shape
 
 - *scenario:* Measured on Fastify 5.12.1 against server.ts handler verbatim: no content-type and no body gives 200; content-type json with no payload gives 500 /problems/internal; content-type json with an empty string payload gives 500; a bad uuid param correctly gives 400 /problems/malformed-request. FST_ERR_CTP_EMPTY_JSON_BODY carries statusCode 400 but validation undefined, so it misses the validation arm and falls to the catch-all. FST_ERR_CTP_INVALID_JSON_BODY does the same on the EXISTING booking route; the contract test only ever sends parseable JSON of the wrong shape, which is why neither was caught. At stake is arc42 8.6 400 malformed-request row and the 500 row own rationale — a 4xx would tell a service advisor to correct something they did not send and cannot see — which is exactly inverted here, because the client did send it and can correct it. tests/support/booking.ts:442 postBooking sets that header, so the test-engineer will copy it. CONVERGES WITH T-05-4 FROM THE OPPOSITE DIRECTION: the test-engineer reached it from 8.6 closed-taxonomy claim, the implementer from a measurement of the running server, independently and without seeing each other reports.
 - *file:* `src/http/server.ts`
+- *accepted* by architect — AGREE, RE-MEASURED INDEPENDENTLY, AND EXTENDED: FST_ERR_CTP_INVALID_JSON_BODY also returns 500, on the EXISTING booking route, live today. Both codes ruled to 400 /problems/malformed-request as a new AC-5, named BY CODE rather than by a statusCode-under-500 disjunction, because server.ts already records why the broader form was deleted after mutation testing. The bodyless-route UX residue — 400 is correct, 200 would be friendlier — is a judgement call rather than a taxonomy breach and becomes OQ-05-2 for slice 10.
 
 **I-05-2** — F-05-1 only mitigation is a docblock, and ADR-0023 Consequences contradict themselves
 
 - *scenario:* The ADR says F-02-9 becomes a rule with a TEST rather than an instruction to remember, and also that the rule is ENFORCED BY REVIEW. The scoped concurrency test measures this cancel path liveness and says nothing about the rule next application. The house answer to an unenforceable claim has been a scan marker or a compile-time witness — and THE MARKER ROUTE IS UNAVAILABLE, which is the part the implementer would not have known without looking: markers are FILE-granular, PERMITTED_FILE asserts exactly one file under src/, and both write functions live in appointmentRepository.ts, so splitting it would break appointment-table-access, which is AC-5 own mechanism. The only function-granular mechanism left is the type system. Proposed: lockResources returns a branded ResourceLock that insertAppointment takes as a parameter — type-only, erased at runtime, one cast at one site, the ADR-0016 shape; forgot-the-lock becomes a compile error and correctly-exempt becomes a signature that does not ask for one, which is the structural difference F-05-1 says does not exist. Residue stated honestly rather than overclaimed: it does not prove the lock keys match the row. Named failure if the rule is next applied wrongly: an in-scope write skipping the locks reproduces ADR-0018 measured 285 of 400 deadlocks, which classify maps to no-verdict and the route to 500, breaking slice 02 AC-3 and AC-4 which require 409.
 - *file:* `docs/adr/0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md`
+- *narrowed* by architect — AGREE ON BOTH FINDINGS: the ADR self-contradiction is straight (a rule with a test versus enforced by review), and the QS-12 marker route is genuinely closed by PERMITTED_FILE exactly-one-file assertion. NARROWER REMEDY: ResourceLock is named with its residue but OWNED BY SLICE 06 under ADR-0019, because at slice 05 its only consumer is a call site already written and already correct — deferring to the slice that makes the work cheaper or stronger, which is the criterion ADR-0019 exists to enforce and which the architect itself breached one slice ago.
 
 **I-05-3** — AC-3 binding half is unfalsifiable as scoped, by the design own argument
 
 - *scenario:* A-05-1 rules AC-3 to mean no column of the row changes AND the response body is identical. The body half is satisfied by ANY implementation including the plain now() the design rejected, because updated_at is in neither AppointmentRow nor AppointmentView and never reaches the client. The no-column-changes half is what the CASE exists for and nothing in scope reads it. A compiled-SQL unit test can kill the mutant but asserts the implementation back at itself; only the container can show PostgreSQL leaves the column alone, and a single step-2 measurement is not evidence that survives under 2.4. THIS IS THE ARGUMENT SECTION 4 USED TO EXCLUDE src/domain/appointment.ts, APPLIED TO THE CASE. Either remedy accepted: state that the integration test reads updated_at before and after the replay, or rule AC-3 to mean the response body only and ship the plain now(), in which case the CASE is complexity with nothing to justify it. What is objected to is the CASE plus nothing that can distinguish it from its alternative.
 - *file:* `docs/slices/05-design.md`
+- *accepted* by architect — AGREE, and the architect records that the framing lands hardest because it is ITS OWN SECTION 4 ARGUMENT TURNED ON THE CASE — the reasoning used to exclude src/domain/appointment.ts applies identically to a CASE that ships indistinguishable from its alternative. Said so in D1 rather than absorbing it quietly.
 
 **I-05-4** — The wiring line slice 05 adds to main.ts is guarded by the acceptance test or by nothing
 
 - *scenario:* ServerDeps and AppointmentRouteDeps gain a third bound use case and main.ts gains a line. main.ts is excluded from mutation, so that line falls into exactly the class stryker.config.mjs comment now names as this project most-counted defect shape. The acceptance test does reach it over HTTP. Named by the implementer rather than left for someone to claim otherwise — the same disclosure T-04-8 made one slice earlier.
 - *file:* `src/main.ts`
+
+**A-05-4** — Two consecutive adjudication rounds have produced zero DISAGREE verdicts on findings
+
+- *scenario:* Slice 04 was nine objections and nine AGREE; slice 05 is nine objections and nine AGREE. Section 6.3 says a round that has never produced a disagreement is not consensus but deference, and the retro reads it the way it reads a reviewer with no findings. The mitigating evidence is real and should be weighed rather than assumed: both rounds produced REMEDY-level disagreement, which section 6.2 explicitly separates from the finding — slice 05 took two narrower remedies (T-05-1 severity reason, I-05-2 ownership moved to slice 06 under ADR-0019) and EXTENDED one beyond what was asked (T-05-2 release witness). And the objections themselves are increasingly measurements rather than opinions, which are harder to disagree with honestly. Recorded by the orchestrator for the retro rather than ruled, because the question is whether the objections are getting better or the adjudication is getting softer, and one slice cannot tell.
+- *file:* `docs/METHODOLOGY.md`
 
 </details>
 
