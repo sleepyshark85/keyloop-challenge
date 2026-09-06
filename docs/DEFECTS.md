@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **166** |
-| Severity | 10 blocking · 89 major · 67 minor |
+| Findings recorded | **172** |
+| Severity | 10 blocking · 93 major · 69 minor |
 | Verdicts | 8 narrowed · 60 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 36 · architect 34 · reviewer 34 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
-| Awaiting a ruling | **82** |
-| Mean escape distance | 1.91 step(s) |
+| Raised by | test-engineer 42 · architect 34 · reviewer 34 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
+| Awaiting a ruling | **88** |
+| Mean escape distance | 1.88 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1162,6 +1162,51 @@ rather than narrated.*
 
 - *scenario:* Section 5 had 1 word of headroom, section 7 had 2, section 11 had 6. About 350 words of additions were paid for out of ADR-0008 repository-port argument retold at length in 5.2, section 11 R-9 --single-transaction consequence told twice with each copy pointing at the other, CLAUDE.md 2.2 restated, and 10.2 QS-10 and QS-12 definitions restated. Nothing unique was cut, and each payment is flagged inside its own commit message rather than left to be discovered in a diff. Recorded because it is evidence the ratchet is doing what the human asked for rather than merely blocking.
 - *file:* `tools/docs/budget.mjs`
+
+</details>
+
+## Slice 05
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **T-05-1** | MAJOR | 2 *(+1)* | test-engineer | Section 1 central claim is false, measured: the predicate already has TWO committed guards | **open** |
+| **T-05-2** | MAJOR | 2 *(+1)* | test-engineer | The new concurrency file cannot fail for the reason it exists — its assertion set is invariant under the mutation it is meant to detect | **open** |
+| **T-05-3** | MAJOR | 2 *(+1)* | test-engineer | ADR-0023 iff outruns its evidence, and slice 06 inherits it | **open** |
+| **T-05-4** | MINOR | 2 *(+1)* | test-engineer | OQ-05-1 is an acceptance-criterion question, not a step-3 detail | **open** |
+| **T-05-5** | MINOR | 2 *(+1)* | test-engineer | D3 "still honestly red" is true in letter and empty in substance, and the test-engineer cannot verify its premise | **open** |
+| **T-05-6** | MAJOR | 2 *(+1)* | test-engineer | AC-3 cannot be a contract assertion, and D1 CASE guard has exactly one guard in the whole system which is a line nobody has written | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**T-05-1** — Section 1 central claim is false, measured: the predicate already has TWO committed guards
+
+- *scenario:* The design says one acceptance criterion is the entire guard on WHERE (status <> cancelled) and that the mutant lives in a .sql file Stryker cannot reach. tests/integration/exclusion-constraints.test.ts already holds a DEFINITIONAL guard comparing pg_get_constraintdef by EQUALITY per constraint name, including the predicate for both no_bay_overlap and no_technician_overlap, so every drop-one and drop-both variant dies there with no behavioural inference; and a BEHAVIOURAL guard on the bay side, case AC-4, whose own title is "the predicate is live and not decorative". The design misnames the mutant and points step 3 at the wrong target. What AC-1 uniquely adds is narrower and better: a behavioural TECHNICIAN-side guard (slice 00 AC-4 deliberately keeps the technician free), and — the one that matters — proof the predicate is live THROUGH THE ALLOCATOR, since slice 00 inserts a hand-chosen pair while AC-1 proves candidate allocation re-derives a pair over a cancelled row. That mutant lives in TypeScript where Stryker CAN reach it. Also load-bearing for the gate: revocation clause 2 rates AC-1 passing vacuously as gate-revoking MAJOR because AC-1 is claimed to be the sole guard, and on a false premise that severity is unearned.
+- *file:* `docs/slices/05-design.md`
+
+**T-05-2** — The new concurrency file cannot fail for the reason it exists — its assertion set is invariant under the mutation it is meant to detect
+
+- *scenario:* Section 5 asserts zero booking.deadlock, zero 500s, every request a verdict, exactly one confirmed row. In slice 05 fixture the BOOKINGS still take the locks; only the cancel is exempt. Run the same file against ADR-0023 REJECTED Option A and the cancels queue behind the bookings on the bay advisory lock: zero deadlocks, zero 500s, every request a verdict, one confirmed row. Identical observable. The file measures ADR-0018 already-tested property, not ADR-0023 decision. It does discriminate catastrophically unsafe from safe, but F-05-1 predicts the LIKELIER regression — someone adds lockResources to the cancel for uniformity because correctly-exempt reads identically to forgot-the-lock — and nothing in the designed file goes red for that. This is no-spurious-refusal.test.ts own documented standard turned on the new file: an absence assertion needs a positive witness, and this one has none. Remedy proposed: hold the bay advisory lock in a second session with keys derived exactly as ADR-0018 specifies and require the cancel to return 200 within a deadline — not timing-flaky, because the gap is 2ms versus blocks-indefinitely — PLUS the non-optional control that a BOOKING for that bay must block under the same held lock, without which a changed key derivation makes the cancel assertion pass vacuously.
+- *file:* `docs/slices/05-design.md`
+
+**T-05-3** — ADR-0023 iff outruns its evidence, and slice 06 inherits it
+
+- *scenario:* M1 to M3 measure ONE statement in ONE transactional shape: a single UPDATE, alone in its transaction, waiting on nothing. The rule they license is universally quantified over statements. The safety argument that actually carries M1 is that the wait is one-directional, inserter onto canceller — a property of the TRANSACTION, not of the row version. A statement outside the constraints scope sitting inside a transaction that also waits on something else is exempt by the rule and can close a cycle; the rule does not exclude it and the measurements do not cover it. Named risk and it is the NEXT slice: if slice 06 atomic move is written as UPDATE old to cancelled plus INSERT new confirmed in one transaction, the rule exempts the first half and locks on the second — harmless today because the transaction holds the locks anyway, but the rule invites reasoning about halves, and the ADR assurance that slice 06 inherits ADR-0018 exactly rests on the insert half rather than on the rule it just shipped. The failure mode reopened is ADR-0018 own, measured at 285 of 400. Separately, "the row version it writes" is ambiguous for an UPDATE, which writes a new version and supersedes an old one that WAS indexed — and all of M1 is about the old version disappearance being what the inserter waits on, while the rule names only the new one. The forward direction is fine and ADR-0018 measured it; the objection is on the converse generality only.
+- *file:* `docs/adr/0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md`
+
+**T-05-4** — OQ-05-1 is an acceptance-criterion question, not a step-3 detail
+
+- *scenario:* Fastify with content-type application/json and a zero-length body raises FST_ERR_CTP_EMPTY_JSON_BODY in the content-type parser, BEFORE the route schema and therefore before slice 03 malformed-request path, which arc42 8.6 attributes to TypeBox before any handler. If that reaches the client as Fastify own error shape it is a client-reachable error response outside 8.6 CLOSED taxonomy, against 8.6 own claim. The natural client call is exactly that header, and slice 10 harness will emit it, so the finding does not stay in a test file — it lands on the contract and it decides AC-4.
+- *file:* `docs/slices/05-design.md`
+
+**T-05-5** — D3 "still honestly red" is true in letter and empty in substance, and the test-engineer cannot verify its premise
+
+- *scenario:* Two parts, separated. On the premise: D3 asserts three things about src/ and the test-engineer is FORBIDDEN to read src/, so agreeing to them is not verification but DEFERENCE WEARING VERIFICATION CLOTHES — flagged rather than agreed. On the red: AC-2 fails at step 3 because the cancel route 404s at its arrange step, the same reason AC-1, AC-3 and AC-4 fail, so 2.4 letter is met but AC-2 has never failed FOR ITS OWN REASON and at green it will pass without a line written for it. Same objection as a test failing on a missing import proves nothing. The role explicitly DISAGREES WITH THE CLAIM AND AGREES WITH THE DESIGN: AC-2 is worth having as a regression guard on slice 02 read path, newly reachable, and it kills the Type.Literal substitution mutant.
+- *file:* `docs/slices/05-design.md`
+
+**T-05-6** — AC-3 cannot be a contract assertion, and D1 CASE guard has exactly one guard in the whole system which is a line nobody has written
+
+- *scenario:* findStoredAppointment returns a FIXED PROJECTION that does not include updated_at, so "no column of the row changes" needs to_jsonb(appointment) equality before and after or AC-3 asserts only over columns the author happened to pick. More: updatedAt appears nowhere in tests/ and on the evidence is not in the response body, so A-05-1 second half — "and the response body is identical" — is satisfied EQUALLY by D1 CASE and by the plain updated_at = now() alternative, doing no discriminating work. The entire observable difference between the two options is SQL-side. Stryker will not produce a targeted CASE-removal mutant either: the statement is one string literal and mutating it to empty fails everything loudly rather than isolating the CASE.
+- *file:* `tests/support/booking.ts`
 
 </details>
 
