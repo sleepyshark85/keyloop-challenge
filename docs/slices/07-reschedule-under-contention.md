@@ -6,7 +6,7 @@ depends_on: ["06"]
 arc42: ["§6.3"]
 adr: [3]
 quality_scenarios: [QS-4, QS-5]
-inherits: ["F-02-9", "A-05-6", "A-06-3"]   # deferred here by ruling; slice:check enforces it (A-05-5)
+inherits: ["F-02-9", "A-05-6", "A-06-3", "O-41"]   # deferred here by ruling; slice:check enforces it (A-05-5)
 loopbacks: 0
 ---
 

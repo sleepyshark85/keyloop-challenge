@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **220** |
-| Severity | 10 blocking · 117 major · 93 minor |
-| Verdicts | 14 narrowed · 81 accepted · 3 escalated · 19 deferred |
-| Raised by | test-engineer 54 · reviewer 44 · architect 41 · implementer 37 · orchestrator 37 · scribe 5 · human 2 |
+| Findings recorded | **226** |
+| Severity | 10 blocking · 118 major · 98 minor |
+| Verdicts | 14 narrowed · 84 accepted · 3 escalated · 22 deferred |
+| Raised by | test-engineer 54 · architect 46 · reviewer 44 · orchestrator 38 · implementer 37 · scribe 5 · human 2 |
 | Awaiting a ruling | **103** |
-| Mean escape distance | 1.87 step(s) |
+| Mean escape distance | 1.83 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1446,8 +1446,14 @@ rather than narrated.*
 | **O-41** | MAJOR | 2 *(+1)* | orchestrator | The A-05-5 check is a SUBSET guard over logged deferrals, not a COMPLETENESS guard over obligations — and slice 06 is the case that shows the gap | deferred |
 | **I-06-1** | MAJOR | 2 *(+1)* | implementer | The problem.ts mutation arithmetic is wrong as measured — the two new taxonomy rows add ZERO mutants, not two, and the file stays exactly at threshold | accepted |
 | **I-06-2** | MAJOR | 2 *(+1)* | implementer | Candidate ORDER on the reschedule loop is specified nowhere, and the plausible default silently reassigns a move that did not need reassigning | accepted |
-| **F-06-2** | MAJOR | 2 *(+0)* | architect | The error taxonomy carries ZERO mutants, so problem.ts mutation score is silent on the thing QS-11 is about | **open** |
-| **O-42** | MAJOR | 2 *(+0)* | orchestrator | A-06-2 was routed to slice 10, a tombstone Gate D folded into 09 — the same defect as OQ-05-2, in the run that ruled a design finding must also be a logged finding | **open** |
+| **F-06-2** | MAJOR | 2 *(+0)* | architect | The error taxonomy carries ZERO mutants, so problem.ts mutation score is silent on the thing QS-11 is about | accepted |
+| **O-42** | MAJOR | 2 *(+0)* | orchestrator | A-06-2 was routed to slice 10, a tombstone Gate D folded into 09 — the same defect as OQ-05-2, in the run that ruled a design finding must also be a logged finding | accepted |
+| **A-06-1** | MINOR | 1 *(+0)* | architect | Section 2.2 exclusion-constraint mechanism is read off PostgreSQL documented behaviour and slice 00 AC-10, not re-measured for the UPDATE path | **open** |
+| **A-06-2** | MINOR | 1 *(+0)* | architect | Nothing asserts deps.newId() is the only site that mints an appointment id, and ADR-0025 absent-is-permanent rests on it | deferred |
+| **OQ-06-1** | MINOR | 1 *(+0)* | architect | A move to the instant the appointment already holds is a successful 200 that rewrites the row and advances updated_at | accepted |
+| **A-06-4** | MAJOR | 2 *(+0)* | architect | ADR-0019 cheaper-or-stronger criterion is PER-ITEM and has no aggregate — slice 09 is now the destination of record for four deferrals and is already the backlog largest slice | deferred |
+| **A-06-5** | MINOR | 2 *(+0)* | architect | 06-design.md landed at 2,997 of 3,000 words, so the next amendment to this slice cannot be absorbed without deleting argument | deferred |
+| **O-43** | MINOR | 2 *(+2)* | orchestrator | The architect writes no tools/ and docs:adr-check stays green are in direct conflict on EVERY ADR, not just this run | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1532,11 +1538,47 @@ rather than narrated.*
 
 - *scenario:* Owed by the architect off the back of I-06-1 and larger than the arithmetic that produced it. Because PROBLEM_TYPES is an as const expression the instrumenter skips, a DELETED TAXONOMY ROW WOULD BE SCORED AS NO CHANGE. What actually guards the taxonomy is tests/contract/error-taxonomy.test.ts asserted for-all-responses there-exists-a-row, which is why ADR-0024 corpus DIRECTION is load-bearing rather than stylistic. Residual: any FUTURE mutant added to problem.ts that is not killed drops the file below threshold immediately, because there is no margin to absorb it.
 - *file:* `src/http/problem.ts`
+- *accepted* by architect — ACCEPTED, NO NEW CONTROL, and the ruling is that THE GUARD ALREADY EXISTS IN THE RIGHT DIRECTION. Because PROBLEM_TYPES is an as const the instrumenter skips as a TSAsExpression type node, A DELETED TAXONOMY ROW SCORES AS NO CHANGE — the mutation score is silent on precisely what QS-11 is about. What actually guards the taxonomy is tests/contract/error-taxonomy.test.ts asserted for-all-responses there-exists-a-row, which is why ADR-0024 corpus DIRECTION is load-bearing rather than stylistic, and this slice extends that corpus to nine rows. NO SLICE DESTINATION: a control that already exists needs no deferral. Residual to section 11 at step 7 — with no margin at all, any future mutant in problem.ts that is not killed drops the file below threshold immediately.
 
 **O-42** — A-06-2 was routed to slice 10, a tombstone Gate D folded into 09 — the same defect as OQ-05-2, in the run that ruled a design finding must also be a logged finding
 
 - *scenario:* The architect T-06-4 ruling declines A-06-2 for slice 06 and gives it a destination, on reasoning the orchestrator does NOT dispute: the check should run against the GENERATED OPENAPI DOCUMENT so it asserts for-all-operations rather than for-all-files-someone-grepped. But the destination named is SLICE 10, whose file is a tombstone carrying folded_into 09, folded_at 2026-09-04, folded_by gate-D — and slice 09 declares absorbs [10, 11] and carries the heading The OpenAPI document and the harness (carried from slice 10). SO THE REASONING IS INTACT AND ONLY THE LABEL IS STALE, which is exactly what was true of OQ-05-2 when it was routed to slice 10 two days after the fold, the defect that produced R-05-2. This is the SECOND ROUTING TO THE SAME DEAD SLICE, and it happened in the same run that ruled O-39. THE ORCHESTRATOR OWN CHECK WOULD NOT HAVE CAUGHT IT: refsDeferredTo matched deferred_to by SHAPE and never asked whether the slice was live, so A-05-5 mechanism had the same blind spot as the mechanism it replaced — docs:adr-check resolved folds for ADRs while the log write path did not. FIXED BEFORE THIS WAS RAISED: destination liveness now runs on the WRITE PATH, refusing the record where the mistake is made rather than in CI after a push, which is the lesson tools/team-log/check.mjs own docblock already records. Verified by attempting the ruling as worded — REFUSED, nothing written. A-06-2 deferred_to is therefore UNRECORDED and the architect must confirm 09 at the amendment run; the orchestrator has NOT silently corrected an architect ruling, because a destination the architect did not name is not a destination.
 - *file:* `docs/slices/10-openapi-and-curl-harness.md`
+- *accepted* by architect — ACCEPTED IN FULL, INCLUDING THE PART THAT LANDS ON THE ARCHITECT. The label was stale and the reasoning was not, exactly as measured. THE CORRECTION IS NOT A FOLD-FOLLOW: slice 09 is named because it EMITS THE OPENAPI DOCUMENT, which is what makes the check assert over all operations, and that is the argument the original ruling gave — it simply attached it to the wrong id. AND THE ORCHESTRATOR REMEDY IS RULED RIGHT AND BETTER THAN THE FINDING: moving liveness onto the WRITE PATH refuses the record where the mistake is made rather than in CI after a push, which is the lesson tools/team-log/check.mjs own docblock already carried and which A-05-5 mechanism had not inherited. That it was verified by attempting the architect OWN RULING VERBATIM — refused, nothing written — is the evidence this project asks for and rarely gets on a guard first run.
+
+**A-06-1** — Section 2.2 exclusion-constraint mechanism is read off PostgreSQL documented behaviour and slice 00 AC-10, not re-measured for the UPDATE path
+
+- *scenario:* AC-1 rests on check_exclusion_constraint skipping the row own superseded heap tuple because its xmax is this transaction xid. That is documented behaviour plus slice 00 SINGLE-THREADED AC-10 measurement; slice 06 does not re-measure it for the statement the application generates. Section 2.2 TWO constraint-name controls are what would catch it being wrong — and after T-06-2 they now cover BOTH constraints rather than only the bay, which is the change that makes this assumption tolerable.
+- *file:* `docs/slices/06-design.md`
+
+**A-06-2** — Nothing asserts deps.newId() is the only site that mints an appointment id, and ADR-0025 absent-is-permanent rests on it
+
+- *scenario:* The read-decides design is sound only while an id is unreachable by a client before it exists: that is what makes the read absent answer permanent and its 404 unable to go stale. It rests on deps.newId() being the sole minting site, which no test, no dependency-cruiser rule and no marker asserts. T-06-4 confirmed independently that it cannot be closed from the HTTP boundary the test-engineer owns.
+- *file:* `docs/slices/06-design.md`
+- *deferred* by architect — DECLINED FOR SLICE 06 AND DEFERRED TO SLICE 09. ADR-0019 applied to the architect itself: the mechanism exists but THE HAZARD DOES NOT — no client-supplied id exists — so a control here guards a future regression rather than a live doubt, unlike section 4.4 DDL-drop cell that ADR-0019 made it build immediately. Slice 09 is STRONGER because it EMITS THE OPENAPI DOCUMENT, so the check runs over ALL OPERATIONS rather than over the files someone grepped, the direction-of-assertion move ADR-0024 corpus makes; and CHEAPER because that document is generated there anyway. The T-06-4 remedy stays rejected in all three parts: dependency-cruiser is file-granular, a grep over src/http/routes/ is a denylist over a directory someone remembered to name, and reviewer-owned is not executable. THE DESTINATION NAMED AT STEP 2 WAS SLICE 10, A TOMBSTONE GATE D FOLDED INTO 09 — second routing to the same dead slice after OQ-05-2, and inside the run that ruled O-39. The reasoning was never at issue, only the label; SLICE 09 IS NAMED HERE ON ITS OWN MERITS, NOT BY FOLLOWING THE FOLD. Written into 09-observability.md, not only recorded here.
+
+**OQ-06-1** — A move to the instant the appointment already holds is a successful 200 that rewrites the row and advances updated_at
+
+- *scenario:* Slice 05 spent a CASE expression on the cancel path specifically to avoid a client-reachable write to an unchanged row. The move path has no equivalent guard, and section 3 rules one out on the ground that A MOVE IS NEVER IDEMPOTENT. A move to the SAME startsAt is the counter-example to that ground: it changes nothing and still writes. Ruled OUT OF SCOPE and recorded because the gate may disagree.
+- *file:* `docs/slices/06-design.md`
+- *accepted* by architect — RULED OUT OF SCOPE and left RECORDED rather than resolved. A move to the same instant is a request, not a replay of one, so slice 05 CASE has no analogue here. Provisional until the gate, which is the point of recording it.
+
+**A-06-4** — ADR-0019 cheaper-or-stronger criterion is PER-ITEM and has no aggregate — slice 09 is now the destination of record for four deferrals and is already the backlog largest slice
+
+- *scenario:* Slice 09 carries fifteen acceptance criteria, absorbs slices 10 and 11 by Gate D, and now holds OQ-05-2, F-06-1, A-06-2 and T-06-5 with ADR-0028. EVERY ONE OF THOSE FOUR DEFERRALS IS INDIVIDUALLY CORRECT UNDER ADR-0019, and three were ruled by the architect in this slice alone. That is the gap: the criterion asks whether a slice is cheaper OR stronger for ONE control, and never whether it has become THE PLACE WORK GOES TO STOP BEING ANYONE PROBLEM. The measurement is visible in the budget — 09-observability.md went from 653 to 793 of 800 words in this run, and each new obligation must now be paid for by deleting an existing one.
+- *file:* `docs/slices/09-observability.md`
+- *deferred* by architect — RAISED AND ROUTED, NOT RULED. The architect owns ADR-0019 and CANNOT BE THE ONE TO DECIDE that its own four applications of it have overloaded a slice — the decision is SCOPE, which section 6 gives to the human at the gate, and slice:check exists to show the gate what moved in its absence. Recorded now rather than at step 7 so the gate sees the accumulation WHILE IT CAN STILL ACT ON IT. The answer is a split, a fold, or an explicit acceptance that slice 09 is the close-out and will be large.
+
+**A-06-5** — 06-design.md landed at 2,997 of 3,000 words, so the next amendment to this slice cannot be absorbed without deleting argument
+
+- *scenario:* Folding five step-2 findings in took ELEVEN TRIM PASSES. Every deletion so far removed a RESTATEMENT — the racing-moves argument now lives only in 07 file, the duplicated-loop argument only in 09 file, AC-5 amended wording only in the slice file — which is the concision rule working as designed. THAT SUPPLY IS NOW EXHAUSTED: what remains is the mechanism paragraphs, the option tables and the rulings. A third round on slice 06, a DCR at step 5 or a gate ruling that reopens a decision, would have to CUT REASONING TO FIT, and the budget would report that as green. Step 7 is unaffected: the merged ceiling is 1,200, so the design shrinks rather than grows.
+- *file:* `docs/slices/06-design.md`
+- *deferred* by architect — DEFERRED TO THE RETRO, NOT FIXED. Raising the ceiling to fit a document is precisely what the budget tool own docblock forbids, and THE ARCHITECT ASKING FOR MORE ROOM FOR ITS OWN PROSE IS THE LEAST CREDIBLE VERSION OF THAT REQUEST. What the retro should weigh is a measurement rather than a preference: whether an in-flight design that must absorb an adjudication round needs a different number, shown by the enumeration of what slice 06 2,997 words actually hold. IF THE ANSWER IS THAT THE DESIGN SHOULD HAVE BEEN SMALLER, that is the more likely finding and the retro should be free to reach it.
+
+**O-43** — The architect writes no tools/ and docs:adr-check stays green are in direct conflict on EVERY ADR, not just this run
+
+- *scenario:* Flagged by the architect in its amendment report and recorded because it recurs by construction rather than by carelessness. docs:adr-check REFUSES AN UNPINNED ADR — that is F-02-10 remedy, and it is correct: a new ADR is proposed, so it will be edited before ratification, which is when a dropped option is most likely and least visible. The tool prints --pin as the remedy and explicitly warns against --rebaseline. So every architect dispatch that says NO tools/ and ALSO says keep docs:adr-check green is unsatisfiable the moment an ADR lands, and the architect has now written tools/docs/adr-baseline.json in two consecutive slices under exactly that instruction. It is DATA rather than tool logic and the diff was three lines, which is why nobody has called it a violation — but an instruction that is routinely and correctly disobeyed is a bad instruction, and the boundary should either name the baseline as an architect-writable artifact or the pin should move to the orchestrator commit. The ORCHESTRATOR WROTE THE INSTRUCTION BOTH TIMES; this is a finding against the dispatch, not against the architect.
+- *file:* `tools/docs/adr-invariants.mjs`
 
 </details>
 

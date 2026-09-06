@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| Last commit | `419b1d1 chore(log): step 2 closes — one objection, backed by a measurement, and O-40 resolved` |
+| Last commit | `64ab23c docs(06): step 2 amendment — five findings folded in, and a dead destination replaced` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 121 |
-| ADRs accepted | 22 |
+| Agent runs recorded | 122 |
+| ADRs accepted | 23 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
@@ -133,6 +133,8 @@
 | [0024](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) | The error taxonomy's residual is a property, not a row | accepted | — |
 | [0025](adr/0025-existence-is-the-reads-legality-is-the-statements.md) | Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE | accepted | — |
 | [0026](adr/0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md) | The lock is a value the write takes, and it carries the keys it took | accepted | — |
+| [0027](adr/0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md) | A move attempts the pair it already holds before it shuffles | accepted | — |
+| [0028](adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | The lock carries the transaction it was taken on | proposed | — |
 
 ## Agent runs
 
@@ -259,7 +261,8 @@
 | 2026-09-06 12:54 | test-engineer | 5m18 | 42 / 488 / 868,778 | `derived` |
 | 2026-09-06 12:58 | implementer | 8m31 | 140 / 18,278 / 6,556,780 | `derived` |
 | 2026-09-06 13:08 | architect | 8m10 | 68 / 6,110 / 1,850,910 | `derived` |
-| | **total** | **5265m47** | **28,304 / 2,191,754 / 2,107,542,329** | |
+| 2026-09-06 13:30 | architect | 17m37 | 234 / 12,488 / 14,261,612 | `derived` |
+| | **total** | **5283m24** | **28,538 / 2,204,242 / 2,121,803,941** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
