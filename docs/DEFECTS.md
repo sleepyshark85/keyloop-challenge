@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **177** |
-| Severity | 10 blocking · 95 major · 72 minor |
+| Findings recorded | **179** |
+| Severity | 10 blocking · 96 major · 73 minor |
 | Verdicts | 10 narrowed · 67 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 42 · architect 34 · reviewer 34 · implementer 31 · orchestrator 29 · scribe 5 · human 2 |
-| Awaiting a ruling | **84** |
-| Mean escape distance | 1.86 step(s) |
+| Raised by | test-engineer 44 · architect 34 · reviewer 34 · implementer 31 · orchestrator 29 · scribe 5 · human 2 |
+| Awaiting a ruling | **86** |
+| Mean escape distance | 1.85 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1180,6 +1180,8 @@ rather than narrated.*
 | **I-05-3** | MINOR | 2 *(+1)* | implementer | AC-3 binding half is unfalsifiable as scoped, by the design own argument | accepted |
 | **I-05-4** | MINOR | 2 *(+1)* | implementer | The wiring line slice 05 adds to main.ts is guarded by the acceptance test or by nothing | **open** |
 | **A-05-4** | MINOR | 2 *(+2)* | orchestrator | Two consecutive adjudication rounds have produced zero DISAGREE verdicts on findings | **open** |
+| **T-05-7** | MAJOR | 3 *(+3)* | test-engineer | AC-12, section 8.6 totality sweep, is GREEN in the same run over the very build AC-5 proves is broken | **open** |
+| **T-05-8** | MINOR | 3 *(+0)* | test-engineer | Two sub-assertions are green at the red and would be green over a wrong build | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1246,6 +1248,16 @@ rather than narrated.*
 
 - *scenario:* Slice 04 was nine objections and nine AGREE; slice 05 is nine objections and nine AGREE. Section 6.3 says a round that has never produced a disagreement is not consensus but deference, and the retro reads it the way it reads a reviewer with no findings. The mitigating evidence is real and should be weighed rather than assumed: both rounds produced REMEDY-level disagreement, which section 6.2 explicitly separates from the finding — slice 05 took two narrower remedies (T-05-1 severity reason, I-05-2 ownership moved to slice 06 under ADR-0019) and EXTENDED one beyond what was asked (T-05-2 release witness). And the objections themselves are increasingly measurements rather than opinions, which are harder to disagree with honestly. Recorded by the orchestrator for the retro rather than ruled, because the question is whether the objections are getting better or the adjudication is getting softer, and one slice cannot tell.
 - *file:* `docs/METHODOLOGY.md`
+
+**T-05-7** — AC-12, section 8.6 totality sweep, is GREEN in the same run over the very build AC-5 proves is broken
+
+- *scenario:* Seven rows observed, set equality satisfied, no collision — and the taxonomy totality claim passed for three slices while a live input produced 500 /problems/internal where 8.6 promises 400. THE SWEEP ONLY EVER VISITS INPUTS AN AUTHOR ENUMERATED. Raised unprompted at step 3, and it is the general form of the defect both roles found independently at step 2: a totality claim asserted over a hand-written input set is a claim about the author imagination rather than about the taxonomy.
+- *file:* `tests/contract/error-taxonomy.test.ts`
+
+**T-05-8** — Two sub-assertions are green at the red and would be green over a wrong build
+
+- *scenario:* The concurrency file step-1 LIVENESS half — the cancel answered within 5000ms — passes at the red because a 404 is fast, for a reason unrelated to locking; the status assertion beside it is what actually failed, at 13ms. And AC-4 status assertion toBe(404) is green because Fastify own not-found handler already answers 404, the documented vacuous-green trap; the media-type assertion is what failed. Both become load-bearing the moment the route exists. Named unprompted for the third consecutive slice.
+- *file:* `tests/concurrency/cancellation-takes-no-lock.test.ts`
 
 </details>
 
