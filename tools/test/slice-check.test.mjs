@@ -217,6 +217,25 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
   ok('a head_sha git cannot relate to HEAD is UNVERIFIED, not PASS',
     row(out, 'tests green').startsWith('UNVERIFIED'), row(out, 'tests green'));
 }
+{
+  // O-35. An ABBREVIATED `head_sha` for the very commit under test was reported as behind
+  // it. `check.run` records do not all carry the same SHA width, the equality guard above
+  // was a string comparison, and a commit IS an ancestor of itself — so the run fell
+  // through to `merge-base --is-ancestor` and the gate printed the self-refuting detail
+  // "the newest recorded run is 86af39b, an ancestor of this slice's last commit 86af39b".
+  //
+  // Right about the rule, wrong about the identity of two names for one commit. Both sides
+  // are now resolved through `rev-parse` before anything is compared, which is why the
+  // failing direction is asserted first: an abbreviated record must PASS, and the O-17
+  // behaviour above must survive it.
+  const { out, sha } = build([ciRun({ checks: (ctx) => ({ head_sha: ctx.sha.slice(0, 7) }) })]);
+  ok('an ABBREVIATED head_sha for the commit under test passes — two names, one commit',
+    row(out, 'tests green').startsWith('PASS'), `${sha.slice(0, 7)} — ${row(out, 'tests green')}`);
+  const behind = build([ciRun({ checks: (ctx) => ({ head_sha: ctx.rootSha.slice(0, 7) }) })],
+    { commits: [{ subject: 'feat(77): later work', files: { 'src/later.ts': 'export const x = 1;\n' } }] });
+  ok('...and an abbreviated run that really IS behind still fails — the widening is not a hole',
+    row(behind.out, 'tests green').startsWith('FAIL'), row(behind.out, 'tests green'));
+}
 
 {
   // The retarget, and the reason for it: pinning to HEAD meant every later commit to

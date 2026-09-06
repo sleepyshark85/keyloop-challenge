@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **162** |
-| Severity | 10 blocking · 88 major · 64 minor |
+| Findings recorded | **163** |
+| Severity | 10 blocking · 88 major · 65 minor |
 | Verdicts | 8 narrowed · 60 accepted · 1 escalated · 10 deferred |
-| Raised by | test-engineer 35 · reviewer 34 · architect 31 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
-| Awaiting a ruling | **83** |
-| Mean escape distance | 1.80 step(s) |
+| Raised by | test-engineer 36 · reviewer 34 · architect 31 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
+| Awaiting a ruling | **84** |
+| Mean escape distance | 1.82 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -905,6 +905,7 @@ rather than narrated.*
 | **R-04-6** | MINOR | 5 *(+5)* | reviewer | A naive main..HEAD diff MISREADS section 8.3 as a regression that this slice did not make | **open** |
 | **A-04-13** | MAJOR | 5 *(+5)* | architect | The derivation R-04-1 asks for is already built, already fired, and no artifact carries its verdict | **open** |
 | **A-04-14** | MAJOR | 5 *(+5)* | architect | Section 13 asserts a property section 13 does not have, and it went stale inside the slice that wrote it | **open** |
+| **T-04-8** | MINOR | 5 *(+5)* | test-engineer | main.ts line 46 is now guarded; the general claim in the Stryker comment is still undischarged | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1133,6 +1134,11 @@ rather than narrated.*
 
 - *scenario:* Line 46 reads "The register is generated from the log and cannot drift: 130 findings — 10 blocking, 71 major, 49 minor. Mean escape distance 1.66 steps." Written at 13:15. Measured now: 474 log records not 407, a 160-row register not 130, 10/86/64 not 10/71/49, 146 prompt files not 130, mean escape 1.76 not 1.66, and 84 of 160 awaiting a ruling rather than 67 of 130. Every cited number was wrong within two hours, before the reviewer even opened the branch. The register genuinely cannot drift; the SENTENCE SAYING SO is hand-copied prose and had already drifted, under a header reading "Sourced from artifacts, never memory". Fixable with a mechanism that already exists and is used twice: tools/docs/build.mjs has a general replaceBlock(marker) that section 9 and section 11 both consume, and section 13 has zero generated markers. A generated:team-stats block would regenerate these with docs:build and, better, make docs:check FAIL when they go stale — which is what caught this class everywhere else.
 - *file:* `docs/arc42/13-ai-collaboration.md`
+
+**T-04-8** — main.ts line 46 is now guarded; the general claim in the Stryker comment is still undischarged
+
+- *scenario:* The architect corrected the exclusion justification while the test-engineer worked, and the new comment is true after the change — the test IS the remedy it names. But its stated cost, that every line of main.ts is guarded by an outside-in assertion or by nothing and the mutation score cannot tell which, remains exactly true. One line moved from the second class to the first; nothing tells a reader which other lines are in which.
+- *file:* `src/main.ts`
 
 </details>
 

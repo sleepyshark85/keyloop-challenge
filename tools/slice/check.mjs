@@ -312,16 +312,31 @@ if (!onlyReady) {
   })();
   const head = sliceHead ?? git(['rev-parse', 'HEAD']);
   const runSha = lastRun?.checks?.head_sha;
+  // BOTH SIDES RESOLVED TO FULL SHAs BEFORE ANYTHING IS COMPARED.
+  //
+  // The equality guard below was a string comparison, and `check.run` records do not all
+  // carry the same SHA width — most are full, some abbreviated. An abbreviated record for
+  // the very commit under test therefore failed `===`, fell through to `merge-base
+  // --is-ancestor`, and a commit IS an ancestor of itself, so the gate reported the run as
+  // behind the work with the self-refuting detail "the newest recorded run is 86af39b, an
+  // ancestor of this slice's last commit 86af39b".
+  //
+  // The check was right about the rule and wrong about the identity of two names for one
+  // commit — the same spelling-versus-concept error this project has now found in six
+  // markers, this time in the tool that grades the others.
+  const fullSha = (sha) => (sha ? git(["rev-parse", `${sha}^{commit}`]) : null);
   const coversHead = (() => {
-    if (!head || !runSha) return null;
-    if (runSha === head) return true;
+    const h = fullSha(head);
+    const r = fullSha(runSha);
+    if (!h || !r) return null;
+    if (r === h) return true;
     // `merge-base --is-ancestor` exits 0 when the first is an ancestor of the second,
     // so this reads "the run is behind the slice's last commit" — exactly the failure
     // being caught, and nothing more.
     const isAncestor = (a, b) =>
       spawnSync('git', ['merge-base', '--is-ancestor', a, b], { encoding: 'utf8' }).status === 0;
-    if (isAncestor(runSha, head)) return false;     // the run is BEHIND the work
-    if (isAncestor(head, runSha)) return true;      // the run is at or AFTER it
+    if (isAncestor(r, h)) return false;     // the run is BEHIND the work
+    if (isAncestor(h, r)) return true;      // the run is at or AFTER it
     return null;                                    // unrelated or unknown — cannot tell
   })();
 
