@@ -15,10 +15,10 @@ the ADR is why it beat the alternatives.
 |---|---|---|
 | **Stubbed client** | Not built. An OpenAPI document and a cURL harness stand in for it (TC-5) | The contract is *emitted* from the route schemas (ADR-0005), so it cannot drift from the service |
 | **Scheduler service** | The whole system: validate, allocate, persist, report | One Node process, five internal modules (§5.2) |
-| **PostgreSQL** | The persistent store **and the enforcement point for the central invariant** | Not a generic persistence port. §2.1 forbids substituting it in any test that asserts a persistence invariant, and §4.1 says why calling it swappable would be a lie |
+| **PostgreSQL** | The persistent store **and the enforcement point for the central invariant** | Not a generic persistence port; §4.1 says why calling it swappable would be a lie, and `CLAUDE.md` §2.2 why no test may substitute it |
 | **Telemetry collector** | Receives OTLP traces and metrics; `pino` writes JSON to stdout | A local `grafana/otel-lgtm` container (§7). Its absence must not break the service |
 
-There are no other neighbours; §3.1.2 argues that omission rather than leaving it as one.
+No other neighbours; §3.1.2 argues that omission.
 
 ## 5.2 Level 2 — components
 
@@ -41,20 +41,13 @@ Pure functions and types. **It imports nothing at all** — no other module, no 
 builtin — and `dependency-cruiser`'s `domain-is-pure` rule enforces that absolutely, with no
 allowlist. IANA-zone conversion uses the `Intl` global, which needs no import.
 
-The purity is not aesthetic: GC-1 requires the opening-hours rule never to learn what is booked, and
-a module that cannot import a database client cannot consult one.
-
 | Module | Owns | The §1.4 ambiguity it absorbs |
 |---|---|---|
 | `interval.ts` *(built)* | The `Instant` and `Interval` types, `instant(epochMillis)`, `appointmentInterval(startsAt, durationMillis)`, and **`occupancyInterval(interval)` — "the interval the constraint sees"**. `instant()` refuses anything outside ±8 640 000 000 000 000 ms, so an `Instant` is renderable by construction (ADR-0014) | **A-4.** `occupancyInterval` is the identity today, which is the statement that there is no buffer. A buffer changes this function and the constraint's range expression, nothing else |
 | `duration.ts` *(built)* | The `DurationMinutes` type, `serviceDuration(serviceType)`, `durationMillis(duration)` — the only place minutes become milliseconds | **A-1.** If duration varies by vehicle this function gains a parameter; the interval arithmetic above it takes a number and does not change |
 | `openingHours.ts` *(built)* | `withinOpeningHours(startsAtMillis, endsAtMillis, ianaZone, weekly)`, returning the `OpeningHoursVerdict` union rather than a boolean. It carries the same epoch bound (ADR-0014) and normalises an end rendering as local `00:00:00` on the next date to 86 400 seconds-of-day (ADR-0015) | **ADR-0001 / GC-1.** The only place that reasons in wall-clock time (A-8). Breaks, holidays and one-off closures land here |
-| `candidates.ts` *(slice 04)* | `orderCandidates(bays, technicians, seed)` and `prune(order, resource, id)` return `CandidateOrder \| null`, `null` *being* a list emptied; `nextCandidate(order)` is total, a `CandidateOrder` being **non-empty by construction** — both lists are `readonly [string, ...string[]]`, since a brand on the object leaves `noUncheckedIndexedAccess` in place and would merely *relocate* the assertion (I-04-3) | **A-10 / ADR-0009.** Seeded Fisher–Yates, pure and importing nothing. `prune` takes the **unbranded** union, to which a `ContendedResource` is assignable: no cast in, none out |
+| `candidates.ts` *(built)* | `orderCandidates(bays, technicians, seed)` and `prune(order, resource, id)` return `CandidateOrder \| null`, `null` *being* a list emptied; `nextCandidate(order)` is total, a `CandidateOrder` being **non-empty by construction** — both lists are `readonly [string, ...string[]]`, since a brand on the object leaves `noUncheckedIndexedAccess` in place and would merely *relocate* the assertion (I-04-3) | **A-10 / ADR-0009.** Seeded Fisher–Yates, pure and importing nothing. `prune` takes the **unbranded** union, to which a `ContendedResource` is assignable: no cast in, none out |
 | `appointment.ts` *(slice 05)* | The status model: `confirmed`/`cancelled`, and which transitions are legal | **ADR-0003.** Cancellation is terminal and idempotent; only a confirmed appointment may be moved |
-
-`occupancyInterval` deserves its name: what A-4 moves is the span the exclusion constraint compares,
-not the customer-facing appointment. Keeping the two distinct while they are equal is the difference
-between a one-function change and an archaeology exercise.
 
 ### `src/application` — the use cases
 
@@ -90,11 +83,8 @@ value**, bounding the loop at `|bays| + |technicians| − 1` rather than their p
 carries it, so the cap is stated once, in the arm (ADR-0020).
 
 **This layer depends on `src/persistence` concretely. There is no repository port**, and that is a
-decision rather than an omission ([ADR-0008](../adr/0008-module-decomposition.md)): a port that can be
-implemented in memory is a port whose implementation cannot hold this system's invariant, and offering
-the socket invites the substitution `CLAUDE.md` §2.2 bans. The cost — a use case cannot be unit-tested
-against a substitute repository, only against a replaced transport — is §8.5's line, and it is what
-keeps §2.2 intact.
+decision rather than an omission: [ADR-0008](../adr/0008-module-decomposition.md) carries the argument
+in full, and §8.5 carries the cost.
 
 ### `src/persistence` — SQL, and the only place SQLSTATE is read
 
@@ -134,10 +124,8 @@ on one path, breaking both the `booking_conflicts_total{resource}` label and ADR
 
 Fastify, TypeBox schemas, RFC 9457 `application/problem+json`, and the OpenAPI emitter (ADR-0005).
 It maps a use-case outcome to a status code and nothing more, and **may not import
-`src/persistence`**: a route querying directly would bypass the span boundaries and the retry policy
-that make the booking path what it is. `problem.ts` holds the whole taxonomy as one closed
-`as const` set with a single constructor over it, so a `type` outside §8.6 is a compile error at the
-call site rather than a serialisation failure at the client.
+`src/persistence`** — §5.3's table says what that rule buys. `problem.ts` holds the whole taxonomy as
+one closed `as const` set, so a `type` outside §8.6 is a compile error at the call site.
 
 ### `src/platform` — the leaf
 
@@ -145,16 +133,26 @@ Config (`BOOKING_ATTEMPT_CAP` 16, `BOOKING_SEED` unset — ADR-0009, ADR-0021, A
 metric registry. Importable by everyone, imports nothing from `src/`. That shape is also a junk drawer's: the leaf rule
 keeps it from acquiring behaviour, only a reviewer from acquiring *contents*.
 
+**ADR-0021 asks `loadConfig` for one startup `warn`, and `loadConfig` cannot emit one.** The logger is
+built *from* its return value, so at the moment `BOOKING_SEED` is read there is no logger, and writing
+to a stream from here would be the leaf acquiring exactly the behaviour the rule above keeps out. It
+ships as `configWarnings(config)`, a pure function returning strings, which `main.ts` emits through
+`pino`. The decision — option B, unset by default, one `warn` — is unchanged and correct as built, so
+ADR-0021 stands unsuperseded; only its emitting site was misstated (I-04-11). **The as-built shape is
+the better one**: a pure function is directly assertable, where a `logger.warn` inside `loadConfig`
+would have been observable only through a stream.
+
 ### `src/main.ts` — the composition root
 
-Reads config, starts telemetry, builds the pool, builds the server, listens. The only module allowed
-to see every layer, and the only place a dependency is chosen rather than received.
+Reads config, emits `configWarnings` through the logger it has just built, starts telemetry, builds the
+pool, builds the server, listens. The only module allowed to see every layer, and the only place a
+dependency is chosen rather than received.
 
 ### As built
 
 | Module | Contents |
 |---|---|
-| `src/domain` | `interval.ts`, `duration.ts`, `openingHours.ts` — three files, **zero import statements between them**. `candidates.ts` is slice 04's and `appointment.ts` slice 05's |
+| `src/domain` | `interval.ts`, `duration.ts`, `openingHours.ts`, `candidates.ts` — four files, **zero import statements between them**. `appointment.ts` is slice 05's. **`candidates.ts` ships with two brand casts where the design predicted three, and no index assertion at all** (I-04-13): destructuring head from tail *is* the emptiness test and *builds* the tuple, so guard and cast collapse into one reachable branch. Fisher–Yates is in **selection** form rather than the in-place swap, because the swap needs the two `noUncheckedIndexedAccess` assertions the tuple carrier was chosen to remove. Uniform to ±1.7 % over 8 bays and 100 000 seeds |
 | `src/application` | `bookAppointment.ts` (the loop, `BookOutcome`, and `AppointmentView` — the one body shape the `201` and the `200` share), `deriveInterval.ts`, `readAppointment.ts`, `checkHealth.ts`. Each outcome union is declared *here* and not in `src/http`, so every route `switch` is exhaustiveness-checked and every use case stays callable without a server |
 | `src/persistence` | `db.ts` (the `Db` alias and the pool), `appointmentRepository.ts`, `candidateRepository.ts` and `referenceRepository.ts` (both reference-data reads only — neither can see `appointment`), `pgError.ts`, `health.ts` (`pingDatabase`, returning a boolean rather than rethrowing a driver error), `schema.ts`, `migrations/` |
 | `src/http` | `server.ts`, `problem.ts`, `routes/appointments.ts`, `routes/health.ts`. `buildServer` takes already-bound use cases, never a handle |
@@ -170,9 +168,9 @@ could read: `candidateRepository.ts` answers *which bays and technicians this de
 service type* from reference data, and cannot consult a booking.
 
 **The ruleset forecloses every shape that *names* the database handle, and partial application is the
-shape taken rather than the shape left.** `sql-only-in-persistence` forbids naming `Kysely` outside
-persistence, `http-must-not-reach-persistence` forbids naming `Db`, and `tsPreCompilationDeps: true`
-catches `import type` too — but a generic parameter evades all three by declining to name the handle:
+shape taken rather than the shape left.** `sql-only-in-persistence`,
+`http-must-not-reach-persistence` and `tsPreCompilationDeps: true` all forbid *naming* it — and a
+generic parameter evades all three by declining to:
 `interface GenericDeps<TDb> { db: TDb }` compiles and cruises clean. Partial application costs nothing
 to prefer, because the generic alternative buys the edge a value it cannot type, cannot use and must
 not touch. *"No other shape compiles"* would be a claim the tooling does not support, and the next
@@ -192,11 +190,10 @@ brands, is written out by a use case in `src/application`. §11 carries the cost
 because the rule is one-directional. What the ruling forecloses is `openingHours.ts` naming it.
 
 **`domain-is-pure` enforces the ruling in its own text**, as `to: {}` rather than
-`to: { pathNot: '^src/domain/' }` — the latter permits intra-domain imports *by construction*, a
-standing exemption for exactly the class of import AC-6 forbids. Measured on the merged tree: plant
-`src/domain/interval.ts → src/domain/duration.ts` and the cruise reports `domain-is-pure` by name;
-restore `pathNot` with the same import in place and the cruise is **clean**. That mutant is a planted
-control in `tests/architecture/layering.test.ts`.
+`to: { pathNot: '^src/domain/' }`: the latter would permit intra-domain imports *by construction*.
+Measured — plant `interval.ts → duration.ts` and the cruise names `domain-is-pure`; restore `pathNot`
+and the same import cruises **clean**. `tests/architecture/layering.test.ts` plants that mutant as a
+control.
 
 ## 5.3 Module dependency graph
 
@@ -212,9 +209,8 @@ npm run lint:arch          # the same configuration, as a CI gate
 `reporterOptions.archi.collapsePattern`**, so it emits one node per *file* inside directory subgraphs,
 plus a subgraph for every `node_modules` package it reaches. The record is therefore split:
 
-- **the fact** is `npm run lint:arch` — **every root covered, zero violations**, printed and CI-gated.
-  That is what QS-10 rests on, a verdict rather than a number: it stays true as the tree grows and
-  fails the build the day it stops being true;
+- **the fact** is `npm run lint:arch` — **every root covered, zero violations**, printed and CI-gated,
+  and a verdict rather than a number is what QS-10 rests on;
 - **the picture** is the presentation diagram, refreshed **once** in phase 6 rather than redrawn per
   slice. `npm run graph:modules` is the check against it — if it disagrees with §5.2's direction block,
   §5.2 is wrong;
@@ -224,10 +220,10 @@ plus a subgraph for every `node_modules` package it reaches. The record is there
 goes stale silently. The command prints the count, the roots and the coverage together:
 
 ```
-npm run lint:arch          # e.g. "no layering violations. 54 module(s) cruised, every root covered: src, tests"
+npm run lint:arch          # "no layering violations. N module(s) cruised, every root covered: src, tests"
 ```
 
-All five modules appear, `src/domain`'s three files as sibling nodes with **no edges between them** —
+All five modules appear, `src/domain`'s four files as sibling nodes with **no edges between them** —
 the literal AC-6 ruling made visible.
 
 `.dependency-cruiser.js` carries thirteen rules. Six describe the layering above; the rest do the real
