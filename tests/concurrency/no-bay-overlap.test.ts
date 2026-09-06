@@ -49,23 +49,35 @@ import type { HttpAnswer } from '../support/booking.js';
  * appear at will, so the assertion goes vacuous while staying green.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * WHY THE BAY IS THE SCARCE RESOURCE AND THE TECHNICIAN IS NOT.
+ * WHY THE BAY IS THE SCARCE RESOURCE AND THE TECHNICIAN IS NOT, AND WHY ADR-0009 DID NOT
+ * TOUCH THAT ARGUMENT (I-04-10).
  *
  * Twenty-four technicians against one bay. With one bay every attempt is on that bay, so
  * every `23P01` includes a bay violation and PostgreSQL names `no_bay_overlap` — whether or
  * not the technician was also taken (design §8, measurements 1-2: under double violation the
  * constraint reported is decided by index creation order, and `0003_appointment.sql` creates
  * `no_bay_overlap` first). That is what makes "every conflict names `no_bay_overlap`" a safe
- * assertion here and an unsafe one in AC-4's mirror image.
+ * assertion here.
+ *
+ * Slice 02 wrote that against a deterministic candidate order, and ADR-0009's Order-C then
+ * replaced the order with a per-request seeded shuffle. **The argument is unaffected, and it
+ * is worth being explicit about why, because the mirror file's was not.** The claim above
+ * never depended on WHICH permutation a racer drew — with `bays: 1` every permutation has the
+ * same head bay, so every draw contends the singleton and every `23P01` includes it. The
+ * technician file reasoned about the ABUNDANT side's draw order instead, and Order-C made a
+ * coin flip of it. `tests/support/booking.ts` states the rule that separates the two cases;
+ * read it before choosing the shape of the next contention fixture.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * RE-RUNNABILITY — F-02-7.
  *
- * The Definition of Done asks for "ADR-0009's seed in the failure message". There is no seed
- * in slice 02: the seeded shuffle and the attempt cap are slice 04's, and candidate ordering
- * here is deterministic (`ORDER BY name` for bays). A deterministic order is re-runnable by
- * construction with nothing to record, so what every failure message below carries instead is
- * the order that was used and the ids it was used on — `describeScenario`.
+ * The Definition of Done asks for "ADR-0009's seed in the failure message". Slice 02 had no
+ * seed to record: the seeded shuffle and the attempt cap arrived with slice 04, and ordering
+ * here was `ORDER BY name` throughout. Now that ADR-0021 wires `BOOKING_SEED`, this file
+ * still records no seed and deliberately sets none — a constant seed hands every racer the
+ * same permutation, which is the Order-A degeneracy the shuffle exists to remove, and this
+ * fixture's argument does not need one. What every failure message below carries instead is
+ * the candidate lists as seeded and the ids in them — `describeScenario`.
  */
 const RACERS = 20;
 

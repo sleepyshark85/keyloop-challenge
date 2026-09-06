@@ -29,31 +29,51 @@ import type { HttpAnswer } from '../support/booking.js';
  * constraints are two database objects and one passing is no evidence for the other.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * THIS CASE IS THE ONE E-02-1 WAS RULED FOR, AND IT CANNOT PASS WITHOUT THE RETRY LOOP.
+ * WHAT SURVIVES ADR-0009's SEEDED SHUFFLE, AND WHAT DID NOT (I-04-10, ruled (a)).
  *
- * Twenty-four bays, one qualified technician. Candidate ordering is deterministic, so every
- * racer attempts the same pair first — `(bay-000, technician 0)` — and every loser's FIRST
- * attempt violates BOTH constraints. Under double violation PostgreSQL names whichever
- * constraint's index was created first, which is `no_bay_overlap` (design §8, measurements
- * 1-2: `RelationGetIndexList` returns indexes by OID and `0003_appointment.sql` creates
- * `no_bay_overlap` first). Without a loop, AC-4 fails twenty times out of twenty — and,
- * worse than a failing fixture, AC-11's `resource` would systematically name the ABUNDANT
- * resource, and `booking_conflicts_total{resource}` would inherit that at slice 09.
+ * Twenty-four bays, one qualified technician. Slice 02 wrote this header against a
+ * DETERMINISTIC candidate order, in which every racer drew `(bay-000, technician 0)` first
+ * and so every loser's first attempt violated BOTH constraints. **Order-C removed that
+ * premise.** Each racer now draws its own permutation, so a loser whose head bay is free
+ * conflicts on the TECHNICIAN at attempt 1, empties its length-one technician list and
+ * refuses correctly with no wasted attempt. Only a loser that happens to draw the winner's
+ * bay sees a bay violation at all — `1 - (23/24)^19 ~ 0.56` of runs.
  *
- * With ADR-0004's loop, pruning is per resource VALUE (T-02-1): `no_bay_overlap` drops THAT
- * BAY, the next attempt is `(bay-001, technician 0)`, which violates only the technician —
- * and the technician list empties first. So what this case asserts is not "which constraint
- * PostgreSQL happened to check" but **which resource was actually scarce**, which is what
- * AC-4 is asking about.
+ * So every claim below is one that holds under EVERY permutation, which is the only kind a
+ * shuffled fixture can carry:
  *
- * That is also why the constraint assertion below is shaped differently from AC-3's. AC-3
- * can say "every conflict names `no_bay_overlap`" because one bay makes it true. Here both
- * names legitimately appear — the bay violation at attempt 1, the technician violation at
- * attempt 2 — so the claim is about the TERMINAL one: the list that emptied.
+ *   - the 1 / 19 split, and exactly one row over the table — twenty-four bays against one
+ *     technician means the technician is the only thing that could have serialised twenty
+ *     requests;
+ *   - `technicianConflicts >= 19` — the technician list has length ONE, so each of the
+ *     nineteen losers must empty it, and emptying it costs exactly one
+ *     `no_technician_overlap` whatever that loser drew first;
+ *   - `resource === 'technician'` on every refusal — E-02-1's guard. The answer names the
+ *     list that EMPTIED, never whichever index PostgreSQL happened to check. That is also
+ *     why this file cannot borrow AC-3's shape and claim "every conflict names
+ *     `no_technician_overlap`": both names legitimately appear here, so the claim has to be
+ *     about the terminal one.
+ *
+ * WHAT WAS REMOVED, AND WHERE THE OBLIGATION ALREADY LIVES. "The loop actually looped" stood
+ * here as `>= 2 distinct attempts`, commented "the first attempt fails on the bay, the second
+ * on the technician". Under Order-C that is a coin flip — measured 6 failures in 20 local runs
+ * — and it fails in the PASSING direction, which is the direction a merge runs in. No
+ * permutation-independent version of it exists in this fixture, so it was REMOVED rather than
+ * substituted (I-04-10): the three terminal claims above hold everywhere, and a fourth would
+ * pad a hole that is not there. The looping obligation is deterministic in
+ * `tests/acceptance/candidate-retry.test.ts` AC-3 — exactly `['1:no_bay_overlap',
+ * '2:no_bay_overlap']` on a fixture where every bay is blocked — and gated in
+ * `tests/concurrency/no-spurious-refusal.test.ts` AC-2, where twelve refusals against a list
+ * of eight owe a correct build `max(attempt) >= 8`.
+ *
+ * The same shuffle softened what this file DISCRIMINATES, which is worth saying plainly: a
+ * loop-less build is caught here in only that same ~56 % of runs, because a loser drawing a
+ * free bay reports `technician` without ever looping. `candidate-retry.test.ts` AC-3 catches
+ * it every time, and that is where E-02-1's guarantee is now anchored.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * Re-runnability: F-02-7, exactly as in `no-bay-overlap.test.ts`. There is no seed to record
- * in slice 02; the candidate order is deterministic and every failure message carries it.
+ * Re-runnability: F-02-7. `tests/support/booking.ts` carries the rule that decides whether a
+ * contention fixture is permutation-safe at all; this one is, on the shape it seeds.
  */
 const RACERS = 20;
 
@@ -156,8 +176,8 @@ describe('QS-2 / AC-4 — exactly one booking survives twenty simultaneous reque
         refused.map((a) => member(a, 'resource')).filter((r) => r !== 'technician'),
         `the contended resource is the TECHNICIAN: 24 bays were seeded and one technician. ` +
           `'bay' here is the systematic mis-naming E-02-1 was ruled on — it is what a ` +
-          `loop-less implementation reports, because the first attempt violates both ` +
-          `constraints and the bay index is checked first.\n${fixture}`,
+          `loop-less implementation reports whenever its single draw lands on the winner's ` +
+          `bay and so violates both constraints at once.\n${fixture}`,
       ).toEqual([]);
 
       const winner = confirmed[0];
@@ -181,10 +201,11 @@ describe('QS-2 / AC-4 — exactly one booking survives twenty simultaneous reque
       const technicianConflicts = conflicts.filter((c) => c.constraint === 'no_technician_overlap');
       expect(
         technicianConflicts.length,
-        `each of the ${String(RACERS - 1)} losers exhausts its technician list, so each ` +
-          `records at least one no_technician_overlap. Zero means the loop never reached a ` +
-          `second candidate and the refusals are being named from the bay index — the E-02-1 ` +
-          `defect exactly.\nconstraints seen: ${JSON.stringify(
+        `the technician list has length ONE, so each of the ${String(RACERS - 1)} losers ` +
+          `must empty it, and that costs exactly one no_technician_overlap under EVERY ` +
+          `permutation. Zero means the refusals are being named from the bay index without ` +
+          `the technician list ever emptying — the E-02-1 defect exactly.\nconstraints ` +
+          `seen: ${JSON.stringify(
             conflicts.map((c) => c.constraint),
           )}\n${describeServiceOutput(service)}\n${fixture}`,
       ).toBeGreaterThanOrEqual(RACERS - 1);
@@ -194,18 +215,6 @@ describe('QS-2 / AC-4 — exactly one booking survives twenty simultaneous reque
         'the resource minted from no_technician_overlap must be `technician` — ADR-0016: a ' +
           'capacity refusal is not constructible without a database verdict',
       ).toEqual(['technician']);
-
-      // THE LOOP ACTUALLY LOOPED. Numbering-agnostic on purpose: the claim is that at least
-      // two distinct attempts occurred per refusal path, not that the counter starts at 0 or
-      // at 1. A single attempt index across every conflict line means no retry happened, and
-      // then the `technician` resource above arrived by some route other than exhaustion.
-      expect(
-        [...new Set(conflicts.map((c) => String(c.attempt)))].length,
-        `the refusal path must show more than one attempt: the first attempt fails on the ` +
-          `bay, the second on the technician.\nattempts seen: ${JSON.stringify(
-            conflicts.map((c) => c.attempt),
-          )}\n${fixture}`,
-      ).toBeGreaterThanOrEqual(2);
     } finally {
       await service.stop();
     }

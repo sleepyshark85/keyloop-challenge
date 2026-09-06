@@ -244,10 +244,13 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
   });
 
   it('AC-11 — when the bay list empties, the 409 carries resource=bay', async () => {
-    // One bay, three technicians, and the bay occupied by the third. The booking attempts
-    // (bay 0, technician 0), is refused `no_bay_overlap`, prunes THAT BAY (per value, T-02-1),
-    // finds the bay list empty and refuses — so `resource` is the list that emptied, which is
-    // the scarce resource and not the abundant one. That distinction is the whole of E-02-1.
+    // One bay, three technicians, and the bay occupied by the third. Under ADR-0009's
+    // shuffle the draw is (the only bay, whichever technician this request's permutation put
+    // first) — and the bay is a SINGLETON, so every permutation contends it. The attempt is
+    // refused `no_bay_overlap`, prunes THAT BAY (per value, T-02-1), finds the bay list empty
+    // and refuses, so `resource` is the list that emptied: the scarce resource and not the
+    // abundant one. That distinction is the whole of E-02-1, and it is permutation-safe here
+    // for the reason `tests/support/booking.ts` states at `seedScenario`.
     const scenario = await seedScenario(client, 'tax-cap-bay', { bays: 1, technicians: 3 });
     await occupy(client, scenario, {
       label: 'bay',
@@ -274,11 +277,17 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
   });
 
   it('AC-11 — when the technician list empties, the 409 carries resource=technician', async () => {
-    // The mirror image, and it is not redundant: with three bays and one technician the FIRST
+    // The mirror image, and it is not redundant. Slice 02 justified it by saying the FIRST
     // attempt violates both constraints and PostgreSQL names `no_bay_overlap` (design §8,
-    // measurements 1-2 — index creation order). Only the retry loop turns that into the truth
-    // about which resource was scarce. Without the loop this case reports `bay` while two
-    // bays sit empty, and `booking_conflicts_total{resource}` inherits the lie at slice 09.
+    // measurements 1-2 — index creation order), so only the loop could reach the truth about
+    // which resource was scarce. ADR-0009's Order-C narrowed that: the three bays are the
+    // ABUNDANT list, so the first draw lands on the occupied bay only 1 time in 3.
+    //
+    // The ASSERTION is unaffected, because it is terminal — the technician list is the
+    // singleton, so it is the one that must empty under every permutation and `resource` is
+    // `technician` either way. What changed is what the case DISCRIMINATES: a loop-less build
+    // is caught here in 1 run in 3, not every run. `tests/acceptance/candidate-retry.test.ts`
+    // AC-3, which blocks the whole abundant list, catches it deterministically (I-04-10).
     const scenario = await seedScenario(client, 'tax-cap-tech', { bays: 3, technicians: 1 });
     await occupy(client, scenario, {
       label: 'tech',
