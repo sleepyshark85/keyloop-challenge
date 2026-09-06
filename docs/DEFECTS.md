@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **154** |
-| Severity | 10 blocking · 84 major · 60 minor |
+| Findings recorded | **160** |
+| Severity | 10 blocking · 86 major · 64 minor |
 | Verdicts | 7 narrowed · 58 accepted · 1 escalated · 10 deferred |
-| Raised by | test-engineer 35 · architect 29 · orchestrator 28 · reviewer 28 · implementer 27 · scribe 5 · human 2 |
-| Awaiting a ruling | **78** |
-| Mean escape distance | 1.77 step(s) |
+| Raised by | test-engineer 35 · reviewer 34 · architect 29 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
+| Awaiting a ruling | **84** |
+| Mean escape distance | 1.76 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -897,6 +897,12 @@ rather than narrated.*
 | **A-04-12** | MINOR | 4 *(+0)* | architect | The ORDER BY assertion became MORE load-bearing at this merge, not less, and its comment still says the opposite | **open** |
 | **T-04-7** | MAJOR | 3 *(+3)* | test-engineer | E-02-1 discrimination has migrated: two file headers claim a guarantee that now lives somewhere else | **open** |
 | **O-34** | MAJOR | 5 *(+4)* | orchestrator | Slice 04 ran steps 1 through 4 with no pull request, against both section 7 and the step-1 draft-PR rule | **open** |
+| **R-04-1** | MAJOR | 5 *(+1)* | reviewer | arc42 section 7.3 was rewritten but is not in the slice declared arc42 scope | **open** |
+| **R-04-2** | MAJOR | 5 *(+1)* | reviewer | R-7a mitigation is unguarded at BOTH ends, and it is the one non-equivalent survivor of eight | **open** |
+| **R-04-3** | MINOR | 5 *(+0)* | reviewer | No CI run exists for the commit that would merge | **open** |
+| **R-04-4** | MINOR | 5 *(+1)* | reviewer | bookAppointment.ts:312 is an ESTABLISHED equivalent mutant, and the proof is stronger than what ADR-0020 and arc42 6.2 currently state | **open** |
+| **R-04-5** | MINOR | 5 *(+1)* | reviewer | The mulberry32 survivors are equivalent for the contract, by more than the implementer claimed | **open** |
+| **R-04-6** | MINOR | 5 *(+5)* | reviewer | A naive main..HEAD diff MISREADS section 8.3 as a regression that this slice did not make | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1082,6 +1088,36 @@ rather than narrated.*
 
 - *scenario:* Section 7 requires one branch and one PR per slice, and METHODOLOGY says the slice PR opens as a draft at step 1. Slice 04 had neither until step 5. Section 6 says every reply, disagreement and vote goes on the PR because the reasoning is the graded artifact — so nine objections, nine AGREE verdicts, a (b), a DCR and four ADR ratifications were recorded in docs/slices and the event log and nowhere a reviewer would look first. The record is complete and was in the wrong place. Nothing enforces the rule: slice-check does not require a PR to exist, so a slice can reach step 5 without one and report nothing wrong. Raised by the orchestrator against the orchestrator.
 - *file:* `docs/METHODOLOGY.md`
+
+**R-04-1** — arc42 section 7.3 was rewritten but is not in the slice declared arc42 scope
+
+- *scenario:* Commit 9dfde0d rewrites the environment-variable contract table and adds a normative sentence; the frontmatter declares only 6.2, 5.2 and 11, and design section 7 lists the same three. Section 10 Ready requires the arc42 scope declared, and F-04-3 shows the field was already amended once this slice to add 11, so the mechanism existed and was not used the second time. Graded MAJOR and deliberately NOT blocking: the reviewer card says block when arc42 moves SILENTLY, and the commit subject names 7.3 explicitly. The content is correct; the declaration is missing.
+- *file:* `docs/slices/04-candidate-allocation-and-retry.md`
+
+**R-04-2** — R-7a mitigation is unguarded at BOTH ends, and it is the one non-equivalent survivor of eight
+
+- *scenario:* The unit test pins config.ts:210 and :212 only. Deleting :213 — "It is for reproducing a run, never for production", the only sentence telling an operator what to do — leaves the suite green; that is the Stryker config.ts:213 survivor, and the test own comment claiming the wording is asserted is true of two of four fragments and false of the two that survived. Separately, config.warning occurs exactly once in the repository, at main.ts:46, asserted by no outside-in test, and stryker.config.mjs excludes main.ts on the ground that AC-2 asserts the wiring end to end — a justification true of the booking path and false of this line. Delete main.ts:46 and BOOKING_SEED runs Order-A in production unannounced while npm test, npm run mutation and depcruise all stay green.
+- *file:* `src/platform/config.ts`
+
+**R-04-3** — No CI run exists for the commit that would merge
+
+- *scenario:* HEAD was 478af2d; the collected run 34019756105 is on 96d0971. 478af2d changes DEFECTS.md and events.jsonl, which are precisely the inputs to defects:check, the append-only check, the log schema check and the budget ratchet — four checks that had not run on the merge candidate. The reviewer ran them against the merge result itself and all pass.
+- *file:* `docs/team-log/events.jsonl`
+
+**R-04-4** — bookAppointment.ts:312 is an ESTABLISHED equivalent mutant, and the proof is stronger than what ADR-0020 and arc42 6.2 currently state
+
+- *scenario:* Not accepted on plausibility. Proof: only the conflict arm reaches continue, and every conflict prunes the head of the named list, so attempt k begins with S-(k-1) ids across two non-empty lists, giving k <= S-1. Corroborated by exhaustive search over all (B,T) in 1..9 squared, 8 seeds, and EVERY adversarial choice of which resource fires at each step: deepest attempt reached globally 17 against bound 18, minimum unused headroom exactly 1. The written documents say the tail is unreachable; this establishes the exact bound AND that it is tight.
+- *file:* `src/application/bookAppointment.ts`
+
+**R-04-5** — The mulberry32 survivors are equivalent for the contract, by more than the implementer claimed
+
+- *scenario:* The implementer said no test pins a particular permutation. The reviewer measured instead: head distribution over 8 bays by 100000 seeds, baseline 8/8 heads with max deviation 1.01 percent and chi-square 2.8 against a critical 24.3; mutant L66 max deviation 1.16 percent chi-square 5.2; mutant L69 max deviation 1.23 percent chi-square 5.3. Both mutants preserve permutation, determinism, seed-sensitivity, head-reachability AND uniformity, because subtracting an odd constant mod 2^32 is still a full-period bijection. Equivalent for the contract, not merely unasserted. Seven of eight survivors equivalent; one real.
+- *file:* `src/domain/candidates.ts`
+
+**R-04-6** — A naive main..HEAD diff MISREADS section 8.3 as a regression that this slice did not make
+
+- *scenario:* The branch was behind main by 57971b4, which edits arc42 8 and 11, and slice 04 rewrote 11 across 124 lines. Diffed against main alone, 8.3 shows ADR-0015 reverting from shipped in slice 02 to accepted and not yet written. The reviewer checked the MERGE rather than trusting it: merge-tree merges clean, the R-02-2 to D-02-1 rename survives, and against the merged tree every docs guard passes. CHECKED AND WITHDRAWN as a defect, recorded because the reverse-delta trap is live for the next reader. The orchestrator has since merged main into the branch.
+- *file:* `docs/arc42/08-crosscutting-concepts.md`
 
 </details>
 
