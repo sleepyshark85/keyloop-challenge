@@ -93,7 +93,18 @@ export interface RescheduleDeps {
 
 const CONFLICT_EVENT = 'booking.conflict';
 const REFUSED_EVENT = 'booking.refused';
-const DEADLOCK_EVENT = 'booking.deadlock';
+/**
+ * R-06-E: DISTINCT from `bookAppointment.ts`'s own `DEADLOCK_EVENT`, unlike `CONFLICT_EVENT`,
+ * `REFUSED_EVENT` and `REFERENCE_DATA_EVENT` above, which are deliberately the SAME event
+ * booking writes (I-02-6 — "one taxonomy of log lines, not two"). A deadlock is not one taxonomy
+ * shared on purpose: it names the write path that skipped ADR-0018's locks, and slice 09's
+ * observability work counts deadlocks per path. Sharing `'booking.deadlock'` here would fold
+ * every reschedule deadlock into booking's count silently — the two would still SUM correctly,
+ * but nothing could tell them apart, and no test anywhere pinned the shared string (measured: a
+ * repo-wide search finds no assertion on it outside `bookAppointment.test.ts`), so nothing
+ * observable depends on undoing this before it compounds.
+ */
+const DEADLOCK_EVENT = 'reschedule.deadlock';
 const REFERENCE_DATA_EVENT = 'booking.reference-data-invalid';
 
 export async function rescheduleAppointment(

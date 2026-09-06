@@ -143,6 +143,25 @@ describe('rescheduleAppointment — the happy path', () => {
     });
   });
 
+  it('R-06-C group C — the UPDATE writes the interval the domain DERIVED, not merely what the scripted row echoes', async () => {
+    // The test above reads its outcome off the SCRIPTED row alone, so a `Move` built as `{}`
+    // (sending `undefined` for id/startsAt/endsAt to the statement) would pass it unnoticed.
+    // This asserts on the STATEMENT itself: recorded[7] is the guarded UPDATE — the six
+    // reference reads, then the lock (recorded[6]), then this.
+    const { db, recorded } = scriptedDb(
+      rescheduleScript({ attempts: [...attempt({ rows: [movedRow('bay-0', 'tech-0')] })] }),
+    );
+    await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
+    expect(recorded[7]?.parameters).toEqual([
+      'bay-0',
+      'tech-0',
+      new Date(COMMAND.startsAtMillis),
+      new Date(COMMAND.startsAtMillis + 3_600_000),
+      APPOINTMENT,
+      'confirmed',
+    ]);
+  });
+
   it('ADR-0027 — attempt 1 is the appointment\'s OWN pair, tried before any shuffle', async () => {
     // Six candidate bays, but attempt 1 must be the row's own bay-0/tech-0 — never a drawn one.
     const bays6 = ['bay-0', 'bay-1', 'bay-2', 'bay-3', 'bay-4', 'bay-5'];
@@ -235,12 +254,73 @@ describe('rescheduleAppointment — the derivation outcomes reach the edge uncha
     const outcome = await rescheduleAppointment(db, deps, COMMAND);
     expect(outcome).toEqual({ kind: 'reference-data-invalid', detail: 'unknown-zone' });
     expect(lines[0]?.level).toBe('error');
+    // R-06-C group B — the WHOLE record, not merely its level: a field quietly dropped here is a
+    // 500 nobody can diagnose, exactly the reasoning `bookAppointment.test.ts`'s mirror already
+    // applies to this same arm.
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      dealershipId: DEALERSHIP,
+      verdict: 'unknown-zone',
+    });
+    expect(lines[0]?.message).toBe('dealership reference data cannot be read');
   });
 
   it('a non-positive service type duration is reference-data-invalid, not a client error', async () => {
     const { db } = scriptedDb(rescheduleScript({ durationMinutes: 0, attempts: [] }));
-    const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
+    const { deps, lines } = collectingDeps();
+    const outcome = await rescheduleAppointment(db, deps, COMMAND);
     expect(outcome).toEqual({ kind: 'reference-data-invalid', detail: 'service-type-duration' });
+    // R-06-C group B — the whole record, mirroring bookAppointment.test.ts's identical arm.
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      serviceTypeId: SERVICE_TYPE,
+    });
+    expect(lines[0]?.message).toBe('service type duration is not a positive integer');
+  });
+});
+
+describe('rescheduleAppointment — broken reference data one step earlier (I-06-4)', () => {
+  // ADR-0025's own "existing is already established" argument, applied one read sooner: the
+  // row's `dealership_id`/`service_type_id` are already known good (the composite FKs on
+  // `bay_id`/`technician_id` make them valid transitively), so this is unreachable in a
+  // consistent database — guarded anyway, the same shape `bookAppointment`'s own broken
+  // reference-data arms take (`bookAppointment.test.ts:691,700` drives those). Nothing in any
+  // suite drove these two arms before this slice's review (R-06-C group A).
+
+  it('a dealership that no longer resolves is reference-data-invalid: dealership, logged at error', async () => {
+    const { db, recorded } = scriptedDb([{ rows: [EXISTING_ROW] }, { rows: [] }]);
+    const { deps, lines } = collectingDeps();
+    const outcome = await rescheduleAppointment(db, deps, COMMAND);
+    expect(outcome).toEqual({ kind: 'reference-data-invalid', detail: 'dealership' });
+    // Exactly the existing-row read and the dealership read — no opening-hours query follows a
+    // dealership that was never found.
+    expect(recorded).toHaveLength(2);
+    expect(lines[0]?.level).toBe('error');
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      dealershipId: DEALERSHIP,
+    });
+    expect(lines[0]?.message).toBe('a confirmed appointment names a dealership that no longer resolves');
+  });
+
+  it('a service type that no longer resolves is reference-data-invalid: service-type, logged at error', async () => {
+    const { db, recorded } = scriptedDb([
+      { rows: [EXISTING_ROW] },
+      { rows: [{ id: DEALERSHIP, time_zone: 'Europe/London' }] },
+      { rows: OPEN_ALL_WEEK },
+      { rows: [] },
+    ]);
+    const { deps, lines } = collectingDeps();
+    const outcome = await rescheduleAppointment(db, deps, COMMAND);
+    expect(outcome).toEqual({ kind: 'reference-data-invalid', detail: 'service-type' });
+    // The four reference reads — no candidates follow a service type that was never found.
+    expect(recorded).toHaveLength(4);
+    expect(lines[0]?.level).toBe('error');
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      serviceTypeId: SERVICE_TYPE,
+    });
+    expect(lines[0]?.message).toBe('a confirmed appointment names a service type that no longer resolves');
   });
 });
 
@@ -291,6 +371,7 @@ describe('rescheduleAppointment — the loop prunes and refuses exactly as booki
       exit: 'exhausted',
     });
   });
+
   it('the attempt cap stops the loop with candidates still untried, and says CAPPED', async () => {
     const { db } = scriptedDb(
       rescheduleScript({
@@ -303,6 +384,23 @@ describe('rescheduleAppointment — the loop prunes and refuses exactly as booki
     );
     const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
     expect(outcome).toEqual({ kind: 'no-capacity', resource: 'bay', attempts: ATTEMPT_CAP, exit: 'capped' });
+  });
+
+  it('R-06-C group D — attempt 1 conflicts with an EMPTY candidate list, and exhausts on the spot', async () => {
+    // Attempt 1 is the incumbent pair, tried directly against `existing.bayId`/`technicianId` —
+    // it never consults the candidate lists. Its failure is what first tries to draw
+    // ADR-0027's shuffle, and an empty bay list means `orderCandidates` returns `null` before any
+    // shuffle exists: `initialOrder === null` must refuse immediately, at attempt 1, rather than
+    // falling through to a `null` `order` on the next iteration.
+    const { db } = scriptedDb(
+      rescheduleScript({
+        bays: [],
+        technicians: ['tech-0'],
+        attempts: [...attempt({ error: pgError('23P01', 'no_bay_overlap') })],
+      }),
+    );
+    const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
+    expect(outcome).toEqual({ kind: 'no-capacity', resource: 'bay', attempts: 1, exit: 'exhausted' });
   });
 
   it('writes the booking.conflict line at attempt 1 for the incumbent pair, and booking.refused on exhaustion', async () => {
@@ -342,21 +440,43 @@ describe('rescheduleAppointment — the loop prunes and refuses exactly as booki
 });
 
 describe('rescheduleAppointment — 40P01 and 23503 are never retried', () => {
-  it('a 40P01 answers no-verdict', async () => {
+  it('a 40P01 answers no-verdict, logged at error with the pair that deadlocked (R-06-C group B)', async () => {
     const { db } = scriptedDb(rescheduleScript({ attempts: [...attempt({ error: pgError('40P01') })] }));
-    const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
+    const { deps, lines } = collectingDeps();
+    const outcome = await rescheduleAppointment(db, deps, COMMAND);
     expect(outcome).toEqual({ kind: 'no-verdict' });
+    // R-06-E: this path's OWN event name, deliberately distinct from booking's — see the
+    // constant's docblock. The whole record, mirroring bookAppointment.test.ts's identical arm:
+    // a field quietly dropped here is a 500 nobody can diagnose.
+    expect(lines[0]?.level).toBe('error');
+    expect(lines[0]?.record).toEqual({
+      event: 'reschedule.deadlock',
+      bayId: 'bay-0',
+      technicianId: 'tech-0',
+      attempt: 1,
+    });
+    expect(lines[0]?.message).toBe('reschedule.deadlock');
   });
 
   it('a 23503 is reference-data-invalid — unreachable in a consistent database, guarded anyway', async () => {
     const { db } = scriptedDb(
       rescheduleScript({ attempts: [...attempt({ error: pgError('23503', 'appointment_technician_qualified') })] }),
     );
-    const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
+    const { deps, lines } = collectingDeps();
+    const outcome = await rescheduleAppointment(db, deps, COMMAND);
     expect(outcome).toEqual({
       kind: 'reference-data-invalid',
       detail: 'appointment_technician_qualified',
     });
+    // R-06-C group B — the whole record, mirroring bookAppointment.test.ts's identical arm.
+    expect(lines[0]?.record).toEqual({
+      event: 'booking.reference-data-invalid',
+      constraint: 'appointment_technician_qualified',
+      dealershipId: DEALERSHIP,
+      bayId: 'bay-0',
+      technicianId: 'tech-0',
+    });
+    expect(lines[0]?.message).toBe('a reschedule candidate was refused by a composite foreign key');
   });
 
   it('an unclassifiable error is RETHROWN, never turned into a refusal', async () => {
