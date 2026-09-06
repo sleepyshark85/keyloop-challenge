@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `64ab23c docs(06): step 2 amendment — five findings folded in, and a dead destination replaced` |
+| Last commit | `ff1900c docs(06): two criteria written before the decisions that constrain them` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 122 |
+| Agent runs recorded | 124 |
 | ADRs accepted | 23 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -262,7 +262,9 @@
 | 2026-09-06 12:58 | implementer | 8m31 | 140 / 18,278 / 6,556,780 | `derived` |
 | 2026-09-06 13:08 | architect | 8m10 | 68 / 6,110 / 1,850,910 | `derived` |
 | 2026-09-06 13:30 | architect | 17m37 | 234 / 12,488 / 14,261,612 | `derived` |
-| | **total** | **5283m24** | **28,538 / 2,204,242 / 2,121,803,941** | |
+| 2026-09-06 13:58 | test-engineer | 24m45 | 370 / 14,431 / 38,952,616 | `derived` |
+| 2026-09-06 14:07 | architect | 6m13 | 74 / 1,082 / 2,148,910 | `derived` |
+| | **total** | **5314m23** | **28,982 / 2,219,755 / 2,162,905,467** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

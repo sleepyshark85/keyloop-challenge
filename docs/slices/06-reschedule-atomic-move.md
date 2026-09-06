@@ -22,8 +22,12 @@ without being obvious.
 
 ## Acceptance criteria
 
-- **AC-1** — Given A confirmed `[09:00, 10:00)`, when A is rescheduled to `[09:15, 10:15)` and then
-  extended to `[09:15, 11:15)`, then both succeed, the id is unchanged, **the bay and technician are
+- **AC-1** — *Worked example amended at step 3 under T-06-6: the original's second move extended
+  `[09:15, 10:15)` to `[09:15, 11:15)`, a duration change `PATCH` cannot express — it carries
+  `startsAt` only and the interval's length is the service type's (ADR-0025). What the criterion
+  asserts is unchanged; §10's QS-6 is corrected with it.* Given A confirmed `[09:00, 10:00)`, when A
+  is rescheduled to `[09:15, 10:15)` and then again to `[09:45, 10:45)`, then both succeed, **each
+  move overlapping the interval it replaces**, the id is unchanged, **the bay and technician are
   unchanged** (asserted on the response body, which carries both), and **no `23P01` is raised** — the
   row does not conflict with the version it replaces. *(QS-6)*
   <br>The bay-and-technician clause was added at step 2 under I-06-2 and it is what makes AC-1 pin
