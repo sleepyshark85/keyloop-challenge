@@ -160,16 +160,21 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
         │     23503   → 422 unknown reference (never retried)             │
         │     other   → rethrow → 500                                     │
         └─────────────────────────────────────────────────────────────────┘
-        tail: UNREACHABLE — a list empties by attempt |bays| + |technicians| - 1, so the
-        arm has returned. It THROWS rather than refusing: nothing is minted there, and a
-        future retried PgOutcome variant meets a loud fault instead of a hang (ADR-0020 F).
+        tail: UNREACHABLE, AND TIGHTLY SO. Each conflict prunes exactly one id while both
+        lists are non-empty, so attempt k requires |B|+|T|-(k-1) >= 2: the deepest
+        REACHABLE attempt is exactly |B|+|T|-1, a bound an adversary attains. `<=` and `<`
+        therefore admit the identical execution set, and `<=` is kept deliberately — under
+        `<` a future PgOutcome variant retrying WITHOUT pruning would leave the loop
+        quietly at the bound instead of meeting the throw. It THROWS rather than refusing:
+        nothing is minted there (ADR-0020 F, §8.6). Proof and exhaustive search over every
+        adversarial path, (B,T) in 1..9^2 and 8 seeds — step 5.
 
         Both refusals are 409 /problems/no-capacity and both carry the resource this
         arm's own classification minted — ADR-0020: the cap is tested INSIDE the 23P01
         arm, never as the loop's bound, so no refusal exit can be reached without a
-        verdict. `exhausted` wins a tie. BOOKING_ATTEMPT_CAP's default of 16 sits BELOW
-        the bound above at §1.1 scale, which is D-04-1 — so a non-zero "capped" is expected
-        today rather than the signal ADR-0009 intended, and §11 carries it.
+        verdict. `exhausted` wins a tie. The bound being exact, "capped" is reachable
+        only where |bays| + |technicians| >= 18 — and at §1.1 scale it is, which is
+        D-04-1: a non-zero "capped" is expected today, not ADR-0009's intended signal.
 ```
 
 Three details that a reviewer should check any implementation against:
