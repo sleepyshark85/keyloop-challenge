@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **121** |
-| Severity | 10 blocking · 67 major · 44 minor |
+| Findings recorded | **130** |
+| Severity | 10 blocking · 71 major · 49 minor |
 | Verdicts | 5 narrowed · 48 accepted · 1 escalated · 9 deferred |
-| Raised by | test-engineer 28 · reviewer 28 · orchestrator 26 · architect 19 · implementer 18 · human 2 |
-| Awaiting a ruling | **58** |
-| Mean escape distance | 1.71 step(s) |
+| Raised by | test-engineer 32 · reviewer 28 · orchestrator 26 · implementer 23 · architect 19 · human 2 |
+| Awaiting a ruling | **67** |
+| Mean escape distance | 1.66 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -864,6 +864,15 @@ rather than narrated.*
 | ref | sev | step | raised by | claim | verdict |
 |---|---|---|---|---|---|
 | **D-04-1** | MAJOR | 1 *(+1)* | architect | ADR-0009 sized the cap of 16 on a premise that does not hold until slice 08's availability filter exists | **open** |
+| **T-04-1** | MAJOR | 2 *(+1)* | test-engineer | The recorded seed is a label, not a handle — AC-5's re-runnability leg is undelivered, and no retry can be forced deterministically | **open** |
+| **T-04-2** | MAJOR | 2 *(+1)* | test-engineer | AC-4 should be asserted at the shipped cap of 16; the cheap-fixture premise is wrong and cap=3 unpins ADR-0009's number | **open** |
+| **T-04-3** | MINOR | 2 *(+1)* | test-engineer | D-04-1's spurious-refusal leg cannot become an AC-1 case — every candidate fixture is a coin flip | **open** |
+| **T-04-4** | MINOR | 2 *(+1)* | test-engineer | AC-2's absence-of-25P02 assertion passes vacuously as a standalone case and the design does not name its fixture | **open** |
+| **I-04-3** | MAJOR | 2 *(+1)* | implementer | §3's nextCandidate signature does not compile, and the brand RELOCATES the index assertion rather than removing it | **open** |
+| **I-04-5** | MAJOR | 2 *(+1)* | implementer | D-04-1 is deferred to a slice whose own Out of scope forbids the work, so the deferral is permanent | **open** |
+| **I-04-2** | MINOR | 2 *(+1)* | implementer | ADR-0020's option table omits a shape that keeps both the arm placement and a structural loop bound | **open** |
+| **I-04-4** | MINOR | 2 *(+1)* | implementer | §4's ordering forces a branch tsc demands and no test can cover | **open** |
+| **I-04-8** | MINOR | 2 *(+1)* | implementer | The seed source adds a node:crypto import that main.ts deliberately avoids | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -871,6 +880,51 @@ rather than narrated.*
 
 - *scenario:* The sharpest finding of this design, and it falls out of deferring the availability filter to slice 08 under ADR-0019's criterion. ADR-0009 sized the cap 'against contention depth, the only driver Bound-2 leaves' - true only of a candidate list ALREADY FILTERED to free resources. Until slice 08, a dealership with more than roughly 16 bays-plus-technicians can reach the cap WITH NO CONCURRENCY AT ALL. And QS-3's fixtures will not see it, because they seed exactly M. So the cap's justification and the cap's behaviour diverge in a way the slice's own tests are shaped not to notice.
 - *file:* `docs/adr/0009-candidate-ordering-and-attempt-cap.md`
+
+**T-04-1** — The recorded seed is a label, not a handle — AC-5's re-runnability leg is undelivered, and no retry can be forced deterministically
+
+- *scenario:* §3 binds seed in main.ts to randomInt(0, 2**32) and §5 records it on booking.refused. NOTHING CAN FEED A SEED BACK IN. A test reading seed: 3141592653 off a failed CI run has learned WHICH order was taken and has no way to take it again. AC-5's words are 'a failing test is re-runnable, not a flake'; the narrowing makes orderCandidates replayable and the SERVICE not. THE STRUCTURAL MEASUREMENT IS THE LOAD-BEARING PART, from arc42 §8.1: appointment carries exclusion constraints on both bay_id and technician_id plus the two dealership FKs, so blocking K technicians over an interval requires K bays at the same dealership - which blocks those bays too - and resources cannot be borrowed from a second dealership. Therefore NO STATIC FIXTURE CAN FORCE A FIRST-CANDIDATE FAILURE: if a free bay and a free technician exist, that pair is a reachable first draw. Without seed control no retry is forceable at all, which is AC-2's and AC-3's problem too. Remedy asked for: bookingSeed?: number from BOOKING_SEED in platform/config.ts, the shape §4 already gives ATTEMPT_CAP, unset in production. The test-engineer ACCEPTED THE COST rather than hiding it - ADR-0009 names 'the seed must actually vary' as a risk and an env var makes Order-A reachable by misconfiguration - and offered either mitigation the architect prefers. It also stated what it can still do if declined, and asked that the gate be told rather than letting AC-2, AC-3 and D-04-1 read as covered.
+- *file:* `docs/slices/04-design.md`
+
+**T-04-2** — AC-4 should be asserted at the shipped cap of 16; the cheap-fixture premise is wrong and cap=3 unpins ADR-0009's number
+
+- *scenario:* §5's third ruling calls a dealership deep enough to need 17 attempts expensive. It is about 52 inserts and ONE HTTP request - cheaper than the (20,8) concurrency case already in the suite, and needing no concurrency at all. Simulated against ADR-0020's loop: 16 bays all blocked gives 16 attempts and exit 'exhausted' (both conditions true, the tie); 17 bays all blocked gives 16 attempts and exit 'capped' with one bay untried. ONE FIXTURE PAIR, ORDER-INDEPENDENT, PINS THREE THINGS: that the cap is exactly 16, that capped and exhausted are distinguishable, and that ADR-0020's tie-break resolves to exhausted. At ATTEMPT_CAP=3 none of the three is pinned and the default survives only in an implementer-owned config unit test, which is not evidence about the loop. Robust to which constraint PostgreSQL names under double violation: the same counts hold on the technician side if index order flips. Not objecting to the cap being configurable - declining to ASSERT against a non-default value.
+- *file:* `docs/slices/04-design.md`
+
+**T-04-3** — D-04-1's spurious-refusal leg cannot become an AC-1 case — every candidate fixture is a coin flip
+
+- *scenario:* P(refused while capacity remained), one request, cap 16, unfiltered list: 20 bays with 17 pre-booked gives 0.35%; 24 with 20 gives 0.66%; 20 with 19 gives 20.0%; 30 with 29 gives 46.7%; 40 with 38 gives 35.4%. The sub-1% rows FLAKE-PASS and the 20-47% rows FLAKE-FAIL, and neither is admissible in a suite that runs on every slice for ever. A deterministic version needs the free resource forced past position 16, which needs T-04-1's seed. TWO CONSEQUENCES. D-04-1's exposure is SHARPER than the design states - it bites hardest when nearly all resources are booked, which is ADR-0004's own motivating case, the 08:00-Saturday burst at a large dealership. And T-04-2's capped fixture is the honest partial: it proves deterministically and with zero concurrency that a 17-resource dealership reaches the cap and reports capped, so ADR-0009's claim that 'a non-zero cap-exceeded counter in production means the cap is wrong' is ALREADY FALSE TODAY, before slice 08.
+- *file:* `docs/slices/04-design.md`
+
+**T-04-4** — AC-2's absence-of-25P02 assertion passes vacuously as a standalone case and the design does not name its fixture
+
+- *scenario:* Written as its own single-request case it passes on a build that refuses at the first conflict, on a build with no retry loop at all, and on a build whose booking route 404s. The observable is also indirect: 25P02 is not 23P01, so per ADR-0004 it surfaces as a 500 /problems/internal rather than a 409. Remedy: the assertion lives INSIDE AC-1's (20,8) case gated on a positive witness - with 20 racers and 8 bays, pigeonhole guarantees at least 12 racers conflict and retry, so max(attempt) >= 2 is CERTAIN rather than probable. Assert in order: one record with attempt >= 2 (without it the rest is vacuous), zero 500s, then no 25P02 anywhere. A transaction-wrapped loop fails the first two before the absence is reached, which makes the absence a confirmation with a good message rather than the evidence.
+- *file:* `docs/slices/04-design.md`
+
+**I-04-3** — §3's nextCandidate signature does not compile, and the brand RELOCATES the index assertion rather than removing it
+
+- *scenario:* §3 states nextCandidate is TOTAL because a CandidateOrder is non-empty, and that the brand 'removes the last as string index assertion on the booking path'. Measured under this repo's own compilerOptions: the stated carrier verbatim is EXIT 2, twice TS2322, 'string \| undefined' not assignable to 'string'. The brand sits on the OBJECT; readonly bays: readonly string[] is untouched by it, so noUncheckedIndexedAccess still yields string \| undefined. The assertion moves from bookAppointment.ts into candidates.ts. The alternative carrier compiles at exit 0 with no index assertion anywhere: readonly [string, ...string[]] plus a nonEmpty() constructor destructuring head and tail. Its three as CandidateOrder minting casts are the house brand pattern used by interval.ts and duration.ts and are not matched by contended-resource-cast, whose pattern is /\bas\s+ContendedResource\b/. The stated carrier needs those casts TOO, plus the index assertions, so the tuple carrier strictly dominates.
+- *file:* `docs/slices/04-design.md`
+
+**I-04-5** — D-04-1 is deferred to a slice whose own Out of scope forbids the work, so the deferral is permanent
+
+- *scenario:* VERIFIED BY THE ORCHESTRATOR. docs/slices/08-availability-query.md, Out of scope: 'Using the query to drive allocation. A-5 fixed booking as can I have 09:00, not find me something Tuesday; making availability authoritative would reintroduce check-then-act.' That covers exactly the work D-04-1 is deferred into, for a stated ADR-level reason, in a slice marked gate: light. ADR-0019's criterion is that the receiving slice makes the work CHEAPER OR STRONGER; a receiving slice whose own file forbids it makes it IMPOSSIBLE. AND THE FINDING IS SHARPER THAN THE FILTER PREMISE. ADR-0009 sized the cap BELOW the bound its own Bound-2 paragraph computed - 'worst case \|bays\| + \|technicians\| - 1 attempts: roughly 40' then 'a hard cap of 16' - so at ordinary scale the additive bound exceeds 16 WITH OR WITHOUT the filter; the filter changes only whether a conflict means a race or a busy resource. Two numbers already in the repository, the first verified by the orchestrator: slice 09's AC-12 fixture is 5 bays and 20 technicians, additive bound 24 > 16, and its AC-13 asserts an uncontended booking issues EXACTLY ONE INSERT on that fixture - which an unfiltered shuffled list over 500 appointments cannot promise. D-04-1 has a sibling and it is slice 09's. And QS-3's largest fixture (20,8) reaches at most 15 attempts against a cap of 16 - the design is right that it cannot see D-04-1, and the margin is ONE ATTEMPT. The remedy must name the slice-08 edit, distinguishing availability as an AUTHORITATIVE ALLOCATOR (excluded, correctly) from an ADVISORY PRE-FILTER still adjudicated by the insert and still retried. The implementer also offered the deferral a better argument than the design's: the pre-filter is only trustworthy because of QS-8, slice 08's property that every pair availability reports free is accepted by an INSERT - and then noted that this places the filter AFTER slice 08, reinforcing its own routing objection rather than answering it.
+- *file:* `docs/slices/08-availability-query.md`
+
+**I-04-2** — ADR-0020's option table omits a shape that keeps both the arm placement and a structural loop bound
+
+- *scenario:* The ADR's 'Bad' names one direction only - move the cap out of the arm and tsc objects. The reverse is silent: add a PgOutcome variant that is retried, a second continue, and the loop is UNBOUNDED - no tsc error, no test, a hang. Under the loop-bound option that is unrepresentable. The ADR trades a structural liveness bound for a type guarantee and does not say so. Measured: arm-placed refusals PLUS a for(attempts = 1; attempts <= cap) header, with a throw at the tail, is exit 0 with no cast and no fabricated resource. The four-tree framing missed it because it assumed the tail had to RETURN a BookOutcome; the post-loop position needs to be unreachable, not a refusal, and a throw discharges noImplicitReturns without minting anything. The implementer does not insist on it - it insists the table stop reading as though the bound and the placement were alternatives, because they compose.
+- *file:* `docs/adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md`
+
+**I-04-4** — §4's ordering forces a branch tsc demands and no test can cover
+
+- *scenario:* §4 says one orderCandidates call AFTER the two empty-candidate guards. Measured: with no null handler, exit 2 TS2345 - tsc forces the branch to exist; with the handler after the guards, exit 0 and the branch is UNREACHABLE by construction, so no test can cover it, Stryker gets a free survivor, and an outcome must be invented for a state that cannot occur. Folding the guards INTO the null branch is exit 0 with both outcomes preserved and every branch reachable. It is also the better split: the domain owns 'is there a candidate', the application owns 'whose fault is it'.
+- *file:* `docs/slices/04-design.md`
+
+**I-04-8** — The seed source adds a node:crypto import that main.ts deliberately avoids
+
+- *scenario:* §3 binds seed to randomInt(0, 2**32), which needs an import. src/main.ts:50 states why newId uses the GLOBAL instead: 'crypto is a Node global, so injecting newId gives src/application no import and leaves no-dev-dep-in-src and the layering rules untouched (DA-02-1)'. Measured: crypto.getRandomValues(new Uint32Array(1))[0] ?? 0 compiles at exit 0 under this repo's options with types: ['node'], no import. A design choice re-derived one slice later against a rationale already written in the file it would change.
+- *file:* `docs/slices/04-design.md`
 
 </details>
 
