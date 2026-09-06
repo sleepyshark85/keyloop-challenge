@@ -35,6 +35,21 @@ it reports free is exactly what the constraint accepts.
 - **AC-6** — Given a query whose `to` precedes its `from`, then `400` with
   `type=/problems/malformed-request`.
 
+## Inherited scope — from slice 05, ruled at its step 5 (R-05-2)
+
+**AC-1 of slice 05 rests on a fact this slice deletes.** What makes cancellation's freed-slot proof
+attributable is that `candidateResources` reads only `service_bay`, `technician` and
+`technician_qualification` — **never `appointment`** — so the candidate list is *identical* before and
+after the cancel, and the only thing that moved between the `409` and the `201` is the constraint's
+verdict on ADR-0004's retry attempts. The advisory pre-filter named in Out of scope below makes the
+candidate path read `appointment`, and that attribution stops holding: a `201` after a cancel could
+then come from a changed candidate order rather than from the predicate.
+
+**So slice 08 owes slice 05's AC-1 a re-derivation**, not a deletion. The cheapest form is to keep the
+1×1 fixture, where a pre-filter cannot change an order of one — but that must be *asserted* here
+rather than left true by accident, because the trap slice 05 closed by shape reopens the moment the
+fixture widens. Its AC-4 above is the availability-side mirror and does not substitute for it.
+
 ## In scope
 
 - The availability query and its route; `tests/property/availability-agrees-with-constraint.test.ts`

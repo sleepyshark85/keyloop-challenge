@@ -69,6 +69,17 @@ is a goal nobody can fail.
   requests for one slot and shows exactly one `201` and the rest `409` — the invariant demonstrated
   from a terminal, without the test suite.
 
+### Inherited from slice 05 — OQ-05-2, re-routed here (R-05-2)
+
+- **AC-6b** — Given `Content-Type: application/json` and an **empty body** on a route that reads no
+  body, then the response is `200` rather than the `400` slice 05's AC-5 pins today. Slice 05 deferred
+  this to **slice 10, which has been a tombstone since 2026-09-04** — the destination could not make
+  the work cheaper or stronger because it does not exist. Corrected to slice 09, which is where the
+  harness went: `postBooking` sets that header reflexively, so the assertion is end-to-end against the
+  real client that emits it. The remedy is a content-type parser mapping an empty body to `undefined`,
+  which routes the booking route's empty body through TypeBox — §8.6's declared owner for that row —
+  rather than through a special case in the handler.
+
 ### The performance budget *(carried from slice 11)*
 
 - **AC-12** — Given a seeded schedule of 5 bays, 20 technicians and 500 appointments in one dealership

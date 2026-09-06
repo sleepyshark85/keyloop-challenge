@@ -58,7 +58,13 @@ Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
   `content-type: application/xml` returns `500`. `server.ts`'s docblock asserts §8.6's totality *"is
   kept"* in `setErrorHandler` and it is not; that docblock is corrected with the handler. The corpus
   is `tests/contract/`, the test-engineer's, asserted in the direction that can fail (∀responses ∃row).
-  **§8.6 gains the row at this slice's step 7.**
+  **§8.6 gains the row at this slice's step 7.** Two warnings, both ruled at slice 05 step 5 so they
+  are not discovered here: registering the handler **breaks the media-type half of AC-4's vacuity
+  guard** in `cancel-appointment.test.ts:247`, which discriminates on Fastify's default body — the
+  `type` member still discriminates, and the test-engineer re-derives that case rather than deleting
+  it; and `src/http/problem.ts`, which renders every row, sits at **exactly §10's 0.75 threshold with
+  three survivors**, so this slice's two taxonomy changes put one new survivor between it and its
+  Definition of Done.
 - **The Stryker exhaustiveness disables.** ~13 structurally unkillable mutants cap
   `routes/appointments.ts` near 88%, so 83.04 has stopped discriminating (reviewer, slice 05).
   `// Stryker disable next-line` on each `const unhandled: never` arm, with the reason on the line —
