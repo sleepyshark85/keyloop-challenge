@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **194** |
-| Severity | 10 blocking · 105 major · 79 minor |
+| Findings recorded | **196** |
+| Severity | 10 blocking · 105 major · 81 minor |
 | Verdicts | 10 narrowed · 72 accepted · 3 escalated · 13 deferred |
-| Raised by | test-engineer 45 · reviewer 42 · architect 35 · implementer 34 · orchestrator 31 · scribe 5 · human 2 |
-| Awaiting a ruling | **96** |
-| Mean escape distance | 1.99 step(s) |
+| Raised by | test-engineer 45 · reviewer 44 · architect 35 · implementer 34 · orchestrator 31 · scribe 5 · human 2 |
+| Awaiting a ruling | **98** |
+| Mean escape distance | 2.02 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1197,6 +1197,8 @@ rather than narrated.*
 | **A-05-5** | MAJOR | 5 *(+5)* | architect | ADR-0019 misidentified its own mutant, and one of slice 05 own deferral destinations was a tombstone two days before the design named it | **open** |
 | **O-36** | MAJOR | 5 *(+0)* | orchestrator | An orchestrator chore(log) commit swept another role in-flight architecture work into itself, and pathspec pinning did not prevent it | **open** |
 | **A-05-6** | MINOR | 5 *(+5)* | orchestrator | Forward debt with a named destination: two unkilled guards inside ADR-0016 sole sanctioned cast site | **open** |
+| **R-05-10** | MINOR | 5 *(+5)* | reviewer | The response-whitelist control already exists on two of three routes; GET is the sole gap and 210:19 is its residue | **open** |
+| **R-05-11** | MINOR | 5 *(+5)* | reviewer | ADR-0019 criterion is 0-for-3 on premises, not 0-for-2 | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1353,6 +1355,16 @@ rather than narrated.*
 
 - *scenario:* ConditionalExpression survivors at 80:9 and 103:39. The architect applied ADR-0019 properly to its own forward debt and named SLICE 07 as the destination, because that is where 23P01 classification on the UPDATE path becomes live rather than historical. Logged against that destination rather than unrouted, which is the practice R-05-2 exists to enforce.
 - *file:* `src/persistence/pgError.ts`
+
+**R-05-10** — The response-whitelist control already exists on two of three routes; GET is the sole gap and 210:19 is its residue
+
+- *scenario:* The reviewer pulled statusReason from mutation.json for all three sibling response maps: 133:46 on POST is Killed by appointments.test.ts:730, 255:19 on the cancel route is Killed by appointments.test.ts:422 which the implementer added THIS SLICE, and 210:19 on GET SURVIVED. Both killers stub an undeclared member. So the proposed unit case is not a formality invented to kill a mutant — it restores a control the file already applies twice, on the one route ADR-0019 pointed at.
+- *file:* `src/http/routes/appointments.ts`
+
+**R-05-11** — ADR-0019 criterion is 0-for-3 on premises, not 0-for-2
+
+- *scenario:* The reviewer measured the premise directly: a cancelled view carrying exactly ten members renders BYTE-IDENTICAL under baseline and mutant, so the producibility of cancelled never touched 210:19, and the status-union mutants ADR-0019 actually argued from at 111:24, 111:38 and 111:65 are all KILLED. Then it corrected the architect upward: slice 05 own deferral named slice 10, and docs/slices/10 carries folded_into 09, folded_at 2026-09-04, folded_by gate-D — a tombstone two days before the design named it. That is the same premise failure a THIRD time, committed by the criterion own author while applying it. Its conclusion: the criterion is sound and unenforced, the enforcement spec is the remedy, and the fact that the spec is unbuilt and tools/ has no owner in this slice is the open risk rather than the criterion.
+- *file:* `docs/adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md`
 
 </details>
 
