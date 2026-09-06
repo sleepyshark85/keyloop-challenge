@@ -116,7 +116,28 @@ interface StatementAuditRow {
   readonly affected: number | null;
 }
 
-async function rowAuditFor(client: Client, appointmentId: string): Promise<readonly RowAuditRow[]> {
+/**
+ * R-06-1 — a high-water mark on `_reschedule_audit.id`, taken after each case's own arrange
+ * (`postBooking` over HTTP, or `occupy`'s literal `insert into appointment`) and before the
+ * one HTTP call under test. `beforeEach` truncates the table once per `it()`, not once per
+ * arrange step, so without this mark `rowAuditFor` below counts the arrange's own INSERT as
+ * a firing against the SAME id it goes on to move — an exact, id-filtered read with no
+ * window at all, which is not the same defect `statementAuditInWindow` guards against with a
+ * clock: this is exact and needs no clock, only a boundary the arrange must be taken past.
+ * `afterId` defaults to 0 for the unknown-id case, which never has an arrange row to skip.
+ */
+async function highWaterMark(client: Client): Promise<number> {
+  const { rows } = await client.query<{ mark: number }>(
+    `select coalesce(max(id), 0)::integer as mark from _reschedule_audit`,
+  );
+  return rows[0]?.mark ?? 0;
+}
+
+async function rowAuditFor(
+  client: Client,
+  appointmentId: string,
+  afterId = 0,
+): Promise<readonly RowAuditRow[]> {
   const { rows } = await client.query<{
     op: string;
     appointment_id: string | null;
@@ -125,9 +146,9 @@ async function rowAuditFor(client: Client, appointmentId: string): Promise<reado
   }>(
     `select op, appointment_id, txid::text as txid, ts::text as ts
        from _reschedule_audit
-      where level = 'ROW' and appointment_id = $1
+      where level = 'ROW' and appointment_id = $1 and id > $2
       order by id`,
-    [appointmentId],
+    [appointmentId, afterId],
   );
   return rows.map((r) => ({
     level: 'ROW' as const,
@@ -258,6 +279,7 @@ describe('slice 06 — AC-2: the audit triggers, installed and dropped by this t
       const booked = await postBooking(service, bookingBody(scenario));
       expect(booked.status, `ARRANGE — A was not booked.${where}`).toBe(201);
       const id = String(member(booked, 'id'));
+      const mark = await highWaterMark(client);
 
       const from = await clock(client);
       const answer = await postReschedule(service, id, isoAt(30));
@@ -266,7 +288,7 @@ describe('slice 06 — AC-2: the audit triggers, installed and dropped by this t
         200,
       );
 
-      const rowAudit = await rowAuditFor(client, id);
+      const rowAudit = await rowAuditFor(client, id, mark);
       expect(
         rowAudit.map((r) => r.op),
         `AC-2 — EXACTLY ONE row-level firing for this id, and it must be an UPDATE. A ` +
@@ -318,6 +340,7 @@ describe('slice 06 — AC-2: the audit triggers, installed and dropped by this t
       startsAt: at(60),
       endsAt: at(75),
     });
+    const mark = await highWaterMark(client);
 
     await withService(async (service) => {
       const answer = await postReschedule(service, aId, isoAt(15));
@@ -327,7 +350,7 @@ describe('slice 06 — AC-2: the audit triggers, installed and dropped by this t
           `refused.\n${describeAnswer(answer)}${where}`,
       ).toBe(200);
 
-      const rowAudit = await rowAuditFor(client, aId);
+      const rowAudit = await rowAuditFor(client, aId, mark);
       expect(
         rowAudit.map((r) => r.op),
         `AC-2 / T-06-3 — the discarded first attempt must leave NO row here at all; only the ` +
