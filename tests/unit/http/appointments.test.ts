@@ -363,6 +363,10 @@ describe('POST /appointments/:id/cancellation — AC-3, AC-4', () => {
     expect(response.json().type).toBe('/problems/appointment-not-found');
     expect(response.json().status).toBe(404);
     expect(response.json().title).toBe('No such appointment');
+    // The title AND the detail, because this file's own mutation history is that every string
+    // literal in a route survived until something asserted it: a row whose detail became `""`
+    // passes every status and `type` assertion above.
+    expect(response.json().detail).toBe('no appointment exists with that id');
   });
 
   it('the id from the PATH is what reaches the use case', async () => {
@@ -413,6 +417,23 @@ describe('POST /appointments/:id/cancellation — AC-3, AC-4', () => {
     const cancelled = await cancel(app);
     const read = await app.inject({ method: 'GET', url: `/appointments/${APPOINTMENT_ID}` });
     expect(read.json()).toEqual(cancelled.json());
+  });
+
+  it('a member the 200 schema does not declare is STRIPPED', async () => {
+    // The `response` schema on this route is what does it, and without this assertion emptying
+    // that schema changes NOTHING observable: the 200 still renders and the 404 sets its own
+    // media type. An internal field added to `AppointmentView` — a retry count, a lock key —
+    // would then reach every client of this route silently.
+    const response = await cancel(
+      serverAnswering({
+        cancel: {
+          kind: 'cancelled',
+          appointment: { ...CANCELLED, internalAttempts: 7 },
+        } as unknown as CancelOutcome,
+      }),
+    );
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(response.json() as object)).not.toContain('internalAttempts');
   });
 
   it('cancellation is a SUB-RESOURCE, not a DELETE — the appointment keeps its URL (ADR-0003)', async () => {
