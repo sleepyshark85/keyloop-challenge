@@ -26,9 +26,11 @@
  * column of the candidate cross-product, which is what makes the loop terminate in
  * |bays| + |technicians| - 1 attempts rather than |bays| x |technicians|.
  *
- * The seeded shuffle and the 16-attempt cap are ADR-0009's and stay in slice 04. Candidate
- * ordering here is deterministic, which is F-02-7's substitute for a seed: a deterministic order
- * is re-runnable by construction with nothing to record.
+ * THE ORDER IS A SEEDED SHUFFLE, drawn once per request and injected (ADR-0009's Order-C,
+ * ADR-0021). `src/domain/candidates.ts` owns the permutation and the prune; this module owns only
+ * WHEN to prune and what a refusal means. Slice 02's deterministic order was F-02-7's stand-in and
+ * it is gone: under it every concurrent request tried the same bay first, which is the Order-A
+ * degeneracy ADR-0004 named and ADR-0009 rejected.
  *
  * ── EACH ATTEMPT IS ITS OWN TRANSACTION, AND THE LOOP IS NOT WRAPPED IN ONE ───────────────────
  *
@@ -39,6 +41,8 @@
  * contradict. That is why `db.transaction()` appears inside the loop body and nowhere outside it.
  */
 import { deriveInterval } from './deriveInterval.js';
+import { nextCandidate, orderCandidates, prune } from '../domain/candidates.js';
+import type { CandidateOrder } from '../domain/candidates.js';
 import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
 import {
@@ -142,6 +146,14 @@ export interface BookDeps {
    */
   readonly newId: () => string;
   /**
+   * ADR-0009's per-request seed, INJECTED and never global — the difference between Order-C and
+   * Order-B, and the only reason ordering can stay a pure function inside `src/domain`.
+   *
+   * `main.ts` binds it to the platform CSPRNG, or to `BOOKING_SEED` when that is set (ADR-0021).
+   * Drawn ONCE per booking, so every attempt of one request walks one permutation.
+   */
+  readonly seed: () => number;
+  /**
    * I-02-6 — the observer AC-3, AC-4, QS-1 and QS-2 need and the design did not have.
    *
    * All four require "the violated constraint reported by PostgreSQL is named `no_bay_overlap`",
@@ -205,23 +217,32 @@ export async function bookAppointment(
 
   // 4. Candidates — REFERENCE DATA ONLY. `candidateResources` does not read `appointment`.
   const candidates = await candidateResources(db, command.dealershipId, command.serviceTypeId);
-  const bays = [...candidates.bays];
-  const technicians = [...candidates.technicians];
 
-  // The two empty cases are DIFFERENT FAILURES and collapsing them was a design defect ruled at
-  // step 2 (I-02-8 / T-02-7). A dealership with no bays cannot perform ANY service — that is a
+  // 5. The order — ADR-0009's Order-C, from one seed drawn for this request.
+  //
+  // THE TWO EMPTY-CANDIDATE ANSWERS LIVE IN THIS `null` BRANCH RATHER THAN IN FRONT OF IT
+  // (I-04-4). Guards ahead of the call would make this branch unreachable: `tsc` would still
+  // demand it, no test could cover it, and Stryker would collect a free survivor. Folded in,
+  // every branch on this path is reachable and the split is the honest one — the domain owns
+  // "is there a candidate at all", this module owns "whose fault is it that there is not".
+  //
+  // They are DIFFERENT FAILURES and collapsing them was a design defect ruled at slice 02 step 2
+  // (I-02-8 / T-02-7). A dealership with no bays cannot perform ANY service — that is a
   // mis-seeded dealership and the system's fault, so `500`. "No technician here is qualified for
   // this service type" is an entirely ordinary state of an ordinary dealership: the request names
   // a (dealership, service-type) pair and that pair does not resolve, which is the only sense in
-  // which this API knows service types at all.
-  if (bays.length === 0) {
-    deps.logger.error(
-      { event: REFERENCE_DATA_EVENT, dealershipId: command.dealershipId },
-      'dealership has no service bays',
-    );
-    return { kind: 'reference-data-invalid', detail: 'no-service-bays' };
-  }
-  if (technicians.length === 0) {
+  // which this API knows service types at all. Neither is a `409`: there is no verdict here to
+  // build one from (ADR-0016).
+  const seed = deps.seed();
+  const initialOrder = orderCandidates(candidates.bays, candidates.technicians, seed);
+  if (initialOrder === null) {
+    if (candidates.bays.length === 0) {
+      deps.logger.error(
+        { event: REFERENCE_DATA_EVENT, dealershipId: command.dealershipId },
+        'dealership has no service bays',
+      );
+      return { kind: 'reference-data-invalid', detail: 'no-service-bays' };
+    }
     return { kind: 'unknown-reference', reference: 'service-type' };
   }
 
@@ -229,16 +250,15 @@ export async function bookAppointment(
   const startsAt = new Date(derivation.occupancyStartsAt);
   const endsAt = new Date(derivation.occupancyEndsAt);
   let attempts = 0;
+  let order: CandidateOrder = initialOrder;
 
-  // 5. The loop. It varies ONLY the candidate: steps 1-3 ran once and nothing inside re-derives.
+  // 6. The loop. It varies ONLY the candidate: steps 1-4 ran once and nothing inside re-derives.
   //
-  // Both lists are non-empty on entry (the two guards above) and EVERY path that empties one
-  // returns from inside the loop, so the head of each is always present. The `as string` is
-  // `noUncheckedIndexedAccess` on an array index and nothing more — it fabricates no brand, which
-  // is the assertion §4.1 and the `contended-resource-cast` marker are about.
+  // A `CandidateOrder` is non-empty by construction and `prune` returns `null` rather than an
+  // empty one, so `nextCandidate` is total and there is no index assertion left on this path —
+  // the `as string` pair that stood here is gone with the tuple carrier (I-04-3).
   for (;;) {
-    const bayId = bays[0] as string;
-    const technicianId = technicians[0] as string;
+    const { bayId, technicianId } = nextCandidate(order);
     attempts += 1;
 
     try {
@@ -280,12 +300,23 @@ export async function bookAppointment(
             CONFLICT_EVENT,
           );
 
-          // PER VALUE, not per class (T-02-1): drop THAT bay, or THAT technician, and leave the
-          // others. Emptying the whole list on one failure refuses while capacity plainly
-          // remains, and it is what made AC-4 fail under this design's earlier wording.
-          const remaining = outcome.resource === 'bay' ? bays : technicians;
-          remaining.shift();
-          if (remaining.length > 0) continue;
+          // PER RESOURCE VALUE, not per class and NOT PER PAIR (T-02-1, ADR-0009's Bound-2):
+          // drop THAT bay, or THAT technician, and leave the others. Emptying the whole list on
+          // one failure refuses while capacity plainly remains; pruning only the (bay,
+          // technician) pair leaves the conflicting resource in the list, meets it again behind
+          // the next partner, and turns the additive bound into a multiplicative one.
+          //
+          // `outcome.resource` is a `ContendedResource`, an intersection with the plain union
+          // `prune` takes — so it goes straight in with no cast at this call site.
+          const remaining = prune(
+            order,
+            outcome.resource,
+            outcome.resource === 'bay' ? bayId : technicianId,
+          );
+          if (remaining !== null) {
+            order = remaining;
+            continue;
+          }
 
           // THE ONE REFUSAL EXIT, and it is reached holding a `ContendedResource` this very
           // classification minted from `err.constraint` rather than one chosen here. A

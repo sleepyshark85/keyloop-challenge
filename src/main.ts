@@ -46,7 +46,16 @@ const db = createDb(config, { logger });
 // the handle, because `http-must-not-reach-persistence` forbids the edge from even NAMING the
 // handle's type. `crypto` is a Node global, so injecting `newId` gives `src/application` no
 // import and leaves `no-dev-dep-in-src` and the layering rules untouched (DA-02-1).
-const bookDeps = { newId: (): string => crypto.randomUUID(), logger };
+const bookDeps = {
+  newId: (): string => crypto.randomUUID(),
+  // ADR-0009's seed, drawn per request from the GLOBAL `crypto` for the same reason `newId`
+  // takes it (I-04-8): `node:crypto`'s `randomInt` would be an import in a file that composes
+  // every layer, and the global costs nothing. `?? 0` is `noUncheckedIndexedAccess` on a
+  // one-element array — `getRandomValues` fills it or throws, so the fallback is unreachable and
+  // a zero seed would be a perfectly ordinary seed anyway.
+  seed: (): number => crypto.getRandomValues(new Uint32Array(1))[0] ?? 0,
+  logger,
+};
 const app = buildServer({
   logger,
   checkHealth: async () => checkHealth(db),

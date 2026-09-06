@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bookAppointment, toAppointmentView } from '../../../src/application/bookAppointment.js';
 import type { BookCommand, BookDeps } from '../../../src/application/bookAppointment.js';
 import type { Logger } from '../../../src/platform/logger.js';
+import { orderCandidates } from '../../../src/domain/candidates.js';
 import { scriptedDb } from '../helpers/stub-db.js';
 import type { ScriptedStep } from '../helpers/stub-db.js';
 
@@ -26,6 +27,35 @@ const SERVICE_TYPE = 'ssssssss-0000-4000-8000-000000000000';
 const CUSTOMER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const VEHICLE = 'vvvvvvvv-0000-4000-8000-000000000000';
 const APPOINTMENT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+/**
+ * The seed every case below injects. ADR-0009 makes ordering a pure function of
+ * `(bays, technicians, seed)`, so fixing the seed fixes the order — which is the whole reason the
+ * seed is a parameter rather than a global, and it is what lets a scripted database line its
+ * answers up with the candidates the loop actually draws.
+ */
+const SEED = 2_026_0904;
+
+/** Six bays, enough for a permutation to be visible and for a prune to have survivors. */
+const bays6 = ['bay-0', 'bay-1', 'bay-2', 'bay-3', 'bay-4', 'bay-5'];
+
+/**
+ * The order the loop will draw, computed the way the loop computes it.
+ *
+ * This calls the SAME function under test's own dependency rather than restating a permutation,
+ * deliberately: a literal expectation here would be a transcription of `mulberry32` and would
+ * forbid the shuffle ever changing behind its contract. What it pins is the claim this file is
+ * about — the loop draws in the order the DOMAIN gives it, in that order, and does not re-sort,
+ * re-shuffle or ignore it.
+ */
+function drawn(
+  bays: readonly string[],
+  technicians: readonly string[],
+): { readonly bays: readonly string[]; readonly technicians: readonly string[] } {
+  const order = orderCandidates(bays, technicians, SEED);
+  if (order === null) throw new Error('the fixture has no candidates');
+  return order;
+}
 
 /** 10:00 local (BST) on Tuesday 2026-09-08, inside 08:00-18:00. */
 const STARTS_AT_MILLIS = Date.parse('2026-09-08T09:00:00.000Z');
@@ -59,7 +89,7 @@ function collectingDeps(): { deps: BookDeps; lines: LogLine[] } {
     trace: record('trace'),
     fatal: record('fatal'),
   } as unknown as Logger;
-  return { deps: { newId: () => APPOINTMENT, logger }, lines };
+  return { deps: { newId: () => APPOINTMENT, seed: () => SEED, logger }, lines };
 }
 
 function pgError(code: string, constraint?: string): unknown {
@@ -249,6 +279,97 @@ describe('bookAppointment — the loop prunes PER VALUE (T-02-1)', () => {
   });
 });
 
+describe('bookAppointment — the loop walks ADR-0009 Order-C, not the repository\'s order', () => {
+  it('attempts the bays in the order the DOMAIN drew, one per attempt, keeping the technician', async () => {
+    // Six bays, three technicians, every attempt refused on the bay. The conflict lines are a
+    // transcript of the walk: six attempts, the six bays in the drawn order, and the SAME
+    // technician throughout because nothing ever pruned one.
+    {
+      const order = drawn(bays6, ['tech-0', 'tech-1', 'tech-2']);
+      const { db } = scriptedDb(
+        bookingScript({
+          bays: bays6,
+          technicians: ['tech-0', 'tech-1', 'tech-2'],
+          attempts: Array.from({ length: 6 }, () =>
+            attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+          ).flat(),
+        }),
+      );
+      const { deps, lines } = collectingDeps();
+      const outcome = await bookAppointment(db, deps, COMMAND);
+
+      const conflicts = lines.filter((l) => l.record['event'] === 'booking.conflict');
+      expect(
+        conflicts.map((l) => l.record['bayId']),
+        'the drawn order, in order — a loop that re-shuffled after each prune, or that walked ' +
+          'the repository order, disagrees here',
+      ).toEqual([...order.bays]);
+      expect(
+        [...new Set(conflicts.map((l) => l.record['technicianId']))],
+        'a bay conflict prunes no technician, so the head technician stands for all six attempts',
+      ).toEqual([order.technicians[0]]);
+      expect(outcome).toMatchObject({ kind: 'no-capacity', resource: 'bay', attempts: 6 });
+    }
+  });
+
+  it('draws EXACTLY ONE seed per request, so one request walks one permutation', async () => {
+    // Drawing per attempt would re-shuffle mid-loop: the survivors would change order behind the
+    // prune, and the seed the refusal reports would label a walk that never happened (ADR-0021).
+    let draws = 0;
+    const { deps } = collectingDeps();
+    const seeded = {
+      ...deps,
+      seed: (): number => {
+        draws += 1;
+        return SEED;
+      },
+    };
+    const { db } = scriptedDb(
+      bookingScript({
+        bays: bays6,
+        attempts: Array.from({ length: 6 }, () =>
+          attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+        ).flat(),
+      }),
+    );
+    await bookAppointment(db, seeded, COMMAND);
+    expect(draws).toBe(1);
+  });
+
+  it('a DIFFERENT seed attempts a different bay first — the injection is wired to the ordering', async () => {
+    // The point of Order-C over Order-A, at the level this module owns: two requests in the same
+    // process, identical in every other respect, do not queue on the same bay. The second seed is
+    // searched for rather than guessed, so this is a claim about the wiring and not about
+    // mulberry32's constants.
+    const head = drawn(bays6, ['tech-0']).bays[0];
+    let other = SEED;
+    for (let candidate = SEED + 1; candidate < SEED + 64; candidate += 1) {
+      const order = orderCandidates(bays6, ['tech-0'], candidate);
+      if (order !== null && order.bays[0] !== head) {
+        other = candidate;
+        break;
+      }
+    }
+    expect(other, 'no nearby seed permutes six bays differently — that is Order-A').not.toBe(SEED);
+
+    const firstBayOf = async (seed: number): Promise<unknown> => {
+      const { db } = scriptedDb(
+        bookingScript({
+          bays: bays6,
+          // Six, because the loop walks the whole list before refusing; only the FIRST is read.
+          attempts: Array.from({ length: 6 }, () =>
+            attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+          ).flat(),
+        }),
+      );
+      const { deps, lines } = collectingDeps();
+      await bookAppointment(db, { ...deps, seed: () => seed }, COMMAND);
+      return lines.find((l) => l.record['event'] === 'booking.conflict')?.record['bayId'];
+    };
+    expect(await firstBayOf(other)).not.toBe(await firstBayOf(SEED));
+  });
+});
+
 describe('bookAppointment — the refusal names the SCARCE resource (E-02-1, AC-11)', () => {
   it('names `bay` when the bay list empties, even with technicians left over', async () => {
     const { db } = scriptedDb(
@@ -296,17 +417,20 @@ describe('bookAppointment — the conflict line is the observer AC-3 and AC-4 re
     const { deps, lines } = collectingDeps();
     await bookAppointment(db, deps, COMMAND);
 
+    const order = drawn(['bay-0', 'bay-1'], ['tech-0']);
     const conflicts = lines.filter((l) => l.record['event'] === 'booking.conflict');
     expect(conflicts).toHaveLength(2);
     // The whole first record, so a dropped field is a failure here rather than at slice 09 when
-    // QS-13's span is built from the same three facts.
+    // QS-13's span is built from the same three facts. The pair is the one `orderCandidates` put
+    // at the head under SEED, not the one the repository returned first: a loop that ignored the
+    // order and walked the candidate list as read would fail here for every seed that permutes.
     expect(conflicts[0]?.record).toEqual({
       event: 'booking.conflict',
       constraint: 'no_bay_overlap',
       resource: 'bay',
       attempt: 1,
-      bayId: 'bay-0',
-      technicianId: 'tech-0',
+      bayId: order.bays[0],
+      technicianId: order.technicians[0],
     });
     expect(conflicts.map((l) => l.record['constraint'])).toEqual([
       'no_bay_overlap',
