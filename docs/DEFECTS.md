@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **229** |
-| Severity | 10 blocking · 121 major · 98 minor |
+| Findings recorded | **230** |
+| Severity | 10 blocking · 122 major · 98 minor |
 | Verdicts | 15 narrowed · 85 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 56 · architect 47 · reviewer 44 · orchestrator 38 · implementer 37 · scribe 5 · human 2 |
-| Awaiting a ruling | **103** |
-| Mean escape distance | 1.83 step(s) |
+| Raised by | test-engineer 56 · architect 47 · reviewer 44 · orchestrator 39 · implementer 37 · scribe 5 · human 2 |
+| Awaiting a ruling | **104** |
+| Mean escape distance | 1.82 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1457,6 +1457,7 @@ rather than narrated.*
 | **T-06-6** | MAJOR | 3 *(+2)* | test-engineer | AC-1 literal clock example is unbuildable — it requires a duration change PATCH cannot make. The SECOND acceptance criterion in this slice found unbuildable by trying to build it | accepted |
 | **T-06-7** | MAJOR | 3 *(+1)* | test-engineer | The affected = 0 discriminator is sound against ordinary traffic but NOT against this slice own AC-4 — the architect narrowing has its own residual | narrowed |
 | **A-06-6** | MAJOR | 3 *(+3)* | architect | Two of five acceptance criteria were unexecutable, and the shared cause is an ORDERING defect in step 1 rather than under-specification | deferred |
+| **O-44** | MAJOR | 4 *(+0)* | orchestrator | A DCR was raised, adjudicated and acted on without the orchestrator knowing — the board never went blocked and none of it reached the log until reconstructed after the fact | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1600,6 +1601,11 @@ rather than narrated.*
 - *scenario:* AC-5 was found unbuildable at step 1 by the architect trying to write the statement; AC-1 at step 3 by the test-engineer trying to write the test. THE CAUSE IS SHARPER THAN THE SLICE WAS UNDER-SPECIFIED. Both criteria were written at BACKLOG TIME in the vocabulary of the REQUEST, and both were falsified by decisions that later moved the fact into the ROW — AC-5 by ADR-0025 putting existence in the read, AC-1 by duration being the service type. READING MISSED BOTH, TWICE, because reading cannot detect that an example vocabulary has expired; ATTEMPTING CAUGHT BOTH. The control is a step-1 ORDERING RULE: fix the interface delta FIRST, then walk every acceptance criterion against it as a paper execution. The architect own step 1 did this in the other order — section 2.2 before section 3 interface table — WHICH IS EXACTLY WHY IT CAUGHT AC-5 WHILE WRITING THE STATEMENT AND MISSED AC-1. A change to step 1, not a note about slice 06.
 - *file:* `docs/slices/06-reschedule-atomic-move.md`
 - *deferred* by architect — DEFERRED TO THE RETRO because it is a change to the SLICE LOOP rather than to this slice, and the architect cannot amend CLAUDE.md section 6 by ruling. The evidence is two independent instances in one slice, each caught by a different role, each by ATTEMPTING rather than reading — which is the strongest form the claim can take and is available now rather than at the end. What the retro should weigh is whether step 1 gains a paper-execution pass over every acceptance criterion AFTER the interface delta is fixed, and the architect own out-of-order step 1 is the worked example of the cost.
+
+**O-44** — A DCR was raised, adjudicated and acted on without the orchestrator knowing — the board never went blocked and none of it reached the log until reconstructed after the fact
+
+- *scenario:* THE SUBSTANCE WAS HANDLED CORRECTLY AND THE PROCESS WAS NOT. The implementer hit an unsatisfiable assertion, correctly refused to edit a test-engineer file under section 5, and correctly raised a DCR — then DISPATCHED THE ARCHITECT ITSELF rather than routing through the orchestrator, and the architect ruled and committed 431c866. Section 6 says the slice goes BLOCKED when a DCR is raised and the architect convenes one round; section 9 says the orchestrator alone writes the log and no agent marks its own work done. Neither happened: no dcr.raised, no dcr.resolved, no board move, and the orchestrator learned of it by noticing an s06-architect-5 prompt file it had not written. HAD THE ARCHITECT RULED (c), A LOOPBACK WOULD HAVE BEEN CONSUMED AND THE GOVERNOR — max 2 — WOULD NOT HAVE COUNTED IT. The events above are reconstructed from the captured prompt and report, which exist only because the capture-prompt and log-agent-finish hooks fire on every invocation regardless of who initiates it; that is the control that made this recoverable, and it is worth recording that it worked. The remedy is not to forbid the dispatch — the implementer was unblocked in 7 minutes and that is a good outcome — but that a role dispatching another role must return the fact in its report so the orchestrator can log it, which is the same reporting-contract gap O-39 named one step earlier.
+- *file:* `docs/team-log/events.jsonl`
 
 </details>
 

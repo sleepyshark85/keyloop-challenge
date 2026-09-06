@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `ff1900c docs(06): two criteria written before the decisions that constrain them` |
+| Last commit | `d046670 feat(06): ADR-0024 — setNotFoundHandler, the second handler §8.6's totality is kept in` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 124 |
+| Agent runs recorded | 126 |
 | ADRs accepted | 23 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -264,7 +264,9 @@
 | 2026-09-06 13:30 | architect | 17m37 | 234 / 12,488 / 14,261,612 | `derived` |
 | 2026-09-06 13:58 | test-engineer | 24m45 | 370 / 14,431 / 38,952,616 | `derived` |
 | 2026-09-06 14:07 | architect | 6m13 | 74 / 1,082 / 2,148,910 | `derived` |
-| | **total** | **5314m23** | **28,982 / 2,219,755 / 2,162,905,467** | |
+| 2026-09-06 14:26 | architect | 7m05 | 86 / 2,387 / 2,532,254 | `derived` |
+| 2026-09-06 14:37 | implementer | 37m17 | 864 / 44,592 / 139,691,199 | `derived` |
+| | **total** | **5358m45** | **29,932 / 2,266,734 / 2,305,128,920** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
