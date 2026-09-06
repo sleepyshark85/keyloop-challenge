@@ -23,8 +23,14 @@ without being obvious.
 ## Acceptance criteria
 
 - **AC-1** — Given A confirmed `[09:00, 10:00)`, when A is rescheduled to `[09:15, 10:15)` and then
-  extended to `[09:15, 11:15)`, then both succeed, the id is unchanged, and **no `23P01` is raised** —
-  the row does not conflict with the version it replaces. *(QS-6)*
+  extended to `[09:15, 11:15)`, then both succeed, the id is unchanged, **the bay and technician are
+  unchanged** (asserted on the response body, which carries both), and **no `23P01` is raised** — the
+  row does not conflict with the version it replaces. *(QS-6)*
+  <br>The bay-and-technician clause was added at step 2 under I-06-2 and it is what makes AC-1 pin
+  QS-6 at all: the self-overlap semantics are only exercised if the new version lands in the *same*
+  bay with the *same* technician, so under a shuffle-from-first candidate order `[09:00,10:00) →
+  [09:15,10:15)` could be satisfied by allocating bay 2 and **AC-1 could not fail**. ADR-0027 fixes
+  the order; this clause makes the criterion able to observe it.
 - **AC-2** — Given A is moved, when the database is inspected, then exactly one statement modified it:
   a single `UPDATE`. A `DELETE`-then-`INSERT`, or a cancel-then-book, fails this criterion.
 - **AC-3** — Given A is moved to an interval outside the dealership's opening hours, then `400` with
