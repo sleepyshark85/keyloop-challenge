@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **205** |
-| Severity | 10 blocking · 107 major · 88 minor |
+| Findings recorded | **208** |
+| Severity | 10 blocking · 109 major · 89 minor |
 | Verdicts | 10 narrowed · 77 accepted · 3 escalated · 15 deferred |
-| Raised by | test-engineer 49 · reviewer 44 · architect 38 · implementer 35 · orchestrator 32 · scribe 5 · human 2 |
-| Awaiting a ruling | **100** |
-| Mean escape distance | 2.04 step(s) |
+| Raised by | test-engineer 49 · reviewer 44 · architect 38 · implementer 35 · orchestrator 35 · scribe 5 · human 2 |
+| Awaiting a ruling | **103** |
+| Mean escape distance | 1.94 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1426,6 +1426,33 @@ rather than narrated.*
 
 - *scenario:* Sections 6.2, 6.3 and 6.5 were compressed to pointers to pay section 6 ratchet. No fact was lost — each now points at its one home — but "I compressed another slice section to fund mine" is a real description of what happened, and the slice frontmatter says so RATHER THAN LEAVING THE GATE TO FIND IT. Section 6.1 was added to the declaration outright, R-02-2 having been built here.
 - *file:* `docs/arc42/06-runtime-view.md`
+
+</details>
+
+## Slice 06
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **O-38** | MINOR | 1 *(+-4)* | orchestrator | A-05-5 specified deferred_to on EVERY deferred ruling, and six of fifteen open deferrals have no slice to name | **open** |
+| **O-39** | MAJOR | 1 *(+-6)* | orchestrator | Two obligations this slice inherits have no finding.raised record anywhere in the log, so the register and every check were blind to them | **open** |
+| **O-40** | MAJOR | 1 *(+-5)* | orchestrator | STATUS.md reported PHASE 4 with Gate D open and undecided, six slices after Gate D was decided — the fourth recurrence of one shape | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**O-38** — A-05-5 specified deferred_to on EVERY deferred ruling, and six of fifteen open deferrals have no slice to name
+
+- *scenario:* Building the check falsified its own specification. O-3, O-6, O-7, O-9, I-11, T-01-3, A-04-4, A-04-13 and A-04-14 name no destination slice; three of them were ruled OUT OF SLICE with 'Home: tooling branch, orchestrator' written into the rationale. I-05-8 is decisive: it is an orchestrator override of ADR-0019 whose ENTIRE ARGUMENT is that no cheaper-or-stronger slice exists for it, logged as an override precisely so the retro can weigh it. A check demanding a slice id there would have forced a false destination into the log to satisfy a rule whose only purpose is to stop false destinations — the defect committing itself inside its own remedy, which is the shape F2 and O1 both had. IMPLEMENTED WITH A REFINEMENT rather than as specified: a destination is a slice id OR a member of a closed set (backlog \| retro \| gate \| human), and only slice ids bind a slice. Second refinement: deferred_to accepts an ARRAY, because F-02-9 is genuinely owed by slices 06 and 07 both. The architect owns the criterion and may rule the refinement wrong; the mechanism is the orchestrator's and is built.
+- *file:* `docs/team-log/events.jsonl`
+
+**O-39** — Two obligations this slice inherits have no finding.raised record anywhere in the log, so the register and every check were blind to them
+
+- *scenario:* Slice 06 file names F-05-1 as an inherited obligation 'deferred under ADR-0019', ADR-0023 cites it, and five prompts and reports discuss it. It has NO finding.raised event with ref F-05-1 — it exists only as a bullet in docs/slices/05-design.md section 4 and as prose inside other records. A-05-6 is the same shape: raised at slice 05 step 7, routed to slice 07 by the R-05-2 ruling table in the design file, never ruled in the log. CONSEQUENCE: DEFECTS.md cannot show them, escape distance cannot be computed for them, and the A-05-5 check built today would have passed slice 06 while it silently dropped F-05-1 — the fifth instance of the mechanism A-05-5 exists to stop, found by building A-05-5. Both are now carried by finding.routed records that state openly that A-05-6's quote comes from the design file rather than the log. THE REMEDY IS NOT MINE: whether a design-document finding must also be a logged finding is the architect's rule to make, and it is the difference between two artifacts that agree and two that merely have not been compared.
+- *file:* `docs/slices/05-design.md`
+
+**O-40** — STATUS.md reported PHASE 4 with Gate D open and undecided, six slices after Gate D was decided — the fourth recurrence of one shape
+
+- *scenario:* Slice 05 gate was recorded with gate: light, a name invented for the human own-cost ruling. generate.mjs held a DENYLIST of gate names known not to close a phase (E, process), so any name invented later defaulted to CLOSES A PHASE. light matched no phase closing gate, completedPhase came back null, and the position fell through to the last event carrying a phase field — phase 4, because every event since has been slice-scoped. FOUND BY REGENERATING THE FILE AND READING IT at the start of this session, which is the same way the third one was found; the committed STATUS.md had said Phase 5 and slice 04 in flight, and the regeneration was a REGRESSION, not a stale file catching up. The file own header tells a resuming session to trust it over narration. FIXED BY INVERTING THE SET: PHASE_CLOSING_GATES is derived from the PHASES table, so a gate nobody claims closes nothing, which is the correct default and cannot regress on a fifth name. Gate E stays an explicit exception because phase 5 does name it and it fires per slice. Three regression cases added to tools/test/status.test.mjs, written with an INVENTED gate name rather than light so the suite does not recreate the denylist; verified failing against the old behaviour before the fix was kept. O-8, O-11 and O-18 are the same defect and each was fixed by extending the denylist.
+- *file:* `tools/status/generate.mjs`
 
 </details>
 

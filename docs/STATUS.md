@@ -15,18 +15,18 @@
 
 | | |
 |---|---|
-| Last commit | `ee868c3 docs: the README and the AI collaboration narrative` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process |
-| Agent runs recorded | 93 |
-| ADRs accepted | 13 |
+| Last commit | `7a7e7f0 fix(06): the phase set is an allowlist — O-40, the fourth name to rewind the resume point` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
+| Agent runs recorded | 117 |
+| ADRs accepted | 22 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Slice [`04`](slices/04-candidate-allocation-and-retry.md) is in flight** — Candidate allocation and retry — no refusal while capacity remains.
+- **Slice [`06`](slices/06-reschedule-atomic-move.md) is in flight** — Rescheduling — one atomic UPDATE, and a row that does not conflict with itself.
 - **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
-- 6 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
+- 4 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
 ## Gate decisions
@@ -95,6 +95,14 @@
 
 > Ruled 2026-09-06: 'don't ever let the team (or you) go idle. don't wait for me for opinion if I'm not here, let the architect (or you) decide them. I will catch up later.' This EXTENDS the two standing delegations rather than replacing them: the architect already rules scope, acceptance criteria and quality goals mid-slice, and the orchestrator already holds Gate E under a mechanical bar. What is new is that NOTHING MAY BE QUEUED FOR THE HUMAN AS A REASON TO STOP - decisions previously parked for their opinion are now the architect's or the orchestrator's, and the record shows who took each. Prompted by a real failure the orchestrator caused: after slice 04's step 1 it reported 'next: step 2, both roles in parallel' and did not dispatch it, so the team sat idle between two human messages. The human noticed by asking 'anything still going on now?'. Announcing the next step is not taking it. TWO THINGS THAT DO NOT CHANGE, because the delegation is about who decides rather than about what is recorded. A gate the human did not see is still logged with actor: orchestrator and decision approved-under-delegated- authority, never actor: human. And every ruling made in their absence is still listed by slice:check at the gate, which is the whole counterweight - they catch up by reading a list rather than by being asked. IMMEDIATE EFFECT ON THE THREE ITEMS THAT WERE PARKED. ADR-0018, ADR-0019 and ADR-0020 are `proposed` and were being held for the human; ratification is the architect's to take, since §4 makes docs/adr its own and §6 gives it architecture. The orchestrator will route it rather than flipping status on the architect's files itself. AND THE IDLE CAPACITY WAS USED RATHER THAN REPORTED: the scribe had never run, README.md did not exist at all despite §4 making it a required deliverable carrying the AI Collaboration Narrative the assessment grades, and arc42 §13 was 144 words. Dispatched, on files that touch nothing slice 04 is using. Its budget was set to 1,500 words BEFORE the file existed, which is the lesson from 02-design.md reaching 13,566 and needing 12,366 cut back.
 
+**Gate E** · 2026-09-06 · approved
+
+> APPROVED — merge. What the evidence supports: the invariant is in the right place, with every refusal exit inside the 23P01 arm so no 409 can be minted without a database verdict; the loop structural bound is PROVED tight rather than asserted, by derivation and by exhaustive search over every adversarial conflict path; AC-1 was measured against a no-retry build AND against ADR-0004 rejected mutex, which is the check that catches a false pass; AC-2 25P02 absence is gated on a positive witness so it cannot be vacuously true; mutation is 0.9756 on changed files with seven of eight survivors established equivalent by measurement rather than argued equivalent; and the one real survivor was closed outside-in with three killed mutants. CI 34021995165 green on all three jobs at the merge head. WHAT THIS APPROVAL IS NOT: section 6 step 6 reads "human exploratory testing, then approval and merge", and no human exploratory testing was performed. I am not able to do that and I am not claiming to have done it. This gate discharges the reviewable evidence and nothing more. FIFTEEN ARCHITECT RULINGS made in the human absence are provisional and remain open to override, and slice:check prints them so the human is shown what moved rather than asked to notice it. Two items are carried to the human unresolved and neither is a merge blocker: D-04-1, which is a Gate B number only the human may change, and A-04-9, a recommended section 2.4 amendment the architect correctly refused to write.
+
+**Gate light** · 2026-09-06 · approved
+
+> LIGHT GATE, AUTO-APPROVED UNDER THE HUMAN OWN COST RULING OF 2026-09-05 — not under the orchestrator delegated Gate E. The slice file declares gate: light, revoked by any open MAJOR/BLOCKING; slice:check now reports Definition of Ready and Definition of Done fully green with every MAJOR ruled or resolved, so the condition the human attached is met on its own terms. Evidence: CI 34030951881 green on all three jobs at the merge head; mutation 0.9122 on changed files against a 0.75 threshold, with the ONE real survivor killed and the remaining eighteen matching the reviewer four inert classes line for line; depcruise clean; test ownership verified per-commit in both directions; all commits typecheck. The reviewer outcome is APPROVED after a section 6.4 round it lost and conceded. SIXTEEN ARCHITECT RULINGS were made in the human absence, all provisional and printed by slice:check. WHAT THIS IS NOT: no human exploratory testing was performed. The architect named the three things it would spend gate attention on — AC-5 predicate on the already-merged POST route, GET /nope, and application/xml — and those are recorded for the human to run rather than claimed as done.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -116,10 +124,15 @@
 | [0015](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) | An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | accepted | — |
 | [0016](adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | proposed | — |
 | [0017](adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | proposed | — |
-| [0018](adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | proposed | — |
-| [0019](adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | Defer a control only to the slice that makes it cheaper or stronger | proposed | — |
-| [0020](adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md) | Test the attempt cap inside the conflict arm, so a capped refusal still carries a database verdict | proposed | — |
-| [0021](adr/0021-the-booking-seed-is-overridable-by-environment.md) | The booking seed is overridable by environment, unset by default, and announces itself | proposed | — |
+| [0018](adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | accepted | — |
+| [0019](adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | Defer a control only to the slice that makes it cheaper or stronger | accepted | — |
+| [0020](adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md) | Test the attempt cap inside the conflict arm, so a capped refusal still carries a database verdict | accepted | — |
+| [0021](adr/0021-the-booking-seed-is-overridable-by-environment.md) | The booking seed is overridable by environment, unset by default, and announces itself | accepted | — |
+| [0022](adr/0022-application-configuration-is-prefixed-booking.md) | Prefix this application's own configuration with `BOOKING_`, and make §7.3's table the contract | accepted | — |
+| [0023](adr/0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md) | A write that leaves the exclusion constraints' scope takes no advisory lock — narrow F-02-9 to an iff | accepted | — |
+| [0024](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) | The error taxonomy's residual is a property, not a row | accepted | — |
+| [0025](adr/0025-existence-is-the-reads-legality-is-the-statements.md) | Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE | accepted | — |
+| [0026](adr/0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md) | The lock is a value the write takes, and it carries the keys it took | accepted | — |
 
 ## Agent runs
 
@@ -218,7 +231,31 @@
 | 2026-09-06 05:40 | implementer | 9m36 | 94 / 7,526 / 3,458,482 | `derived` |
 | 2026-09-06 06:13 | architect | 87m26 | 332 / 5,685 / 27,543,886 | `derived` |
 | 2026-09-06 06:19 | scribe | 11m09 | 196 / 11,100 / 11,588,603 | `derived` |
-| | **total** | **4881m19** | **23,110 / 1,983,220 / 1,811,614,780** | |
+| 2026-09-06 06:40 | test-engineer | 25m24 | 246 / 27,132 / 18,888,888 | `derived` |
+| 2026-09-06 07:00 | architect | 15m32 | 262 / 6,436 / 12,655,039 | `derived` |
+| 2026-09-06 07:12 | implementer | 27m10 | 324 / 5,463 / 29,566,524 | `derived` |
+| 2026-09-06 07:24 | architect | 8m38 | 122 / 526 / 4,417,698 | `derived` |
+| 2026-09-06 07:37 | test-engineer | 11m58 | 138 / 3,100 / 5,544,290 | `derived` |
+| 2026-09-06 07:51 | reviewer | 10m31 | 176 / 2,640 / 7,425,528 | `derived` |
+| 2026-09-06 08:00 | architect | 7m30 | 128 / 2,897 / 4,632,676 | `derived` |
+| 2026-09-06 08:05 | test-engineer | 13m32 | 166 / 6,604 / 7,435,620 | `derived` |
+| 2026-09-06 08:28 | architect | 19m05 | 258 / 19,460 / 16,826,183 | `derived` |
+| 2026-09-06 08:49 | architect | 12m40 | 176 / 2,148 / 9,349,924 | `derived` |
+| 2026-09-06 08:57 | test-engineer | 6m44 | 58 / 13,686 / 1,576,699 | `derived` |
+| 2026-09-06 09:01 | implementer | 11m04 | 140 / 9,337 / 5,905,004 | `derived` |
+| 2026-09-06 09:15 | architect | 12m30 | 162 / 11,465 / 6,804,964 | `derived` |
+| 2026-09-06 09:39 | test-engineer | 22m30 | 268 / 8,892 / 19,551,160 | `derived` |
+| 2026-09-06 09:56 | implementer | 16m20 | 270 / 3,777 / 20,306,907 | `derived` |
+| 2026-09-06 10:29 | reviewer | 17m18 | 300 / 5,266 / 18,212,694 | `derived` |
+| 2026-09-06 10:35 | reviewer | 23m04 | 314 / 5,279 / 19,301,067 | `derived` |
+| 2026-09-06 10:37 | test-engineer | 6m35 | 154 / 1,784 / 4,890,750 | `derived` |
+| 2026-09-06 10:37 | test-engineer | 6m46 | 158 / 1,806 / 5,058,789 | `derived` |
+| 2026-09-06 10:48 | architect | 18m02 | 250 / 9,372 / 13,821,126 | `derived` |
+| 2026-09-06 10:56 | reviewer | 7m36 | 154 / 7,350 / 4,876,998 | `derived` |
+| 2026-09-06 11:00 | implementer | 2m54 | 56 / 150 / 1,221,213 | `derived` |
+| 2026-09-06 11:09 | test-engineer | 12m32 | 146 / 3,768 / 6,967,316 | `derived` |
+| 2026-09-06 11:39 | architect | 28m54 | 334 / 15,229 / 29,014,234 | `derived` |
+| | **total** | **5226m08** | **27,870 / 2,156,787 / 2,085,866,071** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
