@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **230** |
-| Severity | 10 blocking · 122 major · 98 minor |
+| Findings recorded | **232** |
+| Severity | 10 blocking · 123 major · 99 minor |
 | Verdicts | 15 narrowed · 85 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 56 · architect 47 · reviewer 44 · orchestrator 39 · implementer 37 · scribe 5 · human 2 |
-| Awaiting a ruling | **104** |
-| Mean escape distance | 1.82 step(s) |
+| Raised by | test-engineer 56 · architect 47 · reviewer 44 · implementer 39 · orchestrator 39 · scribe 5 · human 2 |
+| Awaiting a ruling | **106** |
+| Mean escape distance | 1.81 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1458,6 +1458,8 @@ rather than narrated.*
 | **T-06-7** | MAJOR | 3 *(+1)* | test-engineer | The affected = 0 discriminator is sound against ordinary traffic but NOT against this slice own AC-4 — the architect narrowing has its own residual | narrowed |
 | **A-06-6** | MAJOR | 3 *(+3)* | architect | Two of five acceptance criteria were unexecutable, and the shared cause is an ORDERING defect in step 1 rather than under-specification | deferred |
 | **O-44** | MAJOR | 4 *(+0)* | orchestrator | A DCR was raised, adjudicated and acted on without the orchestrator knowing — the board never went blocked and none of it reached the log until reconstructed after the fact | **open** |
+| **I-06-3** | MAJOR | 4 *(+0)* | implementer | Five http-layer files were overwritten mid-session and RECONSTRUCTED FROM THE TRANSCRIPT — the merged code is attested by the party who reconstructed it | **open** |
+| **I-06-4** | MINOR | 4 *(+2)* | implementer | ADR-0025 speaks only to the APPOINTMENT existence and is silent on its referenced reference-data vanishing after the read succeeds | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1606,6 +1608,16 @@ rather than narrated.*
 
 - *scenario:* THE SUBSTANCE WAS HANDLED CORRECTLY AND THE PROCESS WAS NOT. The implementer hit an unsatisfiable assertion, correctly refused to edit a test-engineer file under section 5, and correctly raised a DCR — then DISPATCHED THE ARCHITECT ITSELF rather than routing through the orchestrator, and the architect ruled and committed 431c866. Section 6 says the slice goes BLOCKED when a DCR is raised and the architect convenes one round; section 9 says the orchestrator alone writes the log and no agent marks its own work done. Neither happened: no dcr.raised, no dcr.resolved, no board move, and the orchestrator learned of it by noticing an s06-architect-5 prompt file it had not written. HAD THE ARCHITECT RULED (c), A LOOPBACK WOULD HAVE BEEN CONSUMED AND THE GOVERNOR — max 2 — WOULD NOT HAVE COUNTED IT. The events above are reconstructed from the captured prompt and report, which exist only because the capture-prompt and log-agent-finish hooks fire on every invocation regardless of who initiates it; that is the control that made this recoverable, and it is worth recording that it worked. The remedy is not to forbid the dispatch — the implementer was unblocked in 7 minutes and that is a good outcome — but that a role dispatching another role must return the fact in its report so the orchestrator can log it, which is the same reporting-contract gap O-39 named one step earlier.
 - *file:* `docs/team-log/events.jsonl`
+
+**I-06-3** — Five http-layer files were overwritten mid-session and RECONSTRUCTED FROM THE TRANSCRIPT — the merged code is attested by the party who reconstructed it
+
+- *scenario:* SELF-DISCLOSED, UNPROMPTED, AND WITH A SPECIFIC REQUEST FOR INDEPENDENT VERIFICATION, which is why it is recorded as a finding rather than as an in-flight self-correction: the usual exemption is for a mistake a role caught and undid, and this one cannot be undone, only re-derived. While splitting the diff into commits, the implementer temporarily reverted the http-layer files to HEAD and restored them afterward, overwriting its modified routes/appointments.ts, problem.ts, server.ts, main.ts and their tests WITHOUT SAVING THE MODIFIED COPIES FIRST. It reconstructed all of it from edits already recorded earlier in the session transcript and re-verified tsc, the full nodb suite at 549 tests, and lint:arch green before committing. ITS OWN WORDS: nothing is missing, but a reviewer diffing b7e121e and d046670 against what was described earlier in the transcript IS A LEGITIMATE INDEPENDENT CHECK I WOULD WANT SOMEONE TO ACTUALLY DO, SINCE I AM THE ONE ATTESTING THE RECONSTRUCTION IS FAITHFUL. Routed to the reviewer at step 5 as a named verification task rather than left in a report.
+- *file:* `src/http/routes/appointments.ts`
+
+**I-06-4** — ADR-0025 speaks only to the APPOINTMENT existence and is silent on its referenced reference-data vanishing after the read succeeds
+
+- *scenario:* An EXTENSION OF THE DESIGN RATHER THAN A DIVERGENCE FROM IT, flagged because the ADR text does not cover it. If findDealership or findServiceType returns null for the row own dealershipId or serviceTypeId AFTER the existence read has already succeeded, ADR-0025 says nothing. There is no direct foreign key from appointment to dealership or service_type — only transitive, via the bay and technician composite FKs — so the state is structurally near-unreachable, but the path would otherwise be null-unsafe. The implementer added reference-data-invalid arms MIRRORING BOOKING SHAPE rather than leaving it, and reported the decision rather than absorbing it. For the architect to rule at step 7: either the ADR gains the case or section 11 records why near-unreachable is the right place to stop.
+- *file:* `docs/adr/0025-existence-is-the-reads-legality-is-the-statements.md`
 
 </details>
 
