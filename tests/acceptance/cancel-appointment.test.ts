@@ -14,6 +14,7 @@ import {
   member,
   postBooking,
   postCancellation,
+  postRaw,
   seedScenario,
 } from '../support/booking.js';
 
@@ -262,15 +263,26 @@ describe('slice 05 — cancelling an appointment frees its slot through the allo
   });
 
   it('AC-4 — cancelling an unknown but well-formed id is 404 /problems/appointment-not-found', async () => {
-    // THE VACUOUS-GREEN TRAP, the same one slice 02's AC-2 documents. At the red commit this
-    // request ALREADY answers 404, from Fastify's default not-found handler, because the route
-    // does not exist. A case asserting the STATUS alone would be green at the red commit and
-    // green forever after, including over an implementation that never registered the route.
+    // THE VACUOUS-GREEN TRAP, the same one slice 02's AC-2 documents. At the ORIGINAL slice
+    // 05 red commit this request answered 404 from Fastify's OWN default not-found handler,
+    // because the route did not exist yet — a case asserting the STATUS alone would have
+    // been green then and green forever after, including over an implementation that never
+    // registered the route.
     //
-    // The media type and the `type` member discriminate: Fastify's own not-found body is
-    // `{"message":"Route POST:/appointments/… not found","error":"Not Found","statusCode":404}`
-    // as `application/json`, carrying neither. Design §2 D4 clause 3 makes this the assertion
-    // that keeps the cancel `switch`'s `not-found` arm from surviving mutation.
+    // RE-DERIVED AT SLICE 06 UNDER ADR-0024 (design §2.4 warning 1), IN THIS SAME RED COMMIT,
+    // so no merged test is ever degraded by a later fix. Slice 06 registers
+    // `setNotFoundHandler`, which answers a genuinely UNMATCHED route with `404
+    // /problems/route-not-found` — RFC 9457 problem+json, same as every other row. That
+    // means the MEDIA TYPE alone no longer discriminates "the route answered" from "the
+    // route does not exist": both now render `application/problem+json`. What still
+    // discriminates is the `type` member — `appointment-not-found` here, `route-not-found`
+    // for a genuinely absent route — and the media-type assertion is kept below as a plain
+    // correctness check (still true, no longer load-bearing on its own).
+    //
+    // THE CONTROL THE MEDIA TYPE USED TO SUPPLY FOR FREE is the next case: a request to a
+    // path this resource's routes do not register answers `route-not-found`, proving the
+    // CANCELLATION route itself genuinely exists and this 404 is the domain's, not a routing
+    // miss silently sharing the same shape.
     const unknownId = uuidFor('ac4-cancel-unknown', 'never-booked');
 
     await withService(async (service) => {
@@ -279,16 +291,40 @@ describe('slice 05 — cancelling an appointment frees its slot through the allo
       expect(answer.status, describeAnswer(answer)).toBe(404);
       expect(
         answer.contentType,
-        `AC-4 — the 404 must be RFC 9457 problem+json, NOT Fastify's default not-found body. ` +
-          `This is the assertion that separates "the route answered" from "the route does not ` +
-          `exist", and at the red commit it is the one that fails.\n${describeAnswer(answer)}`,
+        `AC-4 — the 404 must be RFC 9457 problem+json.\n${describeAnswer(answer)}`,
       ).toMatch(/application\/problem\+json/);
       expect(
         member(answer, 'type'),
-        `AC-4 — arc42 §8.6 gains no row: the existing appointment-not-found type is reused ` +
-          `verbatim.\n${describeAnswer(answer)}`,
+        `AC-4 — THE DISCRIMINATOR, post-ADR-0024: appointment-not-found and NOT route-not-` +
+          `found. arc42 §8.6 gains no row for this case: the existing appointment-not-found ` +
+          `type is reused verbatim.\n${describeAnswer(answer)}`,
       ).toBe('/problems/appointment-not-found');
       expect(member(answer, 'status'), 'RFC 9457 repeats the status in the body').toBe(404);
+    });
+  });
+
+  it('AC-4 control (ADR-0024) — POST /appointments/{id}/nonsense is 404 /problems/route-not-found, proving the cancellation route genuinely exists rather than sharing the case above\'s shape by accident', async () => {
+    // What the MEDIA TYPE used to prove for free, before setNotFoundHandler made every 404
+    // problem+json: that the request above was answered BY THE CANCELLATION ROUTE'S OWN
+    // not-found arm, and not by a routing miss that happens to look the same. This case
+    // targets a path adjacent to a REAL resource (a well-formed appointment id) but naming
+    // no sub-route this service registers, so the ONLY way it can differ from the case above
+    // is the `type`.
+    const id = uuidFor('ac4-cancel-route-control', 'never-booked');
+
+    await withService(async (service) => {
+      const answer = await postRaw(service, `/appointments/${id}/nonsense`, {});
+
+      expect(answer.status, describeAnswer(answer)).toBe(404);
+      expect(
+        answer.contentType,
+        `must be RFC 9457 problem+json, same shape as the domain 404 above.\n${describeAnswer(answer)}`,
+      ).toMatch(/application\/problem\+json/);
+      expect(
+        member(answer, 'type'),
+        `must be route-not-found, NOT appointment-not-found: this path matches no registered ` +
+          `route at all, so it must not be confused with a domain refusal.\n${describeAnswer(answer)}`,
+      ).toBe('/problems/route-not-found');
     });
   });
 });
