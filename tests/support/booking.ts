@@ -677,3 +677,54 @@ export async function blockPairs(
   }
   return blocked;
 }
+
+// ──────────────────────────────────── slice 05: the cancellation sub-resource, and raw bodies ──
+
+/**
+ * `POST /appointments/{id}/cancellation` — the sub-resource of `docs/slices/05-cancellation.md`.
+ *
+ * IT SENDS NO `content-type` AND NO BODY, and that is a decision rather than an omission.
+ *
+ * The route reads no body (design §4: the id is a path parameter and `AppointmentParams` is the
+ * whole input), and AC-5 maps `FST_ERR_CTP_EMPTY_JSON_BODY` to `400 /problems/malformed-request`.
+ * So a client that reflexively sets `content-type: application/json` on every POST — which
+ * `postBooking` above does, and which OQ-05-2 records the cURL harness will do — would be answered
+ * `400` on a request the endpoint would otherwise have served. OQ-05-2 defers that friction to
+ * slice 10; until then the happy path is exercised by the client that does not provoke it.
+ *
+ * Measured on the pinned `fastify@5.12.1`, third independent measurement of AC-5's premise
+ * (the architect's and the implementer's are the first two), against a route that reads no body:
+ *
+ *   no content-type, no body         -> the handler runs, `200`
+ *   content-type json, no body       -> `FST_ERR_CTP_EMPTY_JSON_BODY`,   statusCode 400, no `validation`
+ *   content-type json, `{oops`       -> `FST_ERR_CTP_INVALID_JSON_BODY`, statusCode 400, no `validation`
+ *   content-type text/plain, no body -> the handler runs, `200`
+ *
+ * The second and third are what AC-5 is about: both carry `statusCode: 400` and neither sets
+ * `validation`, so `server.ts`'s validation arm misses them and the catch-all answers `500`.
+ */
+export async function postCancellation(service: StartedService, id: string): Promise<HttpAnswer> {
+  return await request(`${service.baseUrl}/appointments/${id}/cancellation`, { method: 'POST' });
+}
+
+/**
+ * A POST whose `content-type` and body are sent VERBATIM — including "no body at all", which
+ * `JSON.stringify` cannot express and `postBooking` therefore cannot reach.
+ *
+ * It is the only way to reach AC-5: the two Fastify content-type-parser errors are raised BEFORE
+ * any route schema runs, so no value of a well-formed JSON body can produce them. `path` is taken
+ * whole rather than assembled here, because AC-5 is asserted on TWO routes — the new cancellation
+ * one and the already-merged `POST /appointments` — and a helper that knew only one of them would
+ * quietly make the regression half unwritable.
+ */
+export async function postRaw(
+  service: StartedService,
+  path: string,
+  what: { readonly contentType?: string; readonly body?: string },
+): Promise<HttpAnswer> {
+  return await request(`${service.baseUrl}${path}`, {
+    method: 'POST',
+    ...(what.contentType === undefined ? {} : { headers: { 'content-type': what.contentType } }),
+    ...(what.body === undefined ? {} : { body: what.body }),
+  });
+}
