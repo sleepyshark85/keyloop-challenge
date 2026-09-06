@@ -19,6 +19,7 @@ points at the argument as well as the remedy, and it is carried by the **absorbi
 | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | [ADR-0017](../adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | proposed — not yet agreed |
 | Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | [ADR-0018](../adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | proposed — not yet agreed |
 | Defer a control only to the slice that makes it cheaper or stronger | [ADR-0019](../adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | proposed — not yet agreed |
+| Test the attempt cap inside the conflict arm, so a capped refusal still carries a database verdict | [ADR-0020](../adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md) | proposed — not yet agreed |
 <!-- /generated:debt-register -->
 
 **A row states what is owed, never that anything is correct.** A `proposed` row leaves the register

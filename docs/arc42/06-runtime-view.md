@@ -7,13 +7,12 @@ the happy path.
 
 Two conventions hold throughout, and both are load-bearing:
 
-- **Each write attempt is a single statement in autocommit.** A booking is one `INSERT` (A-6) and a
-  move is one `UPDATE` (ADR-0003), so an attempt *is* its own transaction. ADR-0004's requirement
-  that every attempt be independently recoverable is therefore satisfied by construction rather than
-  by savepoint discipline — and the corresponding prohibition is absolute: **the retry loop must
-  never be wrapped in a transaction**, or the second attempt fails with `25P02` (current transaction
-  is aborted) instead of being retried. Nothing in `.dependency-cruiser.js` can catch that; QS-3
-  does, immediately.
+- **Each attempt is exactly one transaction wide** — ADR-0018's two advisory locks, then the one
+  `INSERT` (A-6) or `UPDATE` (ADR-0003). That satisfies ADR-0004's requirement that every attempt be
+  independently recoverable without savepoint discipline, and the corresponding prohibition is
+  absolute: **no transaction may enclose the loop**, or the second attempt fails with `25P02`
+  (current transaction is aborted) instead of being retried. Nothing in `.dependency-cruiser.js` can
+  catch that; QS-3 does, immediately.
 - **Reads before the loop are validation; reads inside it are advisory.** Opening hours and reference
   data are properties of the request, decided once (ADR-0001, ADR-0004). The candidate read is a
   suggestion about *which write to attempt next*, never about whether a write is allowed.
@@ -132,34 +131,44 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
  │       outside ................................. → 400  ← decided with NO knowledge of
  │                                                           any booking, so no window
  ├─ 5. span availability.candidates
- │     freeResources(dealership, serviceType, occupancy) → bays[], technicians[]   ADVISORY
- │       empty ................................... → 409, no attempt made
- ├─ 6. orderCandidates(set, seed(requestId))                 domain/candidates.ts    (ADR-0009)
+ │     candidateResources(dealership, serviceType) → bays[], technicians[]        ADVISORY
+ │       reference data only; the availability filter arrives at slice 08 (§6.5)
+ │       no bay ..................................... → 500  ┐ two different failures,
+ │       no qualified technician ..................... → 422  ┘ and NEVER a fabricated
+ │                                                              409: there is no verdict
+ │                                                              to build one from (§8.6,
+ │                                                              ADR-0016)
+ ├─ 6. orderCandidates(bays, technicians, deps.seed())       domain/candidates.ts    (ADR-0009)
+ │        seeded, pure, injected — never a global RNG
  │
- └─ 7. loop, attempt ≤ 16, OUTSIDE any transaction:
+ └─ 7. loop: ONE transaction per attempt, NONE around the loop (ADR-0018):
         ┌─────────────────────────────────────────────────────────────────┐
         │ (bay, tech) = nextCandidate(set)                                │
         │ span appointment.insert                                         │
         │   INSERT … VALUES (…, bay, tech, starts_at, ends_at,'confirmed')│
         │     ok      → 201 Created, appointment id, allocated bay+tech   │
-        │     23P01   → classify → resource                               │
+        │     23P01   → classify → resource      ← MINTED here, ADR-0016  │
         │               booking_conflicts_total{resource,                 │
         │                                       outcome="absorbed"}++     │
         │               set = prune(set, resource, id)   ← the WHOLE bay  │
         │                                                  or technician  │
-        │               continue                                          │
+        │               list emptied  → 409 exit="exhausted"   ┐ BOTH      │
+        │               attempts ≥ cap → 409 exit="capped"     ┘ EXITS ARE │
+        │               else            continue                 IN HERE   │
         │     23503   → 422 unknown reference (never retried)             │
         │     other   → rethrow → 500                                     │
         └─────────────────────────────────────────────────────────────────┘
-        exhausted   → 409 {outcome="refused"}
-        cap reached → 409 {outcome="capped"}   ← a different signal; if this is ever
-                                                 non-zero in production the cap is wrong
+        Both refusals are 409 /problems/no-capacity and both carry the resource this
+        arm's own classification minted — ADR-0020: the cap is tested INSIDE the 23P01
+        arm, never as the loop's bound, so no refusal exit can be reached without a
+        verdict. `exhausted` wins a tie. A non-zero "capped" in production means the
+        cap (ATTEMPT_CAP, default 16) is wrong, which is why the two are counted apart.
 ```
 
 Three details that a reviewer should check any implementation against:
 
-- **Steps 2–4 run once.** The loop varies only the candidate; opening hours and reference integrity
-  are properties of the request (ADR-0004).
+- **Steps 2–4 run once**, and step 6 once: the loop varies only the candidate. Opening hours and
+  reference integrity are properties of the request (ADR-0004).
 - **`23503` is never retried.** A foreign-key violation means a bad reference (A-6), which is a client
   error and not contention. Swallowing it in the loop would turn a `422` into a `409` after sixteen
   pointless attempts.
