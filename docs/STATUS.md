@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `42d9097 docs(07): AC-5 — ADR-0031 owes a control, and pg_locks is the deterministic one` |
+| Last commit | `1a4164a docs(07): the architect declares a loopback against its own design — R-07-1` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
 | Agent runs recorded | 145 |
 | ADRs accepted | 26 |

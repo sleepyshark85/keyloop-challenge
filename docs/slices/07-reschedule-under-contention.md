@@ -34,16 +34,30 @@ every test in slice 06.
   *(QS-5)*
 - **AC-3** — Given the racing scenario of AC-2, when it is run repeatedly with recorded seeds, then
   the result is stable across runs and a failure names the seed that produced it.
-- **AC-4** — *(added at step 1)* Given A and B confirmed on **different** incumbent pairs, each
-  contended at its own pair, so that each move's remaining candidate is the pair the other occupies
-  over an overlapping interval, when both are rescheduled simultaneously from a barrier at *P* = 20
-  independent pairs over ≥ 25 trials, then **every attempt receives a database verdict — `23P01`,
-  never `40P01`** — no response is `500`, no two confirmed rows overlap on a bay or a technician,
-  and every refused move's row is unchanged including its `xmin`. *(QS-4, QS-5; ADR-0003's
-  never-asserted claim; [ADR-0030](../adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md)'s control)*
-  <br>**Its mutant control is already measured**: reverting `lockResources` to lock the target pair
-  only produces ~117 `40P01` in 1000 attempts, so the criterion discriminates rather than passing
-  vacuously. A `40P01` from a *lock-ordering* mistake is caught by the same assertion.
+- **AC-4** — *(added at step 1; amended at step 5 under R-07-4)* Given A and B confirmed on
+  **different** incumbent pairs, each contended at its own pair, so that each move's remaining
+  candidate is the pair the other occupies over an overlapping interval, when both are rescheduled
+  simultaneously from a barrier over **≥ 1000 contended attempts, with no more requests in flight at
+  once than the service's connection pool can serve**, then **every attempt receives a database
+  verdict — `23P01`, never `40P01`** — no response is `500`, no two confirmed rows overlap on a bay
+  or a technician, and every refused move's row is unchanged including its `xmin`. *(QS-4, QS-5;
+  ADR-0003's never-asserted claim; ADR-0030's control)*
+  <br>**The in-flight bound is not a flake dodge.** 40 racers against a 10-client pool serialises
+  the very simultaneity this criterion measures — a pair's two movers can be queued apart and never
+  race — as well as manufacturing a codeless `500` the assertion then blames on a deadlock. So
+  bounding concurrency should make the mutant control **stronger**; the unfixed-build rate is
+  re-measured at the new shape, and **if it does not rise, that falsifies the reading and must be
+  said.**
+- **AC-5** — *(added at step 5)* **The lock set is derived from state the transaction itself
+  observed.** Given a confirmed appointment at pair *P*, when a move of it is in flight between
+  `lockResources` and its `UPDATE`, then the transaction holds advisory locks on ***P* as the row
+  currently stands** — never on a pair read before the transaction opened. Asserted
+  **deterministically off `pg_locks`** (`classid`/`objid` against `hashtext`), not by racing four
+  movers into the stale interleaving: a probabilistic witness for a rule is the thing ADR-0030
+  exists to replace, and ADR-0031's claim is about *where a value is read*, which `pg_locks` reads
+  directly. *(QS-4; [ADR-0031](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md)'s control)*
+  <br>**Mutant control:** restore the pre-loop read and relocate the row between it and the attempt
+  — the transaction then holds the *old* pair's keys, which the same assertion reads.
 
 ## Inherited scope — written here, not only where it was deferred
 
