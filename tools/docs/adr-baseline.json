@@ -380,5 +380,14 @@
    "Option D \u2014 one booking.deadlock name plus a path field."
   ],
   "decision": "Chosen option: C. DEADLOCKEVENT is 'reschedule.deadlock' on the move path and"
+ },
+ "0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md": {
+  "options": [
+   "Option A \u2014 Leave it; book the 500 as debt",
+   "Option B \u2014 Retry 40P01 on the move path",
+   "Option C \u2014 Lock the union of the incumbent and target pairs, ordered by (class, key)",
+   "Option D \u2014 Lock the whole dealership for a move"
+  ],
+  "decision": "Chosen option: C. A write acquires a pgadvisoryxactlock for every resource it is in"
  }
 }
