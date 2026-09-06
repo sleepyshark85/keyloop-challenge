@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **120** |
-| Severity | 10 blocking · 66 major · 44 minor |
+| Findings recorded | **121** |
+| Severity | 10 blocking · 67 major · 44 minor |
 | Verdicts | 5 narrowed · 48 accepted · 1 escalated · 9 deferred |
-| Raised by | test-engineer 28 · reviewer 28 · orchestrator 26 · implementer 18 · architect 18 · human 2 |
-| Awaiting a ruling | **57** |
-| Mean escape distance | 1.72 step(s) |
+| Raised by | test-engineer 28 · reviewer 28 · orchestrator 26 · architect 19 · implementer 18 · human 2 |
+| Awaiting a ruling | **58** |
+| Mean escape distance | 1.71 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -856,6 +856,21 @@ rather than narrated.*
 
 - *scenario:* Found by the ARCHITECT immediately after making the reduction, and reported rather than left: 'the ratchet's ceiling is now far above these files... 02-design could grow all the way back without docs:budget:check noticing'. Verified: the baseline still recorded 13,566 while the file stood at 1,200. A ratchet whose ceiling only ever moves up is not a ratchet - it is a high-water mark. The reduction has to be RECORDED or it is not held, and relying on someone remembering to run --rebaseline is discipline, which is what the ratchet exists to replace. Now a material reduction - more than 100 words AND more than a tenth of the ceiling - FAILS the check with an instruction to rebaseline in the change that earned it. Trivial rewording does not, so an ordinary edit does not demand a baseline commit. SECOND DEFECT FOUND WHILE TESTING IT: survey() hard-coded CLAUDE.md and docs/METHODOLOGY.md against the working directory, so every fixture run also measured the REAL repository - the tool enforcing the concision rule could not be exercised in isolation, and it had NO TESTS AT ALL. Both paths are now flags. 16 cases in tools/test/budget.test.mjs covering both --check and the ratchet in every direction, plus the four exclusions (frontmatter, generated blocks, fenced code, assumption registers) and the contested hatch. Three mutants: no tightening kills 2, no growth check kills 3, charging for fenced code kills 1.
 - *file:* `tools/docs/budget.mjs`
+
+</details>
+
+## Slice 04
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **D-04-1** | MAJOR | 1 *(+1)* | architect | ADR-0009 sized the cap of 16 on a premise that does not hold until slice 08's availability filter exists | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**D-04-1** — ADR-0009 sized the cap of 16 on a premise that does not hold until slice 08's availability filter exists
+
+- *scenario:* The sharpest finding of this design, and it falls out of deferring the availability filter to slice 08 under ADR-0019's criterion. ADR-0009 sized the cap 'against contention depth, the only driver Bound-2 leaves' - true only of a candidate list ALREADY FILTERED to free resources. Until slice 08, a dealership with more than roughly 16 bays-plus-technicians can reach the cap WITH NO CONCURRENCY AT ALL. And QS-3's fixtures will not see it, because they seed exactly M. So the cap's justification and the cap's behaviour diverge in a way the slice's own tests are shaped not to notice.
+- *file:* `docs/adr/0009-candidate-ordering-and-attempt-cap.md`
 
 </details>
 

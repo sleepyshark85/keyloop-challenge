@@ -15,18 +15,17 @@
 
 | | |
 |---|---|
-| Last commit | `1f92d7a fix(docs): the ratchet did not tighten, and the tool that enforces it had no tests` |
+| Last commit | `70f7fa7 docs(04): slice 04 design — the capped refusal holds a verdict, measured` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process |
-| Agent runs recorded | 88 |
+| Agent runs recorded | 89 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Next: slice [`04`](slices/04-candidate-allocation-and-retry.md) — Candidate allocation and retry — no refusal while capacity remains**
-- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
-- It claims QS-3.
+- **Slice [`04`](slices/04-candidate-allocation-and-retry.md) is in flight** — Candidate allocation and retry — no refusal while capacity remains.
+- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
 - 6 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
@@ -115,6 +114,7 @@
 | [0017](adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | proposed | — |
 | [0018](adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | proposed | — |
 | [0019](adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | Defer a control only to the slice that makes it cheaper or stronger | proposed | — |
+| [0020](adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md) | Test the attempt cap inside the conflict arm, so a capped refusal still carries a database verdict | proposed | — |
 
 ## Agent runs
 
@@ -208,7 +208,8 @@
 | 2026-09-05 22:05 | architect | 13m16 | 150 / 12,454 / 8,174,449 | `derived` |
 | 2026-09-05 22:29 | architect | 14m27 | 202 / 6,211 / 12,722,777 | `derived` |
 | 2026-09-06 02:59 | architect | 17m29 | 230 / 14,588 / 15,995,983 | `derived` |
-| | **total** | **4750m55** | **22,246 / 1,949,054 / 1,756,150,960** | |
+| 2026-09-06 05:01 | architect | 14m55 | 192 / 3,170 / 11,575,252 | `derived` |
+| | **total** | **4765m50** | **22,438 / 1,952,224 / 1,767,726,212** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

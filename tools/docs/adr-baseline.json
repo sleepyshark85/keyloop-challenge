@@ -261,5 +261,15 @@
    "D \u2014 no action: this record's numbers and the compiler are the evidence."
   ],
   "decision": "Chosen option: B, and the criterion is the decision rather than the destination: a control is"
+ },
+ "0020-test-the-attempt-cap-inside-the-conflict-arm.md": {
+  "options": [
+   "Option A \u2014 The cap as the loop's bound \u2014 while (attempts < cap) \u2014 refusing after the loop ",
+   "Option B \u2014 A, carrying the last minted resource forward in a ContendedResource \\",
+   "Option C \u2014 B plus 'bay' as ContendedResource to discharge the null branch",
+   "Option D \u2014 A second BookOutcome variant for the capped exit, carrying no resource",
+   "Option E \u2014 Test the cap inside the conflict arm, immediately after pruning"
+  ],
+  "decision": "Chosen option: E \u2014 the cap is tested inside the conflict arm of the classification switch, beside"
  }
 }

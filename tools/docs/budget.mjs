@@ -277,8 +277,23 @@ for (const r of rows) {
   // Only MATERIAL slack is called out — more than 100 words and more than a tenth of the
   // ceiling — so ordinary rewording does not demand a baseline commit, while a real
   // reduction is locked in by the change that earned it.
-  r.slack = (r.was ?? r.budget) - r.words;
-  r.loose = r.slack > 100 && r.slack > r.ceiling / 10;
+  // TIGHTENING ONLY MATTERS WHERE THE CEILING IS ABOVE THE BUDGET — F-04-2.
+  //
+  // The first version measured `(was ?? budget) - words`, which is distance UNDER BUDGET
+  // and not a reduction at all. Two false positives, both measured by the architect on the
+  // slice it was about to obstruct: a brand-new 101-word design failed with no baseline,
+  // and failed again with a baseline of 3,000. Its prescribed remedy was worse than the
+  // false positive — rebaselining an in-flight design at its step-1 size pins it there and
+  // leaves steps 2 to 5 unable to amend it, which is exactly what the sliceDesign 3,000 /
+  // sliceDesignMerged 1,200 split exists to permit. A guard that fails a correctly-sized
+  // document and prescribes padding to fix it is worse than no guard.
+  //
+  // A file recorded at or under its budget has no slack to lock in: its ceiling IS the
+  // budget, and it may move freely beneath it. Only legacy overage being paid down needs
+  // recording, because only there does the ceiling sit above the budget and stay there.
+  r.slack = (r.was ?? 0) - r.words;
+  r.loose = r.was !== undefined && r.was > r.budget
+    && r.slack > 100 && r.slack > r.ceiling / 10;
 }
 
 if (REBASELINE) {
