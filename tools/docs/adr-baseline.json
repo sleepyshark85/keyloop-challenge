@@ -364,5 +364,21 @@
    "Option D \u2014 a rule or a marker"
   ],
   "decision": "Chosen option: C, proposed and not applied."
+ },
+ "0029-a-deadlock-names-the-write-path-a-conflict-does-not.md": {
+  "options": [
+   "Bad, because it breaks I-02-6's observer. QS-1 and QS-2 read the constraint name off one",
+   "Bad, because it is a third design proposed at step 7 over merged, measured code, and the",
+   "Bad, because the payload carries bayId, technicianId and attempt and no path, so",
+   "Good, because it is a rule with no cases, and cases are what rot",
+   "Good, because it is also a rule with no cases",
+   "Good, because it keeps the taxonomy flat and is more extensible",
+   "Option A \u2014 every event name is shared with booking. One taxonomy, no exceptions.",
+   "Option B \u2014 every event name is per use case: reschedule.conflict, reschedule.refused.",
+   "Option C \u2014 shared where the event is the same event; distinct where the path is the findin",
+   "Option D is probably the better long-run shape and is not booked: proposing a third design",
+   "Option D \u2014 one booking.deadlock name plus a path field."
+  ],
+  "decision": "Chosen option: C. DEADLOCKEVENT is 'reschedule.deadlock' on the move path and"
  }
 }

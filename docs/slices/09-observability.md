@@ -5,7 +5,7 @@ status: ready
 depends_on: ["08"]
 absorbs: ["10", "11"]
 arc42: ["§3.1", "§8.4", "§8.6", "§10.2", "§11.1"]
-adr: [5, 6, 10]
+adr: [5, 6, 10, 29]
 quality_scenarios: [QS-13, QS-11, QS-14]
 inherits: ["OQ-05-2", "F-06-1", "A-06-2", "T-06-5"]   # deferred here by ruling; slice:check enforces it (A-05-5)
 loopbacks: 0
@@ -96,9 +96,9 @@ is a goal nobody can fail.
 ## Inherited scope — written here, not only where it was deferred
 
 - **F-06-1 — two attempt loops, one design.** `bookAppointment` and `rescheduleAppointment` each
-  carry ADR-0004's retry loop — same pruning, same cap, same `booking.conflict` line — in two files.
-  Slice 06 duplicated it rather than refactor the project's most-measured path inside its largest
-  slice. **The destination is here because this slice must instrument both loops anyway**
+  carry ADR-0004's retry loop — same pruning, same cap, one shared `booking.conflict` line but **two
+  deadlock names, by ADR-0029** — in two files. Slice 06 duplicated it rather than refactor the
+  most-measured path inside its largest slice. **The destination is here because this slice must instrument both loops anyway**
   (`appointment.insert` / `appointment.update` spans, `booking_attempts`, §8.4), so it opens both
   files regardless: *cheaper*, and *stronger*, because an extracted loop is instrumented once. Note
   ADR-0027 — the loops start on different first attempts, so the extraction takes a parameter rather
