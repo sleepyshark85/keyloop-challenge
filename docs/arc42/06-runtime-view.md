@@ -212,8 +212,8 @@ because none of them is obvious:
 A move racing another move, or racing a fresh booking, is the §6.1 story with `UPDATE` in place of
 `INSERT`: the same two advisory locks precede it, carried as a value the write takes (ADR-0026). One
 mechanism; rescheduling adds none. **`0 rows` means one thing — not `confirmed`.** Existence was
-settled by the read above, so there is no follow-up read: §6.6's two `0 rows` rows have two deciders
-(ADR-0025).
+settled by the read above, so there is no follow-up read and §6.6 shows two deciders where it once
+showed one (ADR-0025).
 
 ## 6.4 Cancellation
 
@@ -273,5 +273,5 @@ consulted.
 | Unmatched route | `setNotFoundHandler` (ADR-0024) | nothing | `404` |
 | Every candidate refused | **PostgreSQL, `23P01`, repeatedly** | the whole live schedule, as a side effect of writing | `409` |
 
-The `409` row above it is the only one whose answer depends on what else is happening at that instant,
-and the only one the application does not decide.
+The last row is the only one whose answer depends on what else is happening at that instant, and the
+only one the application does not decide.
