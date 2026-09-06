@@ -45,6 +45,9 @@ const unusedBookingDeps = {
   cancelAppointment: (): never => {
     throw new Error('GET /health must not cancel an appointment');
   },
+  rescheduleAppointment: (): never => {
+    throw new Error('GET /health must not reschedule an appointment');
+  },
 };
 
 function serverReporting(outcome: HealthOutcome | (() => Promise<HealthOutcome>)): FastifyInstance {

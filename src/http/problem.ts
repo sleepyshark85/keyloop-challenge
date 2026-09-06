@@ -41,11 +41,22 @@ import type { Static } from '@sinclair/typebox';
 import type { FastifyReply } from 'fastify';
 
 /**
- * The seven rows of §8.6 in scope for this slice.
+ * The nine rows of §8.6 in scope as of slice 06 — seven through slice 05, plus two landed
+ * together in this one step (design §2.4): `/problems/appointment-not-confirmed` (ADR-0025 —
+ * a cancelled appointment cannot be moved) and `/problems/route-not-found` (ADR-0024 —
+ * `setErrorHandler` alone does not run for a genuinely unmatched route; `server.ts`'s
+ * `setNotFoundHandler` is the second handler that answers inside this taxonomy rather than with
+ * Fastify's own default 404 body).
  *
- * `/problems/appointment-not-confirmed` is deliberately absent: it needs rescheduling and is
- * slice 06's, per the slice file's out-of-scope. It joins the union there, and the union is
- * exactly what makes that addition a one-line, compiler-visible change.
+ * MEASURED, NOT ASSUMED, why this array being `as const` leaves it OUTSIDE Stryker's reach
+ * (I-06-1): `@stryker-mutator/instrumenter`'s `syntax-helpers.js` lists `TSAsExpression` among
+ * `tsTypeAnnotationNodeTypes`, so the whole subtree — this array and every string literal in it —
+ * is classed as a type node and skipped. `src/http/problem.ts` is immune, not cushioned: adding
+ * these two rows put NO new mutant on the mutation report. `tests/unit/http/appointments.test.ts`'s
+ * set-equality assertion is a compiler-and-assertion fact, not a kill, and stays mandatory anyway
+ * — it is what a DELETED row would still be caught by, since the mutation score is silent on
+ * exactly that (F-06-2). `tests/contract/error-taxonomy.test.ts`'s AC-12 sweep is the other guard,
+ * asserted in the direction that can fail (∀responses ∃row).
  */
 export const PROBLEM_TYPES = [
   '/problems/malformed-request',
@@ -55,6 +66,8 @@ export const PROBLEM_TYPES = [
   '/problems/unknown-reference',
   '/problems/vehicle-not-owned',
   '/problems/internal',
+  '/problems/appointment-not-confirmed',
+  '/problems/route-not-found',
 ] as const;
 
 export type ProblemType = (typeof PROBLEM_TYPES)[number];

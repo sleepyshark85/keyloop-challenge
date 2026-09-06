@@ -33,6 +33,8 @@ import type { Problem } from '../problem.js';
 import type { BookCommand, BookOutcome } from '../../application/bookAppointment.js';
 import type { ReadOutcome } from '../../application/readAppointment.js';
 import type { CancelOutcome } from '../../application/cancelAppointment.js';
+import type { RescheduleCommand, RescheduleOutcome } from '../../application/rescheduleAppointment.js';
+import type { OpeningHoursVerdict } from '../../domain/openingHours.js';
 
 export interface AppointmentRouteDeps {
   readonly bookAppointment: (command: BookCommand) => Promise<BookOutcome>;
@@ -43,6 +45,12 @@ export interface AppointmentRouteDeps {
    * other route's exhaustiveness check (§5.2).
    */
   readonly cancelAppointment: (id: string) => Promise<CancelOutcome>;
+  /**
+   * Slice 06. ITS OWN union too, for the same reason — `RescheduleOutcome` has members none of
+   * the other three do (`not-confirmed`, a `no-capacity` reachable via re-allocation) and none
+   * of theirs (no `confirmed`, no `vehicle-not-owned`).
+   */
+  readonly rescheduleAppointment: (command: RescheduleCommand) => Promise<RescheduleOutcome>;
 }
 
 const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
@@ -80,6 +88,25 @@ const BookingBody = Type.Object(
 );
 
 type BookingBodyType = Static<typeof BookingBody>;
+
+/**
+ * `PATCH /appointments/{id}` — design §3. `startsAt` ONLY: `additionalProperties: false` is what
+ * strips a bay or technician the client names, before the handler ever runs — AC-6's structural
+ * argument, reused rather than re-argued. There is no end time here either, for the same reason
+ * `BookingBody` has none: the interval's length is the appointment's service type's, and a move
+ * cannot change it (this slice's own "Out of scope").
+ */
+const RescheduleBody = Type.Object(
+  { startsAt: Type.String({ pattern: RFC3339_PATTERN }) },
+  {
+    additionalProperties: false,
+    description:
+      'A reschedule request. Only startsAt: the interval\'s length, dealership, service type, ' +
+      'customer and vehicle are all unchanged by a move.',
+  },
+);
+
+type RescheduleBodyType = Static<typeof RescheduleBody>;
 
 const AppointmentParams = Type.Object(
   { id: Type.String({ pattern: UUID_PATTERN }) },
@@ -195,8 +222,14 @@ export function registerAppointmentRoutes(
           return await sendProblem(reply, INTERNAL);
 
         default: {
+          // Stryker disable all : an exhaustive switch's `never` arm is unreachable by
+          // construction (every real member is handled above) and structurally unkillable —
+          // there is no input that reaches it, so no mutant here can ever be observed by a
+          // test (design §2.4, reviewer slice 05). Restored immediately below so nothing
+          // else in this switch loses coverage.
           const unhandled: never = outcome;
           throw new Error(`unhandled booking outcome ${JSON.stringify(unhandled)}`);
+          // Stryker restore all
         }
       }
     },
@@ -226,8 +259,14 @@ export function registerAppointmentRoutes(
           );
 
         default: {
+          // Stryker disable all : an exhaustive switch's `never` arm is unreachable by
+          // construction (every real member is handled above) and structurally unkillable —
+          // there is no input that reaches it, so no mutant here can ever be observed by a
+          // test (design §2.4, reviewer slice 05). Restored immediately below so nothing
+          // else in this switch loses coverage.
           const unhandled: never = outcome;
           throw new Error(`unhandled read outcome ${JSON.stringify(unhandled)}`);
+          // Stryker restore all
         }
       }
     },
@@ -273,8 +312,118 @@ export function registerAppointmentRoutes(
           );
 
         default: {
+          // Stryker disable all : an exhaustive switch's `never` arm is unreachable by
+          // construction (every real member is handled above) and structurally unkillable —
+          // there is no input that reaches it, so no mutant here can ever be observed by a
+          // test (design §2.4, reviewer slice 05). Restored immediately below so nothing
+          // else in this switch loses coverage.
           const unhandled: never = outcome;
           throw new Error(`unhandled cancel outcome ${JSON.stringify(unhandled)}`);
+          // Stryker restore all
+        }
+      }
+    },
+  );
+
+  /**
+   * `PATCH /appointments/{id}` — ADR-0025, ADR-0026, ADR-0027; design §3.
+   *
+   * A move, never a cancel-plus-book: the SAME resource, the same URL, the same schema the
+   * `201`, the `GET` and the cancellation `200` all render through — `AppointmentBody` — so a
+   * client parses one thing regardless of which route answered.
+   *
+   * THE RULED CONSEQUENCE (ADR-0025 decision 4), recorded at the one place a reviewer would
+   * otherwise have to reconstruct it: `not-confirmed` and `outside-opening-hours` are both
+   * reachable from a single doubly-invalid request, and the use case decides which — this
+   * `switch` only renders what it is handed, in the order the union happens to be written, which
+   * is why the ORDER OF THESE ARMS ASSERTS NOTHING. The order that matters is inside
+   * `rescheduleAppointment`.
+   */
+  app.patch<{ Params: AppointmentParamsType; Body: RescheduleBodyType }>(
+    '/appointments/:id',
+    {
+      schema: {
+        params: AppointmentParams,
+        body: RescheduleBody,
+        response: { 200: AppointmentBody, ...PROBLEM_RESPONSES },
+      },
+    },
+    async (request, reply) => {
+      const outcome = await deps.rescheduleAppointment({
+        id: request.params.id,
+        // Same construction as the booking route's: the pattern guarantees an explicit offset,
+        // so this names an instant, and `NaN` from a pattern-valid-but-unparseable value is
+        // `malformed-instant`'s subject rather than this handler's.
+        startsAtMillis: Date.parse(request.body.startsAt),
+      });
+
+      switch (outcome.kind) {
+        case 'moved':
+          // 200, not 201: a move creates nothing and the id survives it (AC-1).
+          return await reply.code(200).send(outcome.appointment);
+
+        case 'not-found':
+          // §8.6 gains no row: the type slice 02 minted for GET is reused verbatim (AC-5).
+          return await sendProblem(
+            reply,
+            problem('/problems/appointment-not-found', 404, 'No such appointment', {
+              detail: 'no appointment exists with that id',
+            }),
+          );
+
+        case 'not-confirmed':
+          // AC-4 — a DIFFERENT type from a contended 409, so a client that cannot retry a
+          // terminal appointment is told so distinctly from one it may retry.
+          return await sendProblem(
+            reply,
+            problem(
+              '/problems/appointment-not-confirmed',
+              409,
+              'The appointment is not confirmed',
+              { detail: 'only a confirmed appointment can be rescheduled' },
+            ),
+          );
+
+        case 'malformed-instant':
+          return await sendProblem(
+            reply,
+            problem('/problems/malformed-request', 400, 'The request could not be understood', {
+              detail: 'startsAt is not a usable instant',
+            }),
+          );
+
+        case 'outside-opening-hours':
+          // AC-3, and ADR-0025 decision 4's ruled consequence for a doubly-invalid request: this
+          // arm is reached whether or not the row is confirmed, because the domain rule runs
+          // before the database ever consults the row's status.
+          return await sendProblem(reply, outsideOpeningHours(outcome.verdict));
+
+        case 'no-capacity':
+          // Reached only when the appointment's OWN pair conflicts and re-allocation also fails
+          // (ADR-0027) — the same taxonomy row booking's own no-capacity renders.
+          return await sendProblem(
+            reply,
+            problem('/problems/no-capacity', 409, 'No bay and technician are both free', {
+              resource: outcome.resource,
+              detail: `every candidate ${outcome.resource} was already occupied for this interval`,
+            }),
+          );
+
+        case 'no-verdict':
+        case 'reference-data-invalid':
+          // Both the system's fault, exactly as booking's mirror arm — neither should be
+          // reachable by anything a client controls.
+          return await sendProblem(reply, INTERNAL);
+
+        default: {
+          // Stryker disable all : an exhaustive switch's `never` arm is unreachable by
+          // construction (every real member is handled above) and structurally unkillable —
+          // there is no input that reaches it, so no mutant here can ever be observed by a
+          // test (design §2.4, reviewer slice 05). Restored immediately below so nothing
+          // else in this switch loses coverage.
+          const unhandled: never = outcome;
+          throw new Error(`unhandled reschedule outcome ${JSON.stringify(unhandled)}`);
+          // Stryker restore all
         }
       }
     },
@@ -282,19 +431,17 @@ export function registerAppointmentRoutes(
 }
 
 /**
- * AC-7 names this explicitly: an out-of-hours interval is `400`, NOT `409`. It is a fact about
- * the dealership's schedule, decided by `src/domain/openingHours.ts`, which reads no booking.
+ * AC-7 (booking) and AC-3 (reschedule) name this explicitly: an out-of-hours interval is `400`,
+ * NOT `409`. It is a fact about the dealership's schedule, decided by `src/domain/openingHours.ts`,
+ * which reads no booking — and it is the SAME domain rule both routes render, not a second copy
+ * of it (design §1), which is why this takes `OpeningHoursVerdict` directly rather than a type
+ * extracted from either use case's own outcome union.
  *
  * `opensAt` and `closesAt` are carried when the verdict has them, because "outside opening hours"
  * without the hours is a client that has to guess. The two verdicts that mean broken reference
  * data never reach here — `deriveInterval` routes them to `reference-data-invalid`.
  */
-type OutsideOpeningHoursVerdict = Extract<
-  BookOutcome,
-  { kind: 'outside-opening-hours' }
->['verdict'];
-
-function outsideOpeningHours(verdict: OutsideOpeningHoursVerdict): Problem {
+function outsideOpeningHours(verdict: OpeningHoursVerdict): Problem {
   const extra =
     verdict.kind === 'outside-window'
       ? { opensAt: verdict.opensAt, closesAt: verdict.closesAt }

@@ -7,6 +7,7 @@ import { PROBLEM_TYPES, problem } from '../../../src/http/problem.js';
 import type { BookOutcome } from '../../../src/application/bookAppointment.js';
 import type { ReadOutcome } from '../../../src/application/readAppointment.js';
 import type { CancelOutcome } from '../../../src/application/cancelAppointment.js';
+import type { RescheduleOutcome } from '../../../src/application/rescheduleAppointment.js';
 import type { HealthOutcome } from '../../../src/application/checkHealth.js';
 import { createLogger } from '../../../src/platform/logger.js';
 
@@ -51,6 +52,7 @@ function serverAnswering(options: {
   readonly book?: BookOutcome | ((command: unknown) => BookOutcome);
   readonly read?: ReadOutcome;
   readonly cancel?: CancelOutcome | ((id: string) => CancelOutcome);
+  readonly reschedule?: RescheduleOutcome | ((command: unknown) => RescheduleOutcome);
   readonly logger?: ReturnType<typeof createLogger>;
 }): FastifyInstance {
   const app = buildServer({
@@ -64,6 +66,10 @@ function serverAnswering(options: {
     cancelAppointment: async (id) => {
       const cancel = options.cancel ?? { kind: 'not-found' };
       return typeof cancel === 'function' ? cancel(id) : cancel;
+    },
+    rescheduleAppointment: async (command) => {
+      const reschedule = options.reschedule ?? { kind: 'moved', appointment: VIEW };
+      return typeof reschedule === 'function' ? reschedule(command) : reschedule;
     },
   });
   apps.push(app);
@@ -303,6 +309,7 @@ describe('GET /appointments/:id — AC-2', () => {
         return { kind: 'not-found' };
       },
       cancelAppointment: async () => ({ kind: 'not-found' }),
+      rescheduleAppointment: async () => ({ kind: 'not-found' }),
     });
     apps.push(app);
 
@@ -477,6 +484,156 @@ describe('POST /appointments/:id/cancellation — AC-3, AC-4', () => {
   });
 });
 
+describe('PATCH /appointments/:id — slice 06, the exhaustive status mapping', () => {
+  const MOVED = { ...VIEW, startsAt: '2026-09-08T09:15:00.000Z', endsAt: '2026-09-08T10:15:00.000Z' };
+
+  async function patch(
+    app: FastifyInstance,
+    id = APPOINTMENT_ID,
+    startsAt = MOVED.startsAt,
+  ): Promise<LightMyRequestResponse> {
+    return await app.inject({
+      method: 'PATCH',
+      url: `/appointments/${id}`,
+      payload: { startsAt },
+    });
+  }
+
+  it('moved is 200 with the AppointmentView, as application/json — not 201, a move creates nothing', async () => {
+    const response = await patch(serverAnswering({ reschedule: { kind: 'moved', appointment: MOVED } }));
+    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).not.toBe(201);
+    expect(response.headers['content-type']).toMatch(/application\/json/);
+    expect(response.json()).toEqual(MOVED);
+  });
+
+  it.each([
+    ['not-found', { kind: 'not-found' } as RescheduleOutcome, 404, '/problems/appointment-not-found'],
+    ['not-confirmed', { kind: 'not-confirmed' } as RescheduleOutcome, 409, '/problems/appointment-not-confirmed'],
+    ['malformed-instant', { kind: 'malformed-instant' } as RescheduleOutcome, 400, '/problems/malformed-request'],
+    [
+      'outside-opening-hours',
+      { kind: 'outside-opening-hours', verdict: { kind: 'closed-day', dayOfWeek: 0 } } as RescheduleOutcome,
+      400,
+      '/problems/outside-opening-hours',
+    ],
+    [
+      'no-capacity',
+      { kind: 'no-capacity', resource: 'bay', attempts: 5, exit: 'exhausted' } as unknown as RescheduleOutcome,
+      409,
+      '/problems/no-capacity',
+    ],
+    ['no-verdict', { kind: 'no-verdict' } as RescheduleOutcome, 500, '/problems/internal'],
+    [
+      'reference-data-invalid',
+      { kind: 'reference-data-invalid', detail: 'dealership' } as RescheduleOutcome,
+      500,
+      '/problems/internal',
+    ],
+  ])('%s renders %d %s as problem+json', async (_label, outcome, status, type) => {
+    const response = await patch(serverAnswering({ reschedule: outcome }));
+    expect(response.statusCode).toBe(status);
+    expect(response.headers['content-type']).toMatch(/application\/problem\+json/);
+    expect(response.json().type).toBe(type);
+    expect(response.json().status).toBe(status);
+  });
+
+  it('AC-4 — not-confirmed is a DIFFERENT type from a contended 409, so the two never collide', async () => {
+    const notConfirmed = await patch(serverAnswering({ reschedule: { kind: 'not-confirmed' } }));
+    const contended = await patch(
+      serverAnswering({
+        reschedule: { kind: 'no-capacity', resource: 'bay', attempts: 1, exit: 'capped' } as unknown as RescheduleOutcome,
+      }),
+    );
+    expect(notConfirmed.statusCode).toBe(409);
+    expect(contended.statusCode).toBe(409);
+    expect(notConfirmed.json().type).not.toBe(contended.json().type);
+  });
+
+  it('AC-3 — outside-opening-hours is 400 and never 409, the same rule booking renders', async () => {
+    const response = await patch(
+      serverAnswering({
+        reschedule: {
+          kind: 'outside-opening-hours',
+          verdict: { kind: 'outside-window', dayOfWeek: 2, opensAt: '09:00:00', closesAt: '17:00:00' },
+        },
+      }),
+    );
+    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).not.toBe(409);
+    expect(response.json()).toMatchObject({ opensAt: '09:00:00', closesAt: '17:00:00' });
+  });
+
+  it('the id from the PATH and the startsAt from the BODY are what reach the use case', async () => {
+    const other = '99999999-9999-4999-8999-999999999999';
+    let seen: unknown;
+    const app = serverAnswering({
+      reschedule: (command) => {
+        seen = command;
+        return { kind: 'moved', appointment: MOVED };
+      },
+    });
+    await patch(app, other, '2026-09-08T09:30:00.000Z');
+    expect(seen).toEqual({ id: other, startsAtMillis: Date.parse('2026-09-08T09:30:00.000Z') });
+  });
+
+  it('AC-8 — a NON-uuid id is 400 before the use case runs, so 400 and 404 do not collide', async () => {
+    let rescheduleRan = false;
+    const app = serverAnswering({
+      reschedule: () => {
+        rescheduleRan = true;
+        return { kind: 'not-found' };
+      },
+    });
+    const response = await patch(app, 'not-a-uuid');
+    expect(response.statusCode).toBe(400);
+    expect(response.json().type).toBe('/problems/malformed-request');
+    expect(rescheduleRan, 'the params schema must reject before any use case is called').toBe(false);
+  });
+
+  it('AC-6\'s structural argument — a bay or technician the client names is STRIPPED before the handler runs', async () => {
+    // `additionalProperties: false` on `RescheduleBody`: there is no parameter on this path a
+    // client could use to smuggle either in, so the field never reaches `request.body` at all.
+    let seen: unknown;
+    const app = serverAnswering({
+      reschedule: (command) => {
+        seen = command;
+        return { kind: 'moved', appointment: MOVED };
+      },
+    });
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/appointments/${APPOINTMENT_ID}`,
+      payload: { startsAt: MOVED.startsAt, bayId: 'sneaked-in', technicianId: 'sneaked-in' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(seen).toEqual({ id: APPOINTMENT_ID, startsAtMillis: Date.parse(MOVED.startsAt) });
+  });
+
+  it('a member the 200 schema does not declare is STRIPPED', async () => {
+    const response = await patch(
+      serverAnswering({
+        reschedule: {
+          kind: 'moved',
+          appointment: { ...MOVED, internalAttempts: 7 },
+        } as unknown as RescheduleOutcome,
+      }),
+    );
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(response.json() as object)).not.toContain('internalAttempts');
+  });
+
+  it('the moved appointment and the READ describe one appointment through one schema', async () => {
+    const app = serverAnswering({
+      reschedule: { kind: 'moved', appointment: MOVED },
+      read: { kind: 'found', appointment: MOVED },
+    });
+    const moved = await patch(app);
+    const read = await app.inject({ method: 'GET', url: `/appointments/${APPOINTMENT_ID}` });
+    expect(read.json()).toEqual(moved.json());
+  });
+});
+
 describe('a 500 the route KNOWS about is not an unhandled fault', () => {
   /**
    * `no-verdict` and `reference-data-invalid` render the same document as an escaped exception,
@@ -497,6 +654,7 @@ describe('a 500 the route KNOWS about is not an unhandled fault', () => {
       bookAppointment: async () => outcome,
       readAppointment: async () => ({ kind: 'not-found' }),
       cancelAppointment: async () => ({ kind: 'not-found' }),
+      rescheduleAppointment: async () => ({ kind: 'not-found' }),
     });
     apps.push(app);
 
@@ -522,6 +680,7 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
       },
       readAppointment: async () => ({ kind: 'not-found' }),
       cancelAppointment: async () => ({ kind: 'not-found' }),
+      rescheduleAppointment: async () => ({ kind: 'not-found' }),
     });
     apps.push(app);
 
@@ -793,9 +952,11 @@ describe('the response schemas ENFORCE rather than decorate (measurement 8, re-m
 });
 
 describe('problem() and PROBLEM_TYPES', () => {
-  it('is exactly §8.6\'s seven in-scope rows', () => {
-    // `/problems/appointment-not-confirmed` is slice 06's and its absence is deliberate: it needs
-    // rescheduling. The union is what makes adding it a one-line, compiler-visible change.
+  it('is exactly §8.6\'s nine in-scope rows, as of slice 06', () => {
+    // I-06-1, corrected: this array is `as const`, and `@stryker-mutator/instrumenter` skips a
+    // `TSAsExpression` subtree, so this assertion is a compiler-and-assertion fact rather than a
+    // kill — `problem.ts` scores 9/12 with or without it. It stays mandatory anyway: it is what
+    // would catch a DELETED row, since the mutation score cannot (F-06-2).
     expect([...PROBLEM_TYPES]).toEqual([
       '/problems/malformed-request',
       '/problems/outside-opening-hours',
@@ -804,8 +965,10 @@ describe('problem() and PROBLEM_TYPES', () => {
       '/problems/unknown-reference',
       '/problems/vehicle-not-owned',
       '/problems/internal',
+      '/problems/appointment-not-confirmed',
+      '/problems/route-not-found',
     ]);
-    expect(new Set(PROBLEM_TYPES).size, 'a duplicated row would make the taxonomy ambiguous').toBe(7);
+    expect(new Set(PROBLEM_TYPES).size, 'a duplicated row would make the taxonomy ambiguous').toBe(9);
   });
 
   it('builds the three mandatory members and merges the extras', () => {
