@@ -59,6 +59,18 @@ every test in slice 06.
   one is refused"* mean something rather than count to one. **If either premise is false on
   arrival, say so in the PR**; that is what D-05-3 asked for.
 
+- **F-02-9 — the second half: ADR-0018's two locks in bay-then-technician order, *raced* rather
+  than argued.** Slice 06 discharged its half and did it with a stronger mechanism than the
+  obligation asked for — `lockResources` is the only minting site for a value both writes require,
+  so the order is not merely taken correctly, it is **not expressible at a call site at all** and
+  *"skipped the locks"* is a compile error. What slice 06 could not do is *race* it. The architect's
+  discharge ruling surfaced one fact by reading the merged loop that §3's deadlock argument never
+  stated, and it is this slice's to test rather than to accept: **on attempts ≥ 2 a move vacates its
+  incumbent pair while holding only the target pair's locks.** No cycle is possible — each writer
+  waits only on its own target's class-1/class-2 keys, and vacating writes no index entry another
+  transaction waits on — so ADR-0023's M3 argument extends by one path. That extension is an
+  argument today. Here it meets two `UPDATE`s at once.
+
 - **O-41 — the `Inherited scope` guard becomes bidirectional, and this file is where it first
   bites.** A-05-5's check is a *subset* guard (every ref deferred here appears in `inherits:`) and
   not a *completeness* guard: slice 06 listed five obligations in prose while three of its four

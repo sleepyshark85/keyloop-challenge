@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `659186d docs(06): two sentences in §6 still described the table they had just changed` |
+| Last commit | `09bb414 Merge pull request #15 from sleepyshark85/slice/06-reschedule-atomic-move` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
 | Agent runs recorded | 135 |
 | ADRs accepted | 24 |
@@ -24,9 +24,8 @@
 
 ## What happens next
 
-- **Next: slice [`07`](slices/07-reschedule-under-contention.md) — Rescheduling under contention — a refused move changes nothing, and never opens a window**
-- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
-- It claims QS-4, QS-5.
+- **Slice [`07`](slices/07-reschedule-under-contention.md) is in flight** — Rescheduling under contention — a refused move changes nothing, and never opens a window.
+- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
 - 3 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
