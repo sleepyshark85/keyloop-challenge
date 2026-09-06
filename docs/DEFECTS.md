@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **251** |
-| Severity | 12 blocking · 133 major · 106 minor |
+| Findings recorded | **254** |
+| Severity | 12 blocking · 136 major · 106 minor |
 | Verdicts | 17 narrowed · 90 accepted · 3 escalated · 23 deferred |
-| Raised by | test-engineer 58 · architect 49 · reviewer 49 · orchestrator 46 · implementer 42 · scribe 5 · human 2 |
-| Awaiting a ruling | **118** |
-| Mean escape distance | 1.73 step(s) |
+| Raised by | test-engineer 60 · architect 49 · reviewer 49 · orchestrator 47 · implementer 42 · scribe 5 · human 2 |
+| Awaiting a ruling | **121** |
+| Mean escape distance | 1.69 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1705,6 +1705,9 @@ rather than narrated.*
 | **I-07-3** | MINOR | 2 *(+1)* | implementer | ADR-0030 adds a leave argument that nothing encodes or checks against the row actual current pair — the same residual shape ADR-0026 already documents for take | **open** |
 | **T-07-1** | MINOR | 2 *(+1)* | test-engineer | AC-4 does catch a lock-ordering mistake, verified empirically rather than accepted — with a precision the design does not state | **open** |
 | **T-07-2** | MAJOR | 2 *(+1)* | test-engineer | AC-4 absence-assertions are VACUOUS without a positive witness that both racers actually reached the union-lock path | **open** |
+| **T-07-5** | MAJOR | 3 *(+-4)* | test-engineer | The literal string 40P01 NEVER APPEARS in this service structured output for the reschedule path, so a raw substring check — the pattern several existing concurrency files use — passes VACUOUSLY regardless of build correctness | **open** |
+| **T-07-4** | MAJOR | 3 *(+0)* | test-engineer | The defect fires at about 0.5 percent in this fixture, an ORDER OF MAGNITUDE below the architect 11.7 percent, and the sample size was raised because of it rather than in spite of it | **open** |
+| **O-51** | MAJOR | 3 *(+0)* | orchestrator | Three of the four acceptance criteria PASSED at the red commit, so only AC-4 is driven by this slice and the other three have never been observed failing | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1748,6 +1751,21 @@ rather than narrated.*
 
 - *scenario:* ON THE PRINCIPLE no-spurious-refusal.test.ts ALREADY NAMES EXPLICITLY AS T-04-4: an absence assertion needs a positive witness. ZERO OF 1000 40P01 IS VACUOUSLY TRUE of a fixture where both movers attempt 1 — their own pair — simply succeeds, because the union-lock code path is then never reached and the test is evidence about an inert race rather than about ADR-0030. Remedy, inside the test-engineer own step-3 latitude and flagged now because it shapes the FIXTURE rather than the wording: witness both racers reaching ATTEMPT >= 2 TARGETING THE OTHER PAIR, via the existing booking.conflict attempt field, which is the same observable no-spurious-refusal.test.ts already reads — before trusting the absence of 40P01 as evidence about anything.
 - *file:* `docs/slices/07-design.md`
+
+**T-07-5** — The literal string 40P01 NEVER APPEARS in this service structured output for the reschedule path, so a raw substring check — the pattern several existing concurrency files use — passes VACUOUSLY regardless of build correctness
+
+- *scenario:* AN UNPREDICTED CONSEQUENCE OF ADR-0029, found by diffing a raw output dump against the badAnswers count during validation rather than by reasoning. ADR-0029 gave the reschedule path its own event name, reschedule.deadlock, and the ONLY signal is that structured event — there is no SQLSTATE text alongside it. So a test asserting on the raw string 40P01, which is the shape several existing tests/concurrency/ files already use, WOULD HAVE PASSED ON A BUILD WITH THE DEFECT PRESENT. The new file asserts on the structured event instead. THE FINDING REACHES BEYOND THIS SLICE: it is a live question whether any existing concurrency assertion on the raw SQLSTATE is now vacuous for a path ADR-0029 renamed, and the same trap will exist for every future per-path event name. Recorded at step 3 so the reviewer can sweep the existing files rather than discover it later.
+- *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
+
+**T-07-4** — The defect fires at about 0.5 percent in this fixture, an ORDER OF MAGNITUDE below the architect 11.7 percent, and the sample size was raised because of it rather than in spite of it
+
+- *scenario:* MEASURED RATHER THAN INHERITED, WHICH IS THE POINT. Six throwaway runs: at 20 by 25, 1000 attempts each, 6, 5 and 5 deadlocks — 16 of 3000, about 0.53 percent; at 20 by 40, 1600 attempts each, 13, 4 and 8 — 25 of 4800, about 0.52 percent. Combined 41 of 7800, about 0.5 percent. The architect measured 117 of 1000 on a DIFFERENT FIXTURE; this one FORCES EVERY ATTEMPT 1 TO FAIL FIRST, an extra round trip before the two contended attempt-2s are in flight together, which plausibly narrows the window the two statements must align in. THE FALSE-PASS ANALYSIS THE ORCHESTRATOR ASKED FOR BEFORE THE BUILD: modelled as independent draws, at the AC literal floor of 1000 attempts the chance of observing ZERO deadlocks by luck is 0.995^1000, about 0.67 percent — small but NOT NEGLIGIBLE and not shippable silently. The committed file therefore uses 40 trials rather than 25: at 1600 attempts the figure is about 0.034 percent, roughly 20 times smaller, and still not zero. The test-engineer said so in the file header rather than overselling it, and noted the honest point that THE ARITHMETIC ALONE DOES NOT RETIRE THE RISK — this run non-zero count is what retires it for this observation. AC-4 says P = 20 over AT LEAST 25 trials, so 40 conforms.
+- *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
+
+**O-51** — Three of the four acceptance criteria PASSED at the red commit, so only AC-4 is driven by this slice and the other three have never been observed failing
+
+- *scenario:* AC-1 — single-mover refusal with xmin and ctid unchanged — PASSED at the red commit, because slice 06 guarded UPDATE was already correct for a lone refused move. AC-2 and AC-3 — the transient-release barrier against 15 racing bookings on recorded seed 20260907, three repeated runs — PASSED, because the single atomic UPDATE never gave a racer anything to land in. Only AC-4 failed. THE SUITE IS RED FOR THE INTENDED REASON and that is not in question: everything compiles, and the one criterion ADR-0030 exists to fix is the one that fails. BUT SECTION 2.4 REASONING CUTS AT THESE THREE: a test that has never failed is not evidence, and AC-1, AC-2 and AC-3 are CHARACTERISATION TESTS of behaviour slice 06 already shipped rather than tests that drove anything. They are still worth having — they pin QS-4 and QS-5 against future regression, and AC-1 xmin clause is genuinely stronger than what slice 06 asserted — but nothing has demonstrated they CAN fail. For the reviewer at step 5 and the architect to rule: whether a criterion that passes on first write needs a demonstrated red of its own, by reverting the behaviour it pins, or whether pinning already-correct behaviour is a legitimate second purpose for an acceptance test that section 2.4 does not reach.
+- *file:* `tests/concurrency/move-never-releases-slot.test.ts`
 
 </details>
 

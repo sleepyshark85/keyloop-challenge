@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `5ec6320 docs(07): AC-1 gains xmin, AC-4 lands, and step 2 opens` |
+| Last commit | `e030f52 test(07): rescheduling under contention — refused-unchanged (xmin/ctid), the transient-release barrier, and racing moves never deadlock (red)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 139 |
+| Agent runs recorded | 141 |
 | ADRs accepted | 25 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -285,7 +285,9 @@
 | 2026-09-06 17:35 | architect | 25m57 | 230 / 6,650 / 12,959,899 | `derived` |
 | 2026-09-06 17:43 | implementer | 5m26 | 52 / 23,956 / 1,329,712 | `derived` |
 | 2026-09-06 17:45 | test-engineer | 7m52 | 148 / 44,489 / 6,247,403 | `derived` |
-| | **total** | **5636m56** | **34,736 / 2,534,946 / 2,875,777,090** | |
+| 2026-09-06 18:19 | test-engineer | 33m20 | 384 / 59,074 / 44,871,947 | `derived` |
+| 2026-09-06 18:23 | test-engineer | 37m11 | 388 / 65,103 / 45,550,489 | `derived` |
+| | **total** | **5707m28** | **35,508 / 2,659,123 / 2,966,199,526** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
