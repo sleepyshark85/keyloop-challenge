@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **210** |
-| Severity | 10 blocking · 110 major · 90 minor |
+| Findings recorded | **216** |
+| Severity | 10 blocking · 113 major · 93 minor |
 | Verdicts | 10 narrowed · 77 accepted · 3 escalated · 17 deferred |
-| Raised by | test-engineer 49 · reviewer 44 · architect 40 · implementer 35 · orchestrator 35 · scribe 5 · human 2 |
-| Awaiting a ruling | **103** |
-| Mean escape distance | 1.92 step(s) |
+| Raised by | test-engineer 54 · reviewer 44 · architect 40 · orchestrator 36 · implementer 35 · scribe 5 · human 2 |
+| Awaiting a ruling | **109** |
+| Mean escape distance | 1.89 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1438,6 +1438,12 @@ rather than narrated.*
 | **O-40** | MAJOR | 1 *(+-5)* | orchestrator | STATUS.md reported PHASE 4 with Gate D open and undecided, six slices after Gate D was decided — the fourth recurrence of one shape | **open** |
 | **A-06-3** | MAJOR | 1 *(+0)* | architect | The racing-moves concurrency test is the mirror of QS-1 on the UPDATE path and is named by no scenario and no test | deferred |
 | **F-06-1** | MINOR | 1 *(+0)* | architect | The candidate allocation loop is duplicated by the reschedule path rather than extracted | deferred |
+| **T-06-1** | MAJOR | 2 *(+1)* | test-engineer | Nothing in the design falsifies ADR-0025 central decision — the row-level trigger cannot see an UPDATE that matched zero rows | **open** |
+| **T-06-2** | MAJOR | 2 *(+1)* | test-engineer | AC-1 honesty control names only the bay constraint, so a build that self-conflicts on the technician side still passes | **open** |
+| **T-06-3** | MINOR | 2 *(+1)* | test-engineer | AC-2 test list does not exercise the one shape most likely to leak a stray audit row — a discarded candidate | **open** |
+| **T-06-4** | MINOR | 2 *(+1)* | test-engineer | A-06-2 is real, is not the test-engineer, and cannot be closed by any test at the boundary this role owns | **open** |
+| **T-06-5** | MINOR | 2 *(+1)* | test-engineer | ADR-0026 transaction-identity hole is real and no black-box test can observe it | **open** |
+| **O-41** | MAJOR | 2 *(+1)* | orchestrator | The A-05-5 check is a SUBSET guard over logged deferrals, not a COMPLETENESS guard over obligations — and slice 06 is the case that shows the gap | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1467,6 +1473,36 @@ rather than narrated.*
 - *scenario:* ADR-0003 requires a move needing a different bay or technician to re-run ADR-0004 candidate loop. Ruling re-allocation OUT was considered and rejected: it makes PATCH refuse while capacity exists, which is the one behaviour this system is about. So the loop is duplicated in slice 06 and the extraction is the debt.
 - *file:* `docs/slices/06-design.md`
 - *deferred* by architect — DEFERRED to slice 09 under ADR-0019, which must instrument BOTH loops anyway — so the extraction is cheaper there and the instrumentation is the forcing function that makes a single loop the obvious shape rather than a tidiness argument. Recorded as the cost of the scope ADDITION rather than hidden inside it: re-allocation on the move path is larger than either obligation ruled out of this slice, and the honest record is that slice 06 grew here rather than shrank.
+
+**T-06-1** — Nothing in the design falsifies ADR-0025 central decision — the row-level trigger cannot see an UPDATE that matched zero rows
+
+- *scenario:* AC-2 audit trigger is AFTER INSERT OR UPDATE OR DELETE FOR EACH ROW, and a FOR EACH ROW trigger DOES NOT FIRE when zero rows match. So on the unknown-id path it is silent whether the UPDATE was issued and matched nothing, or was never issued at all — which is precisely the difference between REJECTED Option A (guarded UPDATE plus follow-up read) and CHOSEN Option C (the read decides, no UPDATE). ADR-0025 decision is therefore unfalsifiable as scoped: a build that silently reverted to Option A passes every test the design names. Remedy: a statement-level companion trigger, AFTER UPDATE FOR EACH STATEMENT, which fires once per execution REGARDLESS of rows matched; the unknown-id case asserts 404 AND ZERO STATEMENT-LEVEL FIRINGS. Against Option A that test correctly fails, so it discriminates between the two designs rather than restating the chosen one.
+- *file:* `docs/slices/06-design.md`
+
+**T-06-2** — AC-1 honesty control names only the bay constraint, so a build that self-conflicts on the technician side still passes
+
+- *scenario:* The design control is the same appointment moved onto an interval held by a DIFFERENT confirmed appointment, refused with 23P01 naming no_bay_overlap. There are two exclusion constraints and slice 00 asserts both. A partial fix — or a partial regression — that got the bay side right and left the technician side able to self-conflict passes AC-1 and its control as designed. Remedy: build BOTH a bay-conflict and a technician-conflict negative control, mirroring slice 00 dual assertions.
+- *file:* `docs/slices/06-design.md`
+
+**T-06-3** — AC-2 test list does not exercise the one shape most likely to leak a stray audit row — a discarded candidate
+
+- *scenario:* This slice introduces the re-allocation loop, so a move may try and discard a candidate before landing the winner. That is exactly where a failed attempt could leave an audit row if its subtransaction is not cleanly isolated, and AC-2 named cases (DELETE-then-INSERT, cancel-then-book, two-statement move) do not reach it. The mechanism itself has no hole found: savepoint-scoped retries roll back their trigger-inserted rows with the failed statement, and statement_timestamp() varies per statement where xmin and transaction_timestamp() would not, which is the right reason the design rejected those alternatives. Remedy: add a contended-original-slot scenario forcing a second candidate, still asserting exactly one audit row.
+- *file:* `docs/slices/06-design.md`
+
+**T-06-4** — A-06-2 is real, is not the test-engineer, and cannot be closed by any test at the boundary this role owns
+
+- *scenario:* DISAGREEMENT WITH THE DISPATCH FRAMING, not with the design. The orchestrator asked whether AC-5 is unsound without A-06-2 closed. The test-engineer ruled NOT UNSOUND and, separately, NOT TESTABLE HERE: no client-facing surface lets a caller supply an arbitrary id at creation, so the race cannot be constructed from the HTTP boundary this role owns; and even given another minting path the read-decides design yields no INCORRECT response — a request racing an uncommitted create gets a 404 that was true when checked, which is ordinary eventual consistency rather than a section 2.1 violation. Remedy REJECTED AS FRAMED and re-routed: single-call-site is a code-structure invariant belonging behind a dependency-cruiser rule or a grep-based CI check owned by the architect or reviewer, not a runtime test.
+- *file:* `docs/adr/0025-existence-is-the-reads-legality-is-the-statements.md`
+
+**T-06-5** — ADR-0026 transaction-identity hole is real and no black-box test can observe it
+
+- *scenario:* The branded type does not prove the write runs in the SAME TRANSACTION as the lock. It cannot be caught from outside because the exclusion constraint is a correctness backstop whether or not the advisory lock and the write share a transaction — so any test that observed the hole would also be observing a correctness failure the constraint already prevents. Defence in depth with no external witness. Flagged toward slice 07, whose racing-moves harness is the closest thing to coverage, rather than claimed as closable here.
+- *file:* `docs/adr/0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md`
+
+**O-41** — The A-05-5 check is a SUBSET guard over logged deferrals, not a COMPLETENESS guard over obligations — and slice 06 is the case that shows the gap
+
+- *scenario:* Named by the architect in its step 1 report, then measured. Slice 06 Inherited scope section lists five obligations; inherits carries four refs; and grep shows F-02-9, R-05-7 and R-05-9 APPEAR NOWHERE IN THE FILE EXCEPT THE FRONT MATTER LINE THE ORCHESTRATOR WROTE. Only F-05-1 and the newly minted A-06-3 are named in the prose. The SUBSTANCE of each is present — the ADR-0024 bullet discusses problem.ts margin which is R-05-7, and the Stryker bullet IS R-05-9 — so no work was dropped; what is missing is any link between a bullet and the ruling that put it there. Two of the five obligations had no ref in the event log AT ALL when the slice started, which is O-39, so a silent drop of either would have left slice:check green. PROPOSED REMEDY, the architect: require every bullet under a slice Inherited scope heading to carry a ref id, and cross-check that set against inherits — converting prose into refs at the point where prose is written. NOT BUILT NOW, deliberately: it would fail slice 06 READY and force body edits to a file two step-2 agents are holding, and the orchestrator building a check that changes the slice under review mid-round is the shape this project keeps catching. Routed for the architect to rule its destination at step 5, which is the mechanism A-05-5 just installed being used rather than described.
+- *file:* `tools/slice/check.mjs`
 
 </details>
 
