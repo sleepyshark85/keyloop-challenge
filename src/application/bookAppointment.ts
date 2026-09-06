@@ -26,9 +26,11 @@
  * column of the candidate cross-product, which is what makes the loop terminate in
  * |bays| + |technicians| - 1 attempts rather than |bays| x |technicians|.
  *
- * The seeded shuffle and the 16-attempt cap are ADR-0009's and stay in slice 04. Candidate
- * ordering here is deterministic, which is F-02-7's substitute for a seed: a deterministic order
- * is re-runnable by construction with nothing to record.
+ * THE ORDER IS A SEEDED SHUFFLE, drawn once per request and injected (ADR-0009's Order-C,
+ * ADR-0021). `src/domain/candidates.ts` owns the permutation and the prune; this module owns only
+ * WHEN to prune and what a refusal means. Slice 02's deterministic order was F-02-7's stand-in and
+ * it is gone: under it every concurrent request tried the same bay first, which is the Order-A
+ * degeneracy ADR-0004 named and ADR-0009 rejected.
  *
  * ── EACH ATTEMPT IS ITS OWN TRANSACTION, AND THE LOOP IS NOT WRAPPED IN ONE ───────────────────
  *
@@ -39,6 +41,8 @@
  * contradict. That is why `db.transaction()` appears inside the loop body and nowhere outside it.
  */
 import { deriveInterval } from './deriveInterval.js';
+import { nextCandidate, orderCandidates, prune } from '../domain/candidates.js';
+import type { CandidateOrder } from '../domain/candidates.js';
 import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
 import {
@@ -128,6 +132,16 @@ export type BookOutcome =
       /** ADR-0016: minted by `classify` from `err.constraint`, never chosen. */
       readonly resource: ContendedResource;
       readonly attempts: number;
+      /**
+       * WHICH refusal this is — ADR-0020. `exhausted`: a candidate list emptied, so nothing was
+       * left untried. `capped`: ADR-0009's attempt cap stopped the loop with candidates
+       * remaining. Both render identically at the edge (AC-4) and §8.6 gains no row for the
+       * second; the difference is for the operator, on `booking.refused`.
+       *
+       * `exhausted` WINS A TIE. When one attempt both empties a list and reaches the cap, the
+       * stronger statement is true.
+       */
+      readonly exit: 'exhausted' | 'capped';
     }
   /** `40P01` under ADR-0018's locks — a write path skipped them. T-02-9. */
   | { readonly kind: 'no-verdict' }
@@ -141,6 +155,24 @@ export interface BookDeps {
    * inserted nothing.
    */
   readonly newId: () => string;
+  /**
+   * ADR-0009's per-request seed, INJECTED and never global — the difference between Order-C and
+   * Order-B, and the only reason ordering can stay a pure function inside `src/domain`.
+   *
+   * `main.ts` binds it to the platform CSPRNG, or to `BOOKING_SEED` when that is set (ADR-0021).
+   * Drawn ONCE per booking, so every attempt of one request walks one permutation.
+   */
+  readonly seed: () => number;
+  /**
+   * ADR-0009's attempt cap, from `platform/config.ts`. A LATENCY guard, not a termination guard:
+   * Bound-2 already bounds the loop at `|bays| + |technicians|`, which is the loop's header, and
+   * the cap is a policy number that stops a request spending forty round trips before refusing.
+   *
+   * It is tested INSIDE the `23P01` arm (ADR-0020), never as the loop's bound — so no refusal
+   * exit is reachable without a `ContendedResource` a classification just minted, and the two
+   * numbers stay two numbers doing two jobs.
+   */
+  readonly attemptCap: number;
   /**
    * I-02-6 — the observer AC-3, AC-4, QS-1 and QS-2 need and the design did not have.
    *
@@ -157,6 +189,17 @@ export interface BookDeps {
 
 /** The `pino` line the concurrency suite reads. Renaming it is a behaviour change. */
 const CONFLICT_EVENT = 'booking.conflict';
+/**
+ * The refusal line — one per refused booking, at BOTH exits.
+ *
+ * AC-4 requires the cap to be "visible in telemetry rather than silent", and an outside-in test
+ * may read exactly three things: the response, the database and stdout (I-02-6). The response
+ * carries no `exit` and no `attempts` by design, and a refusal writes no row — so this line is
+ * where the two exits become distinguishable at all, until slice 09's
+ * `booking_conflicts_total{outcome}`. The `seed` on it is what makes a reported failure
+ * re-runnable through `BOOKING_SEED` (ADR-0021): a label that cannot be fed back in is not one.
+ */
+const REFUSED_EVENT = 'booking.refused';
 const DEADLOCK_EVENT = 'booking.deadlock';
 const REFERENCE_DATA_EVENT = 'booking.reference-data-invalid';
 
@@ -205,41 +248,69 @@ export async function bookAppointment(
 
   // 4. Candidates — REFERENCE DATA ONLY. `candidateResources` does not read `appointment`.
   const candidates = await candidateResources(db, command.dealershipId, command.serviceTypeId);
-  const bays = [...candidates.bays];
-  const technicians = [...candidates.technicians];
 
-  // The two empty cases are DIFFERENT FAILURES and collapsing them was a design defect ruled at
-  // step 2 (I-02-8 / T-02-7). A dealership with no bays cannot perform ANY service — that is a
+  // 5. The order — ADR-0009's Order-C, from one seed drawn for this request.
+  //
+  // THE TWO EMPTY-CANDIDATE ANSWERS LIVE IN THIS `null` BRANCH RATHER THAN IN FRONT OF IT
+  // (I-04-4). Guards ahead of the call would make this branch unreachable: `tsc` would still
+  // demand it, no test could cover it, and Stryker would collect a free survivor. Folded in,
+  // every branch on this path is reachable and the split is the honest one — the domain owns
+  // "is there a candidate at all", this module owns "whose fault is it that there is not".
+  //
+  // They are DIFFERENT FAILURES and collapsing them was a design defect ruled at slice 02 step 2
+  // (I-02-8 / T-02-7). A dealership with no bays cannot perform ANY service — that is a
   // mis-seeded dealership and the system's fault, so `500`. "No technician here is qualified for
   // this service type" is an entirely ordinary state of an ordinary dealership: the request names
   // a (dealership, service-type) pair and that pair does not resolve, which is the only sense in
-  // which this API knows service types at all.
-  if (bays.length === 0) {
-    deps.logger.error(
-      { event: REFERENCE_DATA_EVENT, dealershipId: command.dealershipId },
-      'dealership has no service bays',
-    );
-    return { kind: 'reference-data-invalid', detail: 'no-service-bays' };
-  }
-  if (technicians.length === 0) {
+  // which this API knows service types at all. Neither is a `409`: there is no verdict here to
+  // build one from (ADR-0016).
+  const seed = deps.seed();
+  const initialOrder = orderCandidates(candidates.bays, candidates.technicians, seed);
+  if (initialOrder === null) {
+    if (candidates.bays.length === 0) {
+      deps.logger.error(
+        { event: REFERENCE_DATA_EVENT, dealershipId: command.dealershipId },
+        'dealership has no service bays',
+      );
+      return { kind: 'reference-data-invalid', detail: 'no-service-bays' };
+    }
     return { kind: 'unknown-reference', reference: 'service-type' };
   }
 
   const appointmentId = deps.newId();
   const startsAt = new Date(derivation.occupancyStartsAt);
   const endsAt = new Date(derivation.occupancyEndsAt);
-  let attempts = 0;
+  let order: CandidateOrder = initialOrder;
 
-  // 5. The loop. It varies ONLY the candidate: steps 1-3 ran once and nothing inside re-derives.
+  /**
+   * BOTH REFUSAL EXITS, IN ONE PLACE. Only the `exit` differs, and both are called from inside
+   * the `23P01` arm holding a resource that classification minted (ADR-0016, ADR-0020).
+   */
+  const refuse = (
+    exit: 'exhausted' | 'capped',
+    resource: ContendedResource,
+    attempts: number,
+  ): BookOutcome => {
+    deps.logger.info({ event: REFUSED_EVENT, exit, resource, attempts, seed }, REFUSED_EVENT);
+    return { kind: 'no-capacity', resource, attempts, exit };
+  };
+
+  // 6. The loop. It varies ONLY the candidate: steps 1-4 ran once and nothing inside re-derives.
   //
-  // Both lists are non-empty on entry (the two guards above) and EVERY path that empties one
-  // returns from inside the loop, so the head of each is always present. The `as string` is
-  // `noUncheckedIndexedAccess` on an array index and nothing more — it fabricates no brand, which
-  // is the assertion §4.1 and the `contended-resource-cast` marker are about.
-  for (;;) {
-    const bayId = bays[0] as string;
-    const technicianId = technicians[0] as string;
-    attempts += 1;
+  // A `CandidateOrder` is non-empty by construction and `prune` returns `null` rather than an
+  // empty one, so `nextCandidate` is total and there is no index assertion left on this path —
+  // the `as string` pair that stood here is gone with the tuple carrier (I-04-3).
+  //
+  // THE HEADER CARRIES BOUND-2'S STRUCTURAL BOUND, NOT THE CAP (ADR-0020 row F, I-04-2). Two
+  // encodings of one number drift, and these are two different numbers: `|bays| + |technicians|`
+  // is what pruning a whole resource per conflict guarantees, and the cap is a policy value that
+  // may be raised or lowered without touching liveness. The tail below is therefore unreachable —
+  // a list empties by attempt `|bays| + |technicians| - 1` and the arm has returned — and it
+  // THROWS rather than refusing, so that a future retried `PgOutcome` variant meets a loud fault
+  // instead of an unbounded loop.
+  const structuralBound = candidates.bays.length + candidates.technicians.length;
+  for (let attempts = 1; attempts <= structuralBound; attempts += 1) {
+    const { bayId, technicianId } = nextCandidate(order);
 
     try {
       const row = await db.transaction().execute(async (trx) => {
@@ -280,21 +351,39 @@ export async function bookAppointment(
             CONFLICT_EVENT,
           );
 
-          // PER VALUE, not per class (T-02-1): drop THAT bay, or THAT technician, and leave the
-          // others. Emptying the whole list on one failure refuses while capacity plainly
-          // remains, and it is what made AC-4 fail under this design's earlier wording.
-          const remaining = outcome.resource === 'bay' ? bays : technicians;
-          remaining.shift();
-          if (remaining.length > 0) continue;
+          // PER RESOURCE VALUE, not per class and NOT PER PAIR (T-02-1, ADR-0009's Bound-2):
+          // drop THAT bay, or THAT technician, and leave the others. Emptying the whole list on
+          // one failure refuses while capacity plainly remains; pruning only the (bay,
+          // technician) pair leaves the conflicting resource in the list, meets it again behind
+          // the next partner, and turns the additive bound into a multiplicative one.
+          //
+          // `outcome.resource` is a `ContendedResource`, an intersection with the plain union
+          // `prune` takes — so it goes straight in with no cast at this call site.
+          const remaining = prune(
+            order,
+            outcome.resource,
+            outcome.resource === 'bay' ? bayId : technicianId,
+          );
 
-          // THE ONE REFUSAL EXIT, and it is reached holding a `ContendedResource` this very
-          // classification minted from `err.constraint` rather than one chosen here. A
-          // classification prunes only its own list, so the list that emptied is the one the
-          // last classification named — which is what makes `resource` the SCARCE resource and
-          // not the abundant one (E-02-1). Slice 04's attempt cap adds a SECOND exit, with both
-          // lists non-empty and no emptied list to name; that is where ADR-0016's claim needs
-          // re-measuring, in slice 04 and not here.
-          return { kind: 'no-capacity', resource: outcome.resource, attempts };
+          // BOTH REFUSAL EXITS LIVE HERE, IN THE ARM — ADR-0020, and the order of these two
+          // lines is the tie-break.
+          //
+          // The loop `continue`s only on `conflict` and returns on every other classification
+          // and on success, so a refusal is reachable ONLY from a classification: the
+          // `ContendedResource` below is one this very `23P01` minted from `err.constraint`,
+          // never one chosen here. That is what lets ADR-0016's claim survive the cap with no
+          // exception, no nullable carrier and no cast.
+          //
+          // EXHAUSTION FIRST. A classification prunes only its own list, so the list that
+          // emptied is the one the last classification named — which is what makes `resource`
+          // the SCARCE resource rather than the abundant one (E-02-1). When an attempt both
+          // empties a list and reaches the cap, nothing was left untried and `exhausted` is the
+          // stronger true statement.
+          if (remaining === null) return refuse('exhausted', outcome.resource, attempts);
+          if (attempts >= deps.attemptCap) return refuse('capped', outcome.resource, attempts);
+
+          order = remaining;
+          continue;
         }
 
         case 'bad-reference': {
@@ -346,4 +435,13 @@ export async function bookAppointment(
       }
     }
   }
+
+  // UNREACHABLE. Every classification either returns or prunes, and pruning a whole resource per
+  // conflict empties a list by attempt `|bays| + |technicians| - 1`. A `throw` rather than a
+  // refusal because nothing is minted here: there is no verdict to build a `409` from, and a
+  // fabricated one is exactly what ADR-0016 forbids. If this ever fires, a `PgOutcome` variant
+  // gained a second `continue` and the loop lost its bound (ADR-0020's one-directional guarantee).
+  throw new Error(
+    `booking loop exceeded its structural bound of ${String(structuralBound)} attempts`,
+  );
 }

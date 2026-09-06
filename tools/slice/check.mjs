@@ -312,16 +312,31 @@ if (!onlyReady) {
   })();
   const head = sliceHead ?? git(['rev-parse', 'HEAD']);
   const runSha = lastRun?.checks?.head_sha;
+  // BOTH SIDES RESOLVED TO FULL SHAs BEFORE ANYTHING IS COMPARED.
+  //
+  // The equality guard below was a string comparison, and `check.run` records do not all
+  // carry the same SHA width — most are full, some abbreviated. An abbreviated record for
+  // the very commit under test therefore failed `===`, fell through to `merge-base
+  // --is-ancestor`, and a commit IS an ancestor of itself, so the gate reported the run as
+  // behind the work with the self-refuting detail "the newest recorded run is 86af39b, an
+  // ancestor of this slice's last commit 86af39b".
+  //
+  // The check was right about the rule and wrong about the identity of two names for one
+  // commit — the same spelling-versus-concept error this project has now found in six
+  // markers, this time in the tool that grades the others.
+  const fullSha = (sha) => (sha ? git(["rev-parse", `${sha}^{commit}`]) : null);
   const coversHead = (() => {
-    if (!head || !runSha) return null;
-    if (runSha === head) return true;
+    const h = fullSha(head);
+    const r = fullSha(runSha);
+    if (!h || !r) return null;
+    if (r === h) return true;
     // `merge-base --is-ancestor` exits 0 when the first is an ancestor of the second,
     // so this reads "the run is behind the slice's last commit" — exactly the failure
     // being caught, and nothing more.
     const isAncestor = (a, b) =>
       spawnSync('git', ['merge-base', '--is-ancestor', a, b], { encoding: 'utf8' }).status === 0;
-    if (isAncestor(runSha, head)) return false;     // the run is BEHIND the work
-    if (isAncestor(head, runSha)) return true;      // the run is at or AFTER it
+    if (isAncestor(r, h)) return false;     // the run is BEHIND the work
+    if (isAncestor(h, r)) return true;      // the run is at or AFTER it
     return null;                                    // unrelated or unknown — cannot tell
   })();
 
@@ -457,6 +472,31 @@ if (!onlyReady) {
         ? `light gate REVOKED — ${openSerious.length} open MAJOR/BLOCKING finding(s): `
           + `${openSerious.map((e) => e.ref).join(', ')}. This slice needs a human.`
       : 'no Gate E gate.decided event');
+
+  // FINDINGS THE GATE HAS TO SEE — O-30.
+  //
+  // At slice 02's gate seven MAJOR findings read as open and SIX were fixed: each fix had
+  // been written into the prose of the `finding.raised` record that reported it, and never
+  // logged as an event. A human reading the log would have said the work was done; every
+  // mechanism that reads the log said it was open. The orchestrator only noticed by
+  // hand-writing a query, which is the discipline this file exists to replace — so the
+  // gate asks the question itself now.
+  //
+  // Closed means RULED or RESOLVED or answered by a `review.response`. Prose inside the
+  // raise does not count and must not: that is precisely the confusion being removed, and
+  // a text heuristic over a rationale would guess at what a sentence means. Severity is
+  // the filter because a MINOR left open is a backlog item, while a MAJOR left open is
+  // either unfinished work or an unrecorded ruling — and both need the gate to say so.
+  const closedRefs = new Set(events
+    .filter((e) => ['finding.ruled', 'finding.resolved', 'review.response'].includes(e.event))
+    .map((e) => e.ref ?? e.finding_ref)
+    .filter(Boolean));
+  const openSerious2 = events.filter((e) => e.event === 'finding.raised'
+    && ['MAJOR', 'BLOCKING'].includes(e.severity) && !closedRefs.has(e.ref));
+  check('done', 'findings ruled or resolved', openSerious2.length ? FAIL : PASS,
+    openSerious2.length
+      ? `${openSerious2.length} open MAJOR/BLOCKING: ${openSerious2.map((e) => e.ref).join(', ')}`
+      : `every MAJOR/BLOCKING finding is ruled or resolved`);
 
   const loops = events.filter((e) => e.event === 'loopback').length;
   check('done', 'loopbacks within governor', loops <= 2 ? PASS : FAIL,

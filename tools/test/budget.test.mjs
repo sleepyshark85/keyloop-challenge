@@ -133,6 +133,47 @@ const run = ({ dir, bp }, args = []) => spawnSync('node', [BUDGET,
   ok('a TRIVIAL reduction does not demand a baseline commit — ordinary rewording is not a '
     + 'reduction', run(f, ['--check', '--ratchet']).status === 0);
 }
+
+// --- F-04-2: being UNDER budget is not a reduction --------------------------------
+//
+// The first version measured `(was ?? budget) - words`, which is distance under budget.
+// Both false positives below were measured by the architect on the slice this was about to
+// obstruct — and the prescribed remedy was worse than the false positive: rebaselining an
+// in-flight design at its step-1 size pins it there and leaves steps 2–5 unable to amend
+// it. A guard that fails a correctly-sized document and prescribes padding to fix it is
+// worse than no guard.
+{
+  const f = build({ adrs: { '0001-small.md': adr('0001', words(120)) }, baseline: {} });
+  ok('a NEW document well under budget passes — there is no reduction to record',
+    run(f, ['--check', '--ratchet']).status === 0,
+    run(f, ['--check', '--ratchet']).stderr.trim().slice(0, 140));
+}
+{
+  const f = build({
+    adrs: { '0001-small.md': adr('0001', words(120)) },
+    baseline: { 'adr/0001-small.md': 700 },
+  });
+  ok('...and so does one recorded AT its budget — its ceiling is the budget, and it may '
+    + 'move freely beneath it', run(f, ['--check', '--ratchet']).status === 0);
+}
+{
+  const f = build({
+    adrs: { '0001-small.md': adr('0001', words(120)) },
+    baseline: { 'adr/0001-small.md': 700 },
+  });
+  // The in-flight design case, stated as the reason: it must be able to grow back.
+  writeFileSync(join(f.dir, 'adr', '0001-small.md'), adr('0001', words(690)));
+  ok('...and growing back up to the budget is allowed, which is what step 2-5 needs',
+    run(f, ['--check', '--ratchet']).status === 0);
+}
+{
+  const f = build({
+    adrs: { '0001-x.md': adr('0001', words(400)) },
+    baseline: { 'adr/0001-x.md': 3000 },
+  });
+  ok('only legacy OVERAGE being paid down must be recorded — that is where the ceiling '
+    + 'sits above the budget', run(f, ['--check', '--ratchet']).status === 1);
+}
 {
   const f = build({
     adrs: { '0001-x.md': adr('0001', words(400)) },

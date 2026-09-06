@@ -19,10 +19,9 @@ npm start                                  # the scheduler, on the HOST
 ```
 
 **The service is not in compose, by ruling rather than oversight**: containerising it would cost a
-Dockerfile, a build stage and an image-caching story maintained across twelve slices for no demo
-benefit. Compose provides the *dependencies*; the process runs on the host against them, and
+Dockerfile, a build stage and an image-caching story for no demo benefit. Compose provides the *dependencies*; the process runs on the host against them, and
 `docker-compose.yml` says so in its own header so the file and this section cannot drift. Nothing here
-is on the test path — §7.2's Testcontainers starts its own `postgres:16`.
+is on the test path (§7.2).
 
 | Node | Runs | Notes |
 |---|---|---|
@@ -72,10 +71,8 @@ Three properties this arrangement buys, each of which cost a design choice:
 - **The schema under test is the schema that runs**, from the same package, migrations directory and
   `pgmigrations` table — three shared inputs rather than one shared module, because `db:migrate`
   invokes the `node-pg-migrate` **CLI** while `globalSetup` calls its **`runner()`** API, two entry
-  points where [ADR-0007](../adr/0007-node-pg-migrate-with-sql-files.md) specifies one. The measured
-  consequence is the `--single-transaction` default: `true` on the CLI, unset on the programmatic
-  call, so a malformed migration rolls **all** files back under `db:migrate` and leaves earlier files
-  **committed and recorded** under `globalSetup`. §11.2 R-9 carries it as debt.
+  points where [ADR-0007](../adr/0007-node-pg-migrate-with-sql-files.md) specifies one — whose
+  measured consequence §11.2 R-9 carries, with the debt, in full.
 
   **One assertion establishes where the schema came from**, and it is a property of the seam rather
   than of the schema: `tests/integration/exclusion-constraints.test.ts` case 0 asserts that
@@ -142,19 +139,23 @@ ran.
 
 ## 7.3 Configuration
 
-Environment variables only, read once in `src/platform/config.ts` and validated at startup — a
-missing or malformed value fails the process rather than surfacing as a request error at 03:00.
+Environment variables only, validated at startup — a missing or malformed value fails the process
+rather than surfacing as a request error at 03:00. **`src/platform/config.ts` reads each of them once
+and is the only reader — except `OTEL_EXPORTER_OTLP_ENDPOINT`, which the OpenTelemetry SDK
+auto-configures and this application never reads** (A-04-10, and ADR-0022's proposed set-equality
+guard must exempt it).
 
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `PORT` | HTTP listener |
-| `BOOKING_ATTEMPT_CAP` | ADR-0009's cap; default 16 |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector; unset disables export without disabling instrumentation |
 | `LOG_LEVEL` | `pino` level |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector; unset disables export without disabling instrumentation |
+| `BOOKING_ATTEMPT_CAP` | ADR-0009's cap; default 16 |
+| `BOOKING_SEED` | ADR-0021's ordering seed; unset in production. Set, it warns at `warn` — visible at the default `LOG_LEVEL` |
 
-There are no secrets, because there is nothing to authenticate to (ADR-0002) — which is a fact about
-the scope, not a security posture, and §11.3 says so.
+**This table is the contract; `BOOKING_` marks what this application invented** (ADR-0022). There are
+no secrets: nothing to authenticate to (ADR-0002, §11.3).
 
 ## 7.4 The pipeline
 

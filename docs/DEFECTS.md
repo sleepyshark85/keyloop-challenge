@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **120** |
-| Severity | 10 blocking · 66 major · 44 minor |
-| Verdicts | 5 narrowed · 48 accepted · 1 escalated · 9 deferred |
-| Raised by | test-engineer 28 · reviewer 28 · orchestrator 26 · implementer 18 · architect 18 · human 2 |
-| Awaiting a ruling | **57** |
-| Mean escape distance | 1.72 step(s) |
+| Findings recorded | **166** |
+| Severity | 10 blocking · 89 major · 67 minor |
+| Verdicts | 8 narrowed · 60 accepted · 3 escalated · 13 deferred |
+| Raised by | test-engineer 36 · architect 34 · reviewer 34 · orchestrator 28 · implementer 27 · scribe 5 · human 2 |
+| Awaiting a ruling | **82** |
+| Mean escape distance | 1.91 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -855,6 +855,312 @@ rather than narrated.*
 **O-33** — The ratchet did not tighten after a reduction, so a 13,566 to 1,200 cut could have grown all the way back with the check green
 
 - *scenario:* Found by the ARCHITECT immediately after making the reduction, and reported rather than left: 'the ratchet's ceiling is now far above these files... 02-design could grow all the way back without docs:budget:check noticing'. Verified: the baseline still recorded 13,566 while the file stood at 1,200. A ratchet whose ceiling only ever moves up is not a ratchet - it is a high-water mark. The reduction has to be RECORDED or it is not held, and relying on someone remembering to run --rebaseline is discipline, which is what the ratchet exists to replace. Now a material reduction - more than 100 words AND more than a tenth of the ceiling - FAILS the check with an instruction to rebaseline in the change that earned it. Trivial rewording does not, so an ordinary edit does not demand a baseline commit. SECOND DEFECT FOUND WHILE TESTING IT: survey() hard-coded CLAUDE.md and docs/METHODOLOGY.md against the working directory, so every fixture run also measured the REAL repository - the tool enforcing the concision rule could not be exercised in isolation, and it had NO TESTS AT ALL. Both paths are now flags. 16 cases in tools/test/budget.test.mjs covering both --check and the ratchet in every direction, plus the four exclusions (frontmatter, generated blocks, fenced code, assumption registers) and the contested hatch. Three mutants: no tightening kills 2, no growth check kills 3, charging for fenced code kills 1.
+- *file:* `tools/docs/budget.mjs`
+
+</details>
+
+## Slice 04
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **D-04-1** | MAJOR | 1 *(+1)* | architect | ADR-0009 sized the cap of 16 on a premise that does not hold until slice 08's availability filter exists | escalated |
+| **T-04-1** | MAJOR | 2 *(+1)* | test-engineer | The recorded seed is a label, not a handle — AC-5's re-runnability leg is undelivered, and no retry can be forced deterministically | accepted |
+| **T-04-2** | MAJOR | 2 *(+1)* | test-engineer | AC-4 should be asserted at the shipped cap of 16; the cheap-fixture premise is wrong and cap=3 unpins ADR-0009's number | accepted |
+| **T-04-3** | MINOR | 2 *(+1)* | test-engineer | D-04-1's spurious-refusal leg cannot become an AC-1 case — every candidate fixture is a coin flip | accepted |
+| **T-04-4** | MINOR | 2 *(+1)* | test-engineer | AC-2's absence-of-25P02 assertion passes vacuously as a standalone case and the design does not name its fixture | accepted |
+| **I-04-3** | MAJOR | 2 *(+1)* | implementer | §3's nextCandidate signature does not compile, and the brand RELOCATES the index assertion rather than removing it | accepted |
+| **I-04-5** | MAJOR | 2 *(+1)* | implementer | D-04-1 is deferred to a slice whose own Out of scope forbids the work, so the deferral is permanent | deferred |
+| **I-04-2** | MINOR | 2 *(+1)* | implementer | ADR-0020's option table omits a shape that keeps both the arm placement and a structural loop bound | narrowed |
+| **I-04-4** | MINOR | 2 *(+1)* | implementer | §4's ordering forces a branch tsc demands and no test can cover | accepted |
+| **I-04-8** | MINOR | 2 *(+1)* | implementer | The seed source adds a node:crypto import that main.ts deliberately avoids | accepted |
+| **S-01** | MAJOR | 0 *(+0)* | scribe | §6's (c) remedy requires superseding the ADR, and after four slices and two (c) rulings no ADR has ever superseded or been superseded | **open** |
+| **S-02** | MINOR | 0 *(+0)* | scribe | §6.4's vote — a third role breaking a tie — has never been called, in four slices of adjudication | **open** |
+| **S-03** | MINOR | 0 *(+0)* | scribe | The step-2 AGREE rounds at slices 00a, 00 and 01 produced no review.response events, so how a design was argued into shape is reconstructable but not from one event type | **open** |
+| **S-04** | MINOR | 0 *(+0)* | scribe | The project counts its own signature defect shape as five, seven, eight and nine in four different files | **open** |
+| **S-05** | MINOR | 0 *(+0)* | scribe | The video shot list is on the scribe's owned-file list and does not exist | **open** |
+| **T-04-5** | MAJOR | 3 *(+2)* | test-engineer | arc42 names the attempt cap ATTEMPT_CAP in 5.2 and BOOKING_ATTEMPT_CAP in 7 deployment env table, and does not list BOOKING_SEED at all | accepted |
+| **T-04-6** | MAJOR | 3 *(+3)* | test-engineer | A docs commit can silently disarm the red-proof discriminator: docs:check was failing at HEAD since ee868c3, which would have failed verify and made red-proof classify the red run as broken rather than as a red proof | **open** |
+| **A-04-2** | MAJOR | 4 *(+3)* | architect | ADR-0021 startup warn is R-7a stated mitigation and no test in any test-engineer-owned directory asserts it exists | **open** |
+| **A-04-3** | MINOR | 4 *(+4)* | architect | The word-budget counter ignores generated blocks, so a generated register can grow without limit and never register as pressure | **open** |
+| **A-04-4** | MAJOR | 4 *(+4)* | architect | F-04-1 third recurrence, with a second failure mode behind it: the committed baseline escapes non-ASCII codepoints, which JSON.stringify does not reproduce, so the obvious fix silently rewrites all 285 existing pins | deferred |
+| **A-04-5** | MINOR | 4 *(+4)* | architect | The drift direction is diagnostic: BOOKING_SEED reached §5.2, §6.2 and §11 R-7a and never reached §7.3 | **open** |
+| **A-04-6** | MAJOR | 4 *(+4)* | architect | ADRs that cite each other STATUS rot, and §4 immutability then freezes the rot | **open** |
+| **I-04-10** | MAJOR | 4 *(+3)* | implementer | Slice 02 QS-2 concurrency test is a 44 percent flake under ADR-0009 Order-C, and it is green in the run we would merge on | accepted |
+| **I-04-11** | MAJOR | 4 *(+3)* | implementer | ADR-0021 and slice-04 design section 4 both say loadConfig emits the startup warn; that sentence is false as built | accepted |
+| **I-04-12** | MINOR | 4 *(+0)* | implementer | The env-var set-equality guard ADR-0022 recommended would not pass today: config.ts reads five variables, section 7.3 lists six | narrowed |
+| **I-04-13** | MINOR | 4 *(+3)* | implementer | Design section 3 carrier needed no per-list cast, and the shape it specified would have reproduced I-04-4 one level down | **open** |
+| **A-04-7** | MAJOR | 4 *(+4)* | orchestrator | docs:refs put two project rules in contradiction and survived four slices by being prefix-lucky rather than correct | **open** |
+| **A-04-8** | MINOR | 4 *(+4)* | architect | Blast radius of Order-C is exactly one file, and the structural reason is worth more than the finding | **open** |
+| **A-04-9** | MAJOR | 4 *(+4)* | architect | The tsc-versus-vitest gap and I-04-10 are one principle, and section 2.4 states only half of it | escalated |
+| **A-04-10** | MINOR | 4 *(+4)* | architect | Section 7.3 preamble is false today, independently of any guard | **open** |
+| **A-04-11** | MAJOR | 4 *(+0)* | architect | A-04-2 is only half discharged, and by the wrong owner | **open** |
+| **A-04-12** | MINOR | 4 *(+0)* | architect | The ORDER BY assertion became MORE load-bearing at this merge, not less, and its comment still says the opposite | **open** |
+| **T-04-7** | MAJOR | 3 *(+3)* | test-engineer | E-02-1 discrimination has migrated: two file headers claim a guarantee that now lives somewhere else | **open** |
+| **O-34** | MAJOR | 5 *(+4)* | orchestrator | Slice 04 ran steps 1 through 4 with no pull request, against both section 7 and the step-1 draft-PR rule | **open** |
+| **R-04-1** | MAJOR | 5 *(+1)* | reviewer | arc42 section 7.3 was rewritten but is not in the slice declared arc42 scope | accepted |
+| **R-04-2** | MAJOR | 5 *(+1)* | reviewer | R-7a mitigation is unguarded at BOTH ends, and it is the one non-equivalent survivor of eight | narrowed |
+| **R-04-3** | MINOR | 5 *(+0)* | reviewer | No CI run exists for the commit that would merge | **open** |
+| **R-04-4** | MINOR | 5 *(+1)* | reviewer | bookAppointment.ts:312 is an ESTABLISHED equivalent mutant, and the proof is stronger than what ADR-0020 and arc42 6.2 currently state | accepted |
+| **R-04-5** | MINOR | 5 *(+1)* | reviewer | The mulberry32 survivors are equivalent for the contract, by more than the implementer claimed | **open** |
+| **R-04-6** | MINOR | 5 *(+5)* | reviewer | A naive main..HEAD diff MISREADS section 8.3 as a regression that this slice did not make | **open** |
+| **A-04-13** | MAJOR | 5 *(+5)* | architect | The derivation R-04-1 asks for is already built, already fired, and no artifact carries its verdict | deferred |
+| **A-04-14** | MAJOR | 5 *(+5)* | architect | Section 13 asserts a property section 13 does not have, and it went stale inside the slice that wrote it | deferred |
+| **T-04-8** | MINOR | 5 *(+5)* | test-engineer | main.ts line 46 is now guarded; the general claim in the Stryker comment is still undischarged | **open** |
+| **A-04-15** | MAJOR | 7 *(+7)* | architect | Section 8.4 carried a sentence slice 04 made false, in the row an operator reads while looking at the counter | **open** |
+| **A-04-16** | MINOR | 7 *(+7)* | architect | Three stale as-built numbers, one of which argues against itself | **open** |
+| **A-04-17** | MINOR | 7 *(+7)* | architect | The ratchet made every arc42 addition self-funding, and what paid for it was genuine cross-artifact duplication | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**D-04-1** — ADR-0009 sized the cap of 16 on a premise that does not hold until slice 08's availability filter exists
+
+- *scenario:* The sharpest finding of this design, and it falls out of deferring the availability filter to slice 08 under ADR-0019's criterion. ADR-0009 sized the cap 'against contention depth, the only driver Bound-2 leaves' - true only of a candidate list ALREADY FILTERED to free resources. Until slice 08, a dealership with more than roughly 16 bays-plus-technicians can reach the cap WITH NO CONCURRENCY AT ALL. And QS-3's fixtures will not see it, because they seed exactly M. So the cap's justification and the cap's behaviour diverge in a way the slice's own tests are shaped not to notice.
+- *file:* `docs/adr/0009-candidate-ordering-and-attempt-cap.md`
+- *escalated* by orchestrator — FOR THE HUMAN. The cap of 16 is a Gate B number the human accepted, and it sits below Bound-2 additive bound at section 1.1 scale — so a capped refusal is EXPECTED today rather than the signal ADR-0009 intended it to be, and slice 09 AC-13 cannot pass until either the advisory pre-filter lands after slice 08 or the cap is raised. The architect twice declined to act on it because changing the number is not its authority, which is correct. Both remedies are recorded. Not a merge blocker and not a defect in this slice code: the cap behaves exactly as designed, and what is in question is the number the design was given.
+
+**T-04-1** — The recorded seed is a label, not a handle — AC-5's re-runnability leg is undelivered, and no retry can be forced deterministically
+
+- *scenario:* §3 binds seed in main.ts to randomInt(0, 2**32) and §5 records it on booking.refused. NOTHING CAN FEED A SEED BACK IN. A test reading seed: 3141592653 off a failed CI run has learned WHICH order was taken and has no way to take it again. AC-5's words are 'a failing test is re-runnable, not a flake'; the narrowing makes orderCandidates replayable and the SERVICE not. THE STRUCTURAL MEASUREMENT IS THE LOAD-BEARING PART, from arc42 §8.1: appointment carries exclusion constraints on both bay_id and technician_id plus the two dealership FKs, so blocking K technicians over an interval requires K bays at the same dealership - which blocks those bays too - and resources cannot be borrowed from a second dealership. Therefore NO STATIC FIXTURE CAN FORCE A FIRST-CANDIDATE FAILURE: if a free bay and a free technician exist, that pair is a reachable first draw. Without seed control no retry is forceable at all, which is AC-2's and AC-3's problem too. Remedy asked for: bookingSeed?: number from BOOKING_SEED in platform/config.ts, the shape §4 already gives ATTEMPT_CAP, unset in production. The test-engineer ACCEPTED THE COST rather than hiding it - ADR-0009 names 'the seed must actually vary' as a risk and an env var makes Order-A reachable by misconfiguration - and offered either mitigation the architect prefers. It also stated what it can still do if declined, and asked that the gate be told rather than letting AC-2, AC-3 and D-04-1 read as covered.
+- *file:* `docs/slices/04-design.md`
+- *accepted* by architect — (a) plus ADR-0021. The seed becomes a HANDLE rather than a label: BOOKING_SEED, unset in production. The test-engineer's STRUCTURAL measurement is what carried it - because both exclusion constraints and the dealership FKs apply, blocking K technicians requires K bays at the same dealership, so no static fixture can force a first-candidate failure and without seed control no retry is forceable at all. AC-5's re-runnability, AC-2, AC-3's technician half and D-04-1's assertable part all follow. The cost was accepted openly rather than hidden: ADR-0009 names 'the seed must actually vary' as a risk and an env var puts Order-A one variable away.
+
+**T-04-2** — AC-4 should be asserted at the shipped cap of 16; the cheap-fixture premise is wrong and cap=3 unpins ADR-0009's number
+
+- *scenario:* §5's third ruling calls a dealership deep enough to need 17 attempts expensive. It is about 52 inserts and ONE HTTP request - cheaper than the (20,8) concurrency case already in the suite, and needing no concurrency at all. Simulated against ADR-0020's loop: 16 bays all blocked gives 16 attempts and exit 'exhausted' (both conditions true, the tie); 17 bays all blocked gives 16 attempts and exit 'capped' with one bay untried. ONE FIXTURE PAIR, ORDER-INDEPENDENT, PINS THREE THINGS: that the cap is exactly 16, that capped and exhausted are distinguishable, and that ADR-0020's tie-break resolves to exhausted. At ATTEMPT_CAP=3 none of the three is pinned and the default survives only in an implementer-owned config unit test, which is not evidence about the loop. Robust to which constraint PostgreSQL names under double violation: the same counts hold on the technician side if index order flips. Not objecting to the cap being configurable - declining to ASSERT against a non-default value.
+- *file:* `docs/slices/04-design.md`
+- *accepted* by architect — (a), AND THE ARCHITECT REVERSED ITS OWN RULING. Reproduced: 16 bays blocked gives 16 attempts and exhausted (the tie exercised); 17 gives 16 and capped. About 52 inserts and one request - cheaper than the (20,8) case already in the suite. The 'expensive fixture' premise was simply wrong.
+
+**T-04-3** — D-04-1's spurious-refusal leg cannot become an AC-1 case — every candidate fixture is a coin flip
+
+- *scenario:* P(refused while capacity remained), one request, cap 16, unfiltered list: 20 bays with 17 pre-booked gives 0.35%; 24 with 20 gives 0.66%; 20 with 19 gives 20.0%; 30 with 29 gives 46.7%; 40 with 38 gives 35.4%. The sub-1% rows FLAKE-PASS and the 20-47% rows FLAKE-FAIL, and neither is admissible in a suite that runs on every slice for ever. A deterministic version needs the free resource forced past position 16, which needs T-04-1's seed. TWO CONSEQUENCES. D-04-1's exposure is SHARPER than the design states - it bites hardest when nearly all resources are booked, which is ADR-0004's own motivating case, the 08:00-Saturday burst at a large dealership. And T-04-2's capped fixture is the honest partial: it proves deterministically and with zero concurrency that a 17-resource dealership reaches the cap and reports capped, so ADR-0009's claim that 'a non-zero cap-exceeded counter in production means the cap is wrong' is ALREADY FALSE TODAY, before slice 08.
+- *file:* `docs/slices/04-design.md`
+- *accepted* by architect — (a). 0.35 to 46.7 percent per fixture, so the reason is recorded rather than the fixture, and T-04-2's capped fixture is named as D-04-1's standing partial evidence.
+
+**T-04-4** — AC-2's absence-of-25P02 assertion passes vacuously as a standalone case and the design does not name its fixture
+
+- *scenario:* Written as its own single-request case it passes on a build that refuses at the first conflict, on a build with no retry loop at all, and on a build whose booking route 404s. The observable is also indirect: 25P02 is not 23P01, so per ADR-0004 it surfaces as a 500 /problems/internal rather than a 409. Remedy: the assertion lives INSIDE AC-1's (20,8) case gated on a positive witness - with 20 racers and 8 bays, pigeonhole guarantees at least 12 racers conflict and retry, so max(attempt) >= 2 is CERTAIN rather than probable. Assert in order: one record with attempt >= 2 (without it the rest is vacuous), zero 500s, then no 25P02 anywhere. A transaction-wrapped loop fails the first two before the absence is reached, which makes the absence a confirmation with a good message rather than the evidence.
+- *file:* `docs/slices/04-design.md`
+- *accepted* by architect — (a). The 25P02 absence lives inside AC-1's (20,8) case, gated on an attempt >= 2 witness, so a transaction-wrapped loop fails the witness before the absence is reached.
+
+**I-04-3** — §3's nextCandidate signature does not compile, and the brand RELOCATES the index assertion rather than removing it
+
+- *scenario:* §3 states nextCandidate is TOTAL because a CandidateOrder is non-empty, and that the brand 'removes the last as string index assertion on the booking path'. Measured under this repo's own compilerOptions: the stated carrier verbatim is EXIT 2, twice TS2322, 'string \| undefined' not assignable to 'string'. The brand sits on the OBJECT; readonly bays: readonly string[] is untouched by it, so noUncheckedIndexedAccess still yields string \| undefined. The assertion moves from bookAppointment.ts into candidates.ts. The alternative carrier compiles at exit 0 with no index assertion anywhere: readonly [string, ...string[]] plus a nonEmpty() constructor destructuring head and tail. Its three as CandidateOrder minting casts are the house brand pattern used by interval.ts and duration.ts and are not matched by contended-resource-cast, whose pattern is /\bas\s+ContendedResource\b/. The stated carrier needs those casts TOO, plus the index assertions, so the tuple carrier strictly dominates.
+- *file:* `docs/slices/04-design.md`
+- *accepted* by architect — (a). Reproduced: a brand on the object leaves readonly string[] untouched, so nextCandidate is exit 2, twice TS2322. The step-1 claim that it 'removes the last as string' was FALSE - it relocated it. Carrier becomes readonly [string, ...string[]]: exit 0, no index assertion anywhere. The intent was right and the type stated for it was not, which is I-02-9's shape, so (a) rather than (c).
+
+**I-04-5** — D-04-1 is deferred to a slice whose own Out of scope forbids the work, so the deferral is permanent
+
+- *scenario:* VERIFIED BY THE ORCHESTRATOR. docs/slices/08-availability-query.md, Out of scope: 'Using the query to drive allocation. A-5 fixed booking as can I have 09:00, not find me something Tuesday; making availability authoritative would reintroduce check-then-act.' That covers exactly the work D-04-1 is deferred into, for a stated ADR-level reason, in a slice marked gate: light. ADR-0019's criterion is that the receiving slice makes the work CHEAPER OR STRONGER; a receiving slice whose own file forbids it makes it IMPOSSIBLE. AND THE FINDING IS SHARPER THAN THE FILTER PREMISE. ADR-0009 sized the cap BELOW the bound its own Bound-2 paragraph computed - 'worst case \|bays\| + \|technicians\| - 1 attempts: roughly 40' then 'a hard cap of 16' - so at ordinary scale the additive bound exceeds 16 WITH OR WITHOUT the filter; the filter changes only whether a conflict means a race or a busy resource. Two numbers already in the repository, the first verified by the orchestrator: slice 09's AC-12 fixture is 5 bays and 20 technicians, additive bound 24 > 16, and its AC-13 asserts an uncontended booking issues EXACTLY ONE INSERT on that fixture - which an unfiltered shuffled list over 500 appointments cannot promise. D-04-1 has a sibling and it is slice 09's. And QS-3's largest fixture (20,8) reaches at most 15 attempts against a cap of 16 - the design is right that it cannot see D-04-1, and the margin is ONE ATTEMPT. The remedy must name the slice-08 edit, distinguishing availability as an AUTHORITATIVE ALLOCATOR (excluded, correctly) from an ADVISORY PRE-FILTER still adjudicated by the insert and still retried. The implementer also offered the deferral a better argument than the design's: the pre-filter is only trustworthy because of QS-8, slice 08's property that every pair availability reports free is accepted by an INSERT - and then noted that this places the filter AFTER slice 08, reinforcing its own routing objection rather than answering it.
+- *file:* `docs/slices/08-availability-query.md`
+- *deferred* by architect — (b), both halves upheld, AND IT FAILS THE ARCHITECT'S OWN ADR-0019. Slice 09's AC-13 - one INSERT on 5 bays, 20 technicians, 500 appointments, additive bound 24 - is D-04-1's sibling. And arc42 §11's R-4 SAID THE OPPOSITE OF THE TRUTH: 'reaching 16 needs sixteen resources taken from under one request while it loops'. It needs sixteen CONFLICTS, and a merely busy resource supplies one with no concurrency at all. R-4 is rewritten. The filter still stays out but NOT FOR THE REASON GIVEN AT STEP 1 - 'no acceptance criterion needs it' was falsified. The surviving argument is the implementer's: the pre-filter is trustworthy only because of QS-8, and shipping it before the property that validates it is backwards. The slice-08 wording was prepared for the orchestrator and has been applied, distinguishing an AUTHORITATIVE ALLOCATOR (excluded, correctly) from an ADVISORY PRE-FILTER (in scope, after QS-8). THE ONE THING THE ARCHITECT DECLINED TO RULE: D-04-1's remedy is either the filter or a cap above the additive bound, and the cap of 16 is a number the human accepted at Gate B. Both remedies are recorded and neither chosen.
+
+**I-04-2** — ADR-0020's option table omits a shape that keeps both the arm placement and a structural loop bound
+
+- *scenario:* The ADR's 'Bad' names one direction only - move the cap out of the arm and tsc objects. The reverse is silent: add a PgOutcome variant that is retried, a second continue, and the loop is UNBOUNDED - no tsc error, no test, a hang. Under the loop-bound option that is unrepresentable. The ADR trades a structural liveness bound for a type guarantee and does not say so. Measured: arm-placed refusals PLUS a for(attempts = 1; attempts <= cap) header, with a throw at the tail, is exit 0 with no cast and no fabricated resource. The four-tree framing missed it because it assumed the tail had to RETURN a BookOutcome; the post-loop position needs to be unreachable, not a refusal, and a throw discharges noImplicitReturns without minting anything. The implementer does not insist on it - it insists the table stop reading as though the bound and the placement were alternatives, because they compose.
+- *file:* `docs/adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md`
+- *narrowed* by architect — (a) on the finding, DIFFERENT REMEDY - the only disagreement in the round. The finding is accepted in full and the architect calls it the sharpest thing in it: ADR-0020's 'Bad' named one direction only. Move the cap out of the arm and tsc objects; add a retried PgOutcome variant and the loop is UNBOUNDED - no tsc error, no test, a hang. Option A made that unrepresentable and Option E gave it up WITHOUT SAYING SO. The offered shape was not taken, for a reason worth keeping: a for header bounded by the CAP states one number twice, and two encodings of one number drift. The header carries BOUND-2's bound instead - bays.length + technicians.length, captured before the loop - so the structural liveness bound and the policy cap are two numbers doing two jobs, and the tail throws rather than refusing. Measured on the fully composed shape with all three type fixes: exit 0, no as string, no as ContendedResource. ADR-0020 gains row F, loses the one-directional Consequences and is now contested: true - the 700-word version is the one whose option table has lost a row.
+
+**I-04-4** — §4's ordering forces a branch tsc demands and no test can cover
+
+- *scenario:* §4 says one orderCandidates call AFTER the two empty-candidate guards. Measured: with no null handler, exit 2 TS2345 - tsc forces the branch to exist; with the handler after the guards, exit 0 and the branch is UNREACHABLE by construction, so no test can cover it, Stryker gets a free survivor, and an outcome must be invented for a state that cannot occur. Folding the guards INTO the null branch is exit 0 with both outcomes preserved and every branch reachable. It is also the better split: the domain owns 'is there a candidate', the application owns 'whose fault is it'.
+- *file:* `docs/slices/04-design.md`
+- *accepted* by architect — (a), finding and remedy. The empty-candidate guards fold into orderCandidates' null branch: every branch reachable, and the split is better - the domain owns 'is there a candidate', the application owns 'whose fault is it'.
+
+**I-04-8** — The seed source adds a node:crypto import that main.ts deliberately avoids
+
+- *scenario:* §3 binds seed to randomInt(0, 2**32), which needs an import. src/main.ts:50 states why newId uses the GLOBAL instead: 'crypto is a Node global, so injecting newId gives src/application no import and leaves no-dev-dep-in-src and the layering rules untouched (DA-02-1)'. Measured: crypto.getRandomValues(new Uint32Array(1))[0] ?? 0 compiles at exit 0 under this repo's options with types: ['node'], no import. A design choice re-derived one slice later against a rationale already written in the file it would change.
+- *file:* `docs/slices/04-design.md`
+- *accepted* by architect — (a). The crypto global, per main.ts:50's own stated reason (DA-02-1) - a design choice re-derived one slice later against a rationale already written in the file it would change.
+
+**S-01** — §6's (c) remedy requires superseding the ADR, and after four slices and two (c) rulings no ADR has ever superseded or been superseded
+
+- *scenario:* VERIFIED BY THE ORCHESTRATOR: all 21 ADRs carry supersedes: null AND superseded_by: null. §6's (c) row reads 'Loop back to step 1; supersede the ADR; revise (never delete) prior work' - unconditionally. Both (c) rulings correctly did not supersede anything: T-01-2 had no ADR to supersede, and T-02-9 PRODUCED ADR-0018 rather than replacing one. So an agent following the clause literally would either invent a supersession or quietly ignore the rule, and ignoring a rule is how rules die. The scribe's own framing is the sharpest part and is preserved: A §6 CLAUSE WITH ZERO INSTANCES AFTER FOUR SLICES IS EITHER DEAD OR ABOUT TO BE REACHED FOR THE FIRST TIME UNDER PRESSURE. It gave arc42 §13.4 the heading 'the supersession chain that does not exist' rather than implying one existed - a scribe declining to write the tidier sentence, which is exactly its job. FIXED: the clause is now conditional - 'supersede any ADR at fault' - and the added word was paid for out of §6's DCR preamble, which said the same thing twice. CLAUDE.md 1,537 -> 1,536, ratchet green.
+- *file:* `CLAUDE.md`
+
+**S-02** — §6.4's vote — a third role breaking a tie — has never been called, in four slices of adjudication
+
+- *scenario:* Zero occurrences in the event log, in any report, or anywhere under docs/. Every disagreement resolved in one round or went to the human. NOT fixed and not deleted: unlike S-01 the clause is not WRONG, it is unexercised, and the cases that would have used it were resolved by the mechanism §6 prefers - one round, then a decision. Recorded because an unexercised tie-break is a mechanism stated and never run, which is this project's signature shape pointed at its own constitution, and because the honest options are to use it once deliberately or to delete it.
+- *file:* `CLAUDE.md`
+
+**S-03** — The step-2 AGREE rounds at slices 00a, 00 and 01 produced no review.response events, so how a design was argued into shape is reconstructable but not from one event type
+
+- *scenario:* Only 3 review.response records exist in the whole log. §6 says the record of HOW a design was argued into shape is worth more than the amended design alone - and for three slices that record survives only as finding.raised pairs plus prompt files. Same family as O-29 and O-30, one level out: the orchestrator logged findings and rulings but not the round that produced them. Recorded rather than backfilled - inventing events for rounds that happened before the convention existed would be worse than a gap that is stated.
+- *file:* `docs/team-log/events.jsonl`
+
+**S-04** — The project counts its own signature defect shape as five, seven, eight and nine in four different files
+
+- *scenario:* Each count is over a different set and none is wrong in isolation; together they read as a single number that keeps changing. The scribe LEFT IT STANDING AND SAID SO rather than picking one, which is the right call for a role whose rule is that every claim cites an artifact - but the corpus should say the same thing about itself. The count as of slice 04 is 25 by ref: eight in the pilot plus seventeen since. Recorded for the retro rather than corrected in four places now, since the numbers are prose in documents that each meant something narrower.
+- *file:* `docs/DEFECTS.md`
+
+**S-05** — The video shot list is on the scribe's owned-file list and does not exist
+
+- *scenario:* Outside the README task's scope and correctly not written on the way past. A phase-6 deliverable; recorded so it is scheduled rather than discovered at the end.
+- *file:* `docs/video-shotlist.md`
+
+**T-04-5** — arc42 names the attempt cap ATTEMPT_CAP in 5.2 and BOOKING_ATTEMPT_CAP in 7 deployment env table, and does not list BOOKING_SEED at all
+
+- *scenario:* CLAUDE.md 4 resolves a slice-file-versus-arc42 disagreement by ruling arc42 wins; here arc42 disagrees with arc42, so the tie-break has nothing to break. The red does not depend on it - T-04-2 runs at the default - but the implementer loadConfig unit assertion does, and would be written against a name chosen by whichever section it read
+- *file:* `docs/arc42/05-building-blocks.md`
+- *accepted* by architect — (a), not (c) - no AC, QS or §2 clause fails either way, and ADR-0009 never named a variable at all (it says only a platform/config.ts value), so nothing is superseded. BOOKING_ATTEMPT_CAP wins, and NOT on incumbency: the unprefixed option cannot reach the consistency that is its whole argument, because BOOKING_SEED is already read at tests/support/service.ts:178, a test-engineer-owned file the architect may not edit. So the alternative does not buy one namespace, it freezes a one-of-two split permanently. Verified: zero unprefixed occurrences remain in docs/arc42, the slice design or src/. The shape-based guard was MEASURED and declined - nine backticked SHOUTING_SNAKE tokens in arc42, four of them not this service configuration (DOCKER_HOST is genuinely an env var and genuinely not part of the deployment contract), a 44 percent false-positive rate. The guard recommended instead anchors to code: set equality between env[...] keys in src/platform/config.ts and §7.3 first column
+
+**T-04-6** — A docs commit can silently disarm the red-proof discriminator: docs:check was failing at HEAD since ee868c3, which would have failed verify and made red-proof classify the red run as broken rather than as a red proof
+
+- *scenario:* 2.4 requires the red be OBSERVED. red-proof reads verify success as its precondition, so any unrelated docs staleness converts a genuine red into an unclassifiable run and the observation is lost. Repaired mechanically in a separate commit 6e5f7b5 (one derived summary line) so the red commit stayed tests-only; nothing yet PREVENTS the recurrence
+- *file:* `.github/workflows/verify.yml`
+
+**A-04-2** — ADR-0021 startup warn is R-7a stated mitigation and no test in any test-engineer-owned directory asserts it exists
+
+- *scenario:* The ADR answer to this makes ADR-0009 named risk one variable away is the startup line, and OQ-04-1 two-seed assertion. OQ-04-1 asserts the seeds; grep -rn warn tests/ returns only LOG_LEVEL fixtures and an unrelated health test. The mitigation for the risk this ADR knowingly created is unverified. Left for the reviewer at step 5 rather than raised as a DCR, because the red is committed and the implementer may still be writing it
+- *file:* `docs/adr/0021-the-booking-seed-is-overridable-by-environment.md`
+
+**A-04-3** — The word-budget counter ignores generated blocks, so a generated register can grow without limit and never register as pressure
+
+- *scenario:* Deleting four rows from §11 generated debt register freed exactly zero words. Not a defect - nobody authored those words - but anyone planning an edit against §11 remaining budget will be wrong in the same way the architect was, having budgeted 90 words of headroom and had none
+- *file:* `tools/docs/budget.mjs`
+
+**A-04-4** — F-04-1 third recurrence, with a second failure mode behind it: the committed baseline escapes non-ASCII codepoints, which JSON.stringify does not reproduce, so the obvious fix silently rewrites all 285 existing pins
+
+- *scenario:* A new ADR fails as unpinned and the message instructs a hand-edit of a file outside the architect directory. Taking the obvious route produced a 398-line diff on the exact file whose own error message says do NOT run --rebaseline, which rewrites every existing pin. Caught and rewritten as an 8-line append. The guard warns you off the dangerous command and then hands you a footgun that does the same thing
+- *file:* `tools/docs/adr-invariants.mjs`
+- *deferred* by orchestrator — OUT OF SLICE, not deferred for convenience. docs:adr-check warns you off --rebaseline because it rewrites every pin, then instructs a hand-edit that does the same thing, because the committed baseline escapes non-ASCII in a way JSON.stringify does not reproduce — 198 of 294 lines would change on a naive round-trip, which I verified. Home: tooling branch, orchestrator. ADR-0019 asks whether deferring makes the work cheaper or stronger, and the honest answer here is neither — this is not slice-04 work that is being postponed, it is project-tooling work that slice 04 happened to surface. Ruling it (b) would misuse the outcome; recording it with a named home and no slice attached is the accurate act. It is NOT a defect in this slice's code, and the gate is not held on it.
+
+**A-04-5** — The drift direction is diagnostic: BOOKING_SEED reached §5.2, §6.2 and §11 R-7a and never reached §7.3
+
+- *scenario:* §7.3 is the only one of those nobody opens during a slice. It is the deployment contract, and contracts nobody edits are exactly the ones that decay unnoticed. Generalises past environment variables and is the argument for anchoring the recommended guard to code rather than to prose
+- *file:* `docs/arc42/07-deployment-view.md`
+
+**A-04-6** — ADRs that cite each other STATUS rot, and §4 immutability then freezes the rot
+
+- *scenario:* ADR-0019 option-A analysis read ADR-0018 is proposed, and a merge does not rule it - a claim the same commit falsified. Removed while 0019 was still amendable. Had 0019 been accepted a week earlier that sentence would now be permanent and false. The rule: cite the DECISION, never the status
+- *file:* `docs/adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md`
+
+**I-04-10** — Slice 02 QS-2 concurrency test is a 44 percent flake under ADR-0009 Order-C, and it is green in the run we would merge on
+
+- *scenario:* Its header states candidate ordering is deterministic, so every racer attempts the same pair first, and it closes at line 208 asserting at least 2 attempts. Order-C removes that premise: with 24 bays and 1 technician a loser whose first draw is not the winning bay conflicts on the TECHNICIAN at attempt 1 and refuses correctly, wasting no attempt. Only a loser drawing the winning bay reaches a second attempt — about 56 percent. Measured 3 failures in 5 local runs; it passed in CI. Raised, not touched: test-engineer-owned file, section 5.
+- *file:* `tests/concurrency/no-technician-overlap.test.ts`
+- *accepted* by architect — The two-attempt claim is UNREPAIRABLE in this fixture — no permutation-independent version of it exists — so it is REMOVED, not substituted. Finding and remedy judged separately and a NARROWER remedy taken than the implementer offered: the terminal-state substitution is unnecessary because the file already carries claims that hold under every permutation (the 1/19 split, technicianConflicts >= 19, resource === technician, which is E-02-1 guard), and the loop-actually-looped obligation is already deterministic in candidate-retry AC-3 and gated in no-spurious-refusal AC-2. Header prose goes with the assertion, per I-02-9 which ruled the false comment the more dangerous half.
+
+**I-04-11** — ADR-0021 and slice-04 design section 4 both say loadConfig emits the startup warn; that sentence is false as built
+
+- *scenario:* The logger is constructed FROM the loadConfig return value, so at the moment BOOKING_SEED is read there is no logger, and writing to a stream from src/platform is the wrong fix for a module the leaf rule keeps free of behaviour. It ships as configWarnings, called in src/main.ts and emitted through pino. ADR-0021 was ratified accepted an hour earlier and is now immutable under section 4, so the instrument is a superseding ADR or a step-7 as-built correction, never an edit.
+- *file:* `docs/adr/0021-the-booking-seed-is-overridable-by-environment.md`
+- *accepted* by architect — NO SUPERSESSION. Superseding marks the DECISION as replaced, and the decision — option B, BOOKING_SEED, unset by default, one startup warn — is unchanged and correct as built. Only the emitting site is misstated and that was never the decision. Superseding to fix a sentence would tell every future reader that B was reversed. Instrument is an arc42 section 5.2 as-built correction at step 7, already inside slice 04 declared scope, plus a row in the scribe as-designed/as-built delta. Recorded as an IMPROVEMENT rather than apologetically: configWarnings is a pure function returning strings and is therefore assertable, where a logger.warn inside loadConfig would have been observable only through a stream.
+
+**I-04-12** — The env-var set-equality guard ADR-0022 recommended would not pass today: config.ts reads five variables, section 7.3 lists six
+
+- *scenario:* OTEL_EXPORTER_OTLP_ENDPOINT is listed and read by no code — the OTel SDK auto-configures from it at slice 09. The check needs an exemption for variables a LIBRARY reads, which is a design question rather than a rail to bolt on. Found by the implementer against the guard the architect proposed one step earlier.
+- *file:* `docs/adr/0022-application-configuration-is-prefixed-booking.md`
+- *narrowed* by architect — The guard survives with its SUBJECT corrected, and NOT by an exemption list — anyone can silence a guard by adding a name to one. The fix is a "Read by" column in section 7.3, so the check becomes set equality between the rows whose reader is src/platform/config.ts and the env keys in that file: still set equality, still zero false positives, and it now also enforces section 7.3 own read-once claim. Rows a LIBRARY reads are outside its reach by construction and the guard should say so rather than pretend. Third slice running in which the architect names a tools/ remedy it may not build (F-02-10, F-04-1).
+
+**I-04-13** — Design section 3 carrier needed no per-list cast, and the shape it specified would have reproduced I-04-4 one level down
+
+- *scenario:* Section 3 pairs a length-zero guard with a per-list cast, which asserts the fact the guard just established. Destructuring head from tail BUILDS the tuple and the head being undefined IS the emptiness test, so the two collapse into one reachable branch. Measured: tsc exit 0, TWO brand casts where section 3 predicted three, and no index assertion anywhere. The same file takes Fisher-Yates in SELECTION form rather than the in-place swap, because the swap needs two noUncheckedIndexedAccess assertions — the exact thing the tuple carrier was chosen to remove. Distribution measured uniform to plus or minus 1.7 percent across 8 bays over 100000 seeds.
+- *file:* `docs/slices/04-design.md`
+
+**A-04-7** — docs:refs put two project rules in contradiction and survived four slices by being prefix-lucky rather than correct
+
+- *scenario:* The slice-00a ruling and section 9 make the event log a finding DEFINITION site; refs.mjs read it only as a citation source, so a finding whose ref matched the design-local shape was reported as citing itself into the void. REF matches A-, D-, F-, DA- and OQ-, and findings are logged under T-, I-, S-, R-, O-, E-, J-, AB- and AC-, so no logged finding had ever collided until five architect findings landed as A-04-star, into a prefix that already meant "assumption defined in a design". Fixed in 7173b34 as a WIDENING strictly stronger than what it widens — the log is append-only and CI enforces it, so a definition recorded there can never be deleted. refs.mjs had no tests; it now has 16.
+- *file:* `tools/docs/refs.mjs`
+
+**A-04-8** — Blast radius of Order-C is exactly one file, and the structural reason is worth more than the finding
+
+- *scenario:* All nine test directories checked. The mirror test LOOKS like the symmetric twin and is SAFE: with one bay every permutation shares the same head bay, so every 23P01 includes a bay violation. A fixture is permutation-SAFE when the scarce resource is the singleton list, and permutation-DEPENDENT when it reasons about the ABUNDANT resource draw order. Both files have a singleton scarce resource; only the technician one narrated the abundant side. Four files carry stale premise PROSE with sound assertions and are fixed this slice, because I-02-9 ruled the false comment the more dangerous half.
+- *file:* `tests/concurrency/no-bay-overlap.test.ts`
+
+**A-04-9** — The tsc-versus-vitest gap and I-04-10 are one principle, and section 2.4 states only half of it
+
+- *scenario:* A check is evidence only if its verdict is CAUSED by what it names. Section 2.4 states one half — a test that has never failed is not evidence. The flake is the other half (a verdict not caused by the change under test) and vitest-transpiling-without-typechecking is the incomplete-check half (a verdict that never examined what it claims to). Declined as an arc42 section 11 row: CI already gates typecheck over src and tests, so the real gap is that section 7 "every implementer commit is green" uses a weaker local green than CI does, which is a tools/ remedy rather than architecture. Recommended to the human at the gate as a section 2.4 amendment with both instances as evidence; the architect cannot write it, because section 2 is NON-NEGOTIABLE and human-owned.
+- *file:* `CLAUDE.md`
+- *escalated* by orchestrator — FOR THE HUMAN, and correctly not ruled by anyone else. The architect recommended amending CLAUDE.md section 2.4 to state both halves of one principle — a check is evidence only if its verdict is CAUSED by what it names — with I-04-10 (a verdict not caused by the change under test) and the vitest-without-typecheck case (a verdict that never examined what it claims to) as the two instances. It declined to write it because section 2 is NON-NEGOTIABLE and human-owned, which is the right refusal. Carried to the gate rather than resolved, and it is not a merge blocker: section 2.4 as written is not wrong, it is incomplete.
+
+**A-04-10** — Section 7.3 preamble is false today, independently of any guard
+
+- *scenario:* It claims environment is read once in src/platform/config.ts while listing OTEL_EXPORTER_OTLP_ENDPOINT, which that file does not read. The architect step 7.
+- *file:* `docs/arc42/07-deployment-view.md`
+
+**A-04-11** — A-04-2 is only half discharged, and by the wrong owner
+
+- *scenario:* The ADR-0021 startup warn IS asserted, but in an implementer-owned unit test. R-7a mitigation for the risk ADR-0021 knowingly created is therefore guarded solely by a test the implementer may freely change. Still for the reviewer at step 5.
+- *file:* `tests/unit/platform/config.test.ts`
+
+**A-04-12** — The ORDER BY assertion became MORE load-bearing at this merge, not less, and its comment still says the opposite
+
+- *scenario:* The repository order is the shuffle stable input, so a recorded seed reproduces the draw only because that order is pinned. The comment still calls it F-02-7 substitute for a seed. Commit 994bfc5 fixed two other stale promises in the same file and missed this one.
+- *file:* `tests/unit/persistence/candidateRepository.test.ts`
+
+**T-04-7** — E-02-1 discrimination has migrated: two file headers claim a guarantee that now lives somewhere else
+
+- *scenario:* Beyond the assertion the ruling named, the header banner claimed THIS CASE CANNOT PASS WITHOUT THE RETRY LOOP. Under Order-C a loop-less build draws one candidate, conflicts on the technician and PASSES about 44 percent of the time, so the file is a 56 percent detector; the error-taxonomy AC-11 mirror is about 33 percent. Prose rather than an assertion, so it never made anything flaky — but it overstates what the fixture proves, and I-02-9 ruled the false comment the more dangerous half. The suite has NO hole: candidate-retry AC-3 catches a loop-less build exactly. The guarantee migrated; only the narration had not. Written into all three headers rather than proposed as a (b), with the explicit note that re-homing QS-2 discriminator is the orchestrator call and not the test-engineer.
+- *file:* `tests/concurrency/no-technician-overlap.test.ts`
+
+**O-34** — Slice 04 ran steps 1 through 4 with no pull request, against both section 7 and the step-1 draft-PR rule
+
+- *scenario:* Section 7 requires one branch and one PR per slice, and METHODOLOGY says the slice PR opens as a draft at step 1. Slice 04 had neither until step 5. Section 6 says every reply, disagreement and vote goes on the PR because the reasoning is the graded artifact — so nine objections, nine AGREE verdicts, a (b), a DCR and four ADR ratifications were recorded in docs/slices and the event log and nowhere a reviewer would look first. The record is complete and was in the wrong place. Nothing enforces the rule: slice-check does not require a PR to exist, so a slice can reach step 5 without one and report nothing wrong. Raised by the orchestrator against the orchestrator.
+- *file:* `docs/METHODOLOGY.md`
+
+**R-04-1** — arc42 section 7.3 was rewritten but is not in the slice declared arc42 scope
+
+- *scenario:* Commit 9dfde0d rewrites the environment-variable contract table and adds a normative sentence; the frontmatter declares only 6.2, 5.2 and 11, and design section 7 lists the same three. Section 10 Ready requires the arc42 scope declared, and F-04-3 shows the field was already amended once this slice to add 11, so the mechanism existed and was not used the second time. Graded MAJOR and deliberately NOT blocking: the reviewer card says block when arc42 moves SILENTLY, and the commit subject names 7.3 explicitly. The content is correct; the declaration is missing.
+- *file:* `docs/slices/04-candidate-allocation-and-retry.md`
+- *accepted* by architect — (a), and the finding was WIDER than the reviewer found: TWO arc42 sections moved undeclared, not one. 9dfde0d took 7.3; 4d172cc took 13 — scoped chore(04), plus 139 lines, 38 minutes EARLIER, and its subject line names nothing. Both now declared. Section 13 is scribe-owned prose and the architect declared it rather than exempting it, because the declaration governs the BRANCH and not the author — I-04-12 already ruled that nobody silences a guard by writing a name into it. One consequence recorded against the reviewer own criterion: it graded MAJOR-not-BLOCKING because 9dfde0d subject names 7.3, and by that same criterion 4d172cc is silent, so the correct grade for the pair was BLOCKING. The card was applied correctly to the instance it had.
+
+**R-04-2** — R-7a mitigation is unguarded at BOTH ends, and it is the one non-equivalent survivor of eight
+
+- *scenario:* The unit test pins config.ts:210 and :212 only. Deleting :213 — "It is for reproducing a run, never for production", the only sentence telling an operator what to do — leaves the suite green; that is the Stryker config.ts:213 survivor, and the test own comment claiming the wording is asserted is true of two of four fragments and false of the two that survived. Separately, config.warning occurs exactly once in the repository, at main.ts:46, asserted by no outside-in test, and stryker.config.mjs excludes main.ts on the ground that AC-2 asserts the wiring end to end — a justification true of the booking path and false of this line. Delete main.ts:46 and BOOKING_SEED runs Order-A in production unannounced while npm test, npm run mutation and depcruise all stay green.
+- *file:* `src/platform/config.ts`
+- *narrowed* by architect — The Stryker exclusion SURVIVES; its justification does not. vitest.mutation.config.ts includes tests/unit only, and src/main.ts is unimportable by a unit test BY CONSTRUCTION — it awaits app.listen() and calls process.exit at module scope — so mutating it produces a full set of uncovered survivors that say nothing about the tests. The old comment was not merely overstated but INVERTED: it claimed coverage where the truth is unreachability. Rejected alongside it: pointing the mutant command at the outside-in suites, which do exercise the file but run the built artifact under ADR-0013, so a tsc plus a Testcontainers PostgreSQL per mutant turns 33 seconds into hours while Stryker still scores an uninstrumented child process. The comment now states the true reason AND the cost: every line of main.ts is guarded by an outside-in assertion or by nothing, and the mutation score cannot tell which. Ownership split by what the line asserts: the mutate list is a section 10 Definition-of-Done statement and is the ARCHITECT s; the runner, thresholds and reporters are the reviewer instrument and were left untouched. The file now says so.
+
+**R-04-3** — No CI run exists for the commit that would merge
+
+- *scenario:* HEAD was 478af2d; the collected run 34019756105 is on 96d0971. 478af2d changes DEFECTS.md and events.jsonl, which are precisely the inputs to defects:check, the append-only check, the log schema check and the budget ratchet — four checks that had not run on the merge candidate. The reviewer ran them against the merge result itself and all pass.
+- *file:* `docs/team-log/events.jsonl`
+
+**R-04-4** — bookAppointment.ts:312 is an ESTABLISHED equivalent mutant, and the proof is stronger than what ADR-0020 and arc42 6.2 currently state
+
+- *scenario:* Not accepted on plausibility. Proof: only the conflict arm reaches continue, and every conflict prunes the head of the named list, so attempt k begins with S-(k-1) ids across two non-empty lists, giving k <= S-1. Corroborated by exhaustive search over all (B,T) in 1..9 squared, 8 seeds, and EVERY adversarial choice of which resource fires at each step: deepest attempt reached globally 17 against bound 18, minimum unused headroom exactly 1. The written documents say the tail is unreachable; this establishes the exact bound AND that it is tight.
+- *file:* `src/application/bookAppointment.ts`
+- *accepted* by architect — Taken into arc42 6.2 as a stated invariant, word-neutral at 1447 before and after. ADR-0020 cited, not edited. It earns its place because it is a DIFFERENT claim from "the tail is unreachable", with two consequences the old text did not support. First, <= is now recorded as DELIBERATE rather than harmless: if the bound is exact then <= and < admit the identical execution set, which invites a reader to delete the dead iteration — and that would be wrong, because under < a future PgOutcome variant that retried WITHOUT pruning would leave the loop quietly at the bound instead of meeting the throw. The one attempt of slack IS ADR-0020 row F fault detector, and nothing said that before. Second, D-04-1 becomes computable: 6.2 previously said only that 16 sits below the bound at 1.1 scale, and with the bound exact, capped is reachable IFF bays plus technicians is at least 18, because the deepest attempt must exceed the cap with both lists still non-empty and the exhausted tie-break eats the equals-17 case. The architect re-derived the proof rather than taking it, and stated the result as SUPREMUM AND ATTAINED rather than "always exactly S-1", because the latter would read as every run taking that many attempts, which is false and would have been a worse defect than the one being fixed.
+
+**R-04-5** — The mulberry32 survivors are equivalent for the contract, by more than the implementer claimed
+
+- *scenario:* The implementer said no test pins a particular permutation. The reviewer measured instead: head distribution over 8 bays by 100000 seeds, baseline 8/8 heads with max deviation 1.01 percent and chi-square 2.8 against a critical 24.3; mutant L66 max deviation 1.16 percent chi-square 5.2; mutant L69 max deviation 1.23 percent chi-square 5.3. Both mutants preserve permutation, determinism, seed-sensitivity, head-reachability AND uniformity, because subtracting an odd constant mod 2^32 is still a full-period bijection. Equivalent for the contract, not merely unasserted. Seven of eight survivors equivalent; one real.
+- *file:* `src/domain/candidates.ts`
+
+**R-04-6** — A naive main..HEAD diff MISREADS section 8.3 as a regression that this slice did not make
+
+- *scenario:* The branch was behind main by 57971b4, which edits arc42 8 and 11, and slice 04 rewrote 11 across 124 lines. Diffed against main alone, 8.3 shows ADR-0015 reverting from shipped in slice 02 to accepted and not yet written. The reviewer checked the MERGE rather than trusting it: merge-tree merges clean, the R-02-2 to D-02-1 rename survives, and against the merged tree every docs guard passes. CHECKED AND WITHDRAWN as a defect, recorded because the reverse-delta trap is live for the next reader. The orchestrator has since merged main into the branch.
+- *file:* `docs/arc42/08-crosscutting-concepts.md`
+
+**A-04-13** — The derivation R-04-1 asks for is already built, already fired, and no artifact carries its verdict
+
+- *scenario:* npm run slice:check 04 had been printing FAIL "hand-edited but not declared: 07-deployment-view.md, 13-ai-collaboration.md" since 13:15 — 98 minutes before step 5. R-01-7 asked for the derivation at slice 01 and O-14 built it in tools/slice/check.mjs; it is branch-selected precisely so a subject line cannot hide a mid-slice edit, strips generated markers, and reports UNVERIFIED rather than PASS when it cannot resolve a base. It works, and the reviewer re-deriving it by hand found ONE of the two files while the tool had both. So amend-the-declaration is the right remedy per instance but is not the answer: the field was already amended once this slice (04b7879 added 11) and still missed twice afterwards. THE GAP IS THE READING, NOT THE DERIVATION. check.run records carry CI job outcomes only, so the Ready/Done grid is computed on demand, printed to a terminal and persisted nowhere — a red line that no artifact carries is a red line nobody is accountable for. Remedy: check.run should carry the grid alongside the CI jobs, so a FAIL lands in the log, in the DEFECTS.md inputs and on the board. Fourth slice running in which the architect names a tools/ remedy it may not build (F-02-10, F-04-1, A-04-4).
+- *file:* `tools/team-log/collect-ci.mjs`
+- *deferred* by orchestrator — OUT OF SLICE, not deferred for convenience. check.run persists CI job outcomes only, so the slice:check Ready/Done grid is computed on demand, printed to a terminal and carried by no artifact. It printed the FAIL that would have caught R-04-1 for 98 minutes and nobody was accountable for reading it. Home: tooling branch, orchestrator. ADR-0019 asks whether deferring makes the work cheaper or stronger, and the honest answer here is neither — this is not slice-04 work that is being postponed, it is project-tooling work that slice 04 happened to surface. Ruling it (b) would misuse the outcome; recording it with a named home and no slice attached is the accurate act. It is NOT a defect in this slice's code, and the gate is not held on it.
+
+**A-04-14** — Section 13 asserts a property section 13 does not have, and it went stale inside the slice that wrote it
+
+- *scenario:* Line 46 reads "The register is generated from the log and cannot drift: 130 findings — 10 blocking, 71 major, 49 minor. Mean escape distance 1.66 steps." Written at 13:15. Measured now: 474 log records not 407, a 160-row register not 130, 10/86/64 not 10/71/49, 146 prompt files not 130, mean escape 1.76 not 1.66, and 84 of 160 awaiting a ruling rather than 67 of 130. Every cited number was wrong within two hours, before the reviewer even opened the branch. The register genuinely cannot drift; the SENTENCE SAYING SO is hand-copied prose and had already drifted, under a header reading "Sourced from artifacts, never memory". Fixable with a mechanism that already exists and is used twice: tools/docs/build.mjs has a general replaceBlock(marker) that section 9 and section 11 both consume, and section 13 has zero generated markers. A generated:team-stats block would regenerate these with docs:build and, better, make docs:check FAIL when they go stale — which is what caught this class everywhere else.
+- *file:* `docs/arc42/13-ai-collaboration.md`
+- *deferred* by orchestrator — OUT OF SLICE, not deferred for convenience. arc42 section 13 claims the register is generated from the log and cannot drift, then hand-copies six derived numbers, every one of which was wrong within two hours. The fix is a generated:team-stats block consuming the replaceBlock mechanism sections 9 and 11 already use, which would also make docs:check FAIL when the numbers go stale. Home: scribe plus tooling branch. ADR-0019 asks whether deferring makes the work cheaper or stronger, and the honest answer here is neither — this is not slice-04 work that is being postponed, it is project-tooling work that slice 04 happened to surface. Ruling it (b) would misuse the outcome; recording it with a named home and no slice attached is the accurate act. It is NOT a defect in this slice's code, and the gate is not held on it.
+
+**T-04-8** — main.ts line 46 is now guarded; the general claim in the Stryker comment is still undischarged
+
+- *scenario:* The architect corrected the exclusion justification while the test-engineer worked, and the new comment is true after the change — the test IS the remedy it names. But its stated cost, that every line of main.ts is guarded by an outside-in assertion or by nothing and the mutation score cannot tell which, remains exactly true. One line moved from the second class to the first; nothing tells a reader which other lines are in which.
+- *file:* `src/main.ts`
+
+**A-04-15** — Section 8.4 carried a sentence slice 04 made false, in the row an operator reads while looking at the counter
+
+- *scenario:* It said "a non-zero capped in production means the cap is wrong". Section 11.2 R-4 has falsified that since step 4, but 8.4 is what an operator reads AT the counter and still said the old thing. Fixed, and the declaration gains 8.4 rather than the edit going undeclared — I-04-12 rule applied to the architect own work, with A-04-13 as the precedent. ADR-0009 still contains the claim and correctly still does: it is history.
+- *file:* `docs/arc42/08-crosscutting-concepts.md`
+
+**A-04-16** — Three stale as-built numbers, one of which argues against itself
+
+- *scenario:* Section 11 QS-12 corpus said twenty-one files and three domain against a real twenty-two and four; 5.3 said src/domain has three files; and 5.3 lint:arch sample transcript quoted 54 modules against a real 86. The last is the pointed one: the same paragraph argues that a hand-written count goes stale silently, and its own transcript had. Replaced with a shape rather than a number.
+- *file:* `docs/arc42/05-building-blocks.md`
+
+**A-04-17** — The ratchet made every arc42 addition self-funding, and what paid for it was genuine cross-artifact duplication
+
+- *scenario:* Section 5 had 1 word of headroom, section 7 had 2, section 11 had 6. About 350 words of additions were paid for out of ADR-0008 repository-port argument retold at length in 5.2, section 11 R-9 --single-transaction consequence told twice with each copy pointing at the other, CLAUDE.md 2.2 restated, and 10.2 QS-10 and QS-12 definitions restated. Nothing unique was cut, and each payment is flagged inside its own commit message rather than left to be discovered in a diff. Recorded because it is evidence the ratchet is doing what the human asked for rather than merely blocking.
 - *file:* `tools/docs/budget.mjs`
 
 </details>

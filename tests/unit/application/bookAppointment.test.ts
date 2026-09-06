@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bookAppointment, toAppointmentView } from '../../../src/application/bookAppointment.js';
 import type { BookCommand, BookDeps } from '../../../src/application/bookAppointment.js';
 import type { Logger } from '../../../src/platform/logger.js';
+import { orderCandidates } from '../../../src/domain/candidates.js';
 import { scriptedDb } from '../helpers/stub-db.js';
 import type { ScriptedStep } from '../helpers/stub-db.js';
 
@@ -26,6 +27,42 @@ const SERVICE_TYPE = 'ssssssss-0000-4000-8000-000000000000';
 const CUSTOMER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const VEHICLE = 'vvvvvvvv-0000-4000-8000-000000000000';
 const APPOINTMENT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+/**
+ * The seed every case below injects. ADR-0009 makes ordering a pure function of
+ * `(bays, technicians, seed)`, so fixing the seed fixes the order — which is the whole reason the
+ * seed is a parameter rather than a global, and it is what lets a scripted database line its
+ * answers up with the candidates the loop actually draws.
+ */
+const SEED = 2_026_0904;
+
+/**
+ * The shipped cap (ADR-0009), restated here rather than imported: `config.ts` owns the constant
+ * and this file owns the BEHAVIOUR, and they must fail to different regressions. A test that
+ * imported the value could not notice the value changing.
+ */
+const ATTEMPT_CAP = 16;
+
+/** Six bays, enough for a permutation to be visible and for a prune to have survivors. */
+const bays6 = ['bay-0', 'bay-1', 'bay-2', 'bay-3', 'bay-4', 'bay-5'];
+
+/**
+ * The order the loop will draw, computed the way the loop computes it.
+ *
+ * This calls the SAME function under test's own dependency rather than restating a permutation,
+ * deliberately: a literal expectation here would be a transcription of `mulberry32` and would
+ * forbid the shuffle ever changing behind its contract. What it pins is the claim this file is
+ * about — the loop draws in the order the DOMAIN gives it, in that order, and does not re-sort,
+ * re-shuffle or ignore it.
+ */
+function drawn(
+  bays: readonly string[],
+  technicians: readonly string[],
+): { readonly bays: readonly string[]; readonly technicians: readonly string[] } {
+  const order = orderCandidates(bays, technicians, SEED);
+  if (order === null) throw new Error('the fixture has no candidates');
+  return order;
+}
 
 /** 10:00 local (BST) on Tuesday 2026-09-08, inside 08:00-18:00. */
 const STARTS_AT_MILLIS = Date.parse('2026-09-08T09:00:00.000Z');
@@ -59,7 +96,10 @@ function collectingDeps(): { deps: BookDeps; lines: LogLine[] } {
     trace: record('trace'),
     fatal: record('fatal'),
   } as unknown as Logger;
-  return { deps: { newId: () => APPOINTMENT, logger }, lines };
+  return {
+    deps: { newId: () => APPOINTMENT, seed: () => SEED, attemptCap: ATTEMPT_CAP, logger },
+    lines,
+  };
 }
 
 function pgError(code: string, constraint?: string): unknown {
@@ -249,6 +289,97 @@ describe('bookAppointment — the loop prunes PER VALUE (T-02-1)', () => {
   });
 });
 
+describe('bookAppointment — the loop walks ADR-0009 Order-C, not the repository\'s order', () => {
+  it('attempts the bays in the order the DOMAIN drew, one per attempt, keeping the technician', async () => {
+    // Six bays, three technicians, every attempt refused on the bay. The conflict lines are a
+    // transcript of the walk: six attempts, the six bays in the drawn order, and the SAME
+    // technician throughout because nothing ever pruned one.
+    {
+      const order = drawn(bays6, ['tech-0', 'tech-1', 'tech-2']);
+      const { db } = scriptedDb(
+        bookingScript({
+          bays: bays6,
+          technicians: ['tech-0', 'tech-1', 'tech-2'],
+          attempts: Array.from({ length: 6 }, () =>
+            attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+          ).flat(),
+        }),
+      );
+      const { deps, lines } = collectingDeps();
+      const outcome = await bookAppointment(db, deps, COMMAND);
+
+      const conflicts = lines.filter((l) => l.record['event'] === 'booking.conflict');
+      expect(
+        conflicts.map((l) => l.record['bayId']),
+        'the drawn order, in order — a loop that re-shuffled after each prune, or that walked ' +
+          'the repository order, disagrees here',
+      ).toEqual([...order.bays]);
+      expect(
+        [...new Set(conflicts.map((l) => l.record['technicianId']))],
+        'a bay conflict prunes no technician, so the head technician stands for all six attempts',
+      ).toEqual([order.technicians[0]]);
+      expect(outcome).toMatchObject({ kind: 'no-capacity', resource: 'bay', attempts: 6 });
+    }
+  });
+
+  it('draws EXACTLY ONE seed per request, so one request walks one permutation', async () => {
+    // Drawing per attempt would re-shuffle mid-loop: the survivors would change order behind the
+    // prune, and the seed the refusal reports would label a walk that never happened (ADR-0021).
+    let draws = 0;
+    const { deps } = collectingDeps();
+    const seeded = {
+      ...deps,
+      seed: (): number => {
+        draws += 1;
+        return SEED;
+      },
+    };
+    const { db } = scriptedDb(
+      bookingScript({
+        bays: bays6,
+        attempts: Array.from({ length: 6 }, () =>
+          attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+        ).flat(),
+      }),
+    );
+    await bookAppointment(db, seeded, COMMAND);
+    expect(draws).toBe(1);
+  });
+
+  it('a DIFFERENT seed attempts a different bay first — the injection is wired to the ordering', async () => {
+    // The point of Order-C over Order-A, at the level this module owns: two requests in the same
+    // process, identical in every other respect, do not queue on the same bay. The second seed is
+    // searched for rather than guessed, so this is a claim about the wiring and not about
+    // mulberry32's constants.
+    const head = drawn(bays6, ['tech-0']).bays[0];
+    let other = SEED;
+    for (let candidate = SEED + 1; candidate < SEED + 64; candidate += 1) {
+      const order = orderCandidates(bays6, ['tech-0'], candidate);
+      if (order !== null && order.bays[0] !== head) {
+        other = candidate;
+        break;
+      }
+    }
+    expect(other, 'no nearby seed permutes six bays differently — that is Order-A').not.toBe(SEED);
+
+    const firstBayOf = async (seed: number): Promise<unknown> => {
+      const { db } = scriptedDb(
+        bookingScript({
+          bays: bays6,
+          // Six, because the loop walks the whole list before refusing; only the FIRST is read.
+          attempts: Array.from({ length: 6 }, () =>
+            attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+          ).flat(),
+        }),
+      );
+      const { deps, lines } = collectingDeps();
+      await bookAppointment(db, { ...deps, seed: () => seed }, COMMAND);
+      return lines.find((l) => l.record['event'] === 'booking.conflict')?.record['bayId'];
+    };
+    expect(await firstBayOf(other)).not.toBe(await firstBayOf(SEED));
+  });
+});
+
 describe('bookAppointment — the refusal names the SCARCE resource (E-02-1, AC-11)', () => {
   it('names `bay` when the bay list empties, even with technicians left over', async () => {
     const { db } = scriptedDb(
@@ -259,7 +390,12 @@ describe('bookAppointment — the refusal names the SCARCE resource (E-02-1, AC-
       }),
     );
     const outcome = await bookAppointment(db, collectingDeps().deps, COMMAND);
-    expect(outcome).toEqual({ kind: 'no-capacity', resource: 'bay', attempts: 1 });
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'bay',
+      attempts: 1,
+      exit: 'exhausted',
+    });
   });
 
   it('names `technician` when the technician list empties, with 24 bays free', async () => {
@@ -277,7 +413,166 @@ describe('bookAppointment — the refusal names the SCARCE resource (E-02-1, AC-
       }),
     );
     const outcome = await bookAppointment(db, collectingDeps().deps, COMMAND);
-    expect(outcome).toEqual({ kind: 'no-capacity', resource: 'technician', attempts: 2 });
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'technician',
+      attempts: 2,
+      exit: 'exhausted',
+    });
+  });
+});
+
+describe("bookAppointment — the attempt cap, inside the 23P01 arm (AC-4, ADR-0020)", () => {
+  /** `n` bays, every attempt refused on the bay: the loop walks the list and nothing else. */
+  function allBaysBlocked(bayCount: number, conflicts: number): ReturnType<typeof scriptedDb> {
+    return scriptedDb(
+      bookingScript({
+        bays: Array.from({ length: bayCount }, (_unused, i) => `bay-${String(i)}`),
+        attempts: Array.from({ length: conflicts }, () =>
+          attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+        ).flat(),
+      }),
+    );
+  }
+
+  it(`stops at ${String(ATTEMPT_CAP)} attempts with candidates still untried, and says CAPPED`, async () => {
+    // Twenty bays, all blocked. The structural bound is 21, so nothing but the cap can stop this
+    // at 16 — which is the discrimination: a loop bounded by the cap and a loop bounded by
+    // Bound-2 differ here and nowhere else.
+    const { db, recorded } = allBaysBlocked(20, ATTEMPT_CAP);
+    const { deps, lines } = collectingDeps();
+    const outcome = await bookAppointment(db, deps, COMMAND);
+
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'bay',
+      attempts: ATTEMPT_CAP,
+      exit: 'capped',
+    });
+    expect(
+      recorded.filter((q) => q.sql.startsWith('insert')),
+      'four bays were never tried — that is what `capped` MEANS, and D-04-1 is the fact that it ' +
+        'happens at §1.1 scale',
+    ).toHaveLength(ATTEMPT_CAP);
+    expect(lines.filter((l) => l.record['event'] === 'booking.conflict')).toHaveLength(ATTEMPT_CAP);
+  });
+
+  it('EXHAUSTED WINS THE TIE when the last candidate is also the capped attempt', async () => {
+    // Sixteen bays, all blocked: at attempt 16 BOTH conditions hold — the bay list has just
+    // emptied and the cap has been reached. ADR-0020 gives it to `exhausted`, because nothing
+    // was left untried. Swapping the two lines in the arm is a mutant that only this case kills.
+    const { db } = allBaysBlocked(ATTEMPT_CAP, ATTEMPT_CAP);
+    const outcome = await bookAppointment(db, collectingDeps().deps, COMMAND);
+    expect(outcome).toEqual({
+      kind: 'no-capacity',
+      resource: 'bay',
+      attempts: ATTEMPT_CAP,
+      exit: 'exhausted',
+    });
+  });
+
+  it('a cap of 1 refuses after the FIRST attempt — the test is `>=`, not `>`', async () => {
+    const { db, recorded } = allBaysBlocked(4, 1);
+    const { deps } = collectingDeps();
+    const outcome = await bookAppointment(db, { ...deps, attemptCap: 1 }, COMMAND);
+    expect(outcome).toMatchObject({ attempts: 1, exit: 'capped' });
+    expect(recorded.filter((q) => q.sql.startsWith('insert'))).toHaveLength(1);
+  });
+
+  it('THE CAP IS NOT THE LOOP\'S BOUND — a cap of 1000 still refuses when the list empties', async () => {
+    // Bound-2 is what terminates the loop; the cap is a latency policy on top of it. If the two
+    // were one number this would attempt a thousand times against three bays.
+    const { db, recorded } = allBaysBlocked(3, 3);
+    const { deps } = collectingDeps();
+    const outcome = await bookAppointment(db, { ...deps, attemptCap: 1_000 }, COMMAND);
+    expect(outcome).toMatchObject({ attempts: 3, exit: 'exhausted' });
+    expect(recorded.filter((q) => q.sql.startsWith('insert'))).toHaveLength(3);
+  });
+});
+
+describe('bookAppointment — booking.refused is the only place the two exits differ (AC-4)', () => {
+  it('writes ONE line at the exhausted exit, carrying exit, resource, attempts and the seed', async () => {
+    const { db } = scriptedDb(
+      bookingScript({
+        bays: ['bay-0', 'bay-1'],
+        attempts: [
+          ...attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+          ...attempt({ error: pgError('23P01', 'no_bay_overlap') }),
+        ],
+      }),
+    );
+    const { deps, lines } = collectingDeps();
+    await bookAppointment(db, deps, COMMAND);
+
+    const refusals = lines.filter((l) => l.record['event'] === 'booking.refused');
+    expect(refusals).toHaveLength(1);
+    // The WHOLE record. A dropped `seed` is a refusal nobody can re-run (ADR-0021), a dropped
+    // `exit` makes the two refusals indistinguishable everywhere — the response and the table
+    // carry neither, so this line is the only observer either has.
+    expect(refusals[0]?.record).toEqual({
+      event: 'booking.refused',
+      exit: 'exhausted',
+      resource: 'bay',
+      attempts: 2,
+      seed: SEED,
+    });
+    expect(refusals[0]?.message, 'named in both pino renderings, as the conflict line is').toBe(
+      'booking.refused',
+    );
+  });
+
+  it('writes the SAME line at the capped exit, differing only in `exit`', async () => {
+    const { db } = scriptedDb(
+      bookingScript({
+        bays: ['bay-0', 'bay-1', 'bay-2'],
+        attempts: [...attempt({ error: pgError('23P01', 'no_bay_overlap') })],
+      }),
+    );
+    const { deps, lines } = collectingDeps();
+    await bookAppointment(db, { ...deps, attemptCap: 1 }, COMMAND);
+
+    expect(lines.find((l) => l.record['event'] === 'booking.refused')?.record).toEqual({
+      event: 'booking.refused',
+      exit: 'capped',
+      resource: 'bay',
+      attempts: 1,
+      seed: SEED,
+    });
+  });
+
+  it('reports the SEED THE REQUEST ACTUALLY DREW, not a fresh one', async () => {
+    // The line exists so a reported failure can be re-run under BOOKING_SEED. A number drawn at
+    // logging time would be a plausible-looking value that reproduces nothing.
+    const { db } = scriptedDb(
+      bookingScript({
+        bays: ['bay-0'],
+        attempts: [...attempt({ error: pgError('23P01', 'no_bay_overlap') })],
+      }),
+    );
+    const { deps, lines } = collectingDeps();
+    await bookAppointment(db, { ...deps, seed: () => 424_242 }, COMMAND);
+    expect(lines.find((l) => l.record['event'] === 'booking.refused')?.record['seed']).toBe(424_242);
+  });
+
+  it('writes NO refusal line when the booking is confirmed', async () => {
+    const { db } = scriptedDb(
+      bookingScript({ attempts: [...attempt({ rows: [insertedRow('bay-0', 'tech-0')] })] }),
+    );
+    const { deps, lines } = collectingDeps();
+    await bookAppointment(db, deps, COMMAND);
+    expect(lines.filter((l) => l.record['event'] === 'booking.refused')).toEqual([]);
+  });
+
+  it('writes no refusal line for a 40P01 or a 23503 — neither is a capacity refusal', async () => {
+    for (const error of [
+      pgError('40P01'),
+      pgError('23503', 'appointment_technician_qualified'),
+    ]) {
+      const { db } = scriptedDb(bookingScript({ attempts: [...attempt({ error })] }));
+      const { deps, lines } = collectingDeps();
+      await bookAppointment(db, deps, COMMAND);
+      expect(lines.filter((l) => l.record['event'] === 'booking.refused')).toEqual([]);
+    }
   });
 });
 
@@ -296,17 +591,20 @@ describe('bookAppointment — the conflict line is the observer AC-3 and AC-4 re
     const { deps, lines } = collectingDeps();
     await bookAppointment(db, deps, COMMAND);
 
+    const order = drawn(['bay-0', 'bay-1'], ['tech-0']);
     const conflicts = lines.filter((l) => l.record['event'] === 'booking.conflict');
     expect(conflicts).toHaveLength(2);
     // The whole first record, so a dropped field is a failure here rather than at slice 09 when
-    // QS-13's span is built from the same three facts.
+    // QS-13's span is built from the same three facts. The pair is the one `orderCandidates` put
+    // at the head under SEED, not the one the repository returned first: a loop that ignored the
+    // order and walked the candidate list as read would fail here for every seed that permutes.
     expect(conflicts[0]?.record).toEqual({
       event: 'booking.conflict',
       constraint: 'no_bay_overlap',
       resource: 'bay',
       attempt: 1,
-      bayId: 'bay-0',
-      technicianId: 'tech-0',
+      bayId: order.bays[0],
+      technicianId: order.technicians[0],
     });
     expect(conflicts.map((l) => l.record['constraint'])).toEqual([
       'no_bay_overlap',

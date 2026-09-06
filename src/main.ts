@@ -22,7 +22,7 @@ import { checkHealth } from './application/checkHealth.js';
 import { readAppointment } from './application/readAppointment.js';
 import { buildServer } from './http/server.js';
 import { closeDb, createDb } from './persistence/db.js';
-import { ConfigError, loadConfig } from './platform/config.js';
+import { ConfigError, configWarnings, loadConfig } from './platform/config.js';
 import { createLogger } from './platform/logger.js';
 
 function loadConfigOrExit(): ReturnType<typeof loadConfig> {
@@ -41,12 +41,27 @@ function loadConfigOrExit(): ReturnType<typeof loadConfig> {
 
 const config = loadConfigOrExit();
 const logger = createLogger(config);
+// ADR-0021's announcement, at the first moment there is anything to announce it with. The
+// wording lives beside the field in `config.ts`; emitting it is the composition root's job.
+for (const warning of configWarnings(config)) logger.warn({ event: 'config.warning' }, warning);
 const db = createDb(config, { logger });
 // PARTIAL APPLICATION, per 00a's shape: `buildServer` receives already-bound use cases and never
 // the handle, because `http-must-not-reach-persistence` forbids the edge from even NAMING the
 // handle's type. `crypto` is a Node global, so injecting `newId` gives `src/application` no
 // import and leaves `no-dev-dep-in-src` and the layering rules untouched (DA-02-1).
-const bookDeps = { newId: (): string => crypto.randomUUID(), logger };
+const bookDeps = {
+  newId: (): string => crypto.randomUUID(),
+  // ADR-0009's seed, drawn per request from the GLOBAL `crypto` for the same reason `newId`
+  // takes it (I-04-8): `node:crypto`'s `randomInt` would be an import in a file that composes
+  // every layer, and the global costs nothing. `?? 0` is `noUncheckedIndexedAccess` on a
+  // one-element array — `getRandomValues` fills it or throws, so the fallback is unreachable and
+  // a zero seed would be a perfectly ordinary seed anyway.
+  // ADR-0021: `BOOKING_SEED`, when set, IS the seed for every request. Unset — the default and
+  // the only production setting — each request draws its own.
+  seed: (): number => config.bookingSeed ?? crypto.getRandomValues(new Uint32Array(1))[0] ?? 0,
+  attemptCap: config.attemptCap,
+  logger,
+};
 const app = buildServer({
   logger,
   checkHealth: async () => checkHealth(db),

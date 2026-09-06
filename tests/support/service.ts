@@ -122,7 +122,37 @@ async function freePort(): Promise<number> {
  */
 export async function startService(options: {
   databaseUrl: string;
-  logLevel?: string;
+  /**
+   * `LOG_LEVEL` for the child. Omitted, it is `silent` — a test that asserts nothing about
+   * stdout should not have to read past it.
+   *
+   * **`null` means DO NOT SET IT AT ALL**, and it is not a synonym for a level name. The
+   * child then runs at the level the artifact itself defaults to, which is the level a
+   * deployment that configures nothing runs at. R-7a's mitigation is a line an OPERATOR
+   * sees, so the only honest place to assert it is there: a `warn` that is only reachable
+   * at `trace` is not a mitigation, and asserting it at `trace` would not notice. Any
+   * `LOG_LEVEL` inherited from this process is deleted rather than forwarded, so the
+   * child's level is the artifact's own default and never the runner's environment.
+   */
+  logLevel?: string | null;
+  /**
+   * `BOOKING_SEED` — ADR-0021, granted at slice 04 step 2 (objection T-04-1).
+   *
+   * Unset is the default and the only production setting: every request draws its own seed.
+   * Set, every request in the spawned process uses THIS one, which is what makes AC-5's
+   * "the same seed, the same choices" assertable end to end rather than only over the pure
+   * ordering function.
+   *
+   * IT MUST NOT BE SET IN A CONCURRENCY CASE. A constant seed gives every racer the same
+   * permutation, which IS ADR-0009's Order-A — the degeneracy the shuffle exists to remove —
+   * so setting it in QS-3 would make the scenario that proves the shuffle spreads contention
+   * test the opposite. `tests/concurrency/no-spurious-refusal.test.ts` passes nothing here.
+   *
+   * NARROW ON PURPOSE. This is not a general `env` escape hatch: a helper that forwarded an
+   * arbitrary environment would let a later test override `DATABASE_URL` or `NODE_ENV` from a
+   * call site, and the harness's job is to make the spawned artifact the shipped one.
+   */
+  bookingSeed?: number;
 }): Promise<StartAttempt> {
   const cwd = process.cwd();
   const entrypoint = resolve(cwd, ENTRYPOINT);
@@ -134,6 +164,8 @@ export async function startService(options: {
     `  cwd          ${cwd}`,
     `  PORT         ${port}`,
     `  DATABASE_URL ${options.databaseUrl}`,
+    `  LOG_LEVEL    ${options.logLevel === null ? "(unset — the artifact's own default)" : (options.logLevel ?? 'silent')}`,
+    `  BOOKING_SEED ${options.bookingSeed === undefined ? '(unset — a seed per request)' : String(options.bookingSeed)}`,
     `  entrypoint   ${entrypoint} (${existsSync(entrypoint) ? 'exists' : 'DOES NOT EXIST'})`,
   ].join('\n');
 
@@ -142,15 +174,25 @@ export async function startService(options: {
   // streams. It is written out rather than asserted so that changing the tuple below is a
   // compile error here instead of a lie the compiler was told to believe.
   let child: ChildProcessByStdio<null, Readable, Readable>;
+  // `logLevel: null` asks for no LOG_LEVEL in the child at all, so the inherited one is
+  // removed first: spreading `process.env` after it would put the runner's level back.
+  const inherited = { ...process.env };
+  if (options.logLevel === null) delete inherited['LOG_LEVEL'];
   try {
     child = spawn(argv[0] as string, argv.slice(1), {
       cwd,
       env: {
-        ...process.env,
+        ...inherited,
         DATABASE_URL: options.databaseUrl,
         PORT: String(port),
-        LOG_LEVEL: options.logLevel ?? 'silent',
+        ...(options.logLevel === null ? {} : { LOG_LEVEL: options.logLevel ?? 'silent' }),
         NODE_ENV: 'test',
+        // Spread rather than `BOOKING_SEED: undefined`: `spawn` renders an undefined value
+        // as the literal string "undefined" on some platforms, and "unset" is a distinct
+        // configuration from "set to garbage" — ADR-0021 turns on exactly that difference.
+        ...(options.bookingSeed === undefined
+          ? {}
+          : { BOOKING_SEED: String(options.bookingSeed) }),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

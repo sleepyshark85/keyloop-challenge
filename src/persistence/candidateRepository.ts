@@ -9,16 +9,21 @@
  * in tests/architecture is what keeps it that way.
  *
  * arc42 §5.2 calls this module "the ADVISORY free-bay and free-qualified-technician read" and
- * §6.2 step 5 has it consulting availability. Both are right about the FINISHED system. But an
- * advisory read is only safe because ADR-0004's loop makes every suggestion get adjudicated, and
- * this slice should not introduce the read before the mechanism that makes trusting it impossible
- * is visible next to it. In slice 02 there is no availability read IN EXISTENCE, so there is no
- * read whose result could be trusted — check-then-act is not merely absent from the diff, it has
- * no subject. Slice 04 adds the availability filter in the same slice as ADR-0009's ordering and
- * QS-3, where the read and the reason it is advisory arrive together.
+ * §6.2 step 5 has it consulting availability. Both are right about the FINISHED system. There is
+ * still no availability read here, so check-then-act is not merely absent from the diff — it has
+ * no subject.
  *
- * The cost is the pessimism the slice file already scopes: a request may be refused while an
- * untried bay is free, until slice 04. Nothing in AC-1 to AC-19 depends on it not being.
+ * SLICE 04 DID NOT ADD THE FILTER, and the reason is better than the one slice 02 recorded here.
+ * It is not that no acceptance criterion needs it: the pre-filter is only TRUSTWORTHY because of
+ * QS-8 — every pair availability reports free is accepted by an `INSERT` — and QS-8 is slice 08's
+ * property test. Shipping the filter before the property that validates it is backwards, so it
+ * lands after slice 08 (04-design.md §5, §8).
+ *
+ * The cost is D-04-1, and it is now a measured number rather than a scoped pessimism: with no
+ * filter the candidate list is every bay and every qualified technician, so
+ * `|bays| + |technicians| - 1` exceeds ADR-0009's cap of 16 at §1.1 scale and a request CAN be
+ * refused with an untried free bay behind the cap. `tests/acceptance/candidate-retry.test.ts`'s
+ * seventeen-bay case is that refusal, standing evidence, deliberately.
  *
  * `CandidateSet` IS TWO LISTS OF IDS AND NOTHING ELSE. It has no field that could mean "free", no
  * timestamp and no freshness marker — there is nothing in the type for a later reader to trust.
@@ -33,9 +38,11 @@ export interface CandidateSet {
 }
 
 /**
- * Both orderings are DETERMINISTIC and that is F-02-7's substitute for ADR-0009's seed: there is
- * no seed in slice 02, because the seeded shuffle and the attempt cap are slice 04's. A
- * deterministic order is re-runnable by construction with nothing to record.
+ * Both orderings are deterministic, and NOTHING DOWNSTREAM MAY RELY ON THAT any more. Slice 04's
+ * `orderCandidates` permutes both lists from a per-request seed (ADR-0009's Order-C), so the
+ * `ORDER BY` here decides only what a debugging `SELECT` looks like — it is stability for the
+ * reader, not allocation order. F-02-7's "a deterministic order is re-runnable with nothing to
+ * record" is retired: what is recorded now is the seed, on `booking.refused` (ADR-0021).
  */
 export async function candidateResources(
   db: Db,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigError, LOG_LEVELS, loadConfig } from '../../../src/platform/config.js';
+import {
+  ConfigError,
+  DEFAULT_ATTEMPT_CAP,
+  LOG_LEVELS,
+  configWarnings,
+  loadConfig,
+} from '../../../src/platform/config.js';
 
 /**
  * `loadConfig` is the one place arc42 §7.3's "fails the process rather than surfacing as a
@@ -21,6 +27,7 @@ describe('loadConfig', () => {
       databaseUrl: 'postgresql://keyloop:keyloop@127.0.0.1:5432/keyloop',
       port: 3000,
       logLevel: 'warn',
+      attemptCap: 16,
     });
   });
 
@@ -93,6 +100,98 @@ describe('loadConfig', () => {
  * says so: blanking the heading, the bullet prefix or the list separator changed nothing
  * any test could see.
  */
+describe('BOOKING_SEED — ADR-0021, unset by default and announced when it is not', () => {
+  it('IS ABSENT FROM A CONFIGURATION THAT DOES NOT SET IT', () => {
+    // Not `undefined`, absent. Unset is the production setting and the difference between the
+    // two is the difference between "every request draws its own seed" and "someone pinned the
+    // order" — a reader must not have to guess which one a `bookingSeed` key means.
+    expect('bookingSeed' in loadConfig(VALID)).toBe(false);
+  });
+
+  it('reads an integer seed', () => {
+    expect(loadConfig({ ...VALID, BOOKING_SEED: '424242' }).bookingSeed).toBe(424_242);
+    expect(loadConfig({ ...VALID, BOOKING_SEED: '0' }).bookingSeed, 'zero is a seed').toBe(0);
+    expect(loadConfig({ ...VALID, BOOKING_SEED: ' 7\n' }).bookingSeed, 'padded').toBe(7);
+  });
+
+  it('treats an EMPTY value as unset rather than as a problem', () => {
+    // `BOOKING_SEED=` in a `.env` file, or a harness spreading an empty string, is the ordinary
+    // production configuration and must not fail the process.
+    expect('bookingSeed' in loadConfig({ ...VALID, BOOKING_SEED: '' })).toBe(false);
+    expect('bookingSeed' in loadConfig({ ...VALID, BOOKING_SEED: '   ' })).toBe(false);
+  });
+
+  it('REFUSES A MALFORMED SEED rather than ignoring it', () => {
+    // Ignoring it is the dangerous branch: an operator reproducing an incident would believe the
+    // order was pinned while every request kept drawing its own, and nothing would say otherwise.
+    for (const raw of ['banana', '-1', '1.5', '1e9', '0x10']) {
+      expect(() => loadConfig({ ...VALID, BOOKING_SEED: raw }), raw).toThrowError(/BOOKING_SEED/);
+    }
+  });
+
+  it('refuses a seed above uint32 — the range `main.ts` actually draws from', () => {
+    expect(loadConfig({ ...VALID, BOOKING_SEED: '4294967295' }).bookingSeed).toBe(4_294_967_295);
+    expect(() => loadConfig({ ...VALID, BOOKING_SEED: '4294967296' })).toThrowError(
+      /BOOKING_SEED must be at most 4294967295/,
+    );
+  });
+
+  it('warns EXACTLY ONCE when it is set, naming the consequence, and never when it is not', () => {
+    // ADR-0021 buys back the word "silently" from ADR-0009's named risk with this line and
+    // nothing else. A warning that did not say WHAT the consequence is would be a line nobody
+    // acts on, so the wording is asserted, not merely the count.
+    expect(configWarnings(loadConfig(VALID))).toEqual([]);
+    const warnings = configWarnings(loadConfig({ ...VALID, BOOKING_SEED: '99' }));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('BOOKING_SEED=99');
+    expect(warnings[0], 'it must name the degeneracy, not merely report the value').toMatch(
+      /Order-A/,
+    );
+  });
+});
+
+describe('BOOKING_ATTEMPT_CAP — ADR-0009\'s cap, ADR-0022\'s name', () => {
+  it('defaults to the shipped cap when it is unset', () => {
+    expect(loadConfig(VALID).attemptCap).toBe(DEFAULT_ATTEMPT_CAP);
+    expect(loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '' }).attemptCap).toBe(DEFAULT_ATTEMPT_CAP);
+  });
+
+  it('reads an integer in range', () => {
+    expect(loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '40' }).attemptCap).toBe(40);
+    expect(loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: ' 1 ' }).attemptCap).toBe(1);
+    expect(loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '1000' }).attemptCap).toBe(1000);
+  });
+
+  it('REFUSES ZERO, and that bound is load-bearing (I-04-7)', () => {
+    // ADR-0020 puts the cap's test inside the 23P01 arm, so it is reached only after a
+    // classification: there is no refusal exit before the first attempt, and a cap of 0 would
+    // behave EXACTLY as 1. An operator setting it to zero to mean "attempt nothing" would get
+    // one attempt and a refusal, with nothing anywhere saying so.
+    expect(() => loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '0' })).toThrowError(
+      /BOOKING_ATTEMPT_CAP must be between 1 and 1000/,
+    );
+  });
+
+  it('refuses a value past the upper rail, and a malformed one', () => {
+    expect(() => loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: '1001' })).toThrowError(
+      /BOOKING_ATTEMPT_CAP/,
+    );
+    for (const raw of ['sixteen', '-1', '1.5', '16 attempts']) {
+      expect(() => loadConfig({ ...VALID, BOOKING_ATTEMPT_CAP: raw }), raw).toThrowError(
+        /BOOKING_ATTEMPT_CAP must be an integer/,
+      );
+    }
+  });
+
+  it('is 16 by default — the CONSTANT, asserted unconditionally', () => {
+    // Unconditional, and deliberately duplicated with the acceptance suite (I-04-7, T-04-2): the
+    // loop test guards the BEHAVIOUR at the cap and this guards the CONSTANT, and they fail to
+    // different regressions. A cap that quietly became 32 would still pass a test that read the
+    // constant to compute its expectation.
+    expect(DEFAULT_ATTEMPT_CAP).toBe(16);
+  });
+});
+
 describe('ConfigError', () => {
   const thrownBy = (env: NodeJS.ProcessEnv): ConfigError => {
     try {

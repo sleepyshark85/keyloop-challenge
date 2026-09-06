@@ -1,9 +1,9 @@
 ---
 id: "04"
 title: Candidate allocation and retry — no refusal while capacity remains
-status: ready
+status: done
 depends_on: ["02"]
-arc42: ["§6.2", "§5.2"]
+arc42: ["§6.2", "§5.2", "§7.3", "§8.4", "§11", "§13"]
 adr: [4, 9]
 quality_scenarios: [QS-3]
 loopbacks: 0
@@ -53,3 +53,61 @@ Beyond `CLAUDE.md` §10:
 - The pruning rule is the architect's own addition and was flagged at Gate B as theoretically
   over-eager if a blocking appointment is cancelled mid-loop. The reviewer checks that case
   explicitly; if it is real, it is a `(b)` deferral, not a defect.
+
+## I-04-10 — ruled (a), step 4, provisional until the gate
+
+`CLAUDE.md` §6 makes "update the slice file" the remedy for (a), so the ruling lands here.
+
+**The defect.** ADR-0009's Order-C removes the premise `tests/concurrency/no-technician-overlap.test.ts`
+states in its own header. With 24 bays and 1 technician a loser conflicts on the **technician** at
+attempt 1 and refuses correctly unless it drew the winner's bay, so the closing distinct-attempt
+assertion holds only at `1 − (23/24)¹⁹ ≈ 0.56`. The implementer's measurement is confirmed.
+
+**Why (a).** Not **(c)**: (c) supersedes an ADR at fault and returns to step 1 — ADR-0009, this
+design and the implementation are all correct, and nothing in slice 04 fails. Not **(b)**: (b) merges
+as-is, and this cannot, because it is green in the merge run 56 % of the time. What (b) would cost is
+nameable — **§2.4**. A suite failing ~44 % independently of the change under test makes "red observed
+in CI", and its green counterpart, non-evidential for slice 05 onward. No loopback consumed (0 of 2);
+resume from step 3. Precedent: I-02-9, a step-4 test defect ruled (a). It failed **loudly**; this one
+fails in the passing direction, which is strictly worse.
+
+**The obligation — the assertion is the test-engineer's to write (§5).** The two-attempt claim is
+unrepairable in this fixture and must be **removed, not substituted**. What must still hold, and
+already does under every permutation: the 1/19 split, `technicianConflicts >= 19`, and
+`resource === 'technician'` — which is E-02-1's guard. The *loop actually looped* obligation needs no
+new home: it is deterministic in `tests/acceptance/candidate-retry.test.ts` AC-3 (exactly
+`['1:no_bay_overlap','2:no_bay_overlap']`, both bays blocked) and gated in
+`tests/concurrency/no-spurious-refusal.test.ts` AC-2 (`max(attempt) >= 2`). The header prose goes
+with the assertion. Verified by repeated runs, not one green.
+
+**Blast radius — one file breaks; the rest was checked and withdrawn.** Every other assertion is
+permutation-independent. `no-bay-overlap.test.ts` is the mirror and is safe *because* its scarce
+resource is the singleton list; `error-taxonomy.test.ts`'s two AC-11 cases assert terminal state
+only; `no-spurious-refusal.test.ts` and `candidate-retry.test.ts` were authored against the shuffle.
+Four files carry stale premise **prose** with sound assertions — `no-bay-overlap.test.ts`,
+`error-taxonomy.test.ts`, `tests/support/booking.ts` (test-engineer) and
+`tests/unit/persistence/candidateRepository.test.ts` (implementer, `ORDER BY` is now the shuffle's
+stable *input*, which is a better reason than the one recorded). Non-blocking, but fixed this slice:
+I-02-9 ruled the false comment the more dangerous half.
+
+## A-04-13 — the declaration is amended, and the gate had already said so
+
+Frontmatter `arc42:` gains **§7.3** and **§13**. Both moved on this branch; neither was declared.
+
+- **§7.3** — `9dfde0d`, the environment table and its contract sentence (T-04-5, ADR-0022). Mine.
+- **§13** — `4d172cc`, scoped `chore(04)`, +139 lines, and `ee868c3`. Scribe-owned prose, but the
+  declaration governs the **branch**, not the author, so §13 is declared rather than exempted —
+  I-04-12's rule, that nobody silences a guard by writing a name into it.
+
+Ruled **(a)**: the content of both edits is correct and only the declaration was missing, so no AC,
+QS or §2 clause fails either way. No loopback (0 of 2).
+
+**The derivation the finding asks for exists and had already fired.** `npm run slice:check 04`
+prints `FAIL · arc42 edits match the declaration · hand-edited but not declared:
+07-deployment-view.md, 13-ai-collaboration.md`. It has been red since `4d172cc` at 13:15 — 98
+minutes before step 5 — because R-01-7 asked for exactly this and O-14 built it, branch-selected
+so a subject line cannot hide a mid-slice edit. The reviewer re-derived it by reading the diff and
+found one of the two files; the tool had both. **What is missing is the reading, not the
+derivation**: `check.run` records CI job outcomes only, so no artifact carries this verdict and
+nothing failed loudly. Carrying the `slice:check` grid into `check.run` is a `tools/` change and
+not the architect's (F-02-10, F-04-1, A-04-4 — the fourth slice running).

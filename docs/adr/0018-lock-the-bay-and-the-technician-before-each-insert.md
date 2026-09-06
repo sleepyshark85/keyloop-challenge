@@ -1,7 +1,7 @@
 ---
 id: "0018"
 title: Lock the bay and the technician before each insert, and treat a deadlock as an internal fault
-status: proposed
+status: accepted
 date: 2026-09-06
 supersedes: null
 superseded_by: null
@@ -21,6 +21,13 @@ ai-input: >
   against `postgres:16-alpine` on this repository's own migrations, which inverted the
   architect's own first draft: that draft was the obvious remedy, retry with better constants,
   and the measurement shows it livelocks.
+
+  RATIFIED `accepted` on 2026-09-06 by the architect under the human's standing delegation, the
+  human being absent. Slice 02 merged without its gate ruling it — arc42 §11's rule is that a
+  merge does not move an ADR out of `proposed` — so it stood unaccepted while slice 04 was built
+  on it and slices 06 and 07 inherited its lock obligation. Nothing found since narrows it: the
+  implementer's A-04-1 checked the deadlock-freedom argument against the code and found it holds
+  for three independent reasons where this record gives one.
 ---
 
 ## Context and problem statement

@@ -52,9 +52,38 @@ export default {
   // what makes "Ran 1.00 tests per mutant" in the output mean one full suite run.
   coverageAnalysis: 'off',
 
+  // WHAT IS MUTATED IS A DEFINITION-OF-DONE STATEMENT (§10), so the architect owns these
+  // three lines and the reviewer owns everything else in this file. `guard-paths` denies
+  // this path to nobody; the split is by what the line asserts, not by where it lives.
   mutate: [
     'src/**/*.ts',
-    '!src/main.ts',        // the composition root: wiring, asserted by AC-2 end to end
+    // THE EXCLUSION SURVIVES; ITS OLD JUSTIFICATION DID NOT, AND THIS IS THE CORRECTION.
+    //
+    // It read "the composition root: wiring, asserted by AC-2 end to end" — a claim of
+    // COVERAGE, and the reviewer showed it false of the one line that matters: delete
+    // `main.ts:46` and `BOOKING_SEED` runs ADR-0009's Order-A in production unannounced
+    // while `npm test`, `npm run mutation` and `depcruise` all stay green. A comment
+    // asserting coverage that does not exist is this project's most-counted defect shape,
+    // and it does not get to hide in the file that measures the others.
+    //
+    // The true reason is the opposite of coverage: THIS RUNNER CANNOT REACH THIS FILE.
+    // `vitest.mutation.config.ts` includes `tests/unit/**` and nothing else, and
+    // `main.ts` is unimportable by a unit test by construction — it awaits `app.listen()`
+    // and calls `process.exit` at module scope. Mutating it would produce a full set of
+    // uncovered survivors, lowering the score by exactly the mutant count while saying
+    // nothing whatever about the tests. Excluding it is right; claiming it was asserted
+    // was not.
+    //
+    // Considered and rejected: point the mutant command at the outside-in suites, which
+    // DO exercise this file. They run the built artifact (ADR-0013), so each mutant would
+    // need its own `tsc` plus a Testcontainers PostgreSQL — a ~33-second run becomes hours
+    // — and Stryker would still be scoring a child process it did not instrument.
+    //
+    // WHAT THIS COSTS, STATED RATHER THAN IMPLIED: every line of `main.ts` is guarded by
+    // an outside-in assertion or by nothing at all, and the mutation score cannot tell
+    // which. `main.ts:46` was the demonstration. The remedy is an outside-in assertion in
+    // a test-engineer-owned file, not a number in this one.
+    '!src/main.ts',
     '!src/**/*.d.ts',
   ],
 

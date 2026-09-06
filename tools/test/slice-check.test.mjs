@@ -217,6 +217,25 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
   ok('a head_sha git cannot relate to HEAD is UNVERIFIED, not PASS',
     row(out, 'tests green').startsWith('UNVERIFIED'), row(out, 'tests green'));
 }
+{
+  // O-35. An ABBREVIATED `head_sha` for the very commit under test was reported as behind
+  // it. `check.run` records do not all carry the same SHA width, the equality guard above
+  // was a string comparison, and a commit IS an ancestor of itself — so the run fell
+  // through to `merge-base --is-ancestor` and the gate printed the self-refuting detail
+  // "the newest recorded run is 86af39b, an ancestor of this slice's last commit 86af39b".
+  //
+  // Right about the rule, wrong about the identity of two names for one commit. Both sides
+  // are now resolved through `rev-parse` before anything is compared, which is why the
+  // failing direction is asserted first: an abbreviated record must PASS, and the O-17
+  // behaviour above must survive it.
+  const { out, sha } = build([ciRun({ checks: (ctx) => ({ head_sha: ctx.sha.slice(0, 7) }) })]);
+  ok('an ABBREVIATED head_sha for the commit under test passes — two names, one commit',
+    row(out, 'tests green').startsWith('PASS'), `${sha.slice(0, 7)} — ${row(out, 'tests green')}`);
+  const behind = build([ciRun({ checks: (ctx) => ({ head_sha: ctx.rootSha.slice(0, 7) }) })],
+    { commits: [{ subject: 'feat(77): later work', files: { 'src/later.ts': 'export const x = 1;\n' } }] });
+  ok('...and an abbreviated run that really IS behind still fails — the widening is not a hole',
+    row(behind.out, 'tests green').startsWith('FAIL'), row(behind.out, 'tests green'));
+}
 
 {
   // The retarget, and the reason for it: pinning to HEAD meant every later commit to
@@ -349,6 +368,43 @@ const MARKED = '# 9\n\n<!-- generated:adr-index -->\nold\n<!-- /generated:adr-in
 
   ok('a slice with no commits of its own is N/A, not a blocking UNVERIFIED',
     row(run([ciRun()]), 'arc42 edits').startsWith('N/A'), row(run([ciRun()]), 'arc42 edits'));
+}
+
+
+// --- the gate asks whether findings were ruled — O-30 --------------------------
+//
+// At slice 02's gate seven MAJORs read as open and SIX were fixed: each fix was written
+// into the prose of the `finding.raised` that reported it and never logged as an event.
+// The orchestrator only noticed by hand-writing a query, which is the discipline this file
+// replaces. Prose inside a raise must NOT count as a resolution — that is the confusion
+// being removed, and it is what the third case pins.
+{
+  const raise = (ref, over = {}) => ({ ts: '2026-01-01T02:00:00Z', slice: '77',
+    event: 'finding.raised', source: 'reported', actor: 'reviewer', ref, severity: 'MAJOR',
+    step: 5, claim: 'c', scenario: 's', ...over });
+  const rule = (ref) => ({ ts: '2026-01-01T03:00:00Z', slice: '77', event: 'finding.ruled',
+    source: 'reported', actor: 'architect', ref, verdict: 'accepted', rationale: 'r' });
+
+  ok('an unruled MAJOR fails the gate and is named',
+    row(run([ciRun(), raise('R-77-1')]), 'findings ruled').startsWith('FAIL')
+      && row(run([ciRun(), raise('R-77-1')]), 'findings ruled').includes('R-77-1'),
+    row(run([ciRun(), raise('R-77-1')]), 'findings ruled'));
+
+  ok('a ruled one passes',
+    row(run([ciRun(), raise('R-77-1'), rule('R-77-1')]), 'findings ruled').startsWith('PASS'));
+
+  ok('a fix DESCRIBED IN THE RAISE does not count — the whole of O-30',
+    row(run([ciRun(), raise('R-77-2', { scenario: 'Broken. FIXED: both now corrected and tested.' })]),
+      'findings ruled').startsWith('FAIL'),
+    row(run([ciRun(), raise('R-77-2', { scenario: 'FIXED' })]), 'findings ruled'));
+
+  ok('a MINOR left open does not fail the gate — that is a backlog item',
+    row(run([ciRun(), raise('R-77-3', { severity: 'MINOR' })]), 'findings ruled').startsWith('PASS'));
+
+  ok('a review.response closes it too — the reviewer answering its own finding',
+    row(run([ciRun(), raise('R-77-4'), { ts: '2026-01-01T04:00:00Z', slice: '77',
+      event: 'review.response', source: 'reported', finding_ref: 'R-77-4', resolution: 'fixed' }]),
+      'findings ruled').startsWith('PASS'));
 }
 
 console.log(`\n${pass}/${pass + fail} passed`);
