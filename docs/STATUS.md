@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `38ff6df chore(log): step 4's narrative, including work the implementer lost and rebuilt` |
+| Last commit | `2588a9c docs(06): the disable pairs suppressed 93 mutants where 8 were ruled` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light |
-| Agent runs recorded | 130 |
+| Agent runs recorded | 132 |
 | ADRs accepted | 23 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -270,7 +270,9 @@
 | 2026-09-06 14:44 | implementer | 43m34 | 908 / 45,724 / 149,236,013 | `derived` |
 | 2026-09-06 14:44 | implementer | 43m59 | 920 / 45,735 / 150,731,620 | `derived` |
 | 2026-09-06 14:45 | implementer | 45m14 | 932 / 48,017 / 153,606,424 | `derived` |
-| | **total** | **5495m15** | **32,840 / 2,409,499 / 2,762,663,244** | |
+| 2026-09-06 15:49 | architect | 13m37 | 210 / 10,958 / 10,716,699 | `derived` |
+| 2026-09-06 15:49 | reviewer | 14m21 | 192 / 5,853 / 10,695,764 | `derived` |
+| | **total** | **5523m12** | **33,242 / 2,426,310 / 2,784,075,707** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
