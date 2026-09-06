@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `c854bab docs: pay down the concision debt slice 02 accrued` |
+| Last commit | `1f92d7a fix(docs): the ratchet did not tighten, and the tool that enforces it had no tests` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process |
 | Agent runs recorded | 88 |
 | ADRs accepted | 13 |

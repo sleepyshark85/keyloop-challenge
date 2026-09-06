@@ -458,6 +458,31 @@ if (!onlyReady) {
           + `${openSerious.map((e) => e.ref).join(', ')}. This slice needs a human.`
       : 'no Gate E gate.decided event');
 
+  // FINDINGS THE GATE HAS TO SEE — O-30.
+  //
+  // At slice 02's gate seven MAJOR findings read as open and SIX were fixed: each fix had
+  // been written into the prose of the `finding.raised` record that reported it, and never
+  // logged as an event. A human reading the log would have said the work was done; every
+  // mechanism that reads the log said it was open. The orchestrator only noticed by
+  // hand-writing a query, which is the discipline this file exists to replace — so the
+  // gate asks the question itself now.
+  //
+  // Closed means RULED or RESOLVED or answered by a `review.response`. Prose inside the
+  // raise does not count and must not: that is precisely the confusion being removed, and
+  // a text heuristic over a rationale would guess at what a sentence means. Severity is
+  // the filter because a MINOR left open is a backlog item, while a MAJOR left open is
+  // either unfinished work or an unrecorded ruling — and both need the gate to say so.
+  const closedRefs = new Set(events
+    .filter((e) => ['finding.ruled', 'finding.resolved', 'review.response'].includes(e.event))
+    .map((e) => e.ref ?? e.finding_ref)
+    .filter(Boolean));
+  const openSerious2 = events.filter((e) => e.event === 'finding.raised'
+    && ['MAJOR', 'BLOCKING'].includes(e.severity) && !closedRefs.has(e.ref));
+  check('done', 'findings ruled or resolved', openSerious2.length ? FAIL : PASS,
+    openSerious2.length
+      ? `${openSerious2.length} open MAJOR/BLOCKING: ${openSerious2.map((e) => e.ref).join(', ')}`
+      : `every MAJOR/BLOCKING finding is ruled or resolved`);
+
   const loops = events.filter((e) => e.event === 'loopback').length;
   check('done', 'loopbacks within governor', loops <= 2 ? PASS : FAIL,
     `${loops} of max 2${loops > 2 ? ' — should have been split, not ground through' : ''}`);
