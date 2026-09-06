@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `b8fdd35 docs(04): step 2 adjudicated — nine objections, nine AGREE, one narrower remedy` |
+| Last commit | `ee868c3 docs: the README and the AI collaboration narrative` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process |
-| Agent runs recorded | 92 |
+| Agent runs recorded | 93 |
 | ADRs accepted | 13 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -217,7 +217,8 @@
 | 2026-09-06 05:38 | test-engineer | 7m18 | 50 / 6,685 / 1,297,597 | `derived` |
 | 2026-09-06 05:40 | implementer | 9m36 | 94 / 7,526 / 3,458,482 | `derived` |
 | 2026-09-06 06:13 | architect | 87m26 | 332 / 5,685 / 27,543,886 | `derived` |
-| | **total** | **4870m10** | **22,914 / 1,972,120 / 1,800,026,177** | |
+| 2026-09-06 06:19 | scribe | 11m09 | 196 / 11,100 / 11,588,603 | `derived` |
+| | **total** | **4881m19** | **23,110 / 1,983,220 / 1,811,614,780** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

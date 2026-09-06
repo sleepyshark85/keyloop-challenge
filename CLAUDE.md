@@ -127,14 +127,14 @@ architect   all      test-eng  impl     reviewer   human    architect
 
 ### Design Change Requests
 
-Any role, at any step, may raise a DCR on a mismatch. The slice goes `blocked`. The architect
+Any role, at any step, may raise a DCR. The slice goes `blocked`. The architect
 convenes **one** round of discussion, then rules:
 
 | Outcome | Criterion | Effect |
 |---|---|---|
 | **(a) Clarification** | Design right, wording ambiguous | Update slice file; resume from raising step |
 | **(b) Deferred improvement** | Work is **correct** under the agreed ADR; something better exists | **Merge as-is.** New backlog slice + ADR with `status: proposed` |
-| **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede the ADR; revise (never delete) prior work |
+| **(c) Design defect** | Work would be **incorrect, unsafe or unshippable** | Loop back to step 1; supersede any ADR at fault; revise (never delete) prior work |
 | **(d) Defer to the gate** | Trade-off or scope question | Architect rules; the gate reviews it |
 
 To rule **(c)** the architect **must name the acceptance criterion, §10 quality scenario, or §2

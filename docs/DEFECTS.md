@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **130** |
-| Severity | 10 blocking · 71 major · 49 minor |
+| Findings recorded | **135** |
+| Severity | 10 blocking · 72 major · 53 minor |
 | Verdicts | 6 narrowed · 55 accepted · 1 escalated · 10 deferred |
-| Raised by | test-engineer 32 · reviewer 28 · orchestrator 26 · implementer 23 · architect 19 · human 2 |
-| Awaiting a ruling | **58** |
-| Mean escape distance | 1.66 step(s) |
+| Raised by | test-engineer 32 · reviewer 28 · orchestrator 26 · implementer 23 · architect 19 · scribe 5 · human 2 |
+| Awaiting a ruling | **63** |
+| Mean escape distance | 1.60 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -873,6 +873,11 @@ rather than narrated.*
 | **I-04-2** | MINOR | 2 *(+1)* | implementer | ADR-0020's option table omits a shape that keeps both the arm placement and a structural loop bound | narrowed |
 | **I-04-4** | MINOR | 2 *(+1)* | implementer | §4's ordering forces a branch tsc demands and no test can cover | accepted |
 | **I-04-8** | MINOR | 2 *(+1)* | implementer | The seed source adds a node:crypto import that main.ts deliberately avoids | accepted |
+| **S-01** | MAJOR | 0 *(+0)* | scribe | §6's (c) remedy requires superseding the ADR, and after four slices and two (c) rulings no ADR has ever superseded or been superseded | **open** |
+| **S-02** | MINOR | 0 *(+0)* | scribe | §6.4's vote — a third role breaking a tie — has never been called, in four slices of adjudication | **open** |
+| **S-03** | MINOR | 0 *(+0)* | scribe | The step-2 AGREE rounds at slices 00a, 00 and 01 produced no review.response events, so how a design was argued into shape is reconstructable but not from one event type | **open** |
+| **S-04** | MINOR | 0 *(+0)* | scribe | The project counts its own signature defect shape as five, seven, eight and nine in four different files | **open** |
+| **S-05** | MINOR | 0 *(+0)* | scribe | The video shot list is on the scribe's owned-file list and does not exist | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -934,6 +939,31 @@ rather than narrated.*
 - *scenario:* §3 binds seed to randomInt(0, 2**32), which needs an import. src/main.ts:50 states why newId uses the GLOBAL instead: 'crypto is a Node global, so injecting newId gives src/application no import and leaves no-dev-dep-in-src and the layering rules untouched (DA-02-1)'. Measured: crypto.getRandomValues(new Uint32Array(1))[0] ?? 0 compiles at exit 0 under this repo's options with types: ['node'], no import. A design choice re-derived one slice later against a rationale already written in the file it would change.
 - *file:* `docs/slices/04-design.md`
 - *accepted* by architect — (a). The crypto global, per main.ts:50's own stated reason (DA-02-1) - a design choice re-derived one slice later against a rationale already written in the file it would change.
+
+**S-01** — §6's (c) remedy requires superseding the ADR, and after four slices and two (c) rulings no ADR has ever superseded or been superseded
+
+- *scenario:* VERIFIED BY THE ORCHESTRATOR: all 21 ADRs carry supersedes: null AND superseded_by: null. §6's (c) row reads 'Loop back to step 1; supersede the ADR; revise (never delete) prior work' - unconditionally. Both (c) rulings correctly did not supersede anything: T-01-2 had no ADR to supersede, and T-02-9 PRODUCED ADR-0018 rather than replacing one. So an agent following the clause literally would either invent a supersession or quietly ignore the rule, and ignoring a rule is how rules die. The scribe's own framing is the sharpest part and is preserved: A §6 CLAUSE WITH ZERO INSTANCES AFTER FOUR SLICES IS EITHER DEAD OR ABOUT TO BE REACHED FOR THE FIRST TIME UNDER PRESSURE. It gave arc42 §13.4 the heading 'the supersession chain that does not exist' rather than implying one existed - a scribe declining to write the tidier sentence, which is exactly its job. FIXED: the clause is now conditional - 'supersede any ADR at fault' - and the added word was paid for out of §6's DCR preamble, which said the same thing twice. CLAUDE.md 1,537 -> 1,536, ratchet green.
+- *file:* `CLAUDE.md`
+
+**S-02** — §6.4's vote — a third role breaking a tie — has never been called, in four slices of adjudication
+
+- *scenario:* Zero occurrences in the event log, in any report, or anywhere under docs/. Every disagreement resolved in one round or went to the human. NOT fixed and not deleted: unlike S-01 the clause is not WRONG, it is unexercised, and the cases that would have used it were resolved by the mechanism §6 prefers - one round, then a decision. Recorded because an unexercised tie-break is a mechanism stated and never run, which is this project's signature shape pointed at its own constitution, and because the honest options are to use it once deliberately or to delete it.
+- *file:* `CLAUDE.md`
+
+**S-03** — The step-2 AGREE rounds at slices 00a, 00 and 01 produced no review.response events, so how a design was argued into shape is reconstructable but not from one event type
+
+- *scenario:* Only 3 review.response records exist in the whole log. §6 says the record of HOW a design was argued into shape is worth more than the amended design alone - and for three slices that record survives only as finding.raised pairs plus prompt files. Same family as O-29 and O-30, one level out: the orchestrator logged findings and rulings but not the round that produced them. Recorded rather than backfilled - inventing events for rounds that happened before the convention existed would be worse than a gap that is stated.
+- *file:* `docs/team-log/events.jsonl`
+
+**S-04** — The project counts its own signature defect shape as five, seven, eight and nine in four different files
+
+- *scenario:* Each count is over a different set and none is wrong in isolation; together they read as a single number that keeps changing. The scribe LEFT IT STANDING AND SAID SO rather than picking one, which is the right call for a role whose rule is that every claim cites an artifact - but the corpus should say the same thing about itself. The count as of slice 04 is 25 by ref: eight in the pilot plus seventeen since. Recorded for the retro rather than corrected in four places now, since the numbers are prose in documents that each meant something narrower.
+- *file:* `docs/DEFECTS.md`
+
+**S-05** — The video shot list is on the scribe's owned-file list and does not exist
+
+- *scenario:* Outside the README task's scope and correctly not written on the way past. A phase-6 deliverable; recorded so it is scheduled rather than discovered at the end.
+- *file:* `docs/video-shotlist.md`
 
 </details>
 
