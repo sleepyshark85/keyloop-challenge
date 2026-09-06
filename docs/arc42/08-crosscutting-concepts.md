@@ -321,7 +321,7 @@ Rescheduling emits `appointment.update` with the same shape; cancellation emits
 
 | Metric | Type | Labels | Notes |
 |---|---|---|---|
-| `booking_conflicts_total` | counter | `resource` ∈ {bay, technician}, `outcome` ∈ {absorbed, refused, capped} | **The invariant, made observable.** `absorbed` = retried successfully; `refused` = candidates exhausted; `capped` = ADR-0009's attempt cap hit. ADR-0004 requires the first two to be distinguishable — conflating them makes the metric unreadable at the moment it matters. A non-zero `capped` in production means the cap is wrong |
+| `booking_conflicts_total` | counter | `resource` ∈ {bay, technician}, `outcome` ∈ {absorbed, refused, capped} | **The invariant, made observable.** `absorbed` = retried successfully; `refused` = candidates exhausted; `capped` = ADR-0009's attempt cap hit. ADR-0004 requires the first two to be distinguishable — conflating them makes the metric unreadable at the moment it matters. **A non-zero `capped` is expected today rather than a signal the cap is wrong** — D-04-1, §11.2 R-4 |
 | `appointments_booked_total` | counter | `dealership` | |
 | `appointments_rescheduled_total` | counter | `outcome` ∈ {moved, refused} | ADR-0003's second act |
 | `appointments_cancelled_total` | counter | | |

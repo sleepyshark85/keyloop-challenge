@@ -3,7 +3,7 @@ id: "04"
 title: Candidate allocation and retry — no refusal while capacity remains
 status: ready
 depends_on: ["02"]
-arc42: ["§6.2", "§5.2", "§7.3", "§11", "§13"]
+arc42: ["§6.2", "§5.2", "§7.3", "§8.4", "§11", "§13"]
 adr: [4, 9]
 quality_scenarios: [QS-3]
 loopbacks: 0
