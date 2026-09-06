@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **147** |
-| Severity | 10 blocking · 80 major · 57 minor |
-| Verdicts | 6 narrowed · 56 accepted · 1 escalated · 10 deferred |
-| Raised by | test-engineer 34 · reviewer 28 · implementer 27 · orchestrator 27 · architect 24 · scribe 5 · human 2 |
-| Awaiting a ruling | **74** |
-| Mean escape distance | 1.72 step(s) |
+| Findings recorded | **152** |
+| Severity | 10 blocking · 82 major · 60 minor |
+| Verdicts | 7 narrowed · 58 accepted · 1 escalated · 10 deferred |
+| Raised by | test-engineer 34 · architect 29 · reviewer 28 · implementer 27 · orchestrator 27 · scribe 5 · human 2 |
+| Awaiting a ruling | **76** |
+| Mean escape distance | 1.74 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -885,11 +885,16 @@ rather than narrated.*
 | **A-04-4** | MAJOR | 4 *(+4)* | architect | F-04-1 third recurrence, with a second failure mode behind it: the committed baseline escapes non-ASCII codepoints, which JSON.stringify does not reproduce, so the obvious fix silently rewrites all 285 existing pins | **open** |
 | **A-04-5** | MINOR | 4 *(+4)* | architect | The drift direction is diagnostic: BOOKING_SEED reached §5.2, §6.2 and §11 R-7a and never reached §7.3 | **open** |
 | **A-04-6** | MAJOR | 4 *(+4)* | architect | ADRs that cite each other STATUS rot, and §4 immutability then freezes the rot | **open** |
-| **I-04-10** | MAJOR | 4 *(+3)* | implementer | Slice 02 QS-2 concurrency test is a 44 percent flake under ADR-0009 Order-C, and it is green in the run we would merge on | **open** |
-| **I-04-11** | MAJOR | 4 *(+3)* | implementer | ADR-0021 and slice-04 design section 4 both say loadConfig emits the startup warn; that sentence is false as built | **open** |
-| **I-04-12** | MINOR | 4 *(+0)* | implementer | The env-var set-equality guard ADR-0022 recommended would not pass today: config.ts reads five variables, section 7.3 lists six | **open** |
+| **I-04-10** | MAJOR | 4 *(+3)* | implementer | Slice 02 QS-2 concurrency test is a 44 percent flake under ADR-0009 Order-C, and it is green in the run we would merge on | accepted |
+| **I-04-11** | MAJOR | 4 *(+3)* | implementer | ADR-0021 and slice-04 design section 4 both say loadConfig emits the startup warn; that sentence is false as built | accepted |
+| **I-04-12** | MINOR | 4 *(+0)* | implementer | The env-var set-equality guard ADR-0022 recommended would not pass today: config.ts reads five variables, section 7.3 lists six | narrowed |
 | **I-04-13** | MINOR | 4 *(+3)* | implementer | Design section 3 carrier needed no per-list cast, and the shape it specified would have reproduced I-04-4 one level down | **open** |
 | **A-04-7** | MAJOR | 4 *(+4)* | orchestrator | docs:refs put two project rules in contradiction and survived four slices by being prefix-lucky rather than correct | **open** |
+| **A-04-8** | MINOR | 4 *(+4)* | architect | Blast radius of Order-C is exactly one file, and the structural reason is worth more than the finding | **open** |
+| **A-04-9** | MAJOR | 4 *(+4)* | architect | The tsc-versus-vitest gap and I-04-10 are one principle, and section 2.4 states only half of it | **open** |
+| **A-04-10** | MINOR | 4 *(+4)* | architect | Section 7.3 preamble is false today, independently of any guard | **open** |
+| **A-04-11** | MAJOR | 4 *(+0)* | architect | A-04-2 is only half discharged, and by the wrong owner | **open** |
+| **A-04-12** | MINOR | 4 *(+0)* | architect | The ORDER BY assertion became MORE load-bearing at this merge, not less, and its comment still says the opposite | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1017,16 +1022,19 @@ rather than narrated.*
 
 - *scenario:* Its header states candidate ordering is deterministic, so every racer attempts the same pair first, and it closes at line 208 asserting at least 2 attempts. Order-C removes that premise: with 24 bays and 1 technician a loser whose first draw is not the winning bay conflicts on the TECHNICIAN at attempt 1 and refuses correctly, wasting no attempt. Only a loser drawing the winning bay reaches a second attempt — about 56 percent. Measured 3 failures in 5 local runs; it passed in CI. Raised, not touched: test-engineer-owned file, section 5.
 - *file:* `tests/concurrency/no-technician-overlap.test.ts`
+- *accepted* by architect — The two-attempt claim is UNREPAIRABLE in this fixture — no permutation-independent version of it exists — so it is REMOVED, not substituted. Finding and remedy judged separately and a NARROWER remedy taken than the implementer offered: the terminal-state substitution is unnecessary because the file already carries claims that hold under every permutation (the 1/19 split, technicianConflicts >= 19, resource === technician, which is E-02-1 guard), and the loop-actually-looped obligation is already deterministic in candidate-retry AC-3 and gated in no-spurious-refusal AC-2. Header prose goes with the assertion, per I-02-9 which ruled the false comment the more dangerous half.
 
 **I-04-11** — ADR-0021 and slice-04 design section 4 both say loadConfig emits the startup warn; that sentence is false as built
 
 - *scenario:* The logger is constructed FROM the loadConfig return value, so at the moment BOOKING_SEED is read there is no logger, and writing to a stream from src/platform is the wrong fix for a module the leaf rule keeps free of behaviour. It ships as configWarnings, called in src/main.ts and emitted through pino. ADR-0021 was ratified accepted an hour earlier and is now immutable under section 4, so the instrument is a superseding ADR or a step-7 as-built correction, never an edit.
 - *file:* `docs/adr/0021-the-booking-seed-is-overridable-by-environment.md`
+- *accepted* by architect — NO SUPERSESSION. Superseding marks the DECISION as replaced, and the decision — option B, BOOKING_SEED, unset by default, one startup warn — is unchanged and correct as built. Only the emitting site is misstated and that was never the decision. Superseding to fix a sentence would tell every future reader that B was reversed. Instrument is an arc42 section 5.2 as-built correction at step 7, already inside slice 04 declared scope, plus a row in the scribe as-designed/as-built delta. Recorded as an IMPROVEMENT rather than apologetically: configWarnings is a pure function returning strings and is therefore assertable, where a logger.warn inside loadConfig would have been observable only through a stream.
 
 **I-04-12** — The env-var set-equality guard ADR-0022 recommended would not pass today: config.ts reads five variables, section 7.3 lists six
 
 - *scenario:* OTEL_EXPORTER_OTLP_ENDPOINT is listed and read by no code — the OTel SDK auto-configures from it at slice 09. The check needs an exemption for variables a LIBRARY reads, which is a design question rather than a rail to bolt on. Found by the implementer against the guard the architect proposed one step earlier.
 - *file:* `docs/adr/0022-application-configuration-is-prefixed-booking.md`
+- *narrowed* by architect — The guard survives with its SUBJECT corrected, and NOT by an exemption list — anyone can silence a guard by adding a name to one. The fix is a "Read by" column in section 7.3, so the check becomes set equality between the rows whose reader is src/platform/config.ts and the env keys in that file: still set equality, still zero false positives, and it now also enforces section 7.3 own read-once claim. Rows a LIBRARY reads are outside its reach by construction and the guard should say so rather than pretend. Third slice running in which the architect names a tools/ remedy it may not build (F-02-10, F-04-1).
 
 **I-04-13** — Design section 3 carrier needed no per-list cast, and the shape it specified would have reproduced I-04-4 one level down
 
@@ -1037,6 +1045,31 @@ rather than narrated.*
 
 - *scenario:* The slice-00a ruling and section 9 make the event log a finding DEFINITION site; refs.mjs read it only as a citation source, so a finding whose ref matched the design-local shape was reported as citing itself into the void. REF matches A-, D-, F-, DA- and OQ-, and findings are logged under T-, I-, S-, R-, O-, E-, J-, AB- and AC-, so no logged finding had ever collided until five architect findings landed as A-04-star, into a prefix that already meant "assumption defined in a design". Fixed in 7173b34 as a WIDENING strictly stronger than what it widens — the log is append-only and CI enforces it, so a definition recorded there can never be deleted. refs.mjs had no tests; it now has 16.
 - *file:* `tools/docs/refs.mjs`
+
+**A-04-8** — Blast radius of Order-C is exactly one file, and the structural reason is worth more than the finding
+
+- *scenario:* All nine test directories checked. The mirror test LOOKS like the symmetric twin and is SAFE: with one bay every permutation shares the same head bay, so every 23P01 includes a bay violation. A fixture is permutation-SAFE when the scarce resource is the singleton list, and permutation-DEPENDENT when it reasons about the ABUNDANT resource draw order. Both files have a singleton scarce resource; only the technician one narrated the abundant side. Four files carry stale premise PROSE with sound assertions and are fixed this slice, because I-02-9 ruled the false comment the more dangerous half.
+- *file:* `tests/concurrency/no-bay-overlap.test.ts`
+
+**A-04-9** — The tsc-versus-vitest gap and I-04-10 are one principle, and section 2.4 states only half of it
+
+- *scenario:* A check is evidence only if its verdict is CAUSED by what it names. Section 2.4 states one half — a test that has never failed is not evidence. The flake is the other half (a verdict not caused by the change under test) and vitest-transpiling-without-typechecking is the incomplete-check half (a verdict that never examined what it claims to). Declined as an arc42 section 11 row: CI already gates typecheck over src and tests, so the real gap is that section 7 "every implementer commit is green" uses a weaker local green than CI does, which is a tools/ remedy rather than architecture. Recommended to the human at the gate as a section 2.4 amendment with both instances as evidence; the architect cannot write it, because section 2 is NON-NEGOTIABLE and human-owned.
+- *file:* `CLAUDE.md`
+
+**A-04-10** — Section 7.3 preamble is false today, independently of any guard
+
+- *scenario:* It claims environment is read once in src/platform/config.ts while listing OTEL_EXPORTER_OTLP_ENDPOINT, which that file does not read. The architect step 7.
+- *file:* `docs/arc42/07-deployment-view.md`
+
+**A-04-11** — A-04-2 is only half discharged, and by the wrong owner
+
+- *scenario:* The ADR-0021 startup warn IS asserted, but in an implementer-owned unit test. R-7a mitigation for the risk ADR-0021 knowingly created is therefore guarded solely by a test the implementer may freely change. Still for the reviewer at step 5.
+- *file:* `tests/unit/platform/config.test.ts`
+
+**A-04-12** — The ORDER BY assertion became MORE load-bearing at this merge, not less, and its comment still says the opposite
+
+- *scenario:* The repository order is the shuffle stable input, so a recorded seed reproduces the draw only because that order is pinned. The comment still calls it F-02-7 substitute for a seed. Commit 994bfc5 fixed two other stale promises in the same file and missed this one.
+- *file:* `tests/unit/persistence/candidateRepository.test.ts`
 
 </details>
 
