@@ -40,27 +40,41 @@ const PHASES = {
  * (finding O-8); recorded rather than only fixed, because the generator agreed
  * with itself right up until a gate was actually decided.
  */
-const NON_PHASE_GATES = new Set([
-  // Gate E closes a slice, not a phase (O-8).
-  'E',
-  // And `process` closes nothing at all. It is the gate name for a cross-slice RULING —
-  // the light gate, the backlog fold, the mid-slice delegation — invented at slice 02
-  // because the schema rejects `phase: "5"` and a process decision made during phase 5 had
-  // nowhere else to live (O-18).
-  //
-  // Leaving it out of this set regressed the resume point to PHASE 4 with Gate D reported
-  // open and undecided, two slices after Gate D was decided. The mechanism: `lastGate`
-  // picked the newest `process` ruling, no phase names `process` as its closing gate, so
-  // `completedPhase` came back null and the position fell through to the last event
-  // carrying a `phase` field — which was from phase 4, because every event since has been
-  // scoped to a slice.
-  //
-  // Third time this file has misreported the resume point, after O-8 and O-11, and the
-  // same shape each time: a gate that does not close a phase being read as one that does.
-  // The set is now named for what it means rather than for the one case it started with.
-  'process',
-]);
-
+/**
+ * WHICH GATES CLOSE A PHASE — an allowlist, and it is one because the denylist failed four
+ * times.
+ *
+ * The rule is simple and has never changed: a gate closes a phase if some phase NAMES it as
+ * its closing gate. `PHASES` above already holds that fact, so deriving the set from it
+ * means a new gate name cannot regress the resume point — it is not on the list because
+ * nothing claims it closes anything, which is the correct default.
+ *
+ * The previous shape was the inverse: a set of gate names known NOT to close a phase, and
+ * anything unlisted was treated as closing one. Every new gate name was therefore a latent
+ * regression, and four arrived:
+ *
+ *   O-8   Gate E fires on every slice and closed nothing
+ *   O-11  same shape again
+ *   O-18  `process`, invented at slice 02 for cross-slice rulings because the schema
+ *         rejects `phase: "5"`
+ *   O-40  `light`, invented at slice 05 for the human's own-cost ruling — which put the
+ *         resume point back at PHASE 4 with Gate D reported open and undecided, two days
+ *         and six slices after Gate D was decided, on a file whose entire purpose is
+ *         telling a resuming session where it is.
+ *
+ * The comment above the old set said "third time this file has misreported the resume point
+ * ... the same shape each time". It was fixed the same way each time too. An allowlist
+ * cannot have a fourth.
+ *
+ * Gate E is excluded on its own terms even though phase 5 names it: `E (per slice)` fires on
+ * every slice and so marks no transition. That exclusion is explicit rather than emergent,
+ * because it is a real exception to the rule rather than an oversight.
+ */
+const PHASE_CLOSING_GATES = new Set(
+  Object.values(PHASES)
+    .map(([, gate]) => gate)
+    .filter((g) => g && !g.startsWith('E')),
+);
 const events = loadLog().sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
 
 const gates = events.filter((e) => e.event === 'gate.decided');
@@ -69,7 +83,7 @@ const dcrsOpen = events.filter((e) => e.event === 'dcr.raised').length
   - events.filter((e) => e.event === 'dcr.resolved').length;
 
 // Position: the phase after the last gate decided, else the last phase touched.
-const lastGate = [...gates].reverse().find((e) => !NON_PHASE_GATES.has(e.gate));
+const lastGate = [...gates].reverse().find((e) => PHASE_CLOSING_GATES.has(e.gate));
 const lastPhaseTouched = [...events].reverse().find((e) => e.phase)?.phase;
 const completedPhase = lastGate
   ? Object.keys(PHASES).find((p) => PHASES[p][1]?.startsWith(lastGate.gate))

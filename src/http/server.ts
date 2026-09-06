@@ -33,9 +33,23 @@
  * one place a mistyped `type` would escape the compile-time constructor and reach the client as
  * `FST_ERR_FAILED_ERROR_SERIALIZATION` — the backstop becoming the defect.
  *
- * Everything that is not a malformed request is `500 /problems/internal`, logged at error with
- * the cause. §8.6's `500 | Anything else` row is a claim of TOTALITY, and this is where it is
- * kept — AC-5 is that claim being kept rather than assumed.
+ * Everything that reaches this handler and is not a malformed request is `500 /problems/internal`,
+ * logged at error with the cause.
+ *
+ * ── `setNotFoundHandler` — ADR-0024, and the CORRECTION this docblock owed §8.6 ───────────────
+ *
+ * §8.6's `500 | Anything else` row is a claim of TOTALITY, and an earlier version of this
+ * paragraph said `setErrorHandler` was where it was kept. Measured at slice 06 step 1, against
+ * merged code, and it was FALSE: a genuinely unmatched route — `GET /nope` — never reaches
+ * `setErrorHandler` at all. Fastify answers it itself, by default, with `404 application/json`
+ * and no `type`, before this handler is ever consulted — the one response in the whole service
+ * that was outside the taxonomy `tests/contract/error-taxonomy.test.ts` asserts totality over.
+ *
+ * `setNotFoundHandler` is the second handler totality is kept in, and it renders through the
+ * SAME `problem()` constructor for I-02-5's reason: `404 /problems/route-not-found`, RFC 9457,
+ * indistinguishable in media type from a domain `404` — which is why the discriminator a client
+ * (and `tests/acceptance/cancel-appointment.test.ts`) must read is the `type`, not the content
+ * type, once this handler exists.
  */
 import Fastify from 'fastify';
 import type { FastifyBaseLogger, FastifyError, FastifyInstance } from 'fastify';
@@ -125,6 +139,20 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       .send(
         problem('/problems/internal', 500, 'The request could not be completed', {
           detail: 'the service could not complete this request; the failure has been logged',
+        }),
+      );
+  });
+
+  // ADR-0024 — the second handler §8.6's totality claim is kept in. Fastify's own default
+  // not-found body never reaches `setErrorHandler` above; this is what stops it being the one
+  // response outside the taxonomy.
+  app.setNotFoundHandler(async (request, reply) => {
+    await reply
+      .code(404)
+      .type(PROBLEM_CONTENT_TYPE)
+      .send(
+        problem('/problems/route-not-found', 404, 'No such route', {
+          detail: `no route matches ${request.method} ${request.url}`,
         }),
       );
   });

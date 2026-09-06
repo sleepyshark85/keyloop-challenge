@@ -15,6 +15,7 @@ real and consciously not fixed under §6 **(b)**.
 | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | [ADR-0012](../adr/0012-seed-fixtures-are-a-test-owned-loader.md) | proposed — not yet agreed |
 | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | [ADR-0016](../adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | proposed — not yet agreed |
 | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | [ADR-0017](../adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | proposed — not yet agreed |
+| The lock carries the transaction it was taken on | [ADR-0028](../adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | proposed — not yet agreed |
 <!-- /generated:debt-register -->
 
 **A row states what is owed, never that anything is correct.** A `proposed` row leaves when the human
@@ -36,7 +37,7 @@ standing price of that ratified decision, and **none is an argument for revisiti
 ### What the slice-01 scans do not catch
 
 QS-12 defines `duration-arithmetic` as a *concept* against an open spelling set. What it misses is
-**irreducible for a text scan**, not a promise of a cleverer regex:
+**irreducible for a text scan**:
 
 | Escape | Example | Status |
 |---|---|---|
@@ -46,7 +47,7 @@ QS-12 defines `duration-arithmetic` as a *concept* against an open spelling set.
 | a quantity whose name says neither minutes nor seconds | `elapsed * 1000` | **deliberate** — scoping by the quantity's name keeps `kilobytes * 1000` out; widening trades a gap for false positives |
 
 The first three are gaps, not licences: a spelling not listed is a finding to raise. §8.5 describes
-the matching hole one level up (QS-10).
+the matching hole one level up.
 
 ### What the domain tests still do not evidence
 
@@ -67,17 +68,29 @@ Two advisory locks now precede every `INSERT` on the booking path (§6.1), and t
 
 | id | The cost |
 |---|---|
-| **D-02-1** | **ADR-0016's argument is weaker after ADR-0018 than before it, and the ADR says so in its own Consequences.** Inside a per-resource lock a reintroduced check-then-act would be *correct*, not merely harmless, so the reading that bounded the damage no longer bounds it. What survives is the brand, the `appointment-table-access` marker, and §6.1's four-cell control table — whose fourth cell is the direct answer: under perfect mutual exclusion over the bay, twenty overlapping rows still land |
-| **F-02-9** | **Every write path that leaves a row *inside* the constraints' scope must take both locks, in the bay-then-technician order** — narrowed to that *iff* by ADR-0023 at slice 05, and scoped to the transaction rather than the statement. Inherited by **slice 06**'s reschedule `UPDATE` and **slice 07**; one that skips them reintroduces the deadlock against a concurrent booking, and because a `40P01` is deliberately not retried it surfaces as a `500` rather than as a latency blip. Nothing structural enforces it — `lockResources` lives in the only module permitted to name the table, which makes skipping it visible in review, not impossible |
+| **D-02-1** | **ADR-0018 weakens ADR-0016's argument, as ADR-0016's own Consequences record**: inside a per-resource lock a reintroduced check-then-act would be *correct* rather than merely harmless. What survives is the brand, the `appointment-table-access` marker and §6.1's fourth cell — twenty overlapping rows land under perfect mutual exclusion over the bay |
+| **F-02-9** | **Every write path that leaves a row *inside* the constraints' scope must take both locks, in the bay-then-technician order** — narrowed to that *iff* by ADR-0023 at slice 05, and scoped to the transaction rather than the statement. A path that skips them reintroduces the deadlock against a concurrent booking, and a `40P01` being deliberately unretried it surfaces as a `500`, not a latency blip. **ADR-0026 makes it structural for the two writes inside the scope** — the lock is a required parameter — leaving slice 07's paths, and the transaction-identity hole ADR-0028 would close |
 | **F-02-8** | `hashtext` is an **undocumented internal function**; ADR-0018 needs only a deterministic `int4` per id, so an application-side hash would serve. Cheap and unowned |
 
 ### The cost of slice 05
 
+**F-05-1 and D-05-1 discharged at slice 06** by ADR-0026 and `setNotFoundHandler`; residues below.
+OQ-05-2 stays slice 09's.
+
 | id | The cost |
 |---|---|
-| **F-05-1** | `appointmentRepository.ts` now holds two write functions, one taking ADR-0018's locks and one correctly not (ADR-0023), where *"correctly exempt"* reads exactly like *"forgot the lock"*. A docblock is a marker, not a mitigation, and QS-12's markers are file-granular. Remedy — a branded `ResourceLock` parameter on `insertAppointment` — is specified in `06-reschedule-atomic-move.md`, which writes a new locking path |
-| **D-05-1** | Two responses still escape the taxonomy (§8.6), and `src/http/server.ts:36` asserts §8.6's totality *"is kept"* there — over a row ADR-0024 has struck. It is the sentence a future reader will trust, it is `src/`, and slice 06 corrects it with the handler: a docblock the architect may not edit is otherwise nobody's debt. AC-5 likewise makes an empty JSON body a `400` on routes that read none (OQ-05-2, slice 09) |
 | **D-05-3** | **ADR-0019's deferral criterion is 1-for-2 on outcomes and 0-for-2 on premises at its first destination.** R-02-2's *"cheaper"* was true of the file, false of the branch; R-02-3 argued from a mutant already killed while the survivor went unnamed. Both were built at slice 05 instead. Either supersede the criterion or make a deferral re-measure on arrival |
+
+### The cost of slice 06
+
+| id | The cost |
+|---|---|
+| **D-06-1** | The move guards on an allowlist where the constraints carry a denylist, so a third status would be automatically occupying *and* automatically unmovable — the direction `0003_appointment.sql` calls unsafe. ADR-0025 argues it; closing it earns `domain/appointment.ts` back |
+| **F-06-2** | **`problem.ts` has no margin, and its taxonomy is invisible to the mutation score.** `PROBLEM_TYPES` is `as const`, which Stryker's instrumenter skips whole, so a deleted row scores as *no change* — silence on exactly what QS-11 is about. Measured: 12 mutants and 75.00 either side of slice 06's two rows; the guard is `error-taxonomy.test.ts`'s ∀responses ∃row |
+| **D-06-2** | **A `ResourceLock` cannot be forgotten and can be forged.** Under `tsc --strict` omitting it is `TS2554` and a bare pair `TS2345`, but a hand-written `__brand: 'ResourceLock'` compiles clean, so *"the only minting site"* is convention, not construction. `domain/candidates.ts` shares the shape. A `unique symbol` would close it, deliberately unbooked: forging is not an accident |
+| **D-06-3** | **AC-2's audit instrument can fail falsely and cannot pass falsely.** Six test directories share one container without `fileParallelism: false`, so a concurrent zero-row `UPDATE` satisfies its `affected = 0` discriminator; two exist (T-06-7). Remedy on first bite: an `application_name`, filtered in the trigger |
+| **F-06-1** | Two attempt loops, one design; extraction deferred to slice 09, which instruments both anyway |
+| **D-06-4** | A `rescheduleAppointment.ts` docblock cites I-02-6 for a principle it does not hold; ADR-0029 does. D-05-1's shape: `src/` is not the architect's to edit |
 
 ## 11.2 Known risks
 
@@ -100,17 +113,17 @@ spanning two dealerships.
 ### R-2 · A capacity-*n* resource would need a different mechanism (A-2)
 
 An exclusion constraint expresses capacity **one**, exactly, so a technician overseeing two jobs makes
-the mechanism the wrong shape and no tuning fixes it. The cheapest route changes the model instead:
+the mechanism the wrong shape. The cheapest route changes the model:
 give the resource *n* numbered slots, each capacity-one, so only candidate generation changes. A
-counting constraint (which PostgreSQL has no declarative form of) and `SERIALIZABLE` plus an
-application-side count both move correctness back into code, against §2.1.
+counting constraint and `SERIALIZABLE` plus an application-side count both move correctness back into
+code, against §2.1.
 
 ### R-3 to R-6 · Four couplings that nothing structural enforces
 
 | id | The coupling | What holds it, and what does not |
 |---|---|---|
 | R-3 | **The constraint names are behaviour, not documentation.** ADR-0009 prunes from `err.constraint` and §8.4 labels `booking_conflicts_total{resource}` from it | Renaming `no_bay_overlap` degrades the retry loop to a multiplicative bound and mislabels the metric — without failing to compile or looking wrong in a single-threaded test. QS-1 and QS-2 assert the names; nothing else does |
-| R-4 | **The attempt cap refuses while capacity exists, and this row said the opposite until slice 04 (D-04-1).** ADR-0004 accepted a residual refusal as a liveness guard; ADR-0009 set the cap at 16 | Reaching 16 needs sixteen **conflicts**, not sixteen resources taken from under one looping request, and a merely busy resource supplies one with no concurrency at all. ADR-0009 set the cap **below the bound its own Bound-2 paragraph computed** — `\|bays\| + \|technicians\| − 1`, which at §1.1 scale exceeds 16 either way. So *"a non-zero `capped` counter means the cap is wrong"* is already false: it is expected. Slice 09's **AC-13** is the sibling that cannot pass until this closes. Two remedies, neither chosen: the pre-filter after slice 08's QS-8, or a cap above the bound. The number is ADR-0009's and human-decided |
+| R-4 | **The attempt cap refuses while capacity exists, and this row said the opposite until slice 04 (D-04-1).** ADR-0004 accepted a residual refusal as a liveness guard; ADR-0009 set the cap at 16 | ADR-0009 set the cap **below the bound its own Bound-2 paragraph computed** — `\|bays\| + \|technicians\| − 1`, which at §1.1 scale exceeds 16 either way. So *"a non-zero `capped` counter means the cap is wrong"* is already false: it is expected. Slice 09's **AC-13** is the sibling that cannot pass until this closes. Two remedies, neither chosen: the pre-filter after slice 08's QS-8, or a cap above the bound. The number is ADR-0009's and human-decided |
 | D-04-2 | **ADR-0020's cap placement is a rule about where a `return` goes**, stated only by `tsc` | No test can help: a refusal minted in the arm and one cast outside it render identically (ADR-0020) |
 | R-5 | **The exclusion constraint's range expression and the availability query's are one idea in two files** | §4.2 records why a shared `IMMUTABLE` SQL function cannot hold them together; QS-8 is load-bearing, and weakening it leaves no other signal |
 | R-6 | **The `Database` interface can drift from the migrations.** ADR-0006 keeps schema types in `schema.ts` and the schema in `.sql` | Nothing, until a CI check regenerates from a migrated database and diffs. Until then a migration merged without a matching type edit compiles and is wrong |
@@ -124,7 +137,7 @@ application-side count both move correctness back into code, against §2.1.
 | R-7c | `src/platform` is importable-by-all and imports nothing, exactly the shape of a junk drawer | The leaf rule stops it acquiring behaviour, not contents |
 | R-7d | Down migrations are exercised by no test (ADR-0007); the corpus was reversed once by hand on 2026-09-04 — a dated measurement, not a guarantee | A fresh container each deployment; rollback in anger is not a story this system has |
 | R-7e | **The transaction boundary must be exactly one attempt wide**, enforced by nothing structural. Wider and the second attempt fails `25P02` instead of retrying; narrower and `pg_advisory_xact_lock` has no transaction to scope to | QS-3 fails immediately on the first; the second does not compile, both calls taking the same handle |
-| R-7i | `exclusion-constraint-adjudicates.test.ts` phases 1–3 measure simultaneity and do not assert it — their verdicts hold for sequential inserts too. Phase 4 does assert it, discriminating by **one unit**: the mutant that releases the locks before the write, check-then-act's own shape, is caught at 2 against 1 | Ruled adequate at slice 05: an equality at the boundary is the tightest assertion available, and asserting a nondeterministic value in phases 1–3 trades evidence for flake. The residual: a control silently ceasing to discriminate |
+| R-7i | `exclusion-constraint-adjudicates.test.ts` phases 1–3 measure simultaneity without asserting it; their verdicts hold for sequential inserts too. Phase 4 asserts it, discriminating by **one unit** — the mutant releasing the locks before the write is caught at 2 against 1 | Ruled adequate at slice 05: an equality at the boundary is the tightest assertion available, and asserting a nondeterministic value trades evidence for flake. The residual: a control silently ceasing to discriminate |
 | R-7h | The RFC 3339 request pattern is a regex, so `2026-02-30T10:00:00Z` is accepted and `Date.parse` yields 2 March | Fixing it needs a leap-year calculation in `src/http` — the second calendar implementation slice 01 ruled against. **OQ-02-1** carries the trade |
 | R-7g | Case 0's constraint-set assertion filters `contype <> 'p'`, but **PostgreSQL 18 surfaces `NOT NULL` as `contype = 'n'`** — twelve extra rows on `appointment`. The fix is an allowlist, `contype IN ('c','f','u','x')` | Cannot fail today: the image is pinned and `postgres-harness.test.ts` asserts `^16\.`. **The direction of the failure is the finding** — a denylist breaks with a dozen names nobody added, so a version bump reads as *"too strict"* and invites loosening §8.1's seven-and-only-seven |
 
@@ -138,16 +151,15 @@ ADR-0010 founds the pipeline (§7.4). An unenforced enforcement claim stops ever
 | Link integrity and ADR existence are enforced | METHODOLOGY §4 | No tool. CI checks diagram links only; every other relative link is unchecked |
 | `QS-*` names a real test, or CI fails | METHODOLOGY §4, §10.2 | No tool, and no longer blocked now `tests/` exists. The traceability chain's last link is a plain gap, and the oldest unpaid item here |
 
-Not a gap but worth knowing: **`log:audit` cannot run in CI**, its ground truth being subagent
-transcripts that exist only on the maintainer's machine; CI substitutes append-only and schema-valid.
-
 ### R-12 · The mutation gate's failure mode is silence, and it is held by a workaround
 
 The tool producing §8.5's score has a demonstrated mode in which it reports survivors it never tested;
 §8.5 carries the measurement, the workaround and the recipe. **The residual risk is that it was caught
 by a low score, which is luck**: a broken runner producing 0.81 against a 0.75 threshold satisfies
-every check `slice:check` makes. The remedy is §5.3's — put the assertion **inside the thing that
-produces the pass**, here a `mutation.json` check on `testsCompleted`. Until then a reviewer reads the
+every check `slice:check` makes. **Slice 06 supplied the second instance**: a `Stryker restore all`
+the instrumenter never reads, ignoring 93 mutants where 8 were ruled, behind a green gate. The remedy
+is §5.3's — assert **inside the thing that produces the pass**: a `mutation.json` check on
+`testsCompleted` and on the ignored count. Until then a reviewer reads the
 survivor list, which is not a mechanism.
 
 **And it is blind to `src/main.ts` by construction.** `vitest.mutation.config.ts` includes
@@ -185,9 +197,8 @@ notice if it stopped.**
 `closes_at > opens_at`, `duration_minutes > 0`, `vehicle.vin UNIQUE` — are specified in §8.1 and
 asserted by nothing. Measured live: all four exist and all four fire (`23514`
 ×3, `23505`), and dropping any one leaves the suite green. Every other reference-table constraint is
-self-enforcing, being a foreign-key target whose removal fails migration `0003`. The remedy is **not**
-case 0 extended across nine tables — the step back toward the whole-schema snapshot slice 00 rejected
-— but **asserting them where the code that relies on them lands**.
+self-enforcing, being a foreign-key target whose removal fails migration `0003`. The remedy is **not** case 0 extended
+across nine tables, but **asserting them where the code that relies on them lands**.
 
 **R-11b — `appointment_technician_in_dealership` is proven to exist and not to fire.** Six of seven
 `appointment` constraints have a case that provokes them; the seventh has only case 0, though booking
@@ -197,11 +208,9 @@ catalogue assertion alone**, where the bay half has a behavioural one.
 ### R-10 · `updated_at` is maintained by the writer, and nothing enforces it
 
 `appointment.updated_at` has `DEFAULT now()` and no trigger, deliberately: §2.1's discipline is that
-the database holds the **invariant** and the application the convenience, so the obligation sits on
-`appointmentRepository.ts`. Slice 05 is the first to carry it, and carries half. Its cancel
-`CASE` advances the column on the first call and holds it on a replay; the *holding* half is asserted
-(`to_jsonb` equality across the replay), the *advancing* half by nothing. Slice 06's move inherits the
-gap.
+the database holds the **invariant** and the application the convenience. Slice 05's cancel `CASE` advances the column on the first call and holds
+it on a replay; the *holding* half is asserted (`to_jsonb` equality across the replay), the
+*advancing* half by nothing. Slice 06's move writes `now()` unconditionally and inherits the gap.
 
 ## 11.3 What production would additionally require
 
@@ -214,8 +223,8 @@ marked **†** or a Gate A ruling.
 | **Technician shifts, holidays, absence** (ADR-0001) | A technician is bookable whenever the dealership is open, day off included | The expensive one. Per-resource, time-varying availability is a *second* class of rule beside the database-enforced one, needing its own mechanism and concurrency story — or it is the loophole §2.1 exists to close |
 | **Appointment history and audit** (ADR-0003) | "Who cancelled this, and when?" is unanswerable — live from slice 05, which ships cancellation with no actor on the record | An append-only history table beside `appointment`. Additive |
 | **DMS event publication** (§3.1.2) | Nothing downstream learns an appointment exists | An outbox row written in the same statement as the appointment — cheap here, the write already being one statement |
-| **High availability, backup, recovery** (§3.3) | One container. A lost volume is a lost schedule | Ordinary PostgreSQL operations; the application is stateless, so several instances need no coordination (§7.1) |
+| **High availability, backup, recovery** (§3.3) | One container. A lost volume is a lost schedule | Ordinary PostgreSQL operations; the application is stateless (§7.1) |
 | **Vehicle-dependent durations (A-1), buffers (A-4), search-style booking (A-5)** | The three most likely real-world corrections | The first two are one domain function plus one migration each, by construction (ADR-0008, QS-12). A-5 turns the advisory read into something that drives allocation, and is materially larger |
-| **Reference-data management** (A-7) | Bays, technicians and opening hours change only by migration | Conventional CRUD, no interesting risk, spending the review attention OC-3 calls scarce |
+| **Reference-data management** (A-7) | Bays, technicians and opening hours change only by migration | Conventional CRUD, no interesting risk |
 | **Waitlists, overbooking, priority jobs** (§3.3) | No scheduling policy beyond first-come-first-served | Policy is where a real scheduler earns its keep, and needs a real dealership's data. ADR-0009's Order-D is the first honest step |
 | **GDPR-grade PII handling** (§3.3) | Customer names are stored; logs carry ids only (§8.4), a mitigation rather than a policy | Retention, subject access and erasure, the last interacting with the history table above |

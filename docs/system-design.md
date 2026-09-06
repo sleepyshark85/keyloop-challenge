@@ -89,6 +89,11 @@ without taking anyone's word for it.
 - [**ADR-0022**](adr/0022-application-configuration-is-prefixed-booking.md) — Prefix this application's own configuration with `BOOKING_`, and make §7.3's table the contract *(accepted)*
 - [**ADR-0023**](adr/0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md) — A write that leaves the exclusion constraints' scope takes no advisory lock — narrow F-02-9 to an iff *(accepted)*
 - [**ADR-0024**](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) — The error taxonomy's residual is a property, not a row *(accepted)*
+- [**ADR-0025**](adr/0025-existence-is-the-reads-legality-is-the-statements.md) — Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE *(accepted)*
+- [**ADR-0026**](adr/0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md) — The lock is a value the write takes, and it carries the keys it took *(accepted)*
+- [**ADR-0027**](adr/0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md) — A move attempts the pair it already holds before it shuffles *(accepted)*
+- [**ADR-0028**](adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) — The lock carries the transaction it was taken on *(proposed)*
+- [**ADR-0029**](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) — A deadlock event names the write path it happened on; a conflict event does not *(accepted)*
 
 ---
 

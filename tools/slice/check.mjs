@@ -21,6 +21,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { frontmatter, body } from '../lib/frontmatter.mjs';
+import { refsDeferredTo, deferralMap } from '../lib/deferrals.mjs';
 
 const SLICE_DIR = resolve('docs/slices');
 const LOG = resolve(process.env.TEAM_LOG ?? 'docs/team-log/events.jsonl');
@@ -49,12 +50,17 @@ if (!slice) {
   process.exit(2);
 }
 
-const events = existsSync(LOG)
+const allEvents = existsSync(LOG)
   ? readFileSync(LOG, 'utf8').split('\n').filter(Boolean)
       .flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } })
-      .filter((e) => e.slice === id)
       .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))
   : [];
+
+// Deferrals are the one thing this tool must read ACROSS slices. Everything else about a
+// slice is answered from its own span; an inherited obligation is by definition a ruling
+// made somewhere else, and reading only `events` is why the destination lived in prose for
+// five slices — the receiving slice's own record never mentioned it.
+const events = allEvents.filter((e) => e.slice === id);
 
 // ------------------------------------------------------------------ checks --
 const results = [];
@@ -97,6 +103,92 @@ if (!onlyDone) {
   const arc = slice.arc42 ?? [];
   check('ready', 'arc42 scope declared', arc.length ? PASS : FAIL,
     arc.length ? arc.join(' ') : 'declare the sections this slice may touch, or ["none"]');
+
+  // INHERITED OBLIGATIONS — A-05-5, and the fourth attempt at the same defect.
+  //
+  // The mechanism failed identically four times: a ruling said "routed to slice 06", the
+  // receiving slice's file said nothing, and the only thing joining them was memory. R-05-2
+  // twice, A-05-5, then O-37 — which named a destination file that did not have the
+  // structure the dispatch described, because nothing had ever checked that a named
+  // destination was real. The architect ruled the criterion SOUND and the ENFORCEMENT
+  // MISSING, and said in the same ruling that the honest alternative to building this check
+  // is an ADR superseding ADR-0019 rather than a fifth repetition.
+  //
+  // READY fails when a ref deferred here is missing from `inherits:`. The direction matters:
+  // the subset runs deferrals -> inherits, so a slice cannot become Ready by simply not
+  // mentioning what was sent to it. Extra entries in `inherits:` are NOT an error — a slice
+  // may take on an obligation nobody deferred to it, and forbidding that would punish the
+  // one behaviour this whole mechanism is trying to encourage.
+  // O-41 — THE SUBSET GUARD BECOMES BIDIRECTIONAL.
+  //
+  // The check below asks whether `inherits:` covers everything deferred here. It cannot ask
+  // the other question: whether the slice's PROSE still describes what `inherits:` claims.
+  // Measured on slice 06 — `F-02-9`, `R-05-7` and `R-05-9` appeared in the front matter and
+  // NOWHERE ELSE IN THE FILE. The substance was all present in the bullets; nothing linked a
+  // bullet to the ruling that put it there, so a silent drop would have stayed green.
+  //
+  // A REF IS A REF BECAUSE THE LOG KNOWS IT, not because it matches a pattern. Matching by
+  // shape would accept `AC-1` and `QS-6`, which are not findings, and would accept an invented
+  // `F-06-x` — which is the failure O-38 already caught once, a false destination manufactured
+  // to satisfy a rule that exists to stop false destinations. Checking against the log's own
+  // refs enforces O-39 in the same stroke: a bullet may only cite a finding that was actually
+  // raised.
+  //
+  // THE ESCAPE IS DELIBERATE AND VISIBLE. The architect's first version of this rule was
+  // "every bullet carries a ref", and it is false against slice 06's own file: the
+  // `src/domain/appointment.ts` bullet is a retired §5.2 prediction that was never a logged
+  // finding and has no ref to carry. A rule demanding one would invent it. So a bullet may say
+  // `(no ref — <reason>)` instead; bare bullets fail, escaped bullets pass and can be counted.
+  const inheritedScope = (() => {
+    // NOT a lookahead for `\Z`: JavaScript has no such escape, and `(?=^##\s|\Z)` silently
+    // becomes "or a literal Z", so the section never matched and every slice reported N/A —
+    // a guard that could only ever say "nothing to check". Caught by this check's own tests
+    // on their first run, which is the argument for writing them.
+    const m = slice.text.match(/^##\s+Inherited scope[^\n]*\n([\s\S]*)$/m);
+    if (!m) return null;
+    const next = m[1].search(/^##\s/m);
+    return next === -1 ? m[1] : m[1].slice(0, next);
+  })();
+
+  if (inheritedScope === null) {
+    check('ready', 'inherited scope is traceable', NA,
+      'this slice declares no `## Inherited scope` section');
+  } else {
+    const knownRefs = new Set(allEvents
+      .filter((e) => ['finding.raised', 'finding.ruled', 'finding.routed', 'finding.resolved'].includes(e.event))
+      .map((e) => e.ref).filter(Boolean));
+
+    // Top-level bullets only: a nested list belongs to the bullet above it.
+    const bullets = inheritedScope.split(/\n(?=- )/).map((b) => b.trim()).filter(Boolean);
+    const refsIn = (b) => [...knownRefs].filter((r) => new RegExp(`\\b${r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(b));
+    const escaped = (b) => /\(no ref\s*[—-]\s*[^)]+\)/.test(b);
+
+    const bare = bullets.filter((b) => !refsIn(b).length && !escaped(b));
+    const cited = new Set(bullets.flatMap(refsIn));
+    const uncited = (slice.inherits ?? []).filter((r) => !cited.has(r));
+
+    const problems = [
+      ...bare.map((b) => `a bullet cites no ref and carries no escape: "${b.slice(0, 60).replace(/\s+/g, ' ')}…"`),
+      ...(uncited.length ? [`declared in \`inherits:\` but named in no bullet — ${uncited.join(', ')}`] : []),
+    ];
+    check('ready', 'inherited scope is traceable', problems.length ? FAIL : PASS,
+      problems.length
+        ? `${problems.join('; ')}. A ref must be one the log knows; use \`(no ref — reason)\` when there `
+          + 'genuinely is none.'
+        : `${bullets.length} bullet(s), every ref in \`inherits:\` named in one`);
+  }
+
+  const owed = refsDeferredTo(allEvents, id);
+  const inherits = slice.inherits ?? [];
+  const missing = owed.filter((r) => !inherits.includes(r));
+  check('ready', 'inherited obligations declared',
+    owed.length === 0 ? PASS : missing.length ? FAIL : PASS,
+    owed.length === 0
+      ? 'nothing was deferred to this slice'
+      : missing.length
+        ? `deferred here but absent from \`inherits:\` — ${missing.join(', ')}. `
+          + 'A slice does not stop owing an obligation by not listing it.'
+        : `${owed.join(' ')} — all declared`);
 
   // O-14. Presence is not correspondence.
   //
@@ -497,6 +589,30 @@ if (!onlyReady) {
     openSerious2.length
       ? `${openSerious2.length} open MAJOR/BLOCKING: ${openSerious2.map((e) => e.ref).join(', ')}`
       : `every MAJOR/BLOCKING finding is ruled or resolved`);
+
+  // The other half of A-05-5. READY asks whether the slice ADMITTED what it owes; DONE asks
+  // whether it did anything about it. An `inherits:` list with no ruling behind it at the end
+  // of the slice is the same omission one step later, and a slice that discharges an
+  // obligation by copying it into the next file is exactly what R-05-2 kept catching.
+  //
+  // "Did something about it" is deliberately broad: ruled, resolved, or re-deferred with a
+  // destination. Re-deferring COUNTS — an honest onward routing is a legitimate outcome and
+  // the register carries it — but it must be a logged ruling in this slice's own span, which
+  // is the thing prose in a design document is not.
+  const ruledHere = new Set(events
+    .filter((e) => ['finding.ruled', 'finding.resolved', 'finding.routed'].includes(e.event))
+    .map((e) => e.ref).filter(Boolean));
+  const inheritedRefs = slice.inherits ?? [];
+  const undischarged = inheritedRefs.filter((r) => !ruledHere.has(r));
+  check('done', 'inherited obligations discharged',
+    inheritedRefs.length === 0 ? NA : undischarged.length ? FAIL : PASS,
+    inheritedRefs.length === 0
+      ? 'this slice inherited nothing'
+      : undischarged.length
+        ? `no ruling in this slice's span for ${undischarged.join(', ')} — `
+          + 'rule it, resolve it, or re-defer it with a destination; carrying it silently '
+          + 'into the next slice is the defect this check exists for'
+        : `${inheritedRefs.join(' ')} — each ruled, resolved or re-routed here`);
 
   const loops = events.filter((e) => e.event === 'loopback').length;
   check('done', 'loopbacks within governor', loops <= 2 ? PASS : FAIL,

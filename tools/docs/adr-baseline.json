@@ -309,5 +309,76 @@
    "D \u2014 widen the 400 predicate in server.ts to statusCode < 500."
   ],
   "decision": "Chosen option: B, in four parts."
+ },
+ "0025-existence-is-the-reads-legality-is-the-statements.md": {
+  "options": [
+   "Bad, because a guard spread over five CASEs is discoverable only by reading all of them",
+   "Bad, because it makes a refusal write \u2014 a rejected move takes the row lock and leaves a",
+   "Bad, because status then has two adjudicators, and the cheaper one is a read",
+   "Bad, because the read exists only to disambiguate a result the design chose to make",
+   "Good, because a doomed request skips the opening-hours derivation",
+   "Good, because one statement still does the writing",
+   "Good, because one statement's output decides both, unambiguously",
+   "Option A \u2014 guarded UPDATE, plus a follow-up read on zero rows. \u00a76.3 as designed.",
+   "Option B \u2014 unguarded UPDATE, the status guard moved into the SET, slice 05's CASE",
+   "Option C \u2014 the read decides existence; the guarded UPDATE decides legality. Chosen.",
+   "Option D \u2014 Option C, and the read short-circuits on cancelled too."
+  ],
+  "decision": "Chosen option: C."
+ },
+ "0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md": {
+  "options": [
+   "Bad, because both are file-granular, and the two functions this is about are in one file \u2014",
+   "Bad, because it leaves a residue slice 05 named and accepted: the token proves a lock was",
+   "Good, because \"forgot the lock\" becomes a compile error and \"correctly exempt\" becomes a",
+   "Good, because it needs no signature change",
+   "Option A \u2014 keep the docblock. Good, because it costs nothing. Bad, because the defect it",
+   "Option B \u2014 a branded ResourceLock token: lockResources returns it, the writes take it",
+   "Option C \u2014 Option B, and the lock carries the keys it took, the write reading bay and",
+   "Option D \u2014 an ambiguity-containment marker or a dependency-cruiser rule."
+  ],
+  "decision": "Chosen option: C."
+ },
+ "0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md": {
+  "options": [
+   "Option A \u2014 shuffle from the first attempt",
+   "Option A \u2014 shuffle from the first attempt, bookAppointment's order applied unchanged.",
+   "Option B \u2014 current pair first, then the shuffle",
+   "Option B \u2014 the current pair is attempt 1, then ADR-0009's seeded shuffle over the remainde",
+   "Option C \u2014 current pair only",
+   "Option C \u2014 the current pair only; refuse if it conflicts.",
+   "Option D \u2014 order by distance from the current pair",
+   "Option D \u2014 order by distance from the current pair \u2014 current, then same bay other technici"
+  ],
+  "decision": "Chosen option: B. Attempt 1 is the appointment's own (bayid, technicianid). On a 23P01"
+ },
+ "0028-the-lock-carries-the-transaction-it-was-taken-on.md": {
+  "options": [
+   "Option A \u2014 leave it as \u00a711 debt",
+   "Option A \u2014 leave it as \u00a711 debt, ADR-0026's position.",
+   "Option B \u2014 a runtime identity assertion",
+   "Option B \u2014 a runtime identity assertion in each write.",
+   "Option C \u2014 the lock carries its Db",
+   "Option C \u2014 the lock carries the Db it was taken on, and the write takes no Db of its own.",
+   "Option D \u2014 a dependency-cruiser rule or an ambiguity-containment marker.",
+   "Option D \u2014 a rule or a marker"
+  ],
+  "decision": "Chosen option: C, proposed and not applied."
+ },
+ "0029-a-deadlock-names-the-write-path-a-conflict-does-not.md": {
+  "options": [
+   "Bad, because it breaks I-02-6's observer. QS-1 and QS-2 read the constraint name off one",
+   "Bad, because it is a third design proposed at step 7 over merged, measured code, and the",
+   "Bad, because the payload carries bayId, technicianId and attempt and no path, so",
+   "Good, because it is a rule with no cases, and cases are what rot",
+   "Good, because it is also a rule with no cases",
+   "Good, because it keeps the taxonomy flat and is more extensible",
+   "Option A \u2014 every event name is shared with booking. One taxonomy, no exceptions.",
+   "Option B \u2014 every event name is per use case: reschedule.conflict, reschedule.refused.",
+   "Option C \u2014 shared where the event is the same event; distinct where the path is the findin",
+   "Option D is probably the better long-run shape and is not booked: proposing a third design",
+   "Option D \u2014 one booking.deadlock name plus a path field."
+  ],
+  "decision": "Chosen option: C. DEADLOCKEVENT is 'reschedule.deadlock' on the move path and"
  }
 }

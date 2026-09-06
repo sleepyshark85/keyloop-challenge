@@ -13,7 +13,9 @@ import {
   member,
   occupy,
   postBooking,
+  postCancellation,
   postRaw,
+  postReschedule,
   seedScenario,
 } from '../support/booking.js';
 import type { HttpAnswer } from '../support/booking.js';
@@ -21,7 +23,8 @@ import type { HttpAnswer } from '../support/booking.js';
 /**
  * QS-11 / AC-7 to AC-12 — the error taxonomy is total and stable.
  *
- * arc42 §8.6 · `docs/slices/02-design.md` §2.7, §5 · ADR-0002, ADR-0017.
+ * arc42 §8.6 · `docs/slices/02-design.md` §2.7, §5 · `docs/slices/06-design.md` §2.4 ·
+ * ADR-0002, ADR-0017, ADR-0024.
  *
  *   AC-7   an out-of-hours interval is `400 /problems/outside-opening-hours`, NOT `409`
  *   AC-8   a malformed body is `400 /problems/malformed-request`, before any handler runs
@@ -33,14 +36,30 @@ import type { HttpAnswer } from '../support/booking.js';
  *   AC-12  every row of §8.6's table is reachable, and no two rows collide
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * WHAT "EVERY ROW" MEANS HERE, AND WHY IT IS SEVEN AND NOT EIGHT.
+ * WHAT "EVERY ROW" MEANS HERE, AND WHY IT IS NINE, NOT SEVEN, AS OF SLICE 06.
  *
- * §8.6's table has eight rows. `409 /problems/appointment-not-confirmed` needs rescheduling
- * and is the slice file's out-of-scope — it lands with slice 06 and extends this file. The
- * seven in scope are `PROBLEM_TYPES` in design §2.7, and every one of them is EXERCISED
- * here: T-02-4 established at step 2 that `500 /problems/internal` is reachable over HTTP
- * through a dealership whose `time_zone` does not parse, so this slice has no
- * defended-but-unexercised row.
+ * §8.6's table had eight rows at slice 02; `409 /problems/appointment-not-confirmed` needed
+ * rescheduling and was that slice's out-of-scope, deferred here in a comment that named
+ * slice 06 as the destination. It has arrived, and ADR-0024 adds a NINTH that §8.6 never
+ * had at slice 02 at all: `404 /problems/route-not-found`, the residual `setNotFoundHandler`
+ * closes (measured there: `GET /nope` used to answer bare Fastify JSON with no `type`,
+ * reaching the error handler at all). Both land in ONE taxonomy change (design §2.4): the
+ * two rows are added together, so `PROBLEM_TYPES` goes seven to nine in a single step rather
+ * than being revisited a second time.
+ *
+ * `appointment-not-confirmed`'s full acceptance coverage — a cancelled appointment refused a
+ * move, distinctly from a contended one — lives in
+ * `tests/acceptance/reschedule-appointment.test.ts` AC-4; what this file adds is that row's
+ * membership in the CLOSED set (AC-12's sweep, below). `route-not-found` has no other home:
+ * it is exercised here directly, because nothing else in this slice's acceptance suite hits a
+ * genuinely unmatched route.
+ *
+ * AC-4's METRIC HALF IS NOT ASSERTED ANYWHERE IN THIS SLICE (design §5): `booking_conflicts_
+ * total` does not exist until slice 09, which carries "does not increment" as its own AC.
+ *
+ * Every row EXERCISED here, old and new: T-02-4 established at step 2 that `500 /problems/
+ * internal` is reachable over HTTP through a dealership whose `time_zone` does not parse, so
+ * this slice has no defended-but-unexercised row.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * THE FIXTURES ARE UNCONTENDED, DELIBERATELY — design §5.2, measurement 3.
@@ -53,12 +72,14 @@ import type { HttpAnswer } from '../support/booking.js';
  * AC-10 namespace below is therefore freshly seeded with no `appointment` row in it.
  */
 
-/** The seven §8.6 rows in scope for this slice, as `type` → status. Design §2.7 `PROBLEM_TYPES`. */
+/** The NINE §8.6 rows in scope as of slice 06, as `type` → status. Design §2.7, §2.4 `PROBLEM_TYPES`. */
 const TAXONOMY: ReadonlyArray<readonly [string, number]> = [
   ['/problems/malformed-request', 400],
   ['/problems/outside-opening-hours', 400],
   ['/problems/appointment-not-found', 404],
+  ['/problems/route-not-found', 404],
   ['/problems/no-capacity', 409],
+  ['/problems/appointment-not-confirmed', 409],
   ['/problems/unknown-reference', 422],
   ['/problems/vehicle-not-owned', 422],
   ['/problems/internal', 500],
@@ -314,6 +335,46 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
     });
   });
 
+  /* ────────────────────────────────────────────────────────────── slice 06, ADR-0024 ──
+   *
+   * THE HOSTILE CORPUS. Measured at slice 06 step 1 against merged code, before this route
+   * existed: `GET /nope` answered `404 application/json` with NO `type` at all — Fastify's
+   * OWN default not-found body, never reaching `setErrorHandler`. §8.6's residual invariant
+   * — every response with status >= 400 is `problem+json` carrying a `type` from the closed
+   * set — was false for exactly this request. ADR-0024 rules it: register
+   * `setNotFoundHandler`, and give the row a name.
+   *
+   * ASSERTED IN THE DIRECTION THAT CAN FAIL (∀responses ∃row), per the design's own framing:
+   * this is not "does route-not-found look right", it is "does a genuinely unmatched path
+   * still answer inside the taxonomy" — the same shape the residual invariant demands of
+   * every other response in this file.
+   */
+  it('ADR-0024 — a genuinely unmatched route is 404 /problems/route-not-found, not Fastify\'s bare default 404', async () => {
+    await withService(async (service) => {
+      // Two independent unmatched paths, neither ever registered by any route in this
+      // service — the corpus is not a single accident of one shape of URL.
+      const nope = await postRaw(service, '/nope-such-route-exists', {});
+      expectProblem(
+        nope,
+        404,
+        '/problems/route-not-found',
+        'ADR-0024 — a path no route registers',
+      );
+
+      const alsoNope = await postRaw(
+        service,
+        `/appointments/${uuidFor('adr-0024-hostile', 'x')}/not-a-real-verb`,
+        {},
+      );
+      expectProblem(
+        alsoNope,
+        404,
+        '/problems/route-not-found',
+        'ADR-0024 — a real resource prefix with no matching sub-route',
+      );
+    });
+  });
+
   it('AC-12 — every row of §8.6 in scope for this slice is reachable, produces that status and that type, and no two collide', async () => {
     // The sweep. Each row is reached by its own fixture in one service, and the OBSERVED set
     // of (status, type) pairs is then compared to §8.6's table as a SET — so a row that has
@@ -345,6 +406,14 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
       bays: 1,
       technicians: 1,
       timeZone: 'Not/AZone',
+    });
+    // Slice 06's two new rows (design §2.4). `notConfirmed` needs a CANCELLED appointment to
+    // move; `appointment-not-confirmed`'s own full acceptance coverage is
+    // `tests/acceptance/reschedule-appointment.test.ts` AC-4 — this fixture exists only so
+    // the row can be swept into the CLOSED-SET comparison below.
+    const notConfirmed = await seedScenario(client, 'tax-total-notconfirmed', {
+      bays: 1,
+      technicians: 1,
     });
 
     await withService(async (service) => {
@@ -397,12 +466,33 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
       // content-type assertion in `record` is what would catch that.
       await record('internal', await postBooking(service, bookingBody(brokenZone)));
 
+      // Slice 06's two new rows.
+      const bookedToCancel = await postBooking(service, bookingBody(notConfirmed));
+      expect(
+        bookedToCancel.status,
+        `AC-12 ARRANGE — the appointment-not-confirmed fixture was not booked.\n${describeAnswer(bookedToCancel)}`,
+      ).toBe(201);
+      const cancelledId = String(member(bookedToCancel, 'id'));
+      const wasCancelled = await postCancellation(service, cancelledId);
+      expect(
+        wasCancelled.status,
+        `AC-12 ARRANGE — the appointment-not-confirmed fixture was not cancelled.\n${describeAnswer(wasCancelled)}`,
+      ).toBe(200);
+      await record(
+        'appointment-not-confirmed',
+        await postReschedule(service, cancelledId, isoAt(120)),
+      );
+      await record(
+        'route-not-found',
+        await postRaw(service, '/appointments/not-a-real-sub-resource', {}),
+      );
+
       const pairs = observed
         .map((o) => `${String(o.status)} ${String(o.type)}`)
         .sort();
       expect(
         pairs,
-        'AC-12 — the observed (status, type) pairs must be exactly §8.6\'s seven in-scope rows.\n' +
+        'AC-12 — the observed (status, type) pairs must be exactly §8.6\'s nine in-scope rows.\n' +
           observed.map((o) => `  ${o.row.padEnd(24)} -> ${String(o.status)} ${String(o.type)}`).join('\n'),
       ).toEqual([...TAXONOMY].map(([type, status]) => `${String(status)} ${type}`).sort());
 

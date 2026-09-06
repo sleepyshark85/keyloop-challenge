@@ -5,8 +5,9 @@ status: ready
 depends_on: ["08"]
 absorbs: ["10", "11"]
 arc42: ["§3.1", "§8.4", "§8.6", "§10.2", "§11.1"]
-adr: [5, 6, 10]
+adr: [5, 6, 10, 29]
 quality_scenarios: [QS-13, QS-11, QS-14]
+inherits: ["OQ-05-2", "F-06-1", "A-06-2", "T-06-5"]   # deferred here by ruling; slice:check enforces it (A-05-5)
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
 ---
@@ -92,6 +93,33 @@ is a goal nobody can fail.
 - **AC-15** — Given the measured write throughput for a single contended resource, when it is recorded
   in §11, then the figure and the dealership scale at which it would become binding are both stated.
 
+## Inherited scope — written here, not only where it was deferred
+
+- **F-06-1 — two attempt loops, one design.** `bookAppointment` and `rescheduleAppointment` each
+  carry ADR-0004's retry loop — same pruning, same cap, one shared `booking.conflict` line but **two
+  deadlock names, by ADR-0029** — in two files. Slice 06 duplicated it rather than refactor the
+  most-measured path inside its largest slice. **The destination is here because this slice must instrument both loops anyway**
+  (`appointment.insert` / `appointment.update` spans, `booking_attempts`, §8.4), so it opens both
+  files regardless: *cheaper*, and *stronger*, because an extracted loop is instrumented once. Note
+  ADR-0027 — the loops start on different first attempts, so the extraction takes a parameter rather
+  than being a lift. Re-measurable on arrival (D-05-3).
+- **OQ-05-2** — deferred here at slice 05; written up as AC-6b above.
+- **A-06-2 — nothing asserts that `deps.newId()` is the only place an appointment id is minted.**
+  ADR-0025 rests on it: an id unreachable before it exists makes the read's `absent` answer
+  permanent, so the `404` cannot go stale. Declined for slice 06 — the mechanism exists, the hazard
+  does not — and **deferred here because this slice emits the OpenAPI document**, so the check
+  asserts over *every operation* that none accepts a caller-supplied id, rather than over the files
+  someone grepped. A `dependency-cruiser` rule is file-granular and cannot see it; *"the reviewer
+  looked"* is not executable.
+- **T-06-5 / [ADR-0028](../adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) — the lock
+  does not prove the write shares its transaction.** ADR-0026 named the hole; the test-engineer
+  measured it and returned a **negative result** — no black-box test can observe it, because the
+  exclusion constraint backstops correctness either way. Types are the only control:
+  ADR-0028 (`proposed`) has `ResourceLock` carry the `Db` it was taken on. **Here for F-06-1's
+  reason** — the signature then changes once over an extracted loop instead of twice. Accepting it
+  is a decision, not a formality: slice 06 declined it as outcome (b) because nothing fails
+  without it.
+
 ## In scope
 
 - OpenTelemetry spans and metrics per §8.4, `pino` structured logging, and
@@ -109,10 +137,9 @@ is a goal nobody can fail.
 - Tracing the availability query's internals. The span that matters is the one that shows the window.
 - A client SDK, a UI, or a Postman collection. `CLAUDE.md` §1 stubs the client layer at the contract
   and the harness.
-- Reference-data endpoints. A-7 keeps seeding to migrations and fixtures precisely so this surface
-  stays the five operations that carry risk.
-- Optimising to beat the budget. If it passes, nothing changes: goal 3 beats goal 5, and §1.2 says to
-  prefer the decomposition that isolates an ambiguity over the one that saves a query.
+- Reference-data endpoints. A-7 keeps seeding to migrations and fixtures so this surface stays the
+  five operations that carry risk.
+- Optimising to beat the budget. If it passes, nothing changes: goal 3 beats goal 5.
 - Load testing beyond a single dealership, connection-pool tuning, or read replicas. §11 carries them.
 
 ## Definition of done

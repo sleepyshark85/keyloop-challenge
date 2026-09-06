@@ -6,6 +6,7 @@ depends_on: ["07"]
 arc42: ["§6.5", "§8.6"]
 adr: [8]
 quality_scenarios: [QS-8]
+inherits: ["I-04-5"]   # deferred here by ruling; slice:check enforces it (A-05-5)
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
 ---

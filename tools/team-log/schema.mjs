@@ -10,6 +10,8 @@
  *   narrated — written by the orchestrator. The only tier the board renders as opinion.
  */
 
+import { destinations, isDestination, NON_SLICE_DESTINATIONS } from '../lib/deferrals.mjs';
+
 export const ACTORS = [
   'architect', 'test-engineer', 'implementer', 'reviewer', 'scribe',
   'orchestrator', 'human',
@@ -67,6 +69,12 @@ export const EVENTS = {
   // WHY it exists and which finding produced it, which is what the defect register reads
   // to compute escape distance for work that was correctly deferred rather than fixed.
   'backlog.added':    ['actor', 'slices_added'],
+  // The destination of a deferral ruled BEFORE `deferred_to` was required, carried forward
+  // without rewriting the ruling. See tools/lib/deferrals.mjs for why the eighteen
+  // historical records are not edited in place; `quote` is required because the whole claim
+  // is that the original ruling ALREADY named this destination, and a claim about what a
+  // record says is worthless unless the reader can hold it against the record.
+  'finding.routed':   ['actor', 'ref', 'deferred_to', 'quote', 'rationale'],
   'dcr.raised':       ['actor', 'reason', 'step'],
   'dcr.discussed':    ['actor', 'position'],
   'dcr.resolved':     ['ruling', 'rationale'],
@@ -100,6 +108,31 @@ const RESOLUTIONS = ['fixed', 'disputed', 'accepted', 'deferred'];
  * exists rather than forcing that case into `accepted`.
  */
 const VERDICTS = ['accepted', 'narrowed', 'rejected', 'deferred', 'escalated'];
+
+/**
+ * WHEN `deferred_to` BECAME REQUIRED — A-05-5.
+ *
+ * A deferral that cannot name where it went is an omission wearing a routing's clothes, and
+ * this project produced that defect four times (R-05-2 twice, A-05-5, O-37) before the
+ * criterion was ruled sound and the enforcement missing.
+ *
+ * The rule is dated rather than universal because the log is APPEND-ONLY and `log:check`
+ * validates every record ever written. Making it universal would turn eighteen historical
+ * rulings red and leave two ways out, both bad: rewrite them, which O-36 already declined on
+ * the ground that rewriting the history of an artifact under assessment is the worse act; or
+ * exempt them by a flag, which is a dated rule that has stopped admitting it is one.
+ *
+ * So the date is the instant A-05-5 was ruled, and the comparison is STRICTLY after it: the
+ * rule cannot bind the append batch that created it. R-05-7 is the record that proves the
+ * point — a deferral written in the same batch as the ruling that made destinations
+ * mandatory, which a `>=` boundary retroactively convicted of breaking a rule that did not
+ * exist when it was written.
+ *
+ * Before the boundary the rule did not exist and the records are honest; after it there is
+ * no excuse. Historical destinations reach the tools through `finding.routed` instead —
+ * quoted from the ruling, never invented.
+ */
+const DEFERRED_TO_REQUIRED_FROM = Date.parse('2026-09-06T11:44:27.098Z');
 
 /**
  * Validate a record. Returns { ok, errors }.
@@ -155,6 +188,47 @@ export function validate(e) {
   if (e.event === 'finding.ruled' && e.verdict && !VERDICTS.includes(e.verdict)) {
     errors.push(`invalid verdict: ${e.verdict} (expected ${VERDICTS.join(' | ')})`);
   }
+  // A-05-5. A deferral must say where it went, on the same reasoning that makes a DCR
+  // ruling (c) name its failing criterion below: the ruling that cannot name one is not the
+  // ruling it claims to be. ADR-0019's own words — "a deferral which cannot name one IS AN
+  // OMISSION, to be built now".
+  //
+  // The destination may be a slice or a member of a closed set of non-slice destinations.
+  // That is not a loophole and it was not in A-05-5's specification; it is there because
+  // I-05-8 is a deferral whose entire rationale is that NO cheaper-or-stronger slice exists,
+  // and a check that forced a slice id there would have manufactured the false destination
+  // it exists to prevent. An array is accepted because F-02-9 is owed by slices 06 and 07
+  // both. See tools/lib/deferrals.mjs and O-38.
+  if (e.event === 'finding.ruled' && e.verdict === 'deferred'
+      && Date.parse(e.ts) > DEFERRED_TO_REQUIRED_FROM) {
+    const to = destinations(e.deferred_to);
+    if (!to.length) {
+      errors.push(
+        'a `deferred` verdict requires `deferred_to` naming where the finding went — a '
+        + `slice id, or one of ${NON_SLICE_DESTINATIONS.join(' | ')}. A deferral that `
+        + 'cannot name a destination is an omission (ADR-0019); if none is nameable, the '
+        + 'honest values are "retro" or "backlog", not an absent field.',
+      );
+    } else {
+      const bad = to.filter((t) => !isDestination(t));
+      if (bad.length) {
+        errors.push(
+          `invalid deferred_to: ${bad.join(', ')} (expected a slice id like "06" or `
+          + `${NON_SLICE_DESTINATIONS.join(' | ')})`,
+        );
+      }
+    }
+  }
+
+  // The backfill carries the same destination vocabulary, so a routing cannot say something
+  // a ruling could not have said.
+  if (e.event === 'finding.routed') {
+    const to = destinations(e.deferred_to);
+    const bad = to.filter((t) => !isDestination(t));
+    if (!to.length) errors.push('finding.routed requires a non-empty `deferred_to`');
+    else if (bad.length) errors.push(`invalid deferred_to: ${bad.join(', ')}`);
+  }
+
   if (e.event === 'review.response' && e.resolution && !RESOLUTIONS.includes(e.resolution)) {
     errors.push(`invalid resolution: ${e.resolution} (expected ${RESOLUTIONS.join(' | ')})`);
   }

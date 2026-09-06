@@ -728,3 +728,25 @@ export async function postRaw(
     ...(what.body === undefined ? {} : { body: what.body }),
   });
 }
+
+// ──────────────────────────────────────────── slice 06: the reschedule (move) sub-route ──
+
+/**
+ * `PATCH /appointments/{id}` `{ startsAt }` — `docs/slices/06-reschedule-atomic-move.md`,
+ * `docs/slices/06-design.md` §3.
+ *
+ * The body carries `startsAt` ONLY: `additionalProperties: false` is the route schema's own
+ * guard (design §3), so this helper does not accept a bay or technician to send — there is
+ * nothing here that could smuggle one in and nothing a test needs to strip.
+ */
+export async function postReschedule(
+  service: StartedService,
+  id: string,
+  startsAtIso: string,
+): Promise<HttpAnswer> {
+  return await request(`${service.baseUrl}/appointments/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ startsAt: startsAtIso }),
+  });
+}

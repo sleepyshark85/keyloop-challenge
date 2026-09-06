@@ -21,6 +21,7 @@ import { bookAppointment } from './application/bookAppointment.js';
 import { cancelAppointment } from './application/cancelAppointment.js';
 import { checkHealth } from './application/checkHealth.js';
 import { readAppointment } from './application/readAppointment.js';
+import { rescheduleAppointment } from './application/rescheduleAppointment.js';
 import { buildServer } from './http/server.js';
 import { closeDb, createDb } from './persistence/db.js';
 import { ConfigError, configWarnings, loadConfig } from './platform/config.js';
@@ -73,6 +74,10 @@ const app = buildServer({
   // AC-1, AC-3 and AC-4 all fail at their arrange step. That is a real guard, and it is the only
   // one — the score cannot tell this line from `main.ts:46`, which had none.
   cancelAppointment: async (id) => cancelAppointment(db, id),
+  // Slice 06. The SAME seed and attempt-cap policy booking uses (ADR-0009), and the same
+  // reasoning for why both are drawn/read here rather than in the use case (I-04-8).
+  rescheduleAppointment: async (command) =>
+    rescheduleAppointment(db, { seed: bookDeps.seed, attemptCap: bookDeps.attemptCap, logger }, command),
 });
 
 let shuttingDown = false;

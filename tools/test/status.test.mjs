@@ -78,6 +78,41 @@ const nextBlock = (doc) => doc.split('## What happens next')[1]?.split('##')[0] 
     (doc.match(/\*\*Phase \d[^*]*\*\*/) ?? [''])[0]);
 }
 
+// --- O-40: a gate name nobody anticipated must not rewind the phase ----------
+//
+// The fourth recurrence of O-8's shape, and the one that shows why the fix had to change
+// form. The generator held a DENYLIST of gates known not to close a phase, so every gate
+// name invented later defaulted to "closes a phase": `process` at slice 02 (O-18), then
+// `light` at slice 05, which sent the resume point back to PHASE 4 with Gate D reported
+// open and undecided — six slices after Gate D was decided, in the file whose whole job is
+// telling a resuming session where it is.
+//
+// The set is now derived from the PHASES table, so an unknown gate closes nothing. These
+// cases are written with INVENTED gate names rather than `light`, because pinning the test
+// to the name that happened to break it would recreate the denylist in the suite.
+{
+  const base = [gate('A', '1'), gate('B', '2'), gate('C', '3'),
+    { ...gate('D', '4'), decision: 'tune-and-proceed' }];
+
+  const doc = run([...base, { ...gate('quorum', null, '06'), decision: 'approved' }]);
+  ok('a gate name no phase claims does not rewind the phase',
+    doc.includes('Phase 5'), (doc.match(/\*\*Phase \d[^*]*\*\*/) ?? [''])[0]);
+
+  const light = run([...base, { ...gate('light', null, '05'), decision: 'approved' }]);
+  ok('...and specifically `light`, the one that did it', light.includes('Phase 5'),
+    (light.match(/\*\*Phase \d[^*]*\*\*/) ?? [''])[0]);
+
+  const proc = run([...base, { ...gate('process', null, '05'), decision: 'approved' }]);
+  ok('...and `process`, which is O-18 kept in the suite rather than in a comment',
+    proc.includes('Phase 5'), (proc.match(/\*\*Phase \d[^*]*\*\*/) ?? [''])[0]);
+
+  // The allowlist must still WORK, or the fix would be "never advance", which passes every
+  // case above and is useless.
+  const beforeD = run([gate('A', '1'), gate('B', '2'), gate('C', '3')]);
+  ok('a real phase-closing gate still advances the phase', beforeD.includes('Phase 4'),
+    (beforeD.match(/\*\*Phase \d[^*]*\*\*/) ?? [''])[0]);
+}
+
 // --- the next action is derived from what happened INSIDE the phase ----------
 {
   const base = [gate('A', '1'), gate('B', '2'), gate('C', '3')];

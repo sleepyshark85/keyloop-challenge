@@ -37,6 +37,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { checkDestinations } from './adr-destinations.mjs';
 
 const argv = process.argv.slice(2);
 const REBASELINE = argv.includes('--rebaseline');
@@ -239,7 +240,14 @@ if (REBASELINE) {
 }
 
 const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'));
-const problems = check(ADR, baseline);
+const LOG = resolve(flag('log', process.env.TEAM_LOG ?? 'docs/team-log/events.jsonl'));
+const SLICES = resolve(flag('slices', 'docs/slices'));
+const logEvents = existsSync(LOG)
+  ? readFileSync(LOG, 'utf8').split('\n').filter(Boolean)
+      .flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } })
+  : [];
+
+const problems = [...check(ADR, baseline), ...checkDestinations(ADR, SLICES, logEvents)];
 
 if (!problems.length) {
   console.log(`${Object.keys(baseline).length} ADR(s) checked: every considered option and chosen option survives.`);
@@ -255,9 +263,21 @@ if (problems.some((p) => p.kind === 'unpinned')) {
     + '  pre-condensation evidence for every other ADR to register one new file.',
   );
 }
-console.error(
-  `\n${problems.length} ADR(s) lost content a condensation may not remove. Shortening may merge `
-  + 'sections and cut prose; it may not drop a considered option or alter the chosen one — a '
-  + 'rejected option is the evidence that the decision was a choice rather than a default.',
-);
+const DESTINATION_KINDS = ['destination-unknown', 'destination-unrecorded'];
+const contentLost = problems.filter((p) => !DESTINATION_KINDS.includes(p.kind));
+const destinations = problems.filter((p) => DESTINATION_KINDS.includes(p.kind));
+if (contentLost.length) {
+  console.error(
+    `\n${contentLost.length} ADR(s) lost content a condensation may not remove. Shortening may merge `
+    + 'sections and cut prose; it may not drop a considered option or alter the chosen one — a '
+    + 'rejected option is the evidence that the decision was a choice rather than a default.',
+  );
+}
+if (destinations.length) {
+  console.error(
+    `\n${destinations.length} ADR(s) name a destination that no tool can follow. A-05-5: an ADR may `
+    + 'never be the only place a destination is recorded, because an obligation that lives in one '
+    + 'document survives exactly as long as someone remembers it.',
+  );
+}
 process.exit(1);
