@@ -18,6 +18,7 @@
  * into a hung suite.
  */
 import { bookAppointment } from './application/bookAppointment.js';
+import { cancelAppointment } from './application/cancelAppointment.js';
 import { checkHealth } from './application/checkHealth.js';
 import { readAppointment } from './application/readAppointment.js';
 import { buildServer } from './http/server.js';
@@ -67,6 +68,11 @@ const app = buildServer({
   checkHealth: async () => checkHealth(db),
   bookAppointment: async (command) => bookAppointment(db, bookDeps, command),
   readAppointment: async (id) => readAppointment(db, id),
+  // Slice 05. EXCLUDED FROM MUTATION with the rest of this file (`stryker.config.mjs`), so it is
+  // worth saying what does guard it: ADR-0013 spawns `dist/main.js`, so an unwired route 404s and
+  // AC-1, AC-3 and AC-4 all fail at their arrange step. That is a real guard, and it is the only
+  // one — the score cannot tell this line from `main.ts:46`, which had none.
+  cancelAppointment: async (id) => cancelAppointment(db, id),
 });
 
 let shuttingDown = false;
