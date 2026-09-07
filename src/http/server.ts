@@ -76,10 +76,33 @@
  * out registering it only inside `buildOpenApiDocument`, after `buildServer` has already added
  * every route. It adds no HTTP route of its own (that is `@fastify/swagger-ui`'s job, not used
  * here) and costs nothing a production server would notice.
+ *
+ * ── `POST /appointments` SERVER SPAN — HAND-WRITTEN, NOT `@opentelemetry/instrumentation-http`
+ * (step 5 finding 6, the NAMED fallback taken) ───────────────────────────────────────────────
+ *
+ * §8.4 declares the server span "(auto)"; measured against THIS repository's ESM entry point
+ * (`package.json`'s `"type": "module"`), it is not automatic. `@opentelemetry/instrumentation-http`
+ * patches Node's `http`/`https` modules via `require-in-the-middle`, which never fires for an
+ * ESM entry point's imports — confirmed with a bare `http.createServer` plus the SDK's own
+ * `instrumentations` option: no span, no patch (`http.Server.prototype.emit` unchanged). The
+ * documented remedy is a process-launch flag (`--import` registering `@opentelemetry/
+ * instrumentation/hook.mjs`, Node's ESM loader hook), which this file cannot reach — `src/http`
+ * does not start the process. That is the "dependency surface proves unacceptable" branch
+ * finding 6 named in advance.
+ *
+ * `serverFactory` is the fallback that reaches ALL of Fastify's own lifecycle, not only
+ * `onRequest`/`onResponse` (measured: an `onRequest` hook's span correlates `request completed`
+ * but NOT `incoming request`, because Fastify logs that line when it constructs its `Request`
+ * object, before any `onRequest` hook runs). Wrapping the RAW `http.Server`'s request handler —
+ * the one seam that runs before Fastify's own dispatch begins at all — puts a span active for
+ * literally everything Fastify does with the request, AC-6's "any request" without narrowing to
+ * application lines.
  */
 import Fastify, { errorCodes } from 'fastify';
-import type { FastifyBaseLogger, FastifyError, FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyError, FastifyInstance, FastifyServerFactory } from 'fastify';
 import fastifySwagger from '@fastify/swagger';
+import { SpanStatusCode, context, trace } from '@opentelemetry/api';
+import http from 'node:http';
 import { registerHealthRoute } from './routes/health.js';
 import type { HealthRouteDeps } from './routes/health.js';
 import { registerAppointmentRoutes } from './routes/appointments.js';
@@ -88,6 +111,7 @@ import { registerAvailabilityRoute } from './routes/availability.js';
 import type { AvailabilityRouteDeps } from './routes/availability.js';
 import { PROBLEM_CONTENT_TYPE, problem } from './problem.js';
 import { createLogger } from '../platform/logger.js';
+import { tracer } from '../platform/telemetry.js';
 
 export interface ServerDeps extends HealthRouteDeps, AppointmentRouteDeps, AvailabilityRouteDeps {
   readonly logger: FastifyBaseLogger;
@@ -149,8 +173,42 @@ const OPENAPI_INFO = {
   version: '1.0.0',
 };
 
+/**
+ * §8.4's server span — see the file docblock for why this exists instead of
+ * `@opentelemetry/instrumentation-http`. Wraps the RAW `http.Server` request handler, so the
+ * span is active before Fastify's own `Request` object (and its `incoming request` log line)
+ * is even constructed, and stays active through `request completed` and every application line
+ * in between (`AsyncLocalStorageContextManager`, `src/platform/telemetry.ts`).
+ *
+ * Named `${method} ${pathname}` — the PATH, not the raw `url`, so a querystring never lands in
+ * a span name (a low-cardinality label is the whole reason a route belongs in a span name at
+ * all). `pathname` is read with the `URL` constructor rather than a manual split, because
+ * `request.url` on an ordinary request is origin-relative and `new URL` needs a base to parse
+ * one; the base is discarded immediately; it is never a claim about scheme or host.
+ */
+function httpServerFactory(): FastifyServerFactory {
+  return (handler, _opts) => {
+    return http.createServer((request, response) => {
+      const method = request.method ?? 'UNKNOWN';
+      const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+      const span = tracer.startSpan(`${method} ${pathname}`);
+      span.setAttribute('http.method', method);
+      span.setAttribute('http.target', request.url ?? '');
+
+      context.with(trace.setSpan(context.active(), span), () => {
+        response.on('finish', () => {
+          span.setAttribute('http.status_code', response.statusCode);
+          if (response.statusCode >= 500) span.setStatus({ code: SpanStatusCode.ERROR });
+          span.end();
+        });
+        handler(request, response);
+      });
+    });
+  };
+}
+
 export function buildServer(deps: ServerDeps): FastifyInstance {
-  const app = Fastify({ loggerInstance: deps.logger });
+  const app = Fastify({ loggerInstance: deps.logger, serverFactory: httpServerFactory() });
 
   // AC-6b — see the file docblock. `parseAs: 'string'` mirrors Fastify's own default JSON
   // parser; the only change is the zero-length case.

@@ -119,6 +119,18 @@ export const bookingAttempts: Histogram = lazyHistogram('booking_attempts', {
 /**
  * Started once, from `src/main.ts` only — the composition root is the one module the design
  * names as allowed to see the SDK besides this file.
+ *
+ * `instrumentations: []`, MEASURED rather than left over — step 5 finding 6. `@opentelemetry/
+ * instrumentation-http` was tried first: registered here, it produced NO server span and left
+ * `http.Server.prototype.emit` unpatched, because this project's entry point is ESM
+ * (`package.json`'s `"type": "module"`) and `@opentelemetry/instrumentation`'s patching runs
+ * through `require-in-the-middle`, which native ESM `import` never invokes. The documented fix
+ * is a Node process-launch flag (`--import` registering `@opentelemetry/instrumentation/
+ * hook.mjs`) — outside what this file, or any file under `src/`, controls. That is the
+ * "dependency surface proves unacceptable" branch the finding named in advance, so the fallback
+ * it also named is what shipped: `src/http/server.ts`'s hand-written `serverFactory` span, which
+ * reaches the same lines this instrumentation would have and needs nothing at the process's
+ * command line.
  */
 export function startTelemetry(): NodeSDK {
   const sdk = new NodeSDK({
