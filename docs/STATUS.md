@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| Last commit | `4b8b531 docs(arc42): the brief says "a user" — say so where "service advisor" is introduced` |
+| Last commit | `0600deb refactor(08): unname the actor in comments — ADR-0034 supersedes ADR-0002` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 191 |
-| ADRs accepted | 15 |
+| Agent runs recorded | 194 |
+| ADRs accepted | 16 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
@@ -139,6 +139,7 @@
 | [0024](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) | The error taxonomy's residual is a property, not a row | accepted | — |
 | [0025](adr/0025-existence-is-the-reads-legality-is-the-statements.md) | Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE | accepted | — |
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
+| [0034](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) | The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed | accepted | — |
 
 ## Agent runs
 
@@ -335,7 +336,10 @@
 | 2026-09-07 12:36 | architect | 57m22 | 528 / 28,077 / 59,574,813 | `derived` |
 | 2026-09-07 12:39 | architect | 60m18 | 550 / 28,146 / 63,934,599 | `derived` |
 | 2026-09-07 13:43 | architect | 124m14 | 608 / 28,285 / 75,192,181 | `derived` |
-| | **total** | **7098m34** | **46,262 / 3,286,581 / 3,790,401,380** | |
+| 2026-09-07 14:05 | architect | 9m24 | 150 / 5,275 / 6,292,327 | `derived` |
+| 2026-09-07 14:08 | test-engineer | 1m22 | 44 / 1,404 / 794,855 | `derived` |
+| 2026-09-07 14:09 | implementer | 2m13 | 80 / 1,262 / 1,650,514 | `derived` |
+| | **total** | **7111m33** | **46,536 / 3,294,522 / 3,799,139,076** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
