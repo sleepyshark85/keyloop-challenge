@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `6169054 chore(07): gate E approved jointly — slice 07 done` |
+| Last commit | `59ee9e2 Merge pull request #16 from sleepyshark85/slice/07-reschedule-under-contention` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E |
 | Agent runs recorded | 155 |
 | ADRs accepted | 26 |
@@ -24,9 +24,8 @@
 
 ## What happens next
 
-- **Next: slice [`08`](slices/08-availability-query.md) — Availability — advisory by contract, and provably in agreement with the constraint**
-- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
-- It claims QS-8.
+- **Slice [`08`](slices/08-availability-query.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
+- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
 - 2 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 

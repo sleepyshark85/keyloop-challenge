@@ -411,6 +411,38 @@ const MARKED = '# 9\n\n<!-- generated:adr-index -->\nold\n<!-- /generated:adr-in
       'findings ruled').startsWith('PASS'));
 }
 
+// ------------------------------------------------- O-55: the reasoning is on the PR --
+//
+// §6 puts every reply, disagreement and vote on the PR because THE REASONING IS THE GRADED
+// ARTIFACT. Six slices went without it and no check looked, because slice:check reads the
+// log and CI and never the PR. The human found it.
+//
+// WHAT THESE CASES CAN AND CANNOT COVER, said plainly rather than left to be discovered:
+// the PASS and FAIL paths need a real PR with real comments, so they are exercised against
+// the live repository at slice level and not here. What IS covered here is the half that
+// decides whether the check can lie — that it reports N/A when nothing is owed, and
+// UNVERIFIED rather than PASS when it cannot look. A check that answers green because the
+// network was absent is the defect this whole file exists against.
+{
+  const agent = (actor, n) => ({
+    ts: '2026-01-01T00:00:00Z', event: 'agent.finish', source: 'derived', slice: '77',
+    actor, outcome: 'completed', span_id: `s-77-${actor}-${n}`,
+  });
+
+  const noRoles = run([{ ts: '2026-01-01T00:00:00Z', event: 'slice.ready', source: 'reported', slice: '77' }]);
+  ok('no role ran, so no reasoning is owed — N/A, not a failure',
+    /N\/A.*reasoning is on the PR/.test(row(noRoles, 'reasoning is on the PR')),
+    row(noRoles, 'reasoning is on the PR'));
+
+  const roles = run([agent('architect', 1), agent('reviewer', 1)]);
+  ok('a fixture repo has no PR, so the check says it cannot look',
+    /UNVERIFIED/.test(row(roles, 'reasoning is on the PR')), row(roles, 'reasoning is on the PR'));
+  ok('...and never reports PASS when it could not read the PR',
+    !/PASS/.test(row(roles, 'reasoning is on the PR')));
+  ok('...and says WHY it could not, so the gate is not left guessing',
+    /no PR|gh unavailable|unreadable|no branch/.test(row(roles, 'reasoning is on the PR')));
+}
+
 // --------------------------------------------- O-44: every dispatch reached the log --
 //
 // At slice 06 a role dispatched another role directly. The ruling was (a), so nothing was

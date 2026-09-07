@@ -665,6 +665,64 @@ if (!onlyReady) {
           + 'run was (c), the loopback governor is owed one it did not count.'
         : `${captures.length} capture(s), each with an agent event`);
 
+  // O-55 — THE REASONING HAS TO BE ON THE PR, AND FOR SIX SLICES IT WAS NOT.
+  //
+  // §6: "Every reply, disagreement and vote goes on the PR under §9's attribution
+  // convention, because THE REASONING IS THE GRADED ARTIFACT — the record of *how* a design
+  // was argued into shape is worth more than the amended design alone."
+  //
+  // Measured when the human noticed: PR #6 (slice 00) had 4 comments, PR #10 (slice 01) had
+  // 3, and slices 02, 04, 05, 06 and 07 had ZERO. The orchestrator had been putting all of it
+  // in the event log and in commit messages, which keeps the CONTENT and loses the PLACE the
+  // constitution names. Every role read those PRs at review and at as-built; none remarked
+  // they were empty. A rule every role can satisfy itself is being obeyed by nobody is worse
+  // evidence about the process than one role forgetting it.
+  //
+  // No check existed because `slice:check` reads the log and CI and never the PR. This is
+  // that check. It compares against the log rather than a fixed list: the roles that OWE a
+  // comment are exactly the roles that produced an agent event for this slice, so a slice
+  // that never ran a scribe is not failed for a scribe's silence.
+  //
+  // IT SAYS WHEN IT CANNOT LOOK. No `gh`, no network, or no PR for this branch is
+  // UNVERIFIED — never PASS. A gate reporting green because it could not see is the defect
+  // this whole file is built against, and a check that needs the network must be able to
+  // admit the network was not there.
+  const prComments = (() => {
+    const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+    if (!branch || branch === 'HEAD') return { known: false, why: 'no branch' };
+    const gh = spawnSync('gh', ['pr', 'list', '--head', branch, '--state', 'all',
+      '--json', 'number', '--jq', '.[0].number'], { encoding: 'utf8' });
+    if (gh.status !== 0) return { known: false, why: 'gh unavailable' };
+    const num = gh.stdout.trim();
+    if (!num) return { known: false, why: `no PR for ${branch}` };
+    const body = spawnSync('gh', ['pr', 'view', num, '--json', 'comments',
+      '--jq', '.comments[].body'], { encoding: 'utf8' });
+    if (body.status !== 0) return { known: false, why: `PR #${num} unreadable` };
+    return { known: true, num, bodies: body.stdout.split('\n').filter(Boolean) };
+  })();
+
+  const rolesThatRan = [...new Set(events
+    .filter((e) => String(e.event).startsWith('agent.') && e.actor)
+    .map((e) => e.actor))].sort();
+
+  if (!rolesThatRan.length) {
+    check('done', 'reasoning is on the PR', NA, 'no role produced an agent event for this slice');
+  } else if (!prComments.known) {
+    check('done', 'reasoning is on the PR', UNVERIFIED,
+      `${prComments.why} — cannot read the PR, and §6 puts the reasoning there`);
+  } else {
+    // The attribution convention is a leading `**role**`; anything else is prose that
+    // happens to name a role, and counting that would let a mention stand in for a report.
+    const spoke = new Set(rolesThatRan.filter((r) =>
+      prComments.bodies.some((b) => new RegExp(`^\\s*\\*\\*${r}\\*\\*`, 'm').test(b))));
+    const silent = rolesThatRan.filter((r) => !spoke.has(r));
+    check('done', 'reasoning is on the PR', silent.length ? FAIL : PASS,
+      silent.length
+        ? `PR #${prComments.num}: no attributed comment from ${silent.join(', ')} — `
+          + '§6 puts the reasoning on the PR because it is the graded artifact'
+        : `PR #${prComments.num}: every role that ran is attributed`);
+  }
+
   const loops = events.filter((e) => e.event === 'loopback').length;
   check('done', 'loopbacks within governor', loops <= 2 ? PASS : FAIL,
     `${loops} of max 2${loops > 2 ? ' — should have been split, not ground through' : ''}`);
