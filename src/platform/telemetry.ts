@@ -82,11 +82,23 @@ function lazyHistogram(name: string, options: MetricOptions): Histogram {
 }
 
 /**
- * arc42 §8.4's metrics table, verbatim. `booking_conflicts_total` is the one this slice's ACs
- * read; the other five complete the table `docs/slices/09-observability.md` puts in scope, even
- * though no acceptance criterion reads them back off a collector.
+ * arc42 §8.4's metrics table, verbatim — five rows, every one emitted somewhere under `src/`
+ * (`R-09-9`: a table row with no emitter is a panel with an empty series and no error).
+ * `booking_conflicts_total` is the one this slice's ACs read; the other four are emitted from
+ * the use cases and the shared attempt loop (`appointmentsBookedTotal`/
+ * `appointmentsRescheduledTotal`/`appointmentsCancelledTotal` from their own use case,
+ * `bookingAttempts` from `attemptLoop.ts`'s exit), even though no acceptance criterion reads
+ * any of the five back off a collector.
+ *
+ * `booking_conflicts_total` is exported as `conflictCounter`, not `bookingConflictsTotal` (the
+ * other four rows' own `<metricName>Total`/`<metricName>` convention) — `R-09-11`, step 5
+ * finding 11. `tests/architecture/ambiguity-containment.test.ts`'s `conflict-counter-increment`
+ * marker anchors decision 2's cardinality claim on THIS BINDING'S NAME, imported from this
+ * module, so the identifier is load-bearing rather than cosmetic: a rename here is a rename the
+ * marker must be told about, which is the point of anchoring on identity instead of on a label
+ * spelling `.add(...)`'s arguments might not carry (the reviewer's own falsification).
  */
-export const bookingConflictsTotal: Counter = lazyCounter('booking_conflicts_total', {
+export const conflictCounter: Counter = lazyCounter('booking_conflicts_total', {
   description:
     'Bookings and reschedules that met a database-adjudicated conflict (SQLSTATE 23P01), by ' +
     'which resource conflicted and how the attempt loop resolved it.',
@@ -103,10 +115,6 @@ export const appointmentsCancelledTotal: Counter = lazyCounter('appointments_can
 export const bookingAttempts: Histogram = lazyHistogram('booking_attempts', {
   description: "Attempts per booking or reschedule request — ADR-0009's ordering policy, working or not.",
 });
-export const availabilityQueryDurationSeconds: Histogram = lazyHistogram(
-  'availability_query_duration_seconds',
-  { description: "Goal 5's budget (QS-14), measured in production as well as in the suite.", unit: 's' },
-);
 
 /**
  * Started once, from `src/main.ts` only — the composition root is the one module the design
