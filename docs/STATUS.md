@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `73ce198 feat(08): §10 is per changed file, and the gate could not see it — O-64` |
+| Last commit | `b151234 fix(08): the light gate said "DoD green" without checking it — O-66` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process |
 | Agent runs recorded | 186 |
 | ADRs accepted | 27 |
