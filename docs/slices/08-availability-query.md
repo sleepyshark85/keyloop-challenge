@@ -1,7 +1,7 @@
 ---
 id: "08"
 title: Availability — advisory by contract, and provably in agreement with the constraint
-status: ready
+status: done
 depends_on: ["07"]
 arc42: ["§5.2", "§6.5", "§8.6", "§10.2", "§11.2"]
 adr: [8, 32, 33]
