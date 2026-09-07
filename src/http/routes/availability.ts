@@ -160,7 +160,9 @@ export function registerAvailabilityRoute(
           const unhandled: never = outcome;
           // Stryker disable next-line all : an exhaustive switch's `never` arm is unreachable by
           // construction — see `routes/appointments.ts`'s identical arms (R-06-A) for the full
-          // reasoning this single-line directive relies on.
+          // reasoning this single-line directive relies on. It reaches only this `throw`, not
+          // the `default:` arm above it — those two mutants stay in the denominator on purpose
+          // (O-62).
           throw new Error(`unhandled availability outcome ${JSON.stringify(unhandled)}`);
         }
       }
