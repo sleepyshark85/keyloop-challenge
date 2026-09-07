@@ -63,6 +63,14 @@ recorded in §11 as debt rather than silently absorbed.
 
 ## 1.3 Stakeholders
 
+**The primary actor is an interpretation, not a quotation.** The brief says only *"allow **a
+user** to request a service appointment"* and never names the role. OQ-2 asked who that user is
+and [ADR-0002](../adr/0002-service-advisor-actor-no-authentication.md) answered *dealership
+staff* — a service advisor with a phone. The reading is load-bearing: it is why authentication is
+out of scope, why `customer_id` travels in the request body, and why a mismatched vehicle is a
+`4xx` rather than a `403`. Had the user been the customer booking their own car, identity would
+arrive with the request and ownership would be a security boundary.
+
 | Role | Expectation |
 |---|---|
 | **Service advisor** (primary actor, ADR-0002) | Books, cancels and reschedules on a customer's behalf during a phone call. Wants a yes/no in seconds and, on a no, to be told *which* resource was unavailable |
