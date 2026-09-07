@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **323** |
-| Severity | 12 blocking · 163 major · 148 minor |
+| Findings recorded | **325** |
+| Severity | 12 blocking · 163 major · 150 minor |
 | Verdicts | 20 narrowed · 119 accepted · 4 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 68 · reviewer 66 · architect 64 · orchestrator 63 · implementer 50 · scribe 10 · human 2 |
-| Awaiting a ruling | **151** |
-| Mean escape distance | 1.64 step(s) |
+| Raised by | test-engineer 68 · reviewer 66 · orchestrator 65 · architect 64 · implementer 50 · scribe 10 · human 2 |
+| Awaiting a ruling | **153** |
+| Mean escape distance | 1.63 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2014,6 +2014,8 @@ rather than narrated.*
 | **O-65** | MINOR | 5 *(+0)* | architect | The orchestrator's git add -A SWEPT THE ARCHITECT'S UNCOMMITTED RULING into a tooling commit, and the path guard cannot see that direction of the mistake | **open** |
 | **O-66** | MINOR | 5 *(+0)* | orchestrator | The light-gate row asserted AUTO-APPROVED, DoD GREEN without ever checking the Definition of Done | **open** |
 | **A-R-1** | MAJOR | 6 *(+0)* | architect | ADR-0013 IS GENUINELY ARCHITECTURAL and the architect executed its retirement UNDER PROTEST | **open** |
+| **O-67** | MINOR | 6 *(+0)* | orchestrator | An earlier appended line says a sample file STAYS PUT BY INSTRUCTION and this run DELETED it — the correction can only be appended, not made in place | **open** |
+| **O-68** | MINOR | 6 *(+0)* | orchestrator | ADR-0018 NOW GIVES THREE DEADLOCK-FREEDOM REASONS, BUT NOT THE THREE A-04-1 FOUND — the provenance line remains a criticism and correctly so | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2228,6 +2230,16 @@ rather than narrated.*
 
 - *scenario:* THE ARCHITECT DID THE WORK AND SAID IT DISAGREED, WHICH IS WHAT SECTION 6 ASKS FOR. Its case, against the human's own stated bar that only IMPORTANT decisions warrant an ADR: ADR-0013 is marked contested true; it was HUMAN-RATIFIED AT GATE E after TWO MEASURED REVISIONS rather than ruled by an architect alone; and it constrains .dependency-cruiser.js, which CLAUDE.md section 2.3 makes NON-NEGOTIABLE tooling. It does not describe code shape — the thing the human's later ruling excluded from ADRs — it DEFINES WHAT OUTSIDE-IN MEANS OPERATIONALLY for every property test in the project, and its deciding evidence is a NEGATIVE RESULT, that widening the rule does not work, which is exactly the kind of finding that is expensive to rediscover and cheap to lose. NOTHING IS LOST OPERATIONALLY: arc42 section 8.5 already carries the clauses, so only the refused alternatives moved into slice 01's design. THE DISAGREEMENT IS ABOUT WHETHER THE RECORD SHOULD HAVE BEEN DEMOTED AT ALL, not about whether the system still behaves correctly. A SECOND CASE THE BRIEF MISSED ENTIRELY, raised by the architect unprompted: ADR-0023 IS ADR-0031-SHAPED. It does not stand alone — it NARROWS ONE SENTENCE of ADR-0018's Consequences, and ADR-0018 SURVIVES, IS IMMUTABLE, AND IS THE MOST-CITED ADR IN THE LOG. That sentence, every write path to appointment must take these two locks, IS WRONG ABOUT CANCELLATION, and ADR-0023 is the correction. ADR-0030 cites it four times. The architect handled it as the brief handled 0031, with 05-design section 2.1 opening by naming which sentence it narrows, but the brief had flagged only 0031 and the architect found the second one itself.
 - *file:* `docs/adr/0013-outside-in-tests-exercise-the-built-artifact.md`
+
+**O-67** — An earlier appended line says a sample file STAYS PUT BY INSTRUCTION and this run DELETED it — the correction can only be appended, not made in place
+
+- *scenario:* THE ARCHITECT RAISED THIS AGAINST A LINE IT COULD NOT REPAIR, WHICH IS THE RIGHT MOVE. events.jsonl line 1011, written during the ADR retirement, records that docs/adr/_sample-0032-rewrite.md stays put by instruction — true when written, because the retirement brief said so. THE READABILITY RUN THEN DELETED BOTH SAMPLE FILES UNDER A LATER INSTRUCTION: once ADR-0018 itself carries the approved form, a sample proposing that form is redundant, and _sample-0032-rewrite.md described an ADR that no longer exists. NEITHER INSTRUCTION WAS WRONG AND THE LOG IS NOT WRONG EITHER — it records what was true at the moment it was written, which is exactly what an append-only log is for. THE CORRECTION IS THIS RECORD, not an edit, on the precedent O-36 settled: rewriting the record of an artifact under assessment is the worse repair. The architect does not write to the log by section 9 and said so rather than reaching for the file, which is the second time this session a role has declined a repair that was not its to make.
+- *file:* `docs/team-log/events.jsonl`
+
+**O-68** — ADR-0018 NOW GIVES THREE DEADLOCK-FREEDOM REASONS, BUT NOT THE THREE A-04-1 FOUND — the provenance line remains a criticism and correctly so
+
+- *scenario:* THE ARCHITECT REFUSED TO CLAIM THIS AND ASKED FOR IT TO BE CHECKED, WHICH WAS THE RIGHT CALL. ADR-0018's ai-input block closes with the implementer's A-04-1 checking the deadlock-freedom argument against the code and finding it holds FOR THREE INDEPENDENT REASONS WHERE THIS RECORD GIVES ONE. The readability pass restored an argument giving THREE reasons, so the line looked as though it had stopped being a criticism. IT HAS NOT. THE ORCHESTRATOR READ A-04-1 IN THE LOG AND THE SETS DO NOT MATCH. A-04-1's three are: the design's own DISJOINT-CLASS reason; that lockResources takes both locks in ONE SELECT OVER unnest, so it is one literal statement whose evaluation order is THE SAME AT EVERY ATTEMPT and a cycle needs two transactions taking the same objects in OPPOSITE orders, which identical statement text rules out WITHOUT DEPENDING ON unnest ROW ORDER; and that src/domain/candidates.ts CANNOT REACH THE LOCK CLASSES AT ALL because domain-is-pure is to-empty-object, absolute. THE RESTORED THREE ARE: different lock classes, bay-then-technician as a total order no attempt can reverse, and the locks being TRANSACTION-SCOPED so none is held across candidates. ONLY THE FIRST IS SHARED. The second is adjacent but argued from ordering rather than from identical statement text, and the third is a different property entirely. SO THE PROVENANCE LINE IS STILL TRUE AS WRITTEN and must stay: the record still does not enumerate A-04-1's reasons. NOTHING IS LOST — slice 04's design ENUMERATES THEM, moved there at that slice's step 7 precisely because ADR-0018 records THAT there are three, does not enumerate them, and is immutable. Recorded so nobody re-asks the question and answers it by assuming.
+- *file:* `docs/adr/0018-lock-the-bay-and-the-technician-before-each-insert.md`
 
 </details>
 

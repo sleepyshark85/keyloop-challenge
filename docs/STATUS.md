@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `2da4ec6 docs(adr): §11's debt register regenerates without the five retired proposals` |
+| Last commit | `7156927 docs(adr): 0018 gets its deadlock-freedom argument back, and the flag it should have had` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 187 |
+| Agent runs recorded | 190 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -331,7 +331,10 @@
 | 2026-09-07 09:13 | architect | 23m21 | 260 / 25,445 / 17,081,978 | `derived` |
 | 2026-09-07 09:23 | architect | 32m54 | 354 / 25,785 / 28,688,216 | `derived` |
 | 2026-09-07 11:33 | architect | 74m32 | 786 / 17,213 / 131,176,729 | `derived` |
-| | **total** | **6805m43** | **44,114 / 3,174,586 / 3,544,735,740** | |
+| 2026-09-07 12:30 | architect | 50m57 | 462 / 27,487 / 46,964,047 | `derived` |
+| 2026-09-07 12:36 | architect | 57m22 | 528 / 28,077 / 59,574,813 | `derived` |
+| 2026-09-07 12:39 | architect | 60m18 | 550 / 28,146 / 63,934,599 | `derived` |
+| | **total** | **6974m20** | **45,654 / 3,258,296 / 3,715,209,199** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
