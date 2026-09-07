@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `38b7834 test(09): R-09-6, R-09-5, R-09-11, R-09-10 — the (c) remediation's telemetry-half assertions (red)` |
+| Last commit | `b46b3c3 feat(09): the server span, hand-written — @opentelemetry/instrumentation-http does not patch under ESM (R-09-9 finding 6)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 212 |
+| Agent runs recorded | 213 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -358,7 +358,8 @@
 | 2026-09-07 22:05 | test-engineer | 23m42 | 434 / 31,076 / 33,211,598 | `derived` |
 | 2026-09-07 22:05 | test-engineer | 23m51 | 436 / 31,078 / 33,450,317 | `derived` |
 | 2026-09-07 22:06 | test-engineer | 24m13 | 444 / 31,150 / 34,408,186 | `derived` |
-| | **total** | **7505m35** | **51,944 / 3,719,312 / 4,352,006,895** | |
+| 2026-09-07 23:17 | implementer | 95m58 | 1,938 / 92,540 / 397,096,062 | `derived` |
+| | **total** | **7601m33** | **53,882 / 3,811,852 / 4,749,102,957** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

@@ -82,6 +82,23 @@ const m = (status, n = 1) => Array.from({ length: n }, () => ({ status }));
     toChecks(report, changed).tool === 'stryker');
 }
 
+// --- the partial-report guard, O-73 -----------------------------------------
+// `toChecks` is pure and reports what it was given; the REFUSAL lives in the CLI. What is
+// asserted here is the fact the CLI keys off, because it is the fact that was already in
+// the record and unread: a file in the changed set with no entry in `per_file`.
+{
+  const report = { files: { '/abs/repo/src/a.ts': { mutants: m('Killed', 4) } } };
+  const c = toChecks(report, ['src/a.ts', 'src/b.ts', 'src/c.ts']);
+  ok('a partial report measures fewer files than changed, and says which it measured',
+    c.mutation_files_measured === 1, String(c.mutation_files_measured));
+  ok('...and its empty below_threshold is therefore NOT a statement about the slice',
+    c.mutation_below_threshold.length === 0 && c.mutation_per_file['src/b.ts'] === undefined,
+    JSON.stringify(c.mutation_per_file));
+  ok('...so the unmeasured set is recoverable from the record alone',
+    ['src/a.ts', 'src/b.ts', 'src/c.ts'].filter((f) => c.mutation_per_file[f] === undefined)
+      .join(',') === 'src/b.ts,src/c.ts');
+}
+
 // --- changedFiles -----------------------------------------------------------
 {
   const files = changedFiles('main', () => 'src/a.ts\nsrc/b.sql\nsrc/c.ts\n');

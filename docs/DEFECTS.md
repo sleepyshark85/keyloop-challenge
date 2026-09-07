@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **349** |
-| Severity | 14 blocking · 172 major · 163 minor |
+| Findings recorded | **353** |
+| Severity | 14 blocking · 174 major · 165 minor |
 | Verdicts | 20 narrowed · 127 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | test-engineer 75 · architect 72 · orchestrator 68 · reviewer 66 · implementer 54 · scribe 10 · human 4 |
-| Awaiting a ruling | **169** |
-| Mean escape distance | 1.55 step(s) |
+| Raised by | test-engineer 75 · architect 72 · orchestrator 70 · reviewer 66 · implementer 56 · scribe 10 · human 4 |
+| Awaiting a ruling | **173** |
+| Mean escape distance | 1.54 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2306,6 +2306,10 @@ rather than narrated.*
 | **A-09-4** | BLOCKING | 5 *(+4)* | architect | THIS IS NOT ONE SLICE, AND GATE D's FOLD OF SLICES 10 AND 11 INTO 09 WAS WRONG — THE ARCHITECT SAYS SO AND SAYS IT IS NOT ITS RULING TO MAKE | **open** |
 | **T-09-5** | MINOR | 5 *(+0)* | test-engineer | THE ADJUDICATION TABLE ASSIGNED FINDING 5 TO THE IMPLEMENTER ALONE WHEN ITS OWN TEXT IMPLIES AN OUTSIDE-IN HALF | **open** |
 | **T-09-6** | MINOR | 5 *(+0)* | test-engineer | TWO MUTANTS HAVE NO OUTSIDE-IN CROSS-CHECK AND THE TEST-ENGINEER SAYS SO RATHER THAN LETTING THE COVERAGE READ AS COMPLETE | **open** |
+| **I-09-7** | MAJOR | 5 *(+0)* | implementer | QS-1 AND QS-2's TWENTY-RACER TESTS OCCASIONALLY ANSWER 500 INSTEAD OF 409 UNDER LOAD, AND THE SIGNAL CORRELATES WITH THE SERVER-SPAN CHANGE — FOUND, NOT FIXED, AND REPORTED RATHER THAN SILENTLY ABSORBED | **open** |
+| **I-09-6** | MINOR | 5 *(+0)* | implementer | @opentelemetry/instrumentation-http MEASURABLY DOES NOT PATCH UNDER THIS PROJECT'S ESM ENTRY POINT, so the server span is hand-written — the design's own named fallback | **open** |
+| **O-72** | MINOR | 5 *(+0)* | orchestrator | THE ORCHESTRATOR'S REMEDIATION DISPATCHES WERE WRONG IN ONE PLACE AND INCOMPLETE IN ANOTHER, AND BOTH TIMES A ROLE COVERED FOR IT | **open** |
+| **O-73** | MAJOR | 5 *(+0)* | orchestrator | THE COLLECTOR REPORTED NO FILES BELOW THRESHOLD FROM A REPORT CONTAINING ONE FILE — a vacuous pass, and the orchestrator wrote it into the log before catching it | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2401,6 +2405,26 @@ rather than narrated.*
 
 - *scenario:* FIRST, the foreign-key-mislabelled-as-23P01 mutant from R-09-5 IS A CORRECTNESS CLAIM RATHER THAN A LABEL, and the test-engineer COULD NOT FIND OR CONSTRUCT A RELIABLE BLACK-BOX ROUTE TO A GENUINE FOREIGN-KEY VIOLATION ON THE INSERT PATH, because the application PRE-VALIDATES REFERENCES BEFORE INSERTING. Its coverage therefore RESTS ENTIRELY ON THE IMPLEMENTER'S UNIT-LEVEL STUB, which is stated rather than assumed. SECOND, AND THIS IS THE HONEST QUALIFICATION ON AC-6: the strengthened assertion covers EVERY REQUEST SHAPE THE REVIEWER NAMED AS UNCORRELATED — a plain success, a retry-then-succeed carrying booking.conflict, an exhausted refusal carrying booking.refused, and a GENUINE 500 via the same broken-IANA-zone fixture the error taxonomy already uses — and in each it checks EVERY LOG LINE IN THE REQUEST'S WINDOW rather than one. IT DOES NOT COVER a genuine ADR-0018 deadlock, judged impractical to trigger reliably as black box BECAUSE THE SYSTEM'S OWN LOCK ORDERING IS DESIGNED TO PREVENT ONE, nor the same every-line check on the cancellation and reschedule paths. SO AC-6 IS NOW TRUE OF ANY REQUEST AMONG THE SHAPES THIS SUITE CAN REACH, AND NOT A LITERAL UNIVERSAL PROOF — the distinction the reviewer's original finding turned on, kept rather than quietly closed.
 - *file:* `tests/integration/telemetry-booking.test.ts`
+
+**I-09-7** — QS-1 AND QS-2's TWENTY-RACER TESTS OCCASIONALLY ANSWER 500 INSTEAD OF 409 UNDER LOAD, AND THE SIGNAL CORRELATES WITH THE SERVER-SPAN CHANGE — FOUND, NOT FIXED, AND REPORTED RATHER THAN SILENTLY ABSORBED
+
+- *scenario:* THE IMPLEMENTER MEASURED THIS AGAINST ITS OWN CHANGE AND REPORTED IT KNOWING IT COULD BLOCK ITS OWN WORK. Some racers receive 500 rather than 409, with pg-pool's CONNECTION_TIMEOUT_MS of 1000 exceeded, WHEN THE FULL TWENTY-FIVE-FILE db PROJECT RUNS in a shared desktop sandbox. REPRODUCTION COUNTS GIVEN HONESTLY AND THEY ARE SMALL: two of three runs WITH the server-span change, ZERO of two WITHOUT it, and NEVER REPRODUCED IN ISOLATION at eleven of eleven clean. THE BOOKING INVARIANT ITSELF WAS NEVER VIOLATED — exactly one row survived every trial, so section 2.1 holds and this is a LIVENESS AND ANSWER-QUALITY signal rather than a correctness one, which is the same distinction ADR-0018 drew between the constraint deciding and the lock keeping the losers from deadlocking before it can say so. TWO READINGS AND THE EVIDENCE DOES NOT YET SEPARATE THEM. FIRST, ENVIRONMENT: this is O-70 and T-09-3's failure class again, a shared machine running twenty-five files against one container, and the implementer never reproduced it with the suite in isolation. SECOND, REGRESSION: the hand-written server span adds per-request work on the exact path that is pool-bound under contention, and two-of-three versus zero-of-two IS A SIGNAL EVEN IF IT IS NOT PROOF. THE IMPLEMENTER RECOMMENDS VERIFYING ON THE ACTUAL CI RUNNER BEFORE TREATING IT AS CONFIRMED EITHER WAY, and notes that CONNECTION_TIMEOUT_MS and POOL_MAX are design constants OUTSIDE THIS SLICE'S REMIT so it did not touch them. THE ORCHESTRATOR IS NOT MERGING ON THIS SIGNAL UNRESOLVED: QS-1 and QS-2 are the quality scenarios the entire system exists to defend.
+- *file:* `tests/concurrency/no-spurious-refusal.test.ts`
+
+**I-09-6** — @opentelemetry/instrumentation-http MEASURABLY DOES NOT PATCH UNDER THIS PROJECT'S ESM ENTRY POINT, so the server span is hand-written — the design's own named fallback
+
+- *scenario:* R-09-6 and the architect's (c) ruling both turned on telemetry.ts registering instrumentations as an EMPTY ARRAY, so no server span existed and section 8.4's first row for POST /appointments marked auto was ABSENT RATHER THAN UNTESTED. THE OBVIOUS REMEDY IS THE HTTP AUTO-INSTRUMENTATION AND IT DOES NOT WORK HERE: under an ESM entry point the patching requires a process-launch flag that CANNOT BE SET FROM WITHIN src, which the implementer established by measurement rather than by reading. SO THE SHIPPED FORM IS A HAND-WRITTEN serverFactory SPAN — the fallback the design itself names, chosen because the alternative was leaving the test-engineer's already-red AC-6 assertion broken. SECOND POINT WORTH THE RECORD: finding 6 WAS NOT AMONG THE FOUR ITEMS THE ORCHESTRATOR DISPATCHED, but the adjudication table names it implementer-owned, so the implementer BUILT IT RATHER THAN LEAVING THE SLICE BROKEN ON A DISPATCH OMISSION — the second time this round a role has covered for an incomplete instruction, after T-09-5.
+- *file:* `src/http/server.ts`
+
+**O-72** — THE ORCHESTRATOR'S REMEDIATION DISPATCHES WERE WRONG IN ONE PLACE AND INCOMPLETE IN ANOTHER, AND BOTH TIMES A ROLE COVERED FOR IT
+
+- *scenario:* TWO INDEPENDENT ROLES REPORTED THE SAME CLASS OF ORCHESTRATOR ERROR IN ONE ROUND. FIRST, THE DISPATCH SAID THE WRONG FILE: it told the implementer to add DB_POOL_MAX support in src/persistence/db.ts, while the design's own adjudication table says config.ts reads it — and the implementer FOLLOWED THE TABLE RATHER THAN THE DISPATCH, noting the table also matches the test-engineer's service support and the project's established env-var discipline. IT WAS RIGHT TO PREFER THE RULED ARTIFACT OVER THE INSTRUCTION. SECOND, THE DISPATCH WAS INCOMPLETE: finding 6, the server span, was NOT among the four items dispatched to the implementer although the adjudication table names it implementer-owned, and it was ALREADY RED through the test-engineer's committed AC-6 assertion — so a literal reading would have left the slice broken with each role correctly believing the work was not theirs. THE IMPLEMENTER BUILT IT ANYWAY. THAT IS THE SECOND COVER THIS ROUND after T-09-5, where the adjudication table assigned an outside-in half to the implementer alone and the test-engineer built it regardless. THE PATTERN IS THE FINDING: WORK SURVIVED BECAUSE ROLES READ PAST THEIR INSTRUCTIONS, WHICH IS NOT A MECHANISM. A dispatch is not a ruled artifact and should not be treated as one when the two disagree — but nothing enforces that, and on a different day the same two omissions lose two pieces of work silently.
+- *file:* `docs/team-log/prompts/`
+
+**O-73** — THE COLLECTOR REPORTED NO FILES BELOW THRESHOLD FROM A REPORT CONTAINING ONE FILE — a vacuous pass, and the orchestrator wrote it into the log before catching it
+
+- *scenario:* THE IMPLEMENTER RAN STRYKER FILE-SCOPED, AS INSTRUCTED, TO MEASURE THE THREE REMEDIATED FILES — AND EACH FILE-SCOPED RUN OVERWRITES reports/mutation/mutation.json. The last one left a report containing EXACTLY ONE FILE, src/http/server.ts. The orchestrator then ran collect-mutation against it and the collector did precisely what it was built to do with what it was given: it intersected the report with the eleven changed files, FOUND ONE, scored it at 85.57, and reported mutation_below_threshold AS AN EMPTY ARRAY. THAT EMPTY ARRAY IS TRUE OF THE REPORT AND FALSE OF THE SLICE. It would have satisfied slice:check's per-file criterion — the criterion built THIS WEEK under O-64 to stop exactly this class of error — while telemetry.ts and attemptLoop.ts went unmeasured. THIS IS THE THIRD TIME THE MUTATION CRITERION HAS BEEN GIVEN A NUMBER THAT ANSWERED A DIFFERENT QUESTION: O-6 let a mutation record satisfy tests green; a vacuous score let a SQL-only slice clear the clause on the previous slice's measurement; O-64 let an aggregate hide a member. THIS ONE IS THE FIRST WHERE THE ORCHESTRATOR WROTE THE FALSE RECORD ITSELF, having built the guard. THE COLLECTOR IS NOT WRONG AND MUST NOT BE BLAMED — it computes from the report it is handed and has no way to know a full run was intended. WHAT IS MISSING IS A CHECK THAT THE REPORT COVERS THE CHANGED SET: mutation_files_measured is already recorded and was ONE against ELEVEN changed files, so the evidence of vacuity was IN THE RECORD AND NOTHING READ IT — the honesty sitting in a field nothing opens, for the third time in two days. THE IMPLEMENTER'S THREE FIGURES ARE NOT IN DOUBT: telemetry.ts 82.86, attemptLoop.ts 92.54, server.ts 85.57, each measured file-scoped and each above 0.75. WHAT IS IN DOUBT IS WHETHER THE OTHER EIGHT CHANGED FILES STILL CLEAR IT after five commits of remediation, AND ONLY A FULL RUN ANSWERS THAT.
+- *file:* `tools/team-log/collect-mutation.mjs`
 
 </details>
 
