@@ -63,6 +63,16 @@ describe('classify — 23P01 exclusion_violation', () => {
   it('a 23P01 with NO constraint name is `other`', () => {
     expect(classify(pgError('23P01')).kind).toBe('other');
   });
+
+  it('R-07-7 — a constraint named "constructor" is `other`, never the Object constructor as a resource', () => {
+    // Before R-07-7 the lookup was a plain object literal, and bracket access on
+    // `'constructor'` resolves through the prototype chain to `Object.prototype.constructor`
+    // rather than to `undefined` — minting `resource: <the Object constructor>` for a name this
+    // migration never defined. A `Map` has no prototype chain to walk, so this key is simply
+    // absent, exactly like any other name nobody wrote into `0003_appointment.sql`.
+    const outcome = classify(pgError('23P01', 'constructor'));
+    expect(outcome.kind).toBe('other');
+  });
 });
 
 describe('classify — 23503 foreign_key_violation', () => {

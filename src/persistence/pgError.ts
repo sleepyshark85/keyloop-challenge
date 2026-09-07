@@ -52,11 +52,18 @@ export const VEHICLE_OWNERSHIP_CONSTRAINT = 'appointment_vehicle_owned_by_custom
  * resource for a constraint nobody has seen is how the metric ADR-0009 depends on starts lying —
  * and `0003_appointment.sql` says outright that the names are behaviour, so a rename is a
  * behaviour change and must show up as one.
+ *
+ * A `Map`, not a `Record`/object literal — R-07-7. `constraint` is a driver-supplied string read
+ * off `unknown`, and an object literal's lookup by bracket notation resolves a key like
+ * `'constructor'` to `Object.prototype.constructor` rather than to `undefined`, minting
+ * `resource: <the Object constructor>` for a name this migration never defined. A `Map` has no
+ * prototype chain to walk, so that key space does not exist to be reached — the bad state is
+ * unrepresentable rather than guarded against, the same habit §2.1 already asks of the insert.
  */
-const RESOURCE_BY_CONSTRAINT: Readonly<Record<string, 'bay' | 'technician'>> = {
-  no_bay_overlap: 'bay',
-  no_technician_overlap: 'technician',
-};
+const RESOURCE_BY_CONSTRAINT = new Map<string, 'bay' | 'technician'>([
+  ['no_bay_overlap', 'bay'],
+  ['no_technician_overlap', 'technician'],
+]);
 
 /** SQLSTATEs this classifier recognises. Only those MEASURED to reach this path (design §5.1). */
 const EXCLUSION_VIOLATION = '23P01';
@@ -105,7 +112,7 @@ export function classify(error: unknown): PgOutcome {
   if (code === DEADLOCK_DETECTED) return { kind: 'no-verdict' };
 
   if (code === EXCLUSION_VIOLATION && constraint !== undefined) {
-    const resource = RESOURCE_BY_CONSTRAINT[constraint];
+    const resource = RESOURCE_BY_CONSTRAINT.get(constraint);
     if (resource !== undefined) {
       return { kind: 'conflict', resource: resource as ContendedResource, constraint };
     }
