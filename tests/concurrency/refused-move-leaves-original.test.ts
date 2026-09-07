@@ -137,11 +137,13 @@ import type { Scenario } from '../support/booking.js';
  * yet applied — a throwaway worktree, three runs of 1000 attempts each): **20, 23, 13
  * `40P01`** — 56 in 3000 attempts, a point estimate of **1.87%**, 95% CI roughly
  * **1.38%-2.35%**. That interval sits entirely above the unbounded shape's 0.27%-0.80% —
- * **the rate rose, roughly 2x-4x, and the two intervals do not overlap.** This CONFIRMS the
- * architect's reading: queue-serialisation, not the extra-round-trip explanation the
- * red-commit header gave, is why the unbounded shape under-measured. Bounding concurrency to
- * the pool did not merely avoid the codeless `500` — it let more of the true contention
- * happen, which is what a mutant control is for. (As a positive control on the measurement
+ * **the rate rose, roughly 2x-4x, and the two intervals do not overlap.** The unbounded
+ * shape's low rate is retired as a measurement artefact of queue-serialisation: the pool
+ * queued a pair's two movers apart often enough that they frequently never raced the
+ * exclusion check at the same instant, so the old shape was UNDER-RACING, not measuring a
+ * safer build. Bounding concurrency to the pool did not merely avoid the codeless `500` — it
+ * let more of the true contention happen, which is what a mutant control is for. (As a
+ * positive control on the measurement
  * method itself: the SAME bounded shape against the FIXED build — current `HEAD`, ADR-0030
  * applied — measured 0/1000, confirming the harness discriminates rather than always firing.)
  *
@@ -858,11 +860,18 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
  *      row — a second, confirmed park, this time strictly AFTER `lockResources` on EVERY
  *      build (advisory locks never depend on `blocker`'s row). THIS is "in flight between
  *      `lockResources` and its `UPDATE`," and it is where `pg_locks` is read.
- *   4. `pg_locks` is read for exactly four `(classid, objid)` pairs — P1's bay and
- *      technician, P2's bay and technician — computed via the SAME `hashtext` the service
- *      itself uses (`docs/slices/07-design.md` §3), never inferred from a backend pid: since
- *      nothing else in this run takes an advisory lock on these four specific keys, whatever
- *      rows appear are the mover's, full stop.
+ *   4. `pg_locks` is joined, IN ONE STATEMENT, against `hashtext` applied to the four
+ *      candidate resource ids — P1's bay and technician, P2's bay and technician — the SAME
+ *      mechanism the service itself uses (`docs/slices/07-design.md` §3), and the query
+ *      returns the resource ids that are actually held, never a raw `objid`. `hashtext`
+ *      returns a signed `int4`; `pg_locks.objid` is the unsigned `oid` PostgreSQL stores it
+ *      in, so pulling both into JavaScript and comparing them THERE compares two different
+ *      signed/unsigned readings of the same bits and is wrong whenever the hash is negative
+ *      — a real defect this file's own red run found in itself, independent of build
+ *      correctness. Doing the join and the `hashtext` call in the database and letting only
+ *      UUIDs cross into JS removes the encoding entirely, rather than adding a second place
+ *      it could be gotten wrong. Since nothing else in this run takes an advisory lock on
+ *      these four specific keys, whichever ids come back are the mover's, full stop.
  *   5. `blocker` releases and the mover is awaited to completion (the release witness —
  *      `cancellation-takes-no-lock.test.ts`'s own three-step shape), so a hung promise is a
  *      test failure rather than a leaked timer.
@@ -1026,59 +1035,61 @@ describe('slice 07 — AC-5: the lock set is derived from state the transaction 
               `ever ran.${where}`,
           ).toBe('still in flight');
 
-          // ── STEP 4. THE ASSERTION. Read pg_locks for exactly the four keys this scenario
-          // can produce, via the SAME hashtext the service itself uses (design §3).
-          const hash = async (value: string): Promise<number> => {
-            const { rows } = await client.query<{ h: number }>('select hashtext($1::text) as h', [
-              value,
-            ]);
-            return Number(rows[0]?.h);
-          };
-          const p1BayHash = await hash(p1Bay);
-          const p1TechHash = await hash(p1Tech);
-          const p2BayHash = await hash(p2Bay);
-          const p2TechHash = await hash(p2Tech);
-
-          const { rows: locks } = await client.query<{
-            classid: string;
-            objid: string;
-            granted: boolean;
-          }>(
-            `select classid, objid, granted
-               from pg_locks
-              where locktype = 'advisory' and granted = true
-                and classid in ($1, $2)
-                and objid in ($3, $4, $5, $6)`,
-            [ADVISORY_BAY_CLASS, ADVISORY_TECHNICIAN_CLASS, p1BayHash, p1TechHash, p2BayHash, p2TechHash],
+          // ── STEP 4. THE ASSERTION, DONE IN SQL. `hashtext` returns a signed `int4`; the
+          // advisory-lock catalog stores it in `pg_locks.objid`, whose column type is the
+          // UNSIGNED `oid`. Comparing the two by pulling `objid` into JavaScript and pulling
+          // `hashtext(...)` into JavaScript and comparing THERE compares a signed reading of
+          // one against a signed reading of the other — false whenever the hash is negative,
+          // even though the transaction holds the lock (`pg_locks.objid = 4083001586`
+          // against a raw `hashtext` of `-211965710`: the SAME bits, two different signed/
+          // unsigned readings). So neither value crosses into JS at all: the join, and the
+          // `hashtext` call, both happen in ONE statement, and what crosses the boundary is
+          // the RESOURCE IDS the row actually occupies — UUIDs, which are unambiguous on
+          // either side.
+          const { rows: heldRows } = await client.query<{ resource_id: string }>(
+            `with candidate(resource_id, classid) as (
+                 values ($1::uuid, $5::int),
+                        ($2::uuid, $6::int),
+                        ($3::uuid, $5::int),
+                        ($4::uuid, $6::int)
+             )
+             select distinct c.resource_id::text as resource_id
+               from candidate c
+               join pg_locks l
+                 on l.locktype = 'advisory'
+                and l.granted = true
+                and l.classid = c.classid
+                and l.objid = hashtext(c.resource_id::text)`,
+            [p1Bay, p1Tech, p2Bay, p2Tech, ADVISORY_BAY_CLASS, ADVISORY_TECHNICIAN_CLASS],
           );
-          const holds = (classid: number, objid: number): boolean =>
-            locks.some((l) => Number(l.classid) === classid && Number(l.objid) === objid);
+          const heldResources = new Set(heldRows.map((r) => r.resource_id));
 
           const locksWhere =
-            `\n  P1 bay=${p1Bay} (hash ${String(p1BayHash)}) tech=${p1Tech} (hash ${String(p1TechHash)})` +
-            `\n  P2 bay=${p2Bay} (hash ${String(p2BayHash)}) tech=${p2Tech} (hash ${String(p2TechHash)})` +
-            `\n  granted advisory locks on these keys: ${JSON.stringify(locks)}${where}`;
+            `\n  P1 bay=${p1Bay} tech=${p1Tech}` +
+            `\n  P2 bay=${p2Bay} tech=${p2Tech}` +
+            `\n  resource ids the mover currently holds an advisory lock on: ` +
+            `${JSON.stringify([...heldResources])}${where}`;
 
           // ── THE POSITIVE WITNESS, FIRST (T-07-2 / T-04-4's principle): the harness itself
-          // reached the intended state. P1's keys are held on EVERY build — the pre-loop-read
+          // reached the intended state. P1's ids are held on EVERY build — the pre-loop-read
           // build takes them because take=leave=P1 there; ADR-0031 takes them too, because
           // ADR-0027's TAKE for attempt 1 is unaffected by the fix. Their absence means the
           // mover never reached lockResources at all (a fixture defect), not evidence about
           // ADR-0031.
           expect(
-            holds(ADVISORY_BAY_CLASS, p1BayHash) && holds(ADVISORY_TECHNICIAN_CLASS, p1TechHash),
+            heldResources.has(p1Bay) && heldResources.has(p1Tech),
             `the positive witness is missing: the mover holds no advisory lock on P1 at all, ` +
               `on EITHER build — the fixture never reached lockResources.${locksWhere}`,
           ).toBe(true);
 
           // ── THE CLAIM ITSELF. P2 is the pair A ACTUALLY occupies right now (step 2's
           // commit). A transaction whose lock set is "derived from state the transaction
-          // itself observed" (AC-5's own words) must hold P2's keys too — ADR-0031's fix
+          // itself observed" (AC-5's own words) must hold P2's ids too — ADR-0031's fix
           // takes FOUR keys at attempt 1 exactly when the row moved underneath (its own
           // Decision section). The pre-loop-read build never re-reads, so it never acquires
-          // them: this is expected to FAIL at this commit.
+          // them.
           expect(
-            holds(ADVISORY_BAY_CLASS, p2BayHash) && holds(ADVISORY_TECHNICIAN_CLASS, p2TechHash),
+            heldResources.has(p2Bay) && heldResources.has(p2Tech),
             `AC-5 — the transaction must hold advisory locks on P2 (${p2Bay} / ${p2Tech}), the ` +
               `pair A's row CURRENTLY occupies (relocated at step 2, under A's own row lock, ` +
               `before the mover's lockResources call could have run against it). It does not: ` +
