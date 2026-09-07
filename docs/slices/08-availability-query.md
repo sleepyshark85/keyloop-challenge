@@ -29,8 +29,11 @@ it reports free is exactly what the constraint accepts.
   `INSERT` of exactly `[from, to)`, and **every** pair it omits is rejected with SQLSTATE `23P01`.
   Each probe is a `SAVEPOINT` that is rolled back; a verdict of `23503`, `23514` or `40P01` fails the
   run **distinctly**; the two directions are counted apart and the shrunk counterexample names which
-  failed; and the generator is biased to produce appointments ending exactly at `from` and starting
-  exactly at `to`. **Quiescence is witnessed, not declared:** the query is re-run after the probes and
+  failed; the generator is biased to produce appointments ending exactly at `from` and starting
+  exactly at `to`; and *(added at step 5 under `R-08-1`)* **the generator varies `status`** — roughly
+  one schedule item in five is written `cancelled`, because a query and a constraint can agree on the
+  range and disagree on the predicate that scopes it, and without this the whole
+  `status <> 'cancelled'` conjunct is unreachable. **Quiescence is witnessed, not declared:** the query is re-run after the probes and
   must return a byte-identical answer, and `count(*)` with `max(updated_at)` over
   `appointment WHERE dealership_id = $1` — the fixture's own dealership, since no other dealership
   shares a bay or a technician with it — must be unchanged. A case failing the witness is discarded
@@ -42,9 +45,14 @@ it reports free is exactly what the constraint accepts.
   is queried at dealership Y, then that technician is not returned (A-3, A-9).
 - **AC-4** — Given a cancelled appointment, when availability is queried over its interval, then the
   resources it held are reported free.
-- **AC-5** — *(amended at step 1)* Given any availability response, when it is read, then it carries
-  an explicit advisory flag, and the response **and** the OpenAPI description carry **both** facts:
+- **AC-5a** — *(amended at step 1; split at step 5 under `R-08-2`)* Given any availability response,
+  when it is read, then it carries an explicit advisory flag and a disclosure carrying **both** facts:
   that a free result is **not a reservation**, and that it is true **only of the interval queried**.
+  <br>**AC-5b — the same two facts in the OpenAPI description — is deferred to slice 09**, beside
+  AC-9, where the document is emitted and the assertion can therefore fail. Not slice 10, which is a
+  tombstone. AC-5 as written bundled an assertable half with one that cannot fail, and survived only
+  because bundling hid it — the same ground AC-7 was withdrawn on at step 2.
+
 - **AC-6** — *(amended at step 1)* Given a query where **`to <= from`**, then `400` with
   `type=/problems/malformed-request`.
   <br>Not `to < from`. `from == to` is an empty `tstzrange`, which overlaps nothing, so the query

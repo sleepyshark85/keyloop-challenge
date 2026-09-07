@@ -84,7 +84,11 @@ const NA = 'N/A';
 
 // --- Definition of Ready ---
 if (!onlyDone) {
-  const acs = [...slice.text.matchAll(/^\s*[-*]\s*\*\*AC-\d+\*\*/gm)];
+  // `AC-5a` is a criterion. The pattern demanded digits followed immediately by `**`, so when
+  // R-08-2 split AC-5 into an assertable half and one deferred to the slice that can fail it,
+  // slice:check reported five criteria where there were six — a counter that stops counting the
+  // moment a criterion is split is a counter that discourages splitting.
+  const acs = [...slice.text.matchAll(/^\s*[-*]\s*\*\*AC-\d+[a-z]?\*\*/gm)];
   check('ready', 'acceptance criteria present', acs.length ? PASS : FAIL,
     acs.length ? `${acs.length} criteria` : 'no **AC-n** entries found in the body');
 

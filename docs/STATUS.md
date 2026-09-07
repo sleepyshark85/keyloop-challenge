@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `193db2d test(08): unit coverage for GET /availability's own switch and schema` |
+| Last commit | `d734502 docs(08): §10 is not satisfied, and the classification that would satisfy it inverts I-06-5` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process |
-| Agent runs recorded | 175 |
+| Agent runs recorded | 177 |
 | ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -332,7 +332,9 @@
 | 2026-09-07 04:51 | scribe | 14m36 | 294 / 31,910 / 18,288,830 | `derived` |
 | 2026-09-07 05:34 | test-engineer | 16m14 | 236 / 4,982 / 15,966,417 | `derived` |
 | 2026-09-07 05:54 | implementer | 18m51 | 396 / 11,964 / 34,032,502 | `derived` |
-| | **total** | **6588m06** | **41,336 / 3,057,268 / 3,314,045,520** | |
+| 2026-09-07 06:07 | reviewer | 10m36 | 196 / 9,490 / 9,935,094 | `derived` |
+| 2026-09-07 07:18 | architect | 12m11 | 172 / 8,533 / 7,020,464 | `derived` |
+| | **total** | **6610m53** | **41,704 / 3,075,291 / 3,331,001,078** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
