@@ -334,42 +334,77 @@ function matchesAppointmentTableAccess(content: string): boolean {
 const CONTENDED_RESOURCE_CAST = /\bas\s+ContendedResource\b/;
 
 /**
- * `conflict-counter-increment` — slice 09, design decision 2: "`booking_conflicts_total` has
- * exactly one increment site." `dependency-cruiser` is per FILE and cannot see a one-site
- * rule spanning two call sites in two different files, so this marker is decision 2's only
- * executable form — the same shape `contended-resource-cast` already uses for a one-site
- * claim `dependency-cruiser` cannot make either.
+ * `conflict-counter-increment` — slice 09, design decision 2, **restated at step 5 (finding
+ * 11)**: "incremented from exactly one MODULE, at most once per attempt loop" — not the
+ * step-1 wording "one increment site", which the merged code already breaks (see below) and
+ * which the ORIGINAL version of this marker could not see either way. `dependency-cruiser` is
+ * per FILE and cannot see a one-site rule spanning several call sites, so this marker remains
+ * decision 2's only executable form — the same shape `contended-resource-cast` already uses
+ * for a one-site claim `dependency-cruiser` cannot make either.
  *
- * THE CONCEPT, NOT A VARIABLE NAME OR A LITERAL VALUE. arc42 §8.4's metrics table is the
- * anchor: `booking_conflicts_total` is the ONLY metric carrying BOTH a `resource` label
- * (`bay`/`technician`) AND an `outcome` label (`absorbed`/`refused`/`capped`) — every other
- * metric in the table (`appointments_rescheduled_total`'s `outcome`, for one) carries at most
- * one of the two. So the marker is a `Counter#add(...)` call whose argument object carries
- * BOTH an `outcome` key and a `resource` key — matched as bare identifiers rather than as
- * `key:` pairs or literal values, so BOTH `{ resource: r, outcome: 'absorbed' }` and the
- * ES6-shorthand `{ resource, outcome }` are recognised. A shared attempt loop passing
- * `outcome` through as a PARAMETER is a legitimate, arguably better, implementation than
- * repeating a literal at three call sites, and a marker that only recognised one spelling of
- * "carries this label" would stay red after a correct implementation landed — the R-01-6
- * failure mode inverted.
+ * ANCHORED ON THE COUNTER'S OWN BINDING, NOT ON A LABEL SPELLING. The step-1 version matched
+ * any `.add(...)` call whose TEXT contained the bare words `resource` and `outcome` — a
+ * falsification the reviewer found at step 5: a `labels` object built in a SEPARATE place
+ * (`conflictCounter.add(1, labels)`, or worse, a helper function's return value with neither
+ * word anywhere near the call) carries the real increment while defeating a matcher that
+ * reads only what is written INSIDE the parentheses. So this version tracks the counter's own
+ * IDENTITY instead: `conflictCounterLocalBinding` finds each file's own local name for
+ * whatever it imports as `conflictCounter` from a `platform/telemetry` module specifier
+ * (following an `as` alias if the import renames it), and the marker is THAT binding followed
+ * by `.add(` — regardless of what shape, or how many words, sit inside the call. A different
+ * counter imported from the same module (say, `booking_attempts`, finding 9) under a
+ * different local name is not this marker, by construction — see the negative control below.
  *
- * NO PERMITTED-FILE ASSERTION. Unlike `appointment-table-access`, this marker's claim from
- * design decision 2 is CARDINALITY — "exactly one [site]" — not containment relative to a
- * name this design does not commit to (`src/application/`'s extracted attempt loop, F-06-1,
- * has no filename pinned in the building-blocks table). The corpus guard above is still what
- * keeps a scan finding one file honest — see the real-tree describe block below, which is RED
- * at this commit because the count is zero, not two.
+ * CONTAINMENT, NOW ASSERTED — reversing the step-1 note. `src/application/attemptLoop.ts` is
+ * pinned by name in this file's own planted fixtures below and by the reviewer's own finding
+ * (`attemptLoop.ts:185,224`), so unlike step 1 (`F-06-1`'s filename was unpinned), the
+ * real-tree assertion below checks EQUALITY against that one path, not just "exactly one
+ * file, whichever it is".
  *
- * RESIDUE, named rather than promised away (§4.2's own precedent): the naive
- * `.add\s*\([^)]*\)` match does not balance nested parentheses, so `resource: computeIt()`
- * inside an `.add(...)` call would truncate the captured argument text at the FIRST `)` and
- * could miss a genuine site whose `outcome:` key lands after it. A finding to raise if it
- * ever bites, not a licence to leave the marker unable to fire on the common case.
+ * CARDINALITY IS CALL SITES, NOT FILES — this is what closes finding 11's second half. The
+ * OLD marker deduplicated hits by FILE (`scanForMarkers`'s own `[...new Set(hits.map(file))]`
+ * shape), so two `.add()` calls landing in the SAME file were indistinguishable from one —
+ * exactly the shape the architect found already merged: two call sites in `attemptLoop.ts`,
+ * a violation the file-granular version could never see because "one file" was still true.
+ * `countConflictCounterIncrements` below counts OCCURRENCES, and the real-tree test sums them
+ * across the whole corpus rather than counting distinct files.
  */
-function matchesConflictCounterIncrement(content: string): boolean {
+function conflictCounterLocalBinding(strippedContent: string): string | undefined {
+  const importPattern = /import\s*\{([^}]*)\}\s*from\s*['"][^'"]*platform\/telemetry(?:\.js)?['"]/g;
+  let match: RegExpExecArray | null;
+  while ((match = importPattern.exec(strippedContent)) !== null) {
+    for (const raw of (match[1] ?? '').split(',')) {
+      const specifier = raw.trim();
+      if (specifier === '') continue;
+      const aliased = /^conflictCounter\s+as\s+([A-Za-z_$][\w$]*)$/.exec(specifier);
+      if (aliased?.[1] !== undefined) return aliased[1];
+      if (specifier === 'conflictCounter') return 'conflictCounter';
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Every call site incrementing THE COUNTER — identified by its imported binding, never by
+ * what its arguments happen to say — within one file's content. Zero for a file that never
+ * imports it, whatever `.add()` calls it otherwise contains (the two negative controls
+ * below).
+ *
+ * RESIDUE, named rather than promised away (§4.2's own precedent): a namespace import
+ * (`import * as telemetry from '.../platform/telemetry.js'`, then `telemetry.conflictCounter
+ * .add(...)`) is not recognised — this project's own style is named imports throughout (every
+ * planted fixture below, and every other marker in this file, assumes it) — a finding to
+ * raise if it ever bites, not a licence to leave the common case unmatched.
+ */
+function countConflictCounterIncrements(content: string): number {
   const stripped = stripComments(content);
-  const addCalls = stripped.match(/\.add\s*\([^)]*\)/g) ?? [];
-  return addCalls.some((call) => /\bresource\b/.test(call) && /\boutcome\b/.test(call));
+  const binding = conflictCounterLocalBinding(stripped);
+  if (binding === undefined) return 0;
+  return (stripped.match(new RegExp(`\\b${binding}\\s*\\.\\s*add\\s*\\(`, 'g')) ?? []).length;
+}
+
+function matchesConflictCounterIncrement(content: string): boolean {
+  return countConflictCounterIncrements(content) > 0;
 }
 
 const MARKER_TESTS: ReadonlyArray<{ name: Marker; test: (content: string) => boolean }> = [
@@ -1342,35 +1377,51 @@ describe('ADR-0013 — no outside-in test file references src/ by a computed or 
 // ═══════════════════════════════════════════════════════ slice 09 — QS-12's second marker ══
 
 /**
- * QS-12 / slice 09 design decision 2 — "`booking_conflicts_total` has exactly one increment
- * site." Cardinality, not containment: see `CONFLICT_COUNTER_INCREMENT`'s own comment above
- * for why no permitted-file assertion is made here, unlike `appointment-table-access`.
+ * QS-12 / slice 09 design decision 2, restated at step 5 (finding 11): "incremented from
+ * exactly one MODULE, at most once per attempt loop." Two claims, both checked below:
+ * containment (every real increment lives in `src/application/attemptLoop.ts`, by EQUALITY —
+ * the filename is pinned now, unlike step 1) and cardinality (exactly one CALL SITE in total,
+ * not "exactly one file" — see `countConflictCounterIncrements`'s own comment for why files
+ * were never the right unit).
  *
- * THE REAL-TREE CASE IS RED AT THIS COMMIT WITH COUNT 0, NOT 2. Telemetry does not exist
- * before this slice, so there is no increment site anywhere yet — decision 2's own "two
- * before F-06-1's extraction, one after" describes a hypothetical mid-implementation state,
- * not this commit's. "Found 0, expected 1" is nonetheless the right red: it is what the same
- * assertion will report the day after a regression re-splits the one site back into two,
- * which is the property this control exists to catch for the rest of the project's life.
+ * THE REAL-TREE CASE IS RED AT THIS COMMIT. Two possible reds, both correct: count 0 if
+ * telemetry does not increment the counter at all yet, or count 2 at `attemptLoop.ts:185,224`
+ * if the reviewer's own finding is still unremediated — decision 2's "two before F-06-1's
+ * extraction, one after" is exactly that mid-implementation shape, now on the record as an
+ * observed defect rather than a hypothetical. Either way, "found N, expected 1" is what this
+ * assertion reports the day a regression re-splits the one site back into two, which is the
+ * property it exists to catch for the rest of the project's life.
  */
-describe('slice 09 / QS-12 — booking_conflicts_total is incremented from exactly one file', () => {
-  it('the real src/ tree: exactly one file increments booking_conflicts_total', () => {
+function sumConflictCounterIncrements(rootDir: string): ReadonlyArray<{ file: string; count: number }> {
+  const out: { file: string; count: number }[] = [];
+  for (const relFile of listSourceCorpus(rootDir)) {
+    const count = countConflictCounterIncrements(readFileSync(join(rootDir, relFile), 'utf8'));
+    if (count > 0) out.push({ file: relFile, count });
+  }
+  return out;
+}
+
+const ATTEMPT_LOOP_FILE = 'src/application/attemptLoop.ts';
+
+describe('slice 09 / QS-12 — booking_conflicts_total is incremented from exactly one call site, in attemptLoop.ts', () => {
+  it('the real src/ tree: exactly one call site, and it is src/application/attemptLoop.ts', () => {
     const corpus = listSourceCorpus(REPO_ROOT);
     expect(corpus.length, 'src/**/*.ts produced no files — the scan below would be vacuous').toBeGreaterThan(0);
 
-    const files = [
-      ...new Set(
-        scanForMarkers(REPO_ROOT)
-          .filter((h) => h.marker === 'conflict-counter-increment')
-          .map((h) => h.file),
-      ),
-    ];
+    const perFile = sumConflictCounterIncrements(REPO_ROOT);
+    const files = [...new Set(perFile.map((f) => f.file))];
+    const totalSites = perFile.reduce((sum, f) => sum + f.count, 0);
+
     expect(
       files,
-      `expected exactly one file under src/ to increment booking_conflicts_total (an ` +
-        `OTel Counter#add call carrying outcome: 'absorbed'|'refused'|'capped'); found ` +
-        `${String(files.length)}: ${JSON.stringify(files)}`,
-    ).toHaveLength(1);
+      `expected every increment confined to ${ATTEMPT_LOOP_FILE}; found ${JSON.stringify(perFile)}`,
+    ).toEqual([ATTEMPT_LOOP_FILE]);
+    expect(
+      totalSites,
+      `expected exactly one Counter#add call site for booking_conflicts_total (design ` +
+        `decision 2, restated: "at most once per attempt loop"); found ${String(totalSites)}: ` +
+        `${JSON.stringify(perFile)}`,
+    ).toBe(1);
   });
 
   it('planted control: two files each incrementing the counter are BOTH reported — the pre-F-06-1 shape', () => {
@@ -1388,36 +1439,111 @@ describe('slice 09 / QS-12 — booking_conflicts_total is incremented from exact
         '}\n',
     });
 
-    const files = [
-      ...new Set(
-        scanForMarkers(root)
-          .filter((h) => h.marker === 'conflict-counter-increment')
-          .map((h) => h.file),
-      ),
-    ].sort();
-    expect(files, 'two separate attempt loops, two increment sites').toEqual(
-      [...planted].sort(),
+    const perFile = sumConflictCounterIncrements(root);
+    expect(
+      [...perFile].sort((a, b) => a.file.localeCompare(b.file)),
+      'two separate attempt loops, two increment sites, one per file',
+    ).toEqual(
+      [...planted].sort().map((file) => ({ file, count: 1 })),
     );
   });
 
   it('planted control: one shared attempt-loop file, incrementing with all three outcomes, is the ONE site', () => {
     const root = newFixture('conflict-counter-one-site');
-    const planted = plant(root, {
-      'src/application/attemptLoop.ts':
+    plant(root, {
+      [ATTEMPT_LOOP_FILE]:
         "import { conflictCounter } from '../platform/telemetry.js';\n" +
         "export function onConflict(resource: 'bay' | 'technician', outcome: 'absorbed' | 'refused' | 'capped'): void {\n" +
         '  conflictCounter.add(1, { resource, outcome });\n' +
         '}\n',
     });
 
-    const files = [
-      ...new Set(
-        scanForMarkers(root)
-          .filter((h) => h.marker === 'conflict-counter-increment')
-          .map((h) => h.file),
-      ),
-    ];
-    expect(files).toEqual(planted);
+    expect(sumConflictCounterIncrements(root)).toEqual([{ file: ATTEMPT_LOOP_FILE, count: 1 }]);
+  });
+
+  it('planted control (R-09-11, finding 11): TWO call sites in the SAME permitted file are BOTH counted', () => {
+    // This is the exact shape the architect found already merged (`attemptLoop.ts:185,224`)
+    // and the exact shape the OLD marker could not see: `scanForMarkers` dedupes hits by
+    // FILE, so two `.add()` calls landing in one file collapsed to "one file", reading as
+    // conformant when it was the violation the control exists to catch. Counting SITES
+    // rather than files is what makes this red.
+    const root = newFixture('conflict-counter-two-sites-one-file');
+    plant(root, {
+      [ATTEMPT_LOOP_FILE]:
+        "import { conflictCounter } from '../platform/telemetry.js';\n" +
+        "export function onAbsorbed(resource: 'bay' | 'technician'): void {\n" +
+        "  conflictCounter.add(1, { resource, outcome: 'absorbed' });\n" +
+        '}\n' +
+        "export function onRefused(resource: 'bay' | 'technician'): void {\n" +
+        "  conflictCounter.add(1, { resource, outcome: 'refused' });\n" +
+        '}\n',
+    });
+
+    expect(
+      sumConflictCounterIncrements(root),
+      'one file, but TWO call sites — must not collapse to "one site" the way a file-only count would',
+    ).toEqual([{ file: ATTEMPT_LOOP_FILE, count: 2 }]);
+  });
+
+  it('planted control (R-09-11, finding 11): an increment called through an INDIRECT labels object, in a second file, is still found', () => {
+    // The reviewer's own falsification: a `labels` object assembled elsewhere carries no
+    // `resource`/`outcome` WORDS inside the `.add(...)` parentheses at all, which is exactly
+    // what let a second increment site evade the step-1, text-inside-the-call matcher —
+    // "every refusal double-counted" while "incremented from exactly one file" still read
+    // length 1. Anchoring on the imported BINDING rather than the call's own text catches
+    // both real sites regardless of how the argument is built.
+    const root = newFixture('conflict-counter-indirect-labels');
+    const planted = plant(root, {
+      [ATTEMPT_LOOP_FILE]:
+        "import { conflictCounter } from '../platform/telemetry.js';\n" +
+        "export function onConflict(resource: 'bay' | 'technician', outcome: 'absorbed' | 'refused' | 'capped'): void {\n" +
+        '  conflictCounter.add(1, { resource, outcome });\n' +
+        '}\n',
+      'src/application/rescheduleAppointment.ts':
+        "import { conflictCounter } from '../platform/telemetry.js';\n" +
+        "import { describeOutcome } from './describeOutcome.js';\n" +
+        "export function onSecondConflict(resource: 'bay' | 'technician'): void {\n" +
+        "  const labels = describeOutcome(resource);\n" +
+        '  conflictCounter.add(1, labels);\n' +
+        '}\n',
+    });
+
+    const perFile = sumConflictCounterIncrements(root);
+    expect(
+      [...perFile].sort((a, b) => a.file.localeCompare(b.file)),
+      'a call site whose argument carries no resource/outcome WORDS must still be found, ' +
+        'because it is the same imported counter being incremented',
+    ).toEqual([...planted].sort().map((file) => ({ file, count: 1 })));
+  });
+
+  it('negative control: a DIFFERENT counter imported from the same module is not this metric', () => {
+    // Anchoring on the binding, not on `.add()` alone, means a second, legitimate instrument
+    // from the same file (§8.4's `booking_attempts`, finding 9) must not be mistaken for the
+    // conflict counter just because both are Counters incremented nearby.
+    const root = newFixture('conflict-counter-different-instrument');
+    plant(root, {
+      [ATTEMPT_LOOP_FILE]:
+        "import { bookingAttemptsCounter } from '../platform/telemetry.js';\n" +
+        "export function onAttempt(): void {\n" +
+        "  bookingAttemptsCounter.add(1, { outcome: 'absorbed' });\n" +
+        '}\n',
+    });
+
+    expect(
+      sumConflictCounterIncrements(root),
+      'bookingAttemptsCounter is not conflictCounter, even carrying an outcome label',
+    ).toEqual([]);
+  });
+
+  it('negative control: importing conflictCounter without ever calling .add on it does not count', () => {
+    const root = newFixture('conflict-counter-imported-unused');
+    plant(root, {
+      [ATTEMPT_LOOP_FILE]:
+        "import { conflictCounter } from '../platform/telemetry.js';\n" +
+        'export { conflictCounter };\n',
+    });
+
+    expect(sumConflictCounterIncrements(root)).toEqual([]);
   });
 
   it('negative control: naming the outcome labels in a comment or a type union does not trip the marker', () => {
@@ -1428,32 +1554,31 @@ describe('slice 09 / QS-12 — booking_conflicts_total is incremented from exact
         "export type ConflictOutcome = 'absorbed' | 'refused' | 'capped';\n",
     });
 
-    const hits = scanForMarkers(root).filter((h) => h.marker === 'conflict-counter-increment');
     expect(
-      hits,
-      'the marker is the Counter#add CALL, not the vocabulary of outcome labels appearing ' +
-        'anywhere in prose or in a type',
+      sumConflictCounterIncrements(root),
+      'the marker is the imported counter\'s own Counter#add CALL, not the vocabulary of ' +
+        'outcome labels appearing anywhere in prose or in a type',
     ).toEqual([]);
   });
 
-  it('negative control: an unrelated .add() call — e.g. Array.prototype — with an outcome-shaped object is not the metric', () => {
-    // Deliberately over-broad on the SITE (`.add(...)`) and narrow on the LABEL (the
-    // outcome value) — see the marker's own comment. This asserts the label half is doing
-    // real work: an .add() call whose payload happens to carry one of the three literal
-    // strings under an unrelated key is not what this control means to find. Named as a
-    // residue rather than promised away: `.add()` is not a Counter-specific method name.
+  it('negative control: an unrelated .add() call — e.g. Set#add — on a binding never imported from telemetry is not the metric', () => {
+    // Deliberately over-broad on the METHOD NAME (`.add(...)` is not Counter-specific) and
+    // narrow on the BINDING (it must be one this file imported from platform/telemetry). A
+    // local variable that merely happens to be called `conflictCounter` but was never
+    // imported from there is exactly what this control is against — named as residue rather
+    // than promised away (§4.2's own precedent): a file could still shadow the name locally
+    // without importing it, which this marker would then (wrongly) match. Not observed in
+    // this codebase's own style (every marker here assumes named imports throughout).
     const root = newFixture('conflict-counter-add-not-metric');
     plant(root, {
       'src/application/unrelated.ts':
-        "const bag = new Set<string>();\nbag.add('outcome: absorbed');\nexport { bag };\n",
+        "const bag = new Set<string>();\nbag.add('outcome: absorbed, resource: bay');\nexport { bag };\n",
     });
 
-    const hits = scanForMarkers(root).filter((h) => h.marker === 'conflict-counter-increment');
     expect(
-      hits,
-      'a Set#add call with the phrase embedded in a string literal is not a Counter ' +
-        'increment carrying a real outcome: key — this is the residue named rather than ' +
-        'promised away (§4.2\'s own precedent)',
+      sumConflictCounterIncrements(root),
+      'a Set#add call on a binding never imported from platform/telemetry is not a Counter ' +
+        'increment, whatever string it is called with',
     ).toEqual([]);
   });
 });

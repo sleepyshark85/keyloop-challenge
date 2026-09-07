@@ -87,6 +87,53 @@ import type { HttpAnswer, Scenario } from '../support/booking.js';
  * which is exactly the kind of regression a fixed seed is supposed to catch.
  */
 
+const TRACE_ID_HEX32 = /^[0-9a-f]{32}$/;
+const SPAN_ID_HEX16 = /^[0-9a-f]{16}$/;
+
+/**
+ * R-09-6 (`docs/slices/09-design.md` step-5 finding 6) — AC-6 says "given any request", and
+ * the reviewer's falsification was concrete: `booking.conflict`, `booking.refused`, and
+ * Fastify's own request/response lines all carried no `trace_id` while exactly one
+ * application line did. "At least one correlated line" certifies one line out of a request;
+ * this is the assertion that reads every line instead.
+ *
+ * A record counts as CORRELATED, not merely present, when its `trace_id`/`span_id` are
+ * well-formed AND name a trace this run's collector actually received — a fabricated or
+ * stale id must not pass. Returns the offending records themselves (not a count), so a
+ * failing message shows exactly which lines still lack it.
+ */
+function uncorrelatedRequestLogLines(
+  records: readonly Record<string, unknown>[],
+  spanTraceIds: ReadonlySet<string>,
+): readonly Record<string, unknown>[] {
+  return records.filter((r) => {
+    const traceId = r['trace_id'];
+    const spanId = r['span_id'];
+    return !(
+      typeof traceId === 'string' &&
+      TRACE_ID_HEX32.test(traceId) &&
+      typeof spanId === 'string' &&
+      SPAN_ID_HEX16.test(spanId) &&
+      spanTraceIds.has(traceId)
+    );
+  });
+}
+
+/**
+ * `CollectedSpan` carries `startTimeUnixNano`/`endTimeUnixNano` as `BigInt`, which
+ * `JSON.stringify` refuses outright — a failure MESSAGE must not itself throw and hide the
+ * assertion that produced it.
+ */
+function describeSpanForFailure(span: CollectedSpan | undefined): string {
+  if (span === undefined) return '(no span)';
+  return JSON.stringify({
+    name: span.name,
+    traceId: span.traceId,
+    attributes: span.attributes,
+    statusCode: span.statusCode,
+  });
+}
+
 const SHARED_SEED = 7;
 
 async function seedRetryOnceFixture(client: Client, namespace: string): Promise<Scenario> {
@@ -157,7 +204,24 @@ interface TelemetryRun {
   readonly answer: HttpAnswer;
   readonly service: StartedService;
   readonly collector: OtelCollector;
+  /**
+   * R-09-6: every `pino` line the child wrote from the moment `action` was invoked to the
+   * moment it resolved (plus a short flush grace period) — Fastify's own request/response
+   * lines and every application line alike. Captured BEFORE `service.stop()` runs, so
+   * shutdown's own lines are excluded, and after the pre-request snapshot, so boot lines are
+   * excluded too: this is "the request's" logs, not "the process's".
+   */
+  readonly requestLogRecords: readonly Record<string, unknown>[];
 }
+
+/**
+ * How long to wait, after `action` resolves, before snapshotting `requestLogRecords` — pino's
+ * stream can flush a beat after the HTTP response is written. Bounded and unconditional
+ * rather than a poll for a specific line: the claim under test is that EVERY line in the
+ * window correlates, so waiting for a line this test would already recognise begs the
+ * question it exists to answer.
+ */
+const LOG_FLUSH_GRACE_MS = 300;
 
 /**
  * Start a collector and a service pointed at it, run `action`, stop the SERVICE (which is
@@ -181,10 +245,13 @@ async function runWithTelemetry(
     return { failure: attempt.failure ?? 'the service did not start' };
   }
   const service = attempt.service;
+  const logsBeforeRequest = service.logRecords().length;
   const answer = await action(service);
+  await new Promise((resolve) => setTimeout(resolve, LOG_FLUSH_GRACE_MS));
+  const requestLogRecords = service.logRecords().slice(logsBeforeRequest);
   // Flush: SIGTERM, and `main.ts` is described as "starts and shuts the SDK down".
   await service.stop();
-  return { run: { answer, service, collector } };
+  return { run: { answer, service, collector, requestLogRecords } };
 }
 
 describe('QS-13 / AC-1, AC-2, AC-3 — one retried-then-succeeded booking, read off its trace and its metric export', () => {
@@ -253,7 +320,7 @@ describe('QS-13 / AC-1, AC-2, AC-3 — one retried-then-succeeded booking, read 
     ).toBe(true);
   });
 
-  it('AC-2 — exactly two appointment.insert spans; the failed one carries db.sqlstate=23P01 and db.constraint', () => {
+  it('AC-2 — exactly two appointment.insert spans; the failed one carries db.sqlstate=23P01, db.constraint and ERROR status', () => {
     if (run === undefined) return;
     const inserts = run.collector.spans().filter((s) => s.name === 'appointment.insert');
     expect(inserts.map((s) => s.attributes), `expected exactly two appointment.insert spans.${where()}`).toHaveLength(2);
@@ -264,6 +331,49 @@ describe('QS-13 / AC-1, AC-2, AC-3 — one retried-then-succeeded booking, read 
     expect(failed[0]?.attributes['db.constraint'], `db.constraint missing on the failed span.${where()}`).toBe(
       'no_bay_overlap',
     );
+    // R-09-5: §8.4's own claim that `db.sqlstate=23P01` labels an EXCLUSION conflict — a
+    // correctness claim, not a name — so any span carrying it must name one of the two
+    // exclusion constraints, never (say) a foreign-key constraint mislabelled as a conflict.
+    expect(
+      ['no_bay_overlap', 'no_technician_overlap'],
+      `a span carrying db.sqlstate=23P01 named a constraint outside the exclusion pair: ${String(failed[0]?.attributes['db.constraint'])}${where()}`,
+    ).toContain(failed[0]?.attributes['db.constraint']);
+
+    // R-09-5: §1.2 goal 4 / this slice's own retry-waterfall screenshot reads bars by WHICH
+    // bay and WHICH attempt each one was — blank these and the chart loses its own subject
+    // while every status-code-only test stays green.
+    for (const span of inserts) {
+      expect(
+        span.attributes['booking.attempt'],
+        `booking.attempt missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`,
+      ).not.toBeUndefined();
+      expect(
+        span.attributes['bay.id'],
+        `bay.id missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`,
+      ).not.toBeUndefined();
+      expect(
+        span.attributes['technician.id'],
+        `technician.id missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`,
+      ).not.toBeUndefined();
+    }
+    const attemptNumbers = inserts.map((s) => s.attributes['booking.attempt']);
+    expect(
+      new Set(attemptNumbers).size,
+      `both attempts must carry a DISTINCT booking.attempt — a constant value would still ` +
+        `pass an "attribute present" check while erasing the waterfall: ${JSON.stringify(attemptNumbers)}${where()}`,
+    ).toBe(2);
+
+    // R-09-5: a failed attempt that never sets its OWN span's status renders identically to
+    // a slow success on any dashboard reading spans by OTel status — 2 = ERROR.
+    expect(
+      failed[0]?.statusCode,
+      `the failed attempt's span must carry OTel's ERROR status (2): ${describeSpanForFailure(failed[0])}${where()}`,
+    ).toBe(2);
+    const succeeded = inserts.filter((s) => s.attributes['db.sqlstate'] === undefined);
+    expect(
+      succeeded[0]?.statusCode,
+      `a succeeded attempt's span must not carry ERROR status: ${describeSpanForFailure(succeeded[0])}${where()}`,
+    ).not.toBe(2);
   });
 
   it('AC-3 — booking_conflicts_total{resource=bay,outcome=absorbed} increments by exactly 1, with no outcome=refused', () => {
@@ -277,6 +387,29 @@ describe('QS-13 / AC-1, AC-2, AC-3 — one retried-then-succeeded booking, read 
     // exports; every exported value for THIS attribute set must read exactly 1, never more.
     expect(absorbed.every((p) => p.value === 1), `every absorbed export must read exactly 1.${where()}`).toBe(true);
     expect(refused, `no outcome=refused increment is expected in this run.${where()}`).toHaveLength(0);
+  });
+
+  it('AC-6 — the retry produces a booking.conflict line, and it too is trace-correlated', () => {
+    if (run === undefined) return;
+    // This fixture's whole point (SHARED_SEED=7) is that attempt 1 conflicts before attempt
+    // 2 succeeds — R-09-6's own falsification named `booking.conflict` as a line that carried
+    // no trace_id. Guard first: if the loop never actually conflicted, the assertion below
+    // would be vacuous rather than evidence.
+    const conflicts = run.requestLogRecords.filter(
+      (r) => r['event'] === 'booking.conflict' || r['msg'] === 'booking.conflict',
+    );
+    expect(
+      conflicts.length,
+      `expected a booking.conflict line in this request's window — the fixture's own ` +
+        `arrangement.${where()}\n  window:\n${JSON.stringify(run.requestLogRecords, null, 2)}`,
+    ).toBeGreaterThanOrEqual(1);
+
+    const spanTraceIds = new Set<string>(run.collector.spans().map((s: CollectedSpan) => s.traceId));
+    const uncorrelated = uncorrelatedRequestLogLines(conflicts, spanTraceIds);
+    expect(
+      uncorrelated,
+      `the booking.conflict line(s) below carry no correlated trace_id/span_id:\n${JSON.stringify(uncorrelated, null, 2)}${where()}`,
+    ).toHaveLength(0);
   });
 });
 
@@ -327,6 +460,89 @@ describe('QS-13 / AC-4 — a booking refused after exhausting candidates', () =>
 
     expect(refused.length, `expected a booking_conflicts_total{resource=bay,outcome=refused} point.${where()}`).toBeGreaterThanOrEqual(1);
     expect(absorbed, `outcome=absorbed must not increment when every candidate is exhausted.${where()}`).toHaveLength(0);
+  });
+
+  it('AC-6 — the exhausted refusal produces a booking.refused line, and it too is trace-correlated', () => {
+    if (run === undefined) return;
+    // R-09-6's own falsification named `booking.refused` as a line that carried no trace_id.
+    // Guard first: if the loop never actually refused, the assertion below would be vacuous.
+    const refusals = run.requestLogRecords.filter(
+      (r) => r['event'] === 'booking.refused' || r['msg'] === 'booking.refused',
+    );
+    expect(
+      refusals.length,
+      `expected a booking.refused line in this request's window — the fully-blocked ` +
+        `fixture's own arrangement.${where()}\n  window:\n${JSON.stringify(run.requestLogRecords, null, 2)}`,
+    ).toBeGreaterThanOrEqual(1);
+
+    const spanTraceIds = new Set<string>(run.collector.spans().map((s: CollectedSpan) => s.traceId));
+    const uncorrelated = uncorrelatedRequestLogLines(refusals, spanTraceIds);
+    expect(
+      uncorrelated,
+      `the booking.refused line(s) below carry no correlated trace_id/span_id:\n${JSON.stringify(uncorrelated, null, 2)}${where()}`,
+    ).toHaveLength(0);
+  });
+});
+
+describe('QS-13 / AC-6 — an internal fault (500) still correlates every log line to the trace', () => {
+  let client: Client;
+  let scenario: Scenario;
+  let run: TelemetryRun | undefined;
+  let startFailure: string | undefined;
+
+  beforeAll(async () => {
+    client = new Client({ connectionString: inject('databaseUrl') });
+    await client.connect();
+    // `tests/contract/error-taxonomy.test.ts`'s own measured route to a GENUINE 500: a
+    // dealership whose IANA zone Node cannot resolve is a SYSTEM fault, not a caller mistake
+    // — `/problems/internal`, not a 4xx (design §2.7, OQ-02-2 closed; the row is `500` in
+    // that file's own closed-set table). This is the only reachable black-box route to
+    // `server.ts`'s `request.failed` line this suite exercises — see this slice's own report
+    // on why a genuine ADR-0018 deadlock is not reproduced here.
+    scenario = await seedScenario(client, 'ac6-telemetry-internal-fault', {
+      bays: 1,
+      technicians: 1,
+      timeZone: 'Not/AZone',
+    });
+
+    const { failure, run: started } = await runWithTelemetry({}, async (service) =>
+      postBooking(service, bookingBody(scenario)),
+    );
+    startFailure = failure;
+    run = started;
+  });
+
+  afterAll(async () => {
+    await run?.collector.stop();
+    await client?.end();
+  });
+
+  function where(): string {
+    const fixture = describeScenario(scenario);
+    const answer = run === undefined ? '(service did not start)' : describeAnswer(run.answer);
+    return `\n${fixture}\n  HTTP answer: ${answer}`;
+  }
+
+  it('AC-6 — the arrangement: a broken time zone answers 500 /problems/internal', () => {
+    expect(startFailure ?? 'started', `ARRANGE failed.${where()}`).toBe('started');
+    if (run === undefined) return;
+    expect(run.answer.status, `ARRANGE — expected the broken-zone fixture to fault.${where()}`).toBe(500);
+  });
+
+  it("AC-6 — every log line the 500 produced, including server.ts's own request.failed line, is trace-correlated", () => {
+    if (run === undefined) return;
+    const records = run.requestLogRecords;
+    expect(
+      records.length,
+      `expected more than one log line in the request's window.${where()}\n  window:\n${JSON.stringify(records, null, 2)}`,
+    ).toBeGreaterThan(1);
+
+    const spanTraceIds = new Set<string>(run.collector.spans().map((s: CollectedSpan) => s.traceId));
+    const uncorrelated = uncorrelatedRequestLogLines(records, spanTraceIds);
+    expect(
+      uncorrelated,
+      `these log lines from the 500 carry no correlated trace_id/span_id:\n${JSON.stringify(uncorrelated, null, 2)}${where()}`,
+    ).toHaveLength(0);
   });
 });
 
@@ -449,29 +665,29 @@ describe('QS-13 / AC-6 — structured, trace-correlated logs carry no customer n
     expect(run?.answer.status, `ARRANGE — booking failed.${where()}`).toBe(201);
   });
 
-  it('AC-6 — pino output carries trace_id/span_id matching an emitted span, correlating logs to the trace', () => {
+  it('AC-6 — given this request, EVERY log line it produced is trace-correlated, not just one', () => {
     if (run === undefined) return;
-    const records = run.service.logRecords();
-    const withTrace = records.filter(
-      (r) => typeof r['trace_id'] === 'string' && typeof r['span_id'] === 'string',
-    );
-    expect(withTrace.length, `expected at least one log line carrying trace_id/span_id.${where()}`).toBeGreaterThanOrEqual(1);
-
-    const HEX32 = /^[0-9a-f]{32}$/;
-    const HEX16 = /^[0-9a-f]{16}$/;
-    for (const record of withTrace) {
-      expect(HEX32.test(String(record['trace_id'])), `trace_id is not a 32-hex-char id: ${JSON.stringify(record)}${where()}`).toBe(true);
-      expect(HEX16.test(String(record['span_id'])), `span_id is not a 16-hex-char id: ${JSON.stringify(record)}${where()}`).toBe(true);
-    }
-
-    // Correlated, not merely present: the log's trace_id must name a REAL trace this
-    // request produced, not an unrelated or fabricated value.
-    const spanTraceIds = new Set<string>(run.collector.spans().map((s: CollectedSpan) => s.traceId));
-    const correlated = withTrace.some((r) => spanTraceIds.has(String(r['trace_id'])));
+    const records = run.requestLogRecords;
+    // GUARD FIRST (the same discipline `guardTheCruiseHappened` / AC-5's zero-points case
+    // apply): "zero uncorrelated lines" is vacuous if the window is empty or a singleton —
+    // a real HTTP request through Fastify produces its OWN request/response lines on top of
+    // whatever the application logs, so more than one line is the arrangement, not the claim.
     expect(
-      correlated,
-      `no log line's trace_id matched a trace_id the collector actually received.${where()}`,
-    ).toBe(true);
+      records.length,
+      `expected more than one log line in the request's window (Fastify's own request/` +
+        `response lines plus at least one application line) — a window this thin cannot ` +
+        `tell "every line" from "the one line an application happened to instrument".` +
+        `${where()}\n  window (${String(records.length)}):\n${JSON.stringify(records, null, 2)}`,
+    ).toBeGreaterThan(1);
+
+    const spanTraceIds = new Set<string>(run.collector.spans().map((s: CollectedSpan) => s.traceId));
+    const uncorrelated = uncorrelatedRequestLogLines(records, spanTraceIds);
+    expect(
+      uncorrelated,
+      `AC-6 says "given any request", not "at least one line" — these ${String(uncorrelated.length)} ` +
+        `of ${String(records.length)} log lines from the request carry no correlated ` +
+        `trace_id/span_id:\n${JSON.stringify(uncorrelated, null, 2)}${where()}`,
+    ).toHaveLength(0);
   });
 
   it('AC-6 — no log line names the customer, the VIN, or the vehicle description', () => {
