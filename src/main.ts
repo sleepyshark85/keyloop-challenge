@@ -20,6 +20,7 @@
 import { bookAppointment } from './application/bookAppointment.js';
 import { cancelAppointment } from './application/cancelAppointment.js';
 import { checkHealth } from './application/checkHealth.js';
+import { queryAvailability } from './application/queryAvailability.js';
 import { readAppointment } from './application/readAppointment.js';
 import { rescheduleAppointment } from './application/rescheduleAppointment.js';
 import { buildServer } from './http/server.js';
@@ -78,6 +79,9 @@ const app = buildServer({
   // reasoning for why both are drawn/read here rather than in the use case (I-04-8).
   rescheduleAppointment: async (command) =>
     rescheduleAppointment(db, { seed: bookDeps.seed, attemptCap: bookDeps.attemptCap, logger }, command),
+  // Slice 08. Advisory only — no locks, no lookahead, nothing shared with the booking path
+  // beyond the same `db` handle every use case above already takes.
+  queryAvailability: async (query) => queryAvailability(db, query),
 });
 
 let shuttingDown = false;

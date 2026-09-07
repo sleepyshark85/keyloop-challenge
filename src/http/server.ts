@@ -57,9 +57,11 @@ import { registerHealthRoute } from './routes/health.js';
 import type { HealthRouteDeps } from './routes/health.js';
 import { registerAppointmentRoutes } from './routes/appointments.js';
 import type { AppointmentRouteDeps } from './routes/appointments.js';
+import { registerAvailabilityRoute } from './routes/availability.js';
+import type { AvailabilityRouteDeps } from './routes/availability.js';
 import { PROBLEM_CONTENT_TYPE, problem } from './problem.js';
 
-export interface ServerDeps extends HealthRouteDeps, AppointmentRouteDeps {
+export interface ServerDeps extends HealthRouteDeps, AppointmentRouteDeps, AvailabilityRouteDeps {
   readonly logger: FastifyBaseLogger;
 }
 
@@ -159,6 +161,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   registerHealthRoute(app, deps);
   registerAppointmentRoutes(app, deps);
+  registerAvailabilityRoute(app, deps);
 
   return app;
 }

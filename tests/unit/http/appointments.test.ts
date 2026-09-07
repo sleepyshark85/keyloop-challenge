@@ -71,6 +71,11 @@ function serverAnswering(options: {
       const reschedule = options.reschedule ?? { kind: 'moved', appointment: VIEW };
       return typeof reschedule === 'function' ? reschedule(command) : reschedule;
     },
+    // Slice 08's route is `routes/availability.ts`'s own file, asserted there — this file's
+    // whole subject is `POST /appointments`, `GET /appointments/{id}` and cancellation/reschedule.
+    queryAvailability: (): never => {
+      throw new Error('the appointment routes must not query availability');
+    },
   });
   apps.push(app);
   return app;
@@ -310,6 +315,9 @@ describe('GET /appointments/:id — AC-2', () => {
       },
       cancelAppointment: async () => ({ kind: 'not-found' }),
       rescheduleAppointment: async () => ({ kind: 'not-found' }),
+      queryAvailability: (): never => {
+        throw new Error('this test must not query availability');
+      },
     });
     apps.push(app);
 
@@ -676,6 +684,9 @@ describe('a 500 the route KNOWS about is not an unhandled fault', () => {
       readAppointment: async () => ({ kind: 'not-found' }),
       cancelAppointment: async () => ({ kind: 'not-found' }),
       rescheduleAppointment: async () => ({ kind: 'not-found' }),
+      queryAvailability: (): never => {
+        throw new Error('this test must not query availability');
+      },
     });
     apps.push(app);
 
@@ -702,6 +713,9 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
       readAppointment: async () => ({ kind: 'not-found' }),
       cancelAppointment: async () => ({ kind: 'not-found' }),
       rescheduleAppointment: async () => ({ kind: 'not-found' }),
+      queryAvailability: (): never => {
+        throw new Error('this test must not query availability');
+      },
     });
     apps.push(app);
 
