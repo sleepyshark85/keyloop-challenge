@@ -521,10 +521,17 @@ export interface BusyResources {
  * predicate, scoped by `dealership_id` (a candidate pair is never asked about a resource at
  * another dealership) and `status <> 'cancelled'` (the same denylist the two exclusion
  * constraints use, for the same reason: a status added later is inside this query's scope by
- * default, never silently treated as occupying nothing). Design §1.1's QS-8 property is what
- * proves this restatement agrees with the constraint's own expression under quiescence — this
- * file and `0003_appointment.sql` are two independent texts with no shared constant a bug could
- * move once and have both sides silently agree on.
+ * default, never silently treated as occupying nothing).
+ *
+ * ADR-0032 is precise about how much of that QS-8 actually proves: "the range expression QS-8
+ * pins" — and, after mechanic 6 (R-08-1's `status` draw), the `status <> 'cancelled'` conjunct as
+ * well, now that the generator writes a `cancelled` row often enough for the property to see one.
+ * The `dealership_id` conjunct is **not** pinned by QS-8 or by anything else — it is
+ * redundant-by-composite-FK instead: `technician` and `service_bay` each carry `dealership_id
+ * NOT NULL`, and `appointment`'s composite foreign keys make `appointment.dealership_id`
+ * functionally determined by `technician_id`/`bay_id`, so this predicate and the constraint's
+ * dealership-free one cannot diverge — unless a technician is ever allowed at two dealerships,
+ * which nothing here tests (the reviewer's finding, step 5).
  *
  * ── STILL THE ONLY MODULE NAMING `appointment` ────────────────────────────────────────────────
  *
