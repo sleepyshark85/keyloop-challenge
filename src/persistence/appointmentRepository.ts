@@ -524,8 +524,9 @@ export interface BusyResources {
  * default, never silently treated as occupying nothing).
  *
  * ADR-0032 is precise about how much of that QS-8 actually proves: "the range expression QS-8
- * pins" — and, after mechanic 6 (R-08-1's `status` draw), the `status <> 'cancelled'` conjunct as
- * well, now that the generator writes a `cancelled` row often enough for the property to see one.
+ * pins" — and, after mechanic 6 (T-08-7's cancelled witness), the `status <> 'cancelled'`
+ * conjunct as well, now that the generator writes a `cancelled` row BY CONSTRUCTION, not often
+ * enough for the property to see one.
  * The `dealership_id` conjunct is **not** pinned by QS-8 or by anything else — it is
  * redundant-by-composite-FK instead: `technician` and `service_bay` each carry `dealership_id
  * NOT NULL`, and `appointment`'s composite foreign keys make `appointment.dealership_id`
