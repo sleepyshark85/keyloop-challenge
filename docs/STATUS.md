@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `e434d66 fix(08): the O-55 check failed a correctly attributed comment — O-56` |
+| Last commit | `30fbd44 docs(08): four AC amendments, and the backfill's five findings` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E |
-| Agent runs recorded | 169 |
+| Agent runs recorded | 172 |
 | ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -322,7 +322,10 @@
 | 2026-09-07 04:16 | scribe | 16m49 | 90 / 4,959 / 2,992,940 | `derived` |
 | 2026-09-07 04:18 | scribe | 18m27 | 102 / 4,972 / 3,644,851 | `derived` |
 | 2026-09-07 04:19 | scribe | 20m15 | 108 / 5,427 / 3,975,612 | `derived` |
-| | **total** | **6501m36** | **40,098 / 2,986,943 / 3,235,007,105** | |
+| 2026-09-07 04:25 | implementer | 2m27 | 80 / 3,173 / 2,235,810 | `derived` |
+| 2026-09-07 04:26 | test-engineer | 3m21 | 82 / 5,066 / 2,059,448 | `derived` |
+| 2026-09-07 04:28 | architect | 31m02 | 150 / 13,230 / 6,455,408 | `derived` |
+| | **total** | **6538m25** | **40,410 / 3,008,412 / 3,245,757,771** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **285** |
-| Severity | 12 blocking · 147 major · 126 minor |
-| Verdicts | 18 narrowed · 95 accepted · 3 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 62 · reviewer 62 · orchestrator 53 · architect 52 · implementer 44 · scribe 10 · human 2 |
-| Awaiting a ruling | **140** |
-| Mean escape distance | 1.70 step(s) |
+| Findings recorded | **291** |
+| Severity | 12 blocking · 149 major · 130 minor |
+| Verdicts | 18 narrowed · 98 accepted · 3 escalated · 27 deferred · 2 rejected |
+| Raised by | test-engineer 65 · reviewer 62 · orchestrator 53 · architect 52 · implementer 47 · scribe 10 · human 2 |
+| Awaiting a ruling | **143** |
+| Mean escape distance | 1.68 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1961,6 +1961,12 @@ rather than narrated.*
 |---|---|---|---|---|---|
 | **O-56** | MINOR | 1 *(+0)* | orchestrator | The O-55 check demanded a bare double-asterisk role and FAILED A GENUINE, CORRECTLY ATTRIBUTED COMMENT ON ITS FIRST LIVE RUN | **open** |
 | **O-57** | MINOR | 1 *(+0)* | orchestrator | Cross-slice work was logged under slice 08 scope, so the scribe now owes a comment on a PR whose slice it did no work on | **open** |
+| **I-08-1** | MINOR | 2 *(+1)* | implementer | F-08-1 citation VERIFIED EXACT by the implementer, and Option D is the only one of four that does not touch the marker file list | **open** |
+| **I-08-2** | MINOR | 2 *(+1)* | implementer | AC-6 to-less-than-or-equal-from is NOT TypeBox-expressible and must ride the outcome union, which is an existing shape rather than a new one | **open** |
+| **I-08-3** | MINOR | 2 *(+1)* | implementer | ADR-0033 argument holds, verified against the module rather than accepted | **open** |
+| **T-08-1** | MAJOR | 2 *(+1)* | test-engineer | The quiescence witness as literally written is TABLE-WIDE and would invalidate near-continuously under this suite own isolation model | accepted |
+| **T-08-2** | MAJOR | 2 *(+1)* | test-engineer | AC-7 NEEDS NO NEW TEST — the claim is already continuously asserted against the real src/ tree in CI | accepted |
+| **T-08-3** | MINOR | 2 *(+1)* | test-engineer | Two ways the witness could pass while meaning nothing, answered rather than assumed | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1973,6 +1979,39 @@ rather than narrated.*
 
 - *scenario:* The scribe was dispatched to backfill role reasoning onto merged PRs 12, 13, 14 and 15 — O-55 remediation spanning slices 02 to 06 — while docs/team-log/.scope read slice 08. Three agent.finish events are therefore recorded as s-08-scribe-1 through 3, and the new O-55 check correctly reports that a role which RAN for slice 08 has posted nothing to PR 17. THE CHECK IS RIGHT AND THE LOG IS WRONG: the work was not slice 08 work. THE ORCHESTRATOR DID NOT SET THE SCOPE BEFORE DISPATCHING CROSS-SLICE WORK, and the log is append-only so the attribution stands. REMEDY, and it is the honest one rather than the suppressing one: the scribe posts a short note to PR 17 saying what it actually did and why it appears in slice 08 record, which tells a reader something true instead of hiding it. The mechanical remedy is that a dispatch whose work spans slices must set the scope first, and there is no check for that.
 - *file:* `docs/team-log/events.jsonl`
+
+**I-08-1** — F-08-1 citation VERIFIED EXACT by the implementer, and Option D is the only one of four that does not touch the marker file list
+
+- *scenario:* AGREED BY VERIFICATION RATHER THAN BY ACCEPTANCE. The implementer read ambiguity-containment.test.ts:737-742 and confirms it plants candidateRepository.ts reading appointment AS AN EXPECTED VIOLATION — so the architecture control this repository already runs IS built to reject the implementation arc42 section 6.5 has specified since phase 2, and ADR-0032 citation is exact. IT THEN CHECKED THE CONSEQUENCE NOBODY ASKED FOR: of ADR-0032 four considered options, OPTION D IS THE ONLY ONE THAT DOES NOT TOUCH THAT MARKER FILE LIST, which is why AC-7 can pin the marker unchanged. Composition confirmed as an EXISTING pattern rather than a new seam: bookAppointment.ts already composes appointmentRepository and candidateRepository off one Db handle for a single use case, so queryAvailability doing the same for a read is identical. busyResources must mirror the exclusion constraint expression — overlap AND status not cancelled AND dealership — confirmed against 0003_appointment.sql predicate.
+- *file:* `tests/architecture/ambiguity-containment.test.ts`
+
+**I-08-2** — AC-6 to-less-than-or-equal-from is NOT TypeBox-expressible and must ride the outcome union, which is an existing shape rather than a new one
+
+- *scenario:* A cross-field comparison cannot be a TypeBox schema constraint, so the guard belongs in queryAvailability outcome union as malformed-window and is mapped by the route exhaustive switch. VERIFIED AGAINST WHAT EXISTS: that is exactly how bookAppointment malformed-instant is handled today, so NO NEW MAPPING SHAPE IS NEEDED and the route gains one arm rather than a mechanism. Recorded because the design placed the guard at route level without saying which of the two route-level mechanisms it meant, and the answer determines whether AC-6 costs a schema change.
+- *file:* `src/http/routes/appointments.ts`
+
+**I-08-3** — ADR-0033 argument holds, verified against the module rather than accepted
+
+- *scenario:* The implementer read src/domain/candidates.ts and confirms orderCandidates is a PURE, NO-IMPORT module whose only empty-signal is null from a genuinely empty list. So a REMOVING pre-filter would force that same null path to fire on a MERELY BUSY rather than empty candidate set, which section 6.2 routes to 500 or 422 and never 409 — meaning it must either answer 500 for a merely full dealership or mint a 409 from a read, which ADR-0016 forbids. ORDERING CANNOT PRODUCE THAT FAILURE MODE because it never changes list membership. Correctly deferred to slice 09 behind F-06-1 extraction. Size estimate: small — one route handler, one new queryAvailability.ts, one new repository function, unit tests for the outcome union and the set-difference logic, NO MIGRATION.
+- *file:* `docs/adr/0033-the-advisory-read-orders-candidates-it-never-removes-them.md`
+
+**T-08-1** — The quiescence witness as literally written is TABLE-WIDE and would invalidate near-continuously under this suite own isolation model
+
+- *scenario:* AGREED WITH THE DISTINCTION, OBJECTED TO THE WORDING — the finding and the remedy kept separate, which is what section 6 asks. Unchanged count(*) and max(updated_at) ON appointment is table-wide as written. tests/setup/postgres.ts documents ONE SHARED POSTGRES CONTAINER PER RUN with isolation BY DATA, NEVER BY TRUNCATION, across every tests/acceptance and tests/property.db file in the same db vitest project — files that write real appointments — and vitest.config.ts sets no fileParallelism or singleThread, so they plausibly run CONCURRENTLY with this property test. Table-wide, THE WITNESS WOULD INVALIDATE NEAR-CONTINUOUSLY RATHER THAN OCCASIONALLY. Remedy: scope both checks WHERE dealership_id = $1 to the fixture own dealership. NOT A DESIGN DEFECT — the stale-versus-wrong distinction is correct and the witness is buildable; this is a buildability correction to the mechanic literal wording, and the AC text carries that wording.
+- *file:* `docs/slices/08-availability-query.md`
+- *accepted* by architect — AGREE, remedy accepted as proposed, (a) clarification, NO LOOPBACK — and the wording was the architect own. TABLE-WIDE IS NOT MERELY FRAGILE HERE, IT IS WRONG: it observes rows that PROVABLY CANNOT MATTER. Every row that can move either the query answer or a probe verdict carries the fixture dealership_id — the exclusion constraints key on bay_id and technician_id, and the composite FKs appointment_bay_in_dealership and appointment_technician_in_dealership make a bay and a technician belong to EXACTLY ONE dealership — so an appointment in another dealership shares no resource with the fixture and can change nothing. THE PER-DEALERSHIP SCOPE WEAKENS NOTHING; IT IS THE SCOPE THE WITNESS ALWAYS MEANT, AND THE ARCHITECT WROTE THE OVER-BROAD ONE. It also keeps the sensitivity that matters: a probe leaking past mechanic 1 SAVEPOINT writes into the fixture OWN dealership, so the scoped witness still catches exactly the failure the witness exists for, with the cross-file noise removed. Mechanical note for the test-engineer: take count(*) and max(updated_at) IN ONE ROW and compare NULL-safely, since max over an empty set is NULL before the first fixture write.
+
+**T-08-2** — AC-7 NEEDS NO NEW TEST — the claim is already continuously asserted against the real src/ tree in CI
+
+- *scenario:* ambiguity-containment.test.ts:507-524 ALREADY resolves appointment-table-access against the REAL src/ tree by EXACT-FILE EQUALITY, with PERMITTED_FILE mapping it to src/persistence/appointmentRepository.ts, AND ALREADY RUNS IN CI ON EVERY COMMIT. So AC-7 claim is asserted today and slice 08 need not add anything for it to hold — ONLY AVOID BREAKING IT, which is exactly what ADR-0032 Option D does by putting busyResources in appointmentRepository.ts, enforced by that same existing test. For the architect: whether AC-7 is therefore a criterion or a restatement of a standing guarantee, and whether a criterion that requires no work to satisfy belongs in the slice at all.
+- *file:* `tests/architecture/ambiguity-containment.test.ts`
+- *accepted* by architect — AGREE, AND THE ARCHITECT WITHDRAWS AC-7. Ruled under mid-slice scope authority, provisional at the gate, NO LOOPBACK. The citation is right and dispositive: ambiguity-containment.test.ts:507-524 resolves the marker against the REAL src/ tree by exact-file equality, IN CI, ON EVERY COMMIT, and candidateRepository.ts is absent from PERMITTED_FILE. So the claim is asserted today and slice 08 need only avoid breaking it, which Option D does by construction. THE SELF-CRITICISM IS THE ARCHITECT OWN AND IT ASKED THAT IT GO ON THE RECORD: a Definition-of-Done criterion that is SATISFIED BEFORE THE SLICE OPENS CANNOT FAIL THE SLICE, AND A CRITERION THAT CANNOT FAIL IS NOT EVIDENCE — WHICH IS CLAUDE.md SECTION 2.4 OWN ARGUMENT, AND I MINTED ONE AGAINST IT A WEEK AFTER RULING ON EXACTLY THAT SHAPE. ITS VALUE WAS THE NAMING AND THE NAMING SURVIVES WITHOUT THE CRITERION: the obligation is DISCHARGED BY CITATION rather than by a new test, recorded in Inherited scope with the test cited by file and line and with the implementer consequence — that Option D is the only considered option leaving the list unchanged — which the architect calls better than what it wrote. Drop AC-7, keep the sentence, keep the citation. Six ACs, as the file shipped.
+
+**T-08-3** — Two ways the witness could pass while meaning nothing, answered rather than assumed
+
+- *scenario:* ANSWERING THE ORCHESTRATOR QUESTION — could an INVALID run be mistaken for a PASS. FIRST: the re-run must issue a GENUINELY FRESH QUERY rather than reuse the first answer in-memory value, or the witness trivially passes regardless of real drift. SECOND, AND THIS IS THE GOOD NEWS: a SYSTEMIC leak — mechanic 1 SAVEPOINT not truly rolling back — would make quiescence fail on MOST OR ALL cases, which if discarded via fc.pre() TRIPS FAST-CHECK OWN TOO-MANY-DISCARDS ERROR AND FAILS LOUD rather than passing quietly. So the framework supplies the backstop the design did not name. THE CONDITION: that backstop must not be defeated by a bare try/catch swallowing discards, which is the one way the loud failure becomes silent.
+- *file:* `docs/slices/08-design.md`
+- *accepted* by architect — ACKNOWLEDGED, AND ITS ONE CONDITION IS RULED INTO AC-1. The backstop is the test-engineer, not the design, AND IT IS STRONGER THAN WHAT THE ARCHITECT SPECIFIED: a systemic leak makes quiescence fail on most cases, which discarded via fc.pre() trips fast-check own too-many-discards error and FAILS LOUD rather than passing quietly. Its condition — that a bare try/catch must not swallow the discards — IS NOW A REQUIREMENT IN THE CRITERION RATHER THAN AN OBSERVATION IN A REPORT.
 
 </details>
 

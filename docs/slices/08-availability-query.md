@@ -22,19 +22,20 @@ it reports free is exactly what the constraint accepts.
 
 ## Acceptance criteria
 
-- **AC-1** — *(amended at step 1)* Given an arbitrary generated schedule over one dealership and an
-  arbitrary query interval, with no concurrent writer, then **every** (bay, technician) pair **in the
-  candidate set** the query reports free is accepted by an `INSERT`, and **every** pair it omits is
-  rejected with `23P01`. The probe interval is **exactly `[from, to)`**. *(QS-8)*
-  <br>**The universe is the candidate set, not every pair** — over "every (bay, technician) pair" an
-  unqualified technician is `23503`, not `23P01`, so QS-8 is false as §10.2 writes it (`F-08-2`). Five
-  mechanics are required, each closing one way the property passes while wrong: rolled-back
-  `SAVEPOINT` probes; the verdict read as SQLSTATE `23P01` exactly; both directions counted
-  separately; a generator **biased to the `[)` boundary**; and a **quiescence witness** — re-run the
-  query after the probes and assert a byte-identical answer with unchanged `count(*)` and
-  `max(updated_at)`. **A run whose witness fails is *invalid*, not a QS-8 failure.** No isolation
-  level collapses stale and wrong: an exclusion check deliberately ignores the snapshot, so the read
-  and the constraint run on two clocks no `BEGIN` aligns.
+- **AC-1** — *(amended at step 1; scope corrected at step 2 under `T-08-1`)* Given an arbitrary
+  generated schedule over one dealership and an arbitrary query interval, with no concurrent writer,
+  then over the **candidate universe** for the queried (dealership, service type) —
+  `candidateResources`' bays × technicians — **every** pair the query reports free is accepted by an
+  `INSERT` of exactly `[from, to)`, and **every** pair it omits is rejected with SQLSTATE `23P01`.
+  Each probe is a `SAVEPOINT` that is rolled back; a verdict of `23503`, `23514` or `40P01` fails the
+  run **distinctly**; the two directions are counted apart and the shrunk counterexample names which
+  failed; and the generator is biased to produce appointments ending exactly at `from` and starting
+  exactly at `to`. **Quiescence is witnessed, not declared:** the query is re-run after the probes and
+  must return a byte-identical answer, and `count(*)` with `max(updated_at)` over
+  `appointment WHERE dealership_id = $1` — the fixture's own dealership, since no other dealership
+  shares a bay or a technician with it — must be unchanged. A case failing the witness is discarded
+  through **`fc.pre()`**, never swallowed by a `try/catch`, so a systemic leak trips fast-check's
+  too-many-discards error and fails loud rather than passing quietly. *(QS-8)*
 - **AC-2** — Given a bay with a confirmed appointment `[09:00, 10:00)`, when availability is queried
   for `[09:30, 10:30)`, then that bay is not returned; when queried for `[10:00, 11:00)`, it is.
 - **AC-3** — Given a technician qualified for a service type at dealership X only, when availability
@@ -50,30 +51,21 @@ it reports free is exactly what the constraint accepts.
   would report **everything** free — vacuously true — and a probe of that window is refused by
   `23514` rather than `23P01`, putting it outside QS-8's universe entirely. The database guards
   `ends_at > starts_at`; the route must guard the same way round (`F-08-3`).
-- **AC-7** — *(added at step 1)* Given the `ambiguity-containment` marker `appointment-table-access`,
-  when it is resolved after this slice, then it names exactly `src/persistence/appointmentRepository.ts`
-  — **unchanged**. This re-derives slice 05's AC-1 attribution structurally rather than by argument,
-  and it is the criterion that would catch `F-08-1`: §6.5 has specified `candidateRepository.freeResources`
-  since phase 2, which by set equality *is* that marker, and `ambiguity-containment.test.ts:742` plants
-  that exact form as a control **expecting a violation**.
 
 ## Inherited scope — from slice 05, ruled at its step 5 (R-05-2)
 
-- **AC-1 of slice 05 rests on a fact this slice deletes** (no ref — this obligation was ruled at
-  slice 05 step 5 as R-05-2's third routing and recorded in the ruling's prose rather than as a
-  finding of its own; O-39's rule, made at slice 06, would require one today).
-  ** What makes cancellation's freed-slot proof
-attributable is that `candidateResources` reads only `service_bay`, `technician` and
-`technician_qualification` — **never `appointment`** — so the candidate list is *identical* before and
-after the cancel, and the only thing that moved between the `409` and the `201` is the constraint's
-verdict on ADR-0004's retry attempts. The advisory pre-filter named in Out of scope below makes the
-candidate path read `appointment`, and that attribution stops holding: a `201` after a cancel could
-then come from a changed candidate order rather than from the predicate.
-
-**So slice 08 owes slice 05's AC-1 a re-derivation**, not a deletion. The cheapest form is to keep the
-1×1 fixture, where a pre-filter cannot change an order of one — but that must be *asserted* here
-rather than left true by accident, because the trap slice 05 closed by shape reopens the moment the
-fixture widens. Its AC-4 above is the availability-side mirror and does not substitute for it.
+- **AC-1 of slice 05 rests on a fact this slice deletes** (no ref — ruled at slice 05 step 5 as
+  R-05-2's third routing, recorded in the ruling's prose rather than as a finding of its own; O-39's
+  rule, made at slice 06, would require one today).
+  **Discharged by citation rather than by a new criterion** (`T-08-2`): slice 05's AC-1 attribution
+  rests on the `appointment-table-access` marker resolving to exactly
+  `src/persistence/appointmentRepository.ts`, and
+  `tests/architecture/ambiguity-containment.test.ts:507-524` already asserts that against the **real
+  `src/` tree by exact-file equality, in CI, on every commit** — `candidateRepository.ts` is absent
+  from `PERMITTED_FILE`. **ADR-0032's Option D is the only considered option that leaves that list
+  unchanged**, so slice 08 need only avoid breaking a guarantee that already holds. AC-7 was minted
+  at step 1 to assert this and **withdrawn at step 2**: a criterion satisfied before the slice opens
+  cannot fail it, and a criterion that cannot fail is not evidence — §2.4's own argument.
 
 - **I-04-5 — the advisory pre-filter, and the reason it waits for this slice.** Ruled (b) at slice 04
   with both halves upheld, and the surviving argument is the implementer's: *the pre-filter is

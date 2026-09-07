@@ -118,6 +118,7 @@ the duplication that costs is *across* artifacts. A budget is not raised to fit 
 needs more room shows the enumeration, because an estimate loses to a measurement.
 <!-- /agents:concision -->
 
+
 **ADRs.** Immutability is `CLAUDE.md` §4. MADR, extended with `proposed-by` / `decided-by` /
 `ai-input` as direct evidence for the AI-verification criterion. *Considered Options* must be
 populated honestly — one option considered is a note, not a decision record.
@@ -307,6 +308,16 @@ before it a venue. The orchestrator posts every row but the gate, on a role's be
 Step 2 is the easiest to skip, and skipping it is measured: `process-criteria.md` C3 treats a reviewer
 who produces no substance as a failure, and by the same reasoning **an agree step that has never
 produced an objection is rubber-stamping**.
+
+<!-- agents:pr-comment -->
+**Short *and* self-contained**, ~100–150 words. Both failure modes are real and the second is worse:
+a long comment goes unread, but a short one that assumes context is *unreadable* — a reader does not
+know what "Option D" means. Open with one italic line of framing, then gloss each reference in a
+clause as you use it. Keep the **leading** bold role — a role named in prose is not attribution — and
+the citations: span ids, `file:line`, shas. Cut narration and any sentence explaining a fact's
+*significance* rather than stating it. This lapsed for six slices and the human caught it, not a
+check (`O-55`); `slice:check` now fails a slice whose PR lacks a comment from each role that reported.
+<!-- /agents:pr-comment -->
 
 ### Answering an objection
 
