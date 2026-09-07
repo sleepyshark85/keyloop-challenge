@@ -26,12 +26,13 @@ ai-input: >
 
 ## Context and problem statement
 
-[ADR-0018](0018-lock-the-bay-and-the-technician-before-each-insert.md) is titled *before each
-insert*, and an insert is in flight against one pair. Under
-[ADR-0027](0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md) a move's attempts
-from 2 onward target a **different** pair while the row still occupies its incumbent, so a move is
-in flight against two. Its exclusion check can wait on another writer; another writer's check can
-wait on **its** vacated entry. Two such moves cycle.
+An advisor reschedules a car into a busy afternoon and gets a `500`: an internal fault, not *"that
+slot is taken"*. That is 11.7 % of contended moves.
+
+The advisory locks were designed for an **insert**, in flight against one pair. A move is not:
+having tried the pair it holds it targets a **different** pair while still occupying its incumbent,
+so it can wait on another writer while another waits on **its** vacated entry. Two such moves
+cycle.
 
 Measured on `postgres:16-alpine` against this repository's constraints — 20 mutually-vacating move
 pairs from one barrier, 25 trials, every advisory lock taken:
@@ -48,56 +49,54 @@ Uncontended cost is unchanged — 600 moves, p50 2.25 ms against 1.90 ms, one st
 
 | | Option | Good | Bad — decisive |
 |---|---|---|---|
-| **A** | Leave it; book the `500` as debt | Keeps slice 07 proof-only, as its gate allowed | 11.7 % is not a corner: an advisor rescheduling into a busy day gets an internal-fault page that §8.6 renders as the system's fault, which it now is; §11 would carry a defect this slice measured and could close |
-| **B** | Retry `40P01` on the move path | No lock change, no new rule | ADR-0018 measured retry-on-deadlock **livelocking** five ways, and nothing makes a move's retry better behaved than an insert's; it also makes `no-verdict` retryable, the one variant ADR-0016 exists to keep unusable as a verdict |
-| **C** | **Lock the union of the incumbent and target pairs**, ordered by `(class, key)` | Adds no mechanism — same statement, same classes, more keys | Widens the serialisation point on the move path |
-| **D** | Lock the whole dealership for a move | Trivially cycle-free | ADR-0004's rejected Option D returning for one use case, serialising every move in the dealership to fix a two-pair problem |
+| **A** | Leave it; book the `500` as debt | Keeps slice 07 proof-only, as its gate allowed | 11.7 % is not a corner: rescheduling into a busy day gets an internal-fault page the taxonomy renders as the system's fault, which it now is; the debt register would carry a defect this slice could close |
+| **B** | Retry `40P01` on the move path | No lock change, no new rule | Retry-on-deadlock was measured **livelocking** five ways, and nothing makes a move's retry better than an insert's; it also makes `no-verdict` retryable — the outcome that exists so a deadlock never passes as one |
+| **C** | **Lock the union of the incumbent and target pairs**, ordered by `(class, key)` | No new mechanism — same statement, same classes, more keys | Widens the serialisation point on a move |
+| **D** | Lock the whole dealership for a move | Trivially cycle-free | The per-dealership lock rejected earlier on throughput, back for one use case, serialising every move in the dealership to fix a two-pair problem |
 
 **Chosen: C.**
 
 ## Decision
 
 Chosen option: **C.** A write acquires a `pg_advisory_xact_lock` for **every resource it is in
-flight against**: the pair it takes, and — where it also performs an exclusion check — the pair it
-leaves. `lockResources` takes the vacated pair as a **required** parameter, `null` for a booking,
-so no future path omits it by forgetting; the keys are deduplicated and acquired in one statement
-ordered by `(class, hashtext(key))`, a total order over a shared key space, so the enlarged lock
-set cannot itself cycle.
+flight against**: the pair it takes and, where it performs an exclusion check, the pair it
+leaves. The vacated pair is a **required** input, so omission cannot compile; keys are deduplicated
+and acquired in one statement ordered by `(class, hashtext(key))` — a total order over a shared key
+space, so the enlarged set cannot itself cycle.
 
 Three write paths, one rule rather than three cases:
 
 | Write | Leaves | Takes | Checks? | Locks |
 |---|---|---|---|---|
-| booking | — | one pair | yes | that pair (ADR-0018, unchanged) |
-| cancel | one pair | — | **no** — the new version fails the partial predicate | none (ADR-0023, unchanged) |
+| booking | — | one pair | yes | that pair, unchanged |
+| cancel | one pair | — | **no** — its new version fails the partial predicate | none, unchanged |
 | move | one pair | one pair | yes | both |
 
-**A cancel is safe because it never waits, not because it writes no entry.** ADR-0023's M1
-measured an insert waiting on an uncommitted cancel; M2, that a cancel is never itself a waiter —
-which is what made that wait one-directional. A move is the first write that is both.
+**A cancel is safe because it never waits, not because it writes no entry.** Measurement showed an
+insert waiting on an uncommitted cancel, and a cancel never waiting — which made that wait
+one-directional. A move is the first write that is both.
 
-**Two accepted records state a premise this falsifies**, and neither is edited. ADR-0018's
-consequence — *"a deadlock can then only mean some write path did not take these locks"* — was
-true of the path it was measured on, false of the move.
-[ADR-0029](0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) restates it as the ground
-for a per-path deadlock event name; **its decision is unaffected and is re-grounded here**: a
-`40P01` names the path in flight against more resources than it locked.
+**Two accepted decisions state a premise this falsifies**, and neither is edited. *"A deadlock can
+then only mean some write path did not take these locks"* was true of the path it was measured on,
+false of the move. The rule that a deadlock names the write path while a conflict does not rests on
+it too; **its decision is unaffected and re-grounded here**: a `40P01` names the path
+in flight against more resources than it locked.
 
 ## Consequences
 
 **Good**
 
 - The verdict is restored: a racing move's loser gets `23P01` and so `409`, not a `500` at 11.7 %.
-  ADR-0003's *"one commits, the other gets `23P01`"* becomes true of racing **moves** — the claim
-  that had never been asserted.
-- `F-02-9` is discharged by measurement, and the rule it states is corrected: *take both locks* was
-  necessary and not sufficient.
+  *"One commits, the other gets `23P01`"* becomes true of racing **moves**, a claim never before
+  asserted.
+- That obligation is discharged by measurement and corrected: *take both locks* was necessary and
+  not sufficient.
 
 **Bad, or deferred**
 
-- A move past attempt 1 serialises against two bays and two technicians, so its share of the
-  write-throughput ceiling is up to twice as narrow. Bookings, the volume, are untouched.
-- `lockResources` grows a parameter that is `null` at one of two call sites — preferred to an
-  optional one, because omission must not compile.
-- Found only because the race was run. Every other deadlock-freedom claim here is an
-  argument.
+- **The pair a move leaves must be re-read inside the attempt's own transaction**: computed once
+  before the loop it can be stale, and a stale lock set reopens this cycle. Corrected later in this
+  slice; this record is incomplete without it.
+- A move past attempt 1 serialises against two bays and two technicians, at worst halving its share
+  of write throughput. Bookings, the volume, are untouched.
+- Found only because the race was run. Every other deadlock-freedom claim is an argument.

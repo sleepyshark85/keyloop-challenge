@@ -20,28 +20,34 @@ ai-input: >
 
 ## Context and problem statement
 
-§8.6 opens *"Errors are RFC 9457 `application/problem+json`, with a stable `type` per failure"*, and
-§10 indexes QS-11 as *"every failure has one status and one problem type."* The table's last row is
+Ask this service for a URL that does not exist and it answers a bare `404` with **no `type` member
+at all** — sharing a status with "appointment not found" and carrying nothing to tell the two apart.
+Post to it with `content-type: application/xml` and it answers `500 /problems/internal`: an internal
+fault, for a header the client can see and can fix.
+
+Both are conformant, and that is the problem. The error taxonomy opens *"Errors are RFC 9457
+`application/problem+json`, with a stable `type` per failure"*, and the quality scenario indexing it
+promises *"every failure has one status and one problem type."* But the table's last row is
 `500 | /problems/internal | Reference data the client cannot see or correct, **and anything else**`.
 
 That row is two things at once: a described failure class with four named reference-data faults and a
-`40P01`, and an unrestricted catch-all. The catch-all makes the totality claim unfalsifiable. AC-12
-sweeps ∀rows ∃input; the property actually at risk is **∀responses ∃row**, and no reachability sweep
-can falsify a catch-all's *fitness* — which is why T-05-7, as written, can never block.
+`40P01`, and an unrestricted catch-all. The catch-all makes the totality claim unfalsifiable. The
+acceptance criterion sweeps ∀rows ∃input; the property actually at risk is **∀responses ∃row**, and
+no reachability sweep can falsify a catch-all's *fitness* — which is why the test-engineer's
+objection, as written, can never block.
 
-Two responses escape, both measured:
+Both escapes were measured against the real server:
 
 - `POST /appointments` with `content-type: application/xml` → `500 /problems/internal`
-  (`FST_ERR_CTP_INVALID_MEDIA_TYPE`, `statusCode: 415`). I-05-6. Conformant under the catch-all, and
-  the exact inversion AC-5 was added to correct: the client sent a header it can see and can fix.
+  (`FST_ERR_CTP_INVALID_MEDIA_TYPE`, `statusCode: 415`). Conformant under the catch-all, and the
+  exact inversion the criterion was added to correct.
 - `GET /nope` → **`404 application/json; charset=utf-8`**, body
   `{"message":"Route GET:/nope not found","error":"Not Found","statusCode":404}` — **no `type` member
-  at all.** No `setNotFoundHandler` is registered, so it never reaches `setErrorHandler`. It collides
-  on `404` with `/problems/appointment-not-found` and carries nothing to disambiguate it.
+  at all.** No `setNotFoundHandler` is registered, so it never reaches `setErrorHandler`.
 
 ## Considered options
 
-- **A — keep the catch-all**, and close T-05-7 as misframed.
+- **A — keep the catch-all**
 - **B — split the row, register a not-found handler, and assert the residual in the falsifiable
   direction.**
 - **C — reuse `/problems/appointment-not-found` for an unrouted path.**
@@ -51,8 +57,8 @@ Two responses escape, both measured:
 
 Chosen option: **B**, in four parts.
 
-1. **§8.6's `500` row is a described class.** *"and anything else"* is struck. It covers the four
-   reference-data faults and `40P01`, which is what QS-11 already reaches end-to-end.
+1. **The `500` row is a described class.** *"and anything else"* is struck. It covers the four
+   reference-data faults and `40P01`, which is what the quality scenario already reaches end-to-end.
 2. **The residual is an invariant stated beneath the table, not a member of it:** *every response
    this service emits with status ≥ 400 is `application/problem+json` and carries a `type` from the
    closed set.* An input that reaches the fallback handler renders as `/problems/internal`. A
@@ -67,36 +73,38 @@ Chosen option: **B**, in four parts.
    test-engineer's.
 
 **It lands at slice 06 step 1, not here** — and the decisive reason is not cost. `setNotFoundHandler`
-**breaks an assertion this slice committed red.** `cancel-appointment.test.ts:247` closes AC-4's
-vacuous-green trap by discriminating on the media type *and* the `type` member, precisely because
-Fastify's default `404` carries neither; its comment quotes that body verbatim. Register the handler
-and the media-type half stops discriminating — only `route-not-found` ≠ `appointment-not-found` still
-does. Doing that at step 5, with no test-engineer round left, would silently degrade an acceptance
-test by fixing a defect. Slice 06 has that round, already declares §8.6, and grows the taxonomy
-anyway. That satisfies ADR-0019's criterion — and, this being the finding that produced R-05-2, the
-deferral is written into `06-reschedule-atomic-move.md` rather than only into this record.
+**breaks an assertion this slice committed red.** The cancellation acceptance test closes its own
+vacuous-green trap at line 247 by discriminating on the media type *and* the `type` member, precisely
+because Fastify's default `404` carries neither; its comment quotes that body verbatim. Register the
+handler and the media-type half stops discriminating — only `route-not-found` ≠
+`appointment-not-found` still does. Doing that at step 5, with no test-engineer round left, would
+silently degrade an acceptance test by fixing a defect. Slice 06 has that round, already declares the
+taxonomy, and grows it anyway. That satisfies the rule that a control is deferred only to a slice
+making it cheaper or stronger — and, this being the finding that showed an ADR must never be the only
+place a destination is recorded, the deferral is written into slice 06's own file as well as here.
 
 ## Consequences
 
 **Good**
 
-- T-05-7 becomes blockable. The sweep it named certifies absence and therefore cannot; the corpus
-  can only find defects, and found two in one twenty-line run.
-- QS-11's opening sentence becomes something a test asserts rather than something the table assumes.
+- The objection becomes blockable. The sweep it named certifies absence and therefore cannot; the
+  corpus can only find defects, and found two in one twenty-line run.
+- The taxonomy's opening sentence becomes something a test asserts rather than something the table
+  assumes.
 
 **Bad, or deferred**
 
 - Between this record and slice 06 the service ships a **known** second exit, while `server.ts`'s
-  docblock — rewritten in this very slice — asserts §8.6's totality *"is kept"* there. The docblock is
-  `src/`, so the correction ships with the handler. Debt, named as such.
-- §8.6 gains the `route-not-found` row at slice 06's step 7 and not before, so this record is briefly
-  the only place it exists. Deliberate: a taxonomy row with no handler behind it is the inversion this
-  ADR is about.
+  docblock — rewritten in this very slice — asserts the taxonomy's totality *"is kept"* there. The
+  docblock is `src/`, so the correction ships with the handler. Debt, named as such.
+- The taxonomy gains the `route-not-found` row at slice 06's step 7 and not before, so this record is
+  briefly the only place it exists. Deliberate: a taxonomy row with no handler behind it is the
+  inversion this ADR is about.
 - The corpus is still a list somebody wrote. What changed is its direction, not its completeness.
-- **AC-4's vacuity guard must be re-derived when the handler lands**, per the Decision. The gap this
-  record closes is not unknown to `tests/` — it is *load-bearing* there, as a discriminator. That is
-  the sharpest form of the finding: a defect a test depends on.
-- `src/http/problem.ts` renders every row and sits at **exactly §10's 0.75 threshold**, three
+- **The cancellation test's vacuity guard must be re-derived when the handler lands**, per the
+  Decision. The gap this record closes is not unknown to `tests/` — it is *load-bearing* there, as a
+  discriminator. That is the sharpest form of the finding: a defect a test depends on.
+- `src/http/problem.ts` renders every row and sits at **exactly the 0.75 mutation threshold**, three
   survivors. Slice 06 changes it twice — this row and `appointment-not-confirmed` — so one new
   survivor fails its Definition of Done. Named in slice 06's inherited scope as a warning rather than
   left as a surprise.
@@ -105,9 +113,10 @@ deferral is written into `06-reschedule-atomic-move.md` rather than only into th
 
 ### A — keep the catch-all
 
-- Good, because the taxonomy is then total by construction and costs nothing to maintain.
+- Good, because the taxonomy is then total by construction, costs nothing to maintain, and the
+  objection closes as misframed.
 - Bad, because totality by construction is unfalsifiable, and it certifies as conformant a `404`
-  carrying no `type` — which contradicts §8.6's own opening sentence and QS-11's index line.
+  carrying no `type` — which contradicts the taxonomy's own opening sentence.
 
 ### B — split and register the handler
 
@@ -119,8 +128,9 @@ deferral is written into `06-reschedule-atomic-move.md` rather than only into th
 ### C — reuse `appointment-not-found`
 
 - Good, because no row is added and the response is inside the taxonomy immediately.
-- Bad, because it collapses precisely the distinction QS-11 exists to protect: two unrelated failures
-  behind one status *and* one `type`, and a client that retries a typo as a missing appointment.
+- Bad, because it collapses precisely the distinction the taxonomy exists to protect: two unrelated
+  failures behind one status *and* one `type`, and a client that retries a typo as a missing
+  appointment.
 
 ### D — widen the `400` predicate
 
