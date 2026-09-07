@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| Last commit | `0600deb refactor(08): unname the actor in comments — ADR-0034 supersedes ADR-0002` |
+| Last commit | `72d5ca9 fix(docs): a superseded ADR says so in its own row — A-R-4` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
 | Agent runs recorded | 194 |
-| ADRs accepted | 16 |
+| ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
@@ -124,7 +124,7 @@
 | ADR | Title | Status | AI input |
 |---|---|---|---|
 | [0001](adr/0001-validate-dealership-opening-hours.md) | Validate dealership opening hours, do not model technician shifts | accepted | — |
-| [0002](adr/0002-service-advisor-actor-no-authentication.md) | Treat the service advisor as the actor and leave authentication out of scope | accepted | — |
+| [0002](adr/0002-service-advisor-actor-no-authentication.md) | Treat the service advisor as the actor and leave authentication out of scope | superseded | — |
 | [0003](adr/0003-cancellation-and-rescheduling-in-scope.md) | Support cancellation and rescheduling, and move an appointment with one atomic UPDATE | accepted | — |
 | [0004](adr/0004-retry-across-remaining-candidates.md) | On exclusion violation, try the next candidate and refuse only when the list is exhausted | accepted | — |
 | [0005](adr/0005-fastify-with-typebox-schemas.md) | Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them | accepted | — |

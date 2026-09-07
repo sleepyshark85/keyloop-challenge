@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **331** |
-| Severity | 12 blocking · 164 major · 155 minor |
+| Findings recorded | **332** |
+| Severity | 12 blocking · 164 major · 156 minor |
 | Verdicts | 20 narrowed · 119 accepted · 4 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 69 · architect 67 · orchestrator 66 · reviewer 66 · implementer 50 · scribe 10 · human 3 |
-| Awaiting a ruling | **159** |
+| Raised by | test-engineer 69 · architect 67 · orchestrator 66 · reviewer 66 · implementer 50 · scribe 10 · human 4 |
+| Awaiting a ruling | **160** |
 | Mean escape distance | 1.60 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2022,6 +2022,7 @@ rather than narrated.*
 | **O-69** | MINOR | 6 *(+0)* | orchestrator | O-61 RECURRED TWICE IN ONE SESSION and is now fixed at the trigger rather than recorded a third time | **open** |
 | **A-R-4** | MINOR | 6 *(+0)* | architect | THE RENAME FOUND A CLAIM THAT ONLY HELD BECAUSE A ROLE WAS ASSUMED — arc42 asserted the customer never touches the system | **open** |
 | **A-R-5** | MINOR | 6 *(+0)* | test-engineer | NOTHING CHECKS A CODE COMMENT AGAINST THE PROSE IT QUOTES, which is why one arc42 sentence propagated verbatim into eight files unnoticed | **open** |
+| **H-2** | MINOR | 6 *(+0)* | human | A SUPERSEDED ADR STILL READ status: accepted, so the file itself said the withdrawn decision was in force | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2276,6 +2277,11 @@ rather than narrated.*
 
 - *scenario:* RAISED INDEPENDENTLY BY THE ARCHITECT AND THE TEST-ENGINEER, AND NEITHER BUILT IT, per instruction. Section 8.6's justification for its 500 row was quoted VERBATIM in eight files under src and tests — server.ts, deriveInterval.ts, error-taxonomy.test.ts three times, bookAppointment, deriveInterval and appointments unit tests. When section 8.6 was reworded from a service advisor to the caller, ALL EIGHT QUOTATIONS SILENTLY STOPPED MATCHING THEIR SOURCE. One of them, error-taxonomy.test.ts line 532, EXPLICITLY SAYS section 8.6 justifies its 500 row with, so it was a quotation that named its source and no longer matched it. THE PROPOSED CHECK, from the test-engineer: grep tests and src comments for an arc42 anchor of the form section N.N and diff the quoted snippet against the current text of that section in docs/arc42, failing when they diverge. The architect independently proposed the same shape. THE DEFECT CLASS IS WIDER THAN THIS INCIDENT: docs:refs verifies that a citation RESOLVES, never that a quotation is STILL TRUE, and this project has now hit that twice in one day — here, and in section 12's footnote citing a slice-design section that the condensation deleted. Recorded as available work with a named mechanism.
 - *file:* `tests/contract/error-taxonomy.test.ts`
+
+**H-2** — A SUPERSEDED ADR STILL READ status: accepted, so the file itself said the withdrawn decision was in force
+
+- *scenario:* THE HUMAN ASKED, SINCE WE REMOVE THE SERVICE ADVISOR, IS THE ADR STILL VALID — and the answer had two halves the record was conflating. IT IS VALID AS HISTORY: ADR-0002 records what was decided on 3 September, BY THE HUMAN, at Gate A, and why, and section 4 exists precisely so a withdrawn reading and its reasoning survive. IT IS NOT VALID AS A DECISION IN FORCE, and status: accepted read inside the file said otherwise. THIS IS THE SECOND FIELD THE ARCHITECT DECLINED TO TOUCH when it set superseded_by, saying only one was authorised and that flipping a status is a second decision — correct restraint, and this is the ruling it was waiting for. IT IS NOT A NEW DECISION: the supersession was already decided, and the status field merely REPORTS it, so reporting it accurately changes nothing about what was decided. Verified before changing: NO TOOL VALIDATES THE STATUS VALUE and only two consumers branch on it, build.mjs on proposed for the section 11 debt register and status generate.mjs counting ADRs accepted. THE COUNT WAS THE TELL — STATUS.md said 16 ADRs accepted across 17 files, counting a superseded decision among those in force; it now reads 15, which is the number of decisions actually standing. superseded is standard MADR vocabulary, so this is the convention being followed rather than invented. THE RENDERER THEN STUTTERED — the section 9 cell read superseded, superseded by 0034 — fixed so a flipped status reads superseded by 0034 while a record whose status has NOT been flipped still carries the fact beside its status. Thirty-three docs-build assertions, 21 of 21 suites.
+- *file:* `docs/adr/0002-service-advisor-actor-no-authentication.md`
 
 </details>
 

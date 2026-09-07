@@ -66,7 +66,7 @@ superseded by a later one that references it. Each carries `proposed-by`, `decid
 without taking anyone's word for it.
 
 - [**ADR-0001**](adr/0001-validate-dealership-opening-hours.md) — Validate dealership opening hours, do not model technician shifts *(accepted)*
-- [**ADR-0002**](adr/0002-service-advisor-actor-no-authentication.md) — Treat the service advisor as the actor and leave authentication out of scope *(accepted)*
+- [**ADR-0002**](adr/0002-service-advisor-actor-no-authentication.md) — Treat the service advisor as the actor and leave authentication out of scope *(superseded)*
 - [**ADR-0003**](adr/0003-cancellation-and-rescheduling-in-scope.md) — Support cancellation and rescheduling, and move an appointment with one atomic UPDATE *(accepted)*
 - [**ADR-0004**](adr/0004-retry-across-remaining-candidates.md) — On exclusion violation, try the next candidate and refuse only when the list is exhausted *(accepted)*
 - [**ADR-0005**](adr/0005-fastify-with-typebox-schemas.md) — Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them *(accepted)*

@@ -64,9 +64,14 @@ const adrList = existsSync(ADR)
  * So the status cell now carries the supersession beside the status rather than instead of
  * it, and the column reads both ways.
  */
-const supersessionOf = (a) => (a.superseded_by
-  ? `${a.status ?? ''} · superseded by ${a.superseded_by}`
-  : (a.status ?? ''));
+const supersessionOf = (a) => {
+  if (!a.superseded_by) return a.status ?? '';
+  // `status: superseded` already says the word, so appending it again reads as a stutter.
+  // A record whose status has NOT been flipped still needs the fact carried beside it.
+  return a.status === 'superseded'
+    ? `superseded by ${a.superseded_by}`
+    : `${a.status ?? ''} · superseded by ${a.superseded_by}`;
+};
 
 // Paths are written relative to docs/arc42/, where these tables live.
 const adrTable = adrList.length

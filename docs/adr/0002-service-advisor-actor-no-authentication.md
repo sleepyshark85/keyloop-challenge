@@ -1,7 +1,7 @@
 ---
 id: "0002"
 title: Treat the service advisor as the actor and leave authentication out of scope
-status: accepted
+status: superseded
 date: 2026-09-03
 supersedes: null
 superseded_by: "0034"

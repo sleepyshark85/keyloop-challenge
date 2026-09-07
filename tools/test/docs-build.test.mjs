@@ -70,6 +70,7 @@ function makeFixture() {
   adrFile('0002', 'Second decision', 'accepted', 'supersedes: null\nsuperseded_by: "0004"\n');   // deliberately out of order
   adrFile('0001', 'First decision', 'accepted');
   adrFile('0004', 'Replacement decision', 'accepted', 'supersedes: "0002"\n');
+  adrFile('0005', 'Flipped decision', 'superseded', 'supersedes: null\nsuperseded_by: "0004"\n');
   adrFile('0003', 'A deferred idea', 'proposed');   // must reach the debt register
   writeFileSync(join(adr, '_template.md'), '---\nid: "NNNN"\n---\n');  // must be ignored
 
@@ -160,6 +161,12 @@ check('a superseded ADR says so in its own row, not only in its successor\'s',
 check('...and the successor still shows what it supersedes, so it reads both ways',
   /Replacement decision[^\n]*\|\s*accepted\s*\|\s*0002\s*\|/.test(s09),
   (s09.split('\n').find((l) => l.includes('Replacement')) ?? 'no successor row'));
+// And once `status: superseded` says the word itself, the cell must not stutter.
+check('...a flipped status reads "superseded by N", not "superseded · superseded by N"',
+  /Flipped[^\n]*\|\s*superseded by 0004\s*\|/.test(s09)
+    && !/superseded · superseded/.test(s09),
+  (s09.split('\n').find((l) => l.includes('Flipped')) ?? 'no flipped row'));
+
 check('...and an ADR with no supersession is unchanged',
   /0001[^\n]*\|\s*accepted\s*\|\s*—\s*\|/.test(s09),
   (s09.split('\n').find((l) => l.includes('0001')) ?? 'no 0001 row'));

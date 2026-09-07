@@ -13,7 +13,7 @@ accepted, modified or overridden is visible without taking anyone's word for it.
 | ADR | Title | Status | Supersedes |
 |---|---|---|---|
 | [0001](../adr/0001-validate-dealership-opening-hours.md) | Validate dealership opening hours, do not model technician shifts | accepted | — |
-| [0002](../adr/0002-service-advisor-actor-no-authentication.md) | Treat the service advisor as the actor and leave authentication out of scope | accepted · superseded by 0034 | — |
+| [0002](../adr/0002-service-advisor-actor-no-authentication.md) | Treat the service advisor as the actor and leave authentication out of scope | superseded by 0034 | — |
 | [0003](../adr/0003-cancellation-and-rescheduling-in-scope.md) | Support cancellation and rescheduling, and move an appointment with one atomic UPDATE | accepted | — |
 | [0004](../adr/0004-retry-across-remaining-candidates.md) | On exclusion violation, try the next candidate and refuse only when the list is exhausted | accepted | — |
 | [0005](../adr/0005-fastify-with-typebox-schemas.md) | Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them | accepted | — |
