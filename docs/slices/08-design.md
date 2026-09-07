@@ -38,7 +38,8 @@ snapshot (it must see rows committed after it, or two `REPEATABLE READ` writers 
 The read and the constraint therefore run on two clocks that no `BEGIN` can align. Quiescence is a
 property of the fixture, and the test must **observe** it.
 
-**Five mechanics, each closing one way the property passes while wrong.**
+**Six mechanics, each closing one way the property passes while wrong.** Mechanic 6 was added
+at step 5, adjudicating `R-08-1` (§7).
 
 | # | Mechanic | The failure it makes impossible |
 |---|---|---|
@@ -47,8 +48,9 @@ property of the fixture, and the test must **observe** it.
 | 3 | Quiescence is witnessed: re-run the query after the probes, assert byte-identical answer and unchanged `count(*)`/`max(updated_at)` on `appointment` | Without it a failure has two explanations and the test cannot discriminate; with it, exactly one. This is the observation the question asks for |
 | 4 | Both directions counted separately, and the shrunk counterexample names which | A merely *conservative* query — reporting too little — passes the accepted-when-free direction entirely. Conservatism is what a naive implementation produces |
 | 5 | The generator is **biased to the boundary**: appointments ending exactly at `from` and starting exactly at `to` | `[)` versus `[]` is the likeliest divergence between the two SQL expressions, and uniform random generation hits it with probability ≈ 0. AC-2 pins the example; the generator must reach it by design |
+| 6 | The generator varies **`status`**: roughly one item in five is written `cancelled` | A query and a constraint agreeing on the range and disagreeing on the predicate that scopes it. Delete `status <> 'cancelled'` and a cancelled row is reported busy while its probe is **accepted** — direction A. Extensionally it cannot separate the denylist from an allowlist (`A-08-3`) |
 
-Mechanics 1–5 are the answer to *what would catch it*. Mechanic 3 is the answer to *stale versus
+Mechanics 1–6 are the answer to *what would catch it*. Mechanic 3 is the answer to *stale versus
 wrong*.
 
 ### 1.2 The pre-filter: not this slice
@@ -160,6 +162,7 @@ Every section is at 0–15 words of headroom, so each addition names its deletio
 | §8.6 | *"and only about the interval queried"* on the availability row | the same row's restatement of §6.5's staleness prose, collapsed to a clause |
 | §10.2 | QS-8's universe, the probe-interval identity, and the quiescence witness | the *"deliberately not here"* paragraph's availability sentence, compressed — §6.5 now owns the reason |
 | §11.2 | R-5 gains *no runtime signal*; R-4's *"two remedies, neither chosen"* becomes ADR-0033's third | the replaced clause, roughly word-neutral |
+| §11 R-12 | generalised from *blind to `main.ts`* to *blind to any guard outside `tests/unit/`*, with `busyResources` as its third instance (`R-08-3`); R-5 gains QS-8's true reach | R-12's two discharged `main.ts` instances, compressed to their shas — §11 is 589 words over and may not grow |
 
 Front matter for the orchestrator to apply: `arc42: ["§5.2", "§6.5", "§8.6", "§10.2", "§11.2"]`,
 `adr: [8, 32, 33]`, `quality_scenarios: [QS-8, QS-12]`.
@@ -196,3 +199,77 @@ I cannot rule it; ADR-0019 is mine. What this slice adds to the gate's evidence:
 - **OQ-08-1** — the response returns two id lists. Whether the booking screen needs names or capacities
   is a client question §3.3 did not settle; ids match `candidateResources`' shape and A-7 keeps
   reference data out of the API. Ruled ids, provisional at the gate.
+
+## 7. Step 5 — rulings
+
+The reviewer returned changes-requested with no DCR. These are findings on the diff, ruled under
+mid-slice authority, **provisional until the gate**; `slice:check` lists them. No loopback: none of
+the four is (c), and for none of them can I name an acceptance criterion, a `QS-*` or a `CLAUDE.md`
+§2 clause that fails — which is the test, not my preference for a short slice.
+
+**R-08-1 — upheld, §6 (b), and ADR-0019 puts its home in this slice rather than a later one.**
+The measurement is right and the reading of it is right: *"no shared code path"* is true and is not
+coverage, and `status` is a dimension `scheduleItemArbitrary` never varies — every schedule row takes
+the `confirmed` column default at `probeInsertCommitted`. Not (c): AC-1's five mechanics are all
+present, QS-8 as amended in §1.1 is **true**, and §2.1's subject is the `INSERT`, which is untouched.
+The work is correct under ADR-0032; the property's *reach* is narrower than the design claimed. That
+is (b) exactly. But (b) obliges a named home, and **ADR-0019's criterion finds none**: no live slice
+adds a status, reopens the generator, or measures it, so the deferral would be an omission and the
+work is built here — the same disposition §4.4's DDL-drop control took at slice 02.
+
+**Mechanic 6 is added to §1.1's table and AC-1 is amended to require it.** The exact change, stated
+and unmade: `ScheduleItemSpec` gains a `status`, `scheduleItemArbitrary` draws it `confirmed` :
+`cancelled` at weight 4 : 1, and `probeInsertCommitted` writes the column instead of taking its
+default. Nothing else — the probe is the oracle, so no expectation is recomputed.
+
+**What it still cannot reach, and this is `A-08-3`.** `status <> 'cancelled'` and `status =
+'confirmed'` are *extensionally equal* over a two-value enum, so no fixture distinguishes them today.
+The reviewer's `no_show` scenario is real and is **not** assertable until a third status exists —
+`0003_appointment.sql`'s denylist argument stays prose, guarded by a docblock and by nothing that
+runs. Adding an unused enum value to make a test possible is a data-model change no requirement asks
+for; it is booked, not built.
+
+**F-08-4 — and the docblock is wrong in a second way the review did not reach.** ADR-0032 is careful
+(*"the range expression QS-8 pins"*); `busyResources`' docblock claims QS-8 proves the whole
+three-predicate restatement. It does not, even after mechanic 6: each run seeds a **fresh** dealership,
+and a bay at another dealership can never be in `candidateResources`' output, so deleting
+`dealership_id = $1` changes no answer QS-8 can observe. The predicate is redundant-by-composite-FK
+and kept to scope the index, not pinned by the property. The docblock should say **range and status**,
+and say the third is redundant. Implementer-owned; stated, unmade.
+
+**R-08-3 — upheld, and it changes how the gate reads the number.** `vitest.mutation.config.ts`
+includes `tests/unit/**` and nothing else, so the score is a floor on unit-test rigour and is
+**never** evidence for behaviour whose guard is outside-in. `busyResources` will score well on a
+string equality against its own compiled SQL — a change-detector, and the first thing whoever writes
+R-08-1's divergence would update to match. §11 **R-12** already carries this shape for `main.ts`; it
+is generalised there and gains `busyResources` as its third named instance (§4 table). Re-scoping
+Stryker stays rejected on `stryker.config.mjs`'s own measurement — `tsc` plus a container per mutant.
+**The remedy is the reviewer's own method**, recorded as a recipe rather than left as an artifact of
+one review: mutate `dist/` in a throwaway worktree and run the outside-in suite. It produced R-08-1.
+
+**R-08-2 — upheld, and the remedy accepted as proposed.** AC-5's second half cannot fail: there is no
+`docs:openapi` script and no emitted document. That is the ground AC-7 was withdrawn on at step 2 and
+it applies to a criterion I kept. **AC-5 splits.** AC-5a — the response carries both facts — is met
+here. AC-5b — the OpenAPI description carries both — goes to **slice 09** (`id: "09"`, `status:
+ready`), beside AC-9, which already describes error types in that document. Not slice 10: a
+tombstone, and A-06-2 forbids a `deferred_to` that names one. ADR-0019 is met in its strongest form —
+the subject **does not exist yet**, and AC-7's drift test will assert the description rather than
+eyeball it.
+
+**R-08-4 — upheld as recorded, no action.** `a705026` shipped 151 lines of route with its unit tests
+at `193db2d`; one implementer commit of four. §7's *green* held — the acceptance suite passed at
+`a705026` — and §7's *together* did not. It is a discipline observation for the log and the gate, not
+a design matter, and I record it rather than rule on it.
+
+**I-04-5 — re-deferred to slice 09, destination live, and step 5 gave the deferral a new argument.**
+§1.2 argued ADR-0019 in both directions (cheaper: after F-06-1, one site; stronger: AC-13 measures
+it). R-08-1 adds a third: **ADR-0033's deductive chain runs through QS-8** — *under quiescence a pair
+reported free is accepted* — and until mechanic 6 lands, QS-8 says nothing about a **cancelled**
+appointment, which is precisely the row that must not bias free-first ordering away from a bay that
+is genuinely free. Shipping the bias before the remedy would rest the chain on a premise weaker than
+ADR-0033's own text. ADR-0033 stays `proposed`; slice 09 accepts or supersedes it on measurement.
+
+**And this slice routed two items to slice 09, which is evidence in A-06-4's own currency.** ADR-0033
+was the seventh inherited item; AC-5b is the eighth. Each is individually correct on ADR-0019's
+criterion — that is the point A-06-4 makes, and the count is stated here rather than left for the
+human to reconstruct.
