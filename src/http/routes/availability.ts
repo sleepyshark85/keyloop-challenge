@@ -56,7 +56,13 @@ const AvailabilityQuerystring = Type.Object(
     from: Type.String({ pattern: RFC3339_PATTERN }),
     to: Type.String({ pattern: RFC3339_PATTERN }),
   },
+  // Stryker disable next-line ObjectLiteral : {} here changes nothing observable — Fastify's ajv
+  // removeAdditional strips an unknown query key regardless of this object's own
+  // additionalProperties/description (I-08-6); the dist/ recipe (R-08-3) shows no boundary
+  // difference, and the only killer left would assert this description string verbatim.
   {
+    // Stryker disable next-line BooleanLiteral : same boundary as above — removeAdditional
+    // already strips unknown keys whether this reads false or true (I-08-6).
     additionalProperties: false,
     description:
       'What is free for this dealership and service type over [from, to). TypeBox validates ' +
@@ -76,7 +82,15 @@ const AvailabilityBody = Type.Object(
     /** AC-5's two facts, as free text. `Type.String()` for the same non-substitution reason. */
     disclaimer: Type.String(),
   },
+  // Stryker disable next-line ObjectLiteral : {} here changes nothing observable either — the
+  // response serializer already drops keys not named in `AvailabilityBody`'s own properties
+  // regardless of this options object's additionalProperties/description (I-08-6); the dist/
+  // recipe (R-08-3) shows no boundary difference, and the only killer left would assert this
+  // description string verbatim.
   {
+    // Stryker disable next-line BooleanLiteral : same boundary as the querystring schema's
+    // additionalProperties above — the response serializer already drops unlisted keys whether
+    // this reads false or true (I-08-6).
     additionalProperties: false,
     description:
       'The bays and technicians free over the queried interval, as of the instant this response ' +
@@ -97,6 +111,10 @@ export function registerAvailabilityRoute(
     {
       schema: {
         querystring: AvailabilityQuerystring,
+        // Stryker disable next-line ObjectLiteral : {} here drops response-schema validation
+        // entirely, but nothing this route ever sends carries a field it would strip (I-08-6) —
+        // the dist/ recipe (R-08-3) shows no boundary difference, and the only killer left would
+        // assert this response map's own shape.
         response: { 200: AvailabilityBody, ...PROBLEM_RESPONSES },
       },
     },
