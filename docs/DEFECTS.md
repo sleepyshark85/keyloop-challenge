@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **280** |
-| Severity | 12 blocking · 146 major · 122 minor |
+| Findings recorded | **285** |
+| Severity | 12 blocking · 147 major · 126 minor |
 | Verdicts | 18 narrowed · 95 accepted · 3 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 62 · reviewer 62 · orchestrator 53 · architect 52 · implementer 44 · scribe 5 · human 2 |
-| Awaiting a ruling | **135** |
-| Mean escape distance | 1.72 step(s) |
+| Raised by | test-engineer 62 · reviewer 62 · orchestrator 53 · architect 52 · implementer 44 · scribe 10 · human 2 |
+| Awaiting a ruling | **140** |
+| Mean escape distance | 1.70 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -657,6 +657,7 @@ rather than narrated.*
 | **O-31** | MAJOR | 7 *(+7)* | orchestrator | The resume point silently regressed to phase 4, reporting Gate D open and undecided, two slices after Gate D was decided | **open** |
 | **O-32** | MAJOR | 7 *(+7)* | human | The concision ruling was undone in one slice, because the meter that measures it was deliberately kept out of CI | **open** |
 | **O-33** | MAJOR | 7 *(+0)* | orchestrator | The ratchet did not tighten after a reduction, so a 13,566 to 1,200 cut could have grown all the way back with the check green | **open** |
+| **S-08-1** | MAJOR | 6 *(+0)* | scribe | Slice 02 front matter says loopbacks 0 and the log says 1 — a machine-read field silently undercounting the section 6 governor | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -857,6 +858,11 @@ rather than narrated.*
 - *scenario:* Found by the ARCHITECT immediately after making the reduction, and reported rather than left: 'the ratchet's ceiling is now far above these files... 02-design could grow all the way back without docs:budget:check noticing'. Verified: the baseline still recorded 13,566 while the file stood at 1,200. A ratchet whose ceiling only ever moves up is not a ratchet - it is a high-water mark. The reduction has to be RECORDED or it is not held, and relying on someone remembering to run --rebaseline is discipline, which is what the ratchet exists to replace. Now a material reduction - more than 100 words AND more than a tenth of the ceiling - FAILS the check with an instruction to rebaseline in the change that earned it. Trivial rewording does not, so an ordinary edit does not demand a baseline commit. SECOND DEFECT FOUND WHILE TESTING IT: survey() hard-coded CLAUDE.md and docs/METHODOLOGY.md against the working directory, so every fixture run also measured the REAL repository - the tool enforcing the concision rule could not be exercised in isolation, and it had NO TESTS AT ALL. Both paths are now flags. 16 cases in tools/test/budget.test.mjs covering both --check and the ratchet in every direction, plus the four exclusions (frontmatter, generated blocks, fenced code, assumption registers) and the contested hatch. Three mutants: no tightening kills 2, no growth check kills 3, charging for fenced code kills 1.
 - *file:* `tools/docs/budget.mjs`
 
+**S-08-1** — Slice 02 front matter says loopbacks 0 and the log says 1 — a machine-read field silently undercounting the section 6 governor
+
+- *scenario:* FOUND BY THE SCRIBE WHILE RECONSTRUCTING PR 12, AND VERIFIED BY THE ORCHESTRATOR. The front matter reads loopbacks: 0; the log carries s-02-loopback-1 for the T-02-9 (c) ruling, and s-02-gate-e and s-02-done both say one loopback was spent. TWO CONSEQUENCES AND THE SECOND IS THE LARGER. FIRST, slice 02 record disagrees with itself and the front-matter half is the one a reader trusts. SECOND, AND IT LANDS ON A RULING ALREADY HEADED TO THE RETRO: the reviewer O-54 remedy was preferred over the test-engineer per-design wording ON THE GROUND THAT IT IS DERIVABLE FROM loopbacks, WHICH slice:check ALREADY READS. IT DOES NOT. tools/slice/check.mjs:732 counts loopback EVENTS from the log and never opens that field. So the remedy is still countable — from the log — but the premise offered for preferring it is false, AND THE FIELD IT NAMED IS DEMONSTRABLY UNRELIABLE, which slice 02 proves. The retro should adopt the wording against the LOG rather than against the field.
+- *file:* `docs/slices/02-book-and-read-an-appointment.md`
+
 </details>
 
 ## Slice 04
@@ -909,6 +915,8 @@ rather than narrated.*
 | **A-04-15** | MAJOR | 7 *(+7)* | architect | Section 8.4 carried a sentence slice 04 made false, in the row an operator reads while looking at the counter | **open** |
 | **A-04-16** | MINOR | 7 *(+7)* | architect | Three stale as-built numbers, one of which argues against itself | **open** |
 | **A-04-17** | MINOR | 7 *(+7)* | architect | The ratchet made every arc42 addition self-funding, and what paid for it was genuine cross-artifact duplication | **open** |
+| **S-08-2** | MINOR | 6 *(+1)* | scribe | Slice 04 reviewer findings were closed by other roles and it never re-reviewed | **open** |
+| **S-08-3** | MINOR | 6 *(+1)* | scribe | Slice 04 reviewer F1 had an undetected SECOND instance that its own severity rule would have graded BLOCKING | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1163,6 +1171,16 @@ rather than narrated.*
 - *scenario:* Section 5 had 1 word of headroom, section 7 had 2, section 11 had 6. About 350 words of additions were paid for out of ADR-0008 repository-port argument retold at length in 5.2, section 11 R-9 --single-transaction consequence told twice with each copy pointing at the other, CLAUDE.md 2.2 restated, and 10.2 QS-10 and QS-12 definitions restated. Nothing unique was cut, and each payment is flagged inside its own commit message rather than left to be discovered in a diff. Recorded because it is evidence the ratchet is doing what the human asked for rather than merely blocking.
 - *file:* `tools/docs/budget.mjs`
 
+**S-08-2** — Slice 04 reviewer findings were closed by other roles and it never re-reviewed
+
+- *scenario:* Both reviewer findings were closed by the architect and the test-engineer, and the gate was opened and decided entirely by the orchestrator — with no reviewer re-review of the remediation. Slice 07 established the opposite pattern, an explicit re-review returning APPROVED after its own changes-requested. Recorded because a reviewer whose findings are closed by the roles it raised them against has not verified anything, and nothing in the Definition of Done asks whether it did.
+- *file:* `docs/team-log/events.jsonl`
+
+**S-08-3** — Slice 04 reviewer F1 had an undetected SECOND instance that its own severity rule would have graded BLOCKING
+
+- *scenario:* The reviewer caught one silent arc42 section 13 edit. The reconstruction found an EARLIER one 38 minutes before it, undetected at the time. By the reviewer own stated severity rule a second instance grades BLOCKING rather than MAJOR, so the finding was under-graded on evidence that existed when it was written. Recorded as history rather than as work: slice 04 is merged and gated, and the grading cannot be re-run.
+- *file:* `docs/arc42/13-ai-collaboration.md`
+
 </details>
 
 ## Slice 05
@@ -1208,6 +1226,7 @@ rather than narrated.*
 | **A-05-7** | MAJOR | 7 *(+7)* | architect | Section 10.2 asserted a CI check that section 11 R-8 records as absent — arc42 contradicting itself across two sections | **open** |
 | **A-05-8** | MINOR | 7 *(+0)* | architect | R-05-2 committed again by the role that ruled on it, and fixed rather than reported | **open** |
 | **A-05-9** | MINOR | 7 *(+0)* | architect | Three undeclared arc42 sections took pointer-only edits to fund this slice ratchet | **open** |
+| **S-08-4** | MINOR | 6 *(+0)* | scribe | Slice 05 is a clean textbook instance of section 6 reasoned-before-applied rule and should be the retro model case | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1427,6 +1446,11 @@ rather than narrated.*
 - *scenario:* Sections 6.2, 6.3 and 6.5 were compressed to pointers to pay section 6 ratchet. No fact was lost — each now points at its one home — but "I compressed another slice section to fund mine" is a real description of what happened, and the slice frontmatter says so RATHER THAN LEAVING THE GATE TO FIND IT. Section 6.1 was added to the declaration outright, R-02-2 having been built here.
 - *file:* `docs/arc42/06-runtime-view.md`
 
+**S-08-4** — Slice 05 is a clean textbook instance of section 6 reasoned-before-applied rule and should be the retro model case
+
+- *scenario:* THE ONLY POSITIVE FINDING OF THE RECONSTRUCTION, and recorded because the register is otherwise a record of what went wrong. The architect disagreed, STATED ITS MEASUREMENT, AND DID NOT EDIT; the reviewer answered once, REPRODUCED THE OTHER SIDE, AND CONCEDED. That is section 6 clause working exactly as written — deliberating and conceding as separate acts, with the disagreement opening a review loop the objector answered once. The retro should cite it as the model rather than describing the rule abstractly.
+- *file:* `docs/team-log/events.jsonl`
+
 </details>
 
 ## Slice 06
@@ -1471,6 +1495,7 @@ rather than narrated.*
 | **O-47** | MINOR | 5 *(+0)* | orchestrator | The approximately 91.3 prediction is NOW genuinely falsified, on the correct measurement rather than the suppressed one — which is the opposite of what O-45 could conclude at the time | **open** |
 | **O-48** | MINOR | 5 *(+0)* | orchestrator | The disable-next-line remedy under-covers the exhaustiveness arms by half — 8 more unkillable mutants sit on the adjacent default line | **open** |
 | **O-49** | MAJOR | 5 *(+0)* | orchestrator | An orchestrator test asserted a TRANSIENT PROJECT STATE and turned CI red when the project correctly advanced | **open** |
+| **S-08-5** | MINOR | 6 *(+0)* | scribe | PR 15 record was misleading in isolation — its F-02-9 discharge was later found WRONG at slice 07 | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1690,6 +1715,11 @@ rather than narrated.*
 
 - *scenario:* Two cases in the A-05-5 suite read the LIVE slice 06 rather than a fixture: that it declared every ref deferred to it, and that it had NOT YET DISCHARGED THEM. The second was true when written and FALSE FOUR HOURS LATER, the moment the architect ruled F-02-9, F-05-1, R-05-7 and R-05-9 — so a correct advance of the project turned CI red on run 34043707926, on a DOCS-ONLY commit that changed no tool and no test. A TEST THAT ASSERTS A TRANSIENT PROJECT STATE IS NOT TESTING THE TOOL, IT IS PINNING THE CALENDAR. Fixed by moving both to the fixtures that already assert the same two conditions in both directions; what is kept from the live run is only that the two criteria APPEAR, which is a property of the tool and cannot go stale. Raised against the orchestrator by the orchestrator: the same suite whose docblock says every case is written in the direction that can fail contained a case that could only fail by the project succeeding. The failure was contained — the db suite and red-proof both passed on that run, so nothing about the slice code was in doubt — but it cost a red CI on a branch under review and it would have blocked the gate.
 - *file:* `tools/test/deferrals.test.mjs`
+
+**S-08-5** — PR 15 record was misleading in isolation — its F-02-9 discharge was later found WRONG at slice 07
+
+- *scenario:* Slice 06 discharged F-02-9 on the argument that vacating writes no index entry another transaction waits on. Slice 07 raced it and measured 11.7 percent of contended moves deadlocking, falsifying that sentence; ADR-0030 and ADR-0031 are the correction. A READER OF PR 15 ALONE WOULD TAKE THE DISCHARGE AS SOUND. The scribe added one cited parenthetical to the backfilled comment so the record is not misleading standalone — which is the right remedy, since the original ruling stands as what was believed at the time and only its later falsification was missing.
+- *file:* `docs/slices/06-reschedule-atomic-move.md`
 
 </details>
 

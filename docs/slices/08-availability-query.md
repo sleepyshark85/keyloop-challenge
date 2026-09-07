@@ -22,19 +22,40 @@ it reports free is exactly what the constraint accepts.
 
 ## Acceptance criteria
 
-- **AC-1** — Given an arbitrary generated schedule over one dealership and an arbitrary query
-  interval, with no concurrent writer, then **every** (bay, technician) pair the query reports free is
-  accepted by an `INSERT`, and **every** pair it omits is rejected with `23P01`. *(QS-8)*
+- **AC-1** — *(amended at step 1)* Given an arbitrary generated schedule over one dealership and an
+  arbitrary query interval, with no concurrent writer, then **every** (bay, technician) pair **in the
+  candidate set** the query reports free is accepted by an `INSERT`, and **every** pair it omits is
+  rejected with `23P01`. The probe interval is **exactly `[from, to)`**. *(QS-8)*
+  <br>**The universe is the candidate set, not every pair** — over "every (bay, technician) pair" an
+  unqualified technician is `23503`, not `23P01`, so QS-8 is false as §10.2 writes it (`F-08-2`). Five
+  mechanics are required, each closing one way the property passes while wrong: rolled-back
+  `SAVEPOINT` probes; the verdict read as SQLSTATE `23P01` exactly; both directions counted
+  separately; a generator **biased to the `[)` boundary**; and a **quiescence witness** — re-run the
+  query after the probes and assert a byte-identical answer with unchanged `count(*)` and
+  `max(updated_at)`. **A run whose witness fails is *invalid*, not a QS-8 failure.** No isolation
+  level collapses stale and wrong: an exclusion check deliberately ignores the snapshot, so the read
+  and the constraint run on two clocks no `BEGIN` aligns.
 - **AC-2** — Given a bay with a confirmed appointment `[09:00, 10:00)`, when availability is queried
   for `[09:30, 10:30)`, then that bay is not returned; when queried for `[10:00, 11:00)`, it is.
 - **AC-3** — Given a technician qualified for a service type at dealership X only, when availability
   is queried at dealership Y, then that technician is not returned (A-3, A-9).
 - **AC-4** — Given a cancelled appointment, when availability is queried over its interval, then the
   resources it held are reported free.
-- **AC-5** — Given any availability response, when it is read, then it carries an explicit advisory
-  flag, and the OpenAPI description states that a free result is not a reservation.
-- **AC-6** — Given a query whose `to` precedes its `from`, then `400` with
+- **AC-5** — *(amended at step 1)* Given any availability response, when it is read, then it carries
+  an explicit advisory flag, and the response **and** the OpenAPI description carry **both** facts:
+  that a free result is **not a reservation**, and that it is true **only of the interval queried**.
+- **AC-6** — *(amended at step 1)* Given a query where **`to <= from`**, then `400` with
   `type=/problems/malformed-request`.
+  <br>Not `to < from`. `from == to` is an empty `tstzrange`, which overlaps nothing, so the query
+  would report **everything** free — vacuously true — and a probe of that window is refused by
+  `23514` rather than `23P01`, putting it outside QS-8's universe entirely. The database guards
+  `ends_at > starts_at`; the route must guard the same way round (`F-08-3`).
+- **AC-7** — *(added at step 1)* Given the `ambiguity-containment` marker `appointment-table-access`,
+  when it is resolved after this slice, then it names exactly `src/persistence/appointmentRepository.ts`
+  — **unchanged**. This re-derives slice 05's AC-1 attribution structurally rather than by argument,
+  and it is the criterion that would catch `F-08-1`: §6.5 has specified `candidateRepository.freeResources`
+  since phase 2, which by set equality *is* that marker, and `ambiguity-containment.test.ts:742` plants
+  that exact form as a control **expecting a violation**.
 
 ## Inherited scope — from slice 05, ruled at its step 5 (R-05-2)
 

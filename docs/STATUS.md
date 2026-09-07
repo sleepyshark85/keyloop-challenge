@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `ee279e7 docs(08): front matter for step 1 — arc42, ADRs 0032/0033, QS-12` |
+| Last commit | `e434d66 fix(08): the O-55 check failed a correctly attributed comment — O-56` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E |
-| Agent runs recorded | 160 |
+| Agent runs recorded | 169 |
 | ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -313,7 +313,16 @@
 | 2026-09-07 04:09 | architect | 12m19 | 146 / 13,220 / 6,455,408 | `derived` |
 | 2026-09-07 04:11 | scribe | 11m24 | 58 / 737 / 1,416,264 | `derived` |
 | 2026-09-07 04:12 | scribe | 12m37 | 60 / 738 / 1,508,667 | `derived` |
-| | **total** | **6351m52** | **39,300 / 2,941,951 / 3,208,654,949** | |
+| 2026-09-07 04:13 | scribe | 14m12 | 78 / 4,920 / 2,367,031 | `derived` |
+| 2026-09-07 04:15 | scribe | 15m32 | 80 / 4,921 / 2,464,566 | `derived` |
+| 2026-09-07 04:15 | scribe | 15m37 | 82 / 4,922 / 2,568,576 | `derived` |
+| 2026-09-07 04:15 | scribe | 16m01 | 84 / 4,956 / 2,673,552 | `derived` |
+| 2026-09-07 04:15 | scribe | 16m09 | 86 / 4,957 / 2,779,211 | `derived` |
+| 2026-09-07 04:16 | scribe | 16m41 | 88 / 4,958 / 2,885,817 | `derived` |
+| 2026-09-07 04:16 | scribe | 16m49 | 90 / 4,959 / 2,992,940 | `derived` |
+| 2026-09-07 04:18 | scribe | 18m27 | 102 / 4,972 / 3,644,851 | `derived` |
+| 2026-09-07 04:19 | scribe | 20m15 | 108 / 5,427 / 3,975,612 | `derived` |
+| | **total** | **6501m36** | **40,098 / 2,986,943 / 3,235,007,105** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
