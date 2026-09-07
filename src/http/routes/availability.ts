@@ -23,9 +23,22 @@
  * `disclaimer`) both pass the handler's actual value through unchanged.
  *
  * The disclaimer text is repeated as the response schema's own `description` — the OpenAPI half
- * AC-5 also requires. `tests/acceptance/availability.test.ts`'s own header records that half as
- * unassertable today (no `docs:openapi` emitter yet, QS-11's same gap) and leaves it to the
- * reviewer to read this schema directly.
+ * AC-5 also requires, now assertable end to end via `buildOpenApiDocument()` (AC-5b).
+ *
+ * ── THE OPERATION-LEVEL `description`, AND WHY THE QUERYSTRING'S OWN COPY STAYS TOO ────────────
+ *
+ * `docs/slices/09-design.md` "AC-7 does not kill the seven description mutants", decision 4:
+ * `@fastify/swagger` 9.8.1, measured, EXPLODES an object `querystring` schema into individual
+ * `in: query` parameters and DROPS the object's own `description` in the process — so
+ * `AVAILABILITY_QUERYSTRING_DESCRIPTION`'s three concatenated literals rendered nowhere in the
+ * emitted document, unkillable from `tests/contract/openapi-document.test.ts` even though that
+ * file diffs the document byte for byte. An OPERATION-level `schema.description` — a sibling of
+ * `querystring`/`response`, not a property of either — IS preserved into `operation.description`.
+ * The constant is reused rather than duplicated: a mutation to any of its three literal pieces
+ * changes the ONE emitted copy, so `AC-5b`'s test (which reads the whole operation, not just the
+ * response) can still tell. It touches no criterion — AC-5b names the response schema's own two
+ * facts, which are unrelated text — and renders, in the document, a rule that previously
+ * rendered nowhere in it at all.
  */
 import { Type } from '@sinclair/typebox';
 import type { Static } from '@sinclair/typebox';
@@ -49,6 +62,16 @@ const DISCLAIMER =
   'concurrent booking can make it stale immediately afterwards. Only POST /appointments makes an ' +
   'adjudicated decision.';
 
+/**
+ * The three concatenated literals `AC-7 does not kill the seven description mutants` (decision 4)
+ * relocates onto the route's own operation-level `schema.description` below — SAME constant, not
+ * a second copy, so a mutation to either use is caught by the one place the document keeps it.
+ */
+const AVAILABILITY_QUERYSTRING_DESCRIPTION =
+  'What is free for this dealership and service type over [from, to). TypeBox validates ' +
+  'each instant on its own; to <= from is rejected by the route (400), not by this schema, ' +
+  'because a schema cannot compare two of its own properties.';
+
 const AvailabilityQuerystring = Type.Object(
   {
     dealershipId: Type.String({ pattern: UUID_PATTERN }),
@@ -64,10 +87,7 @@ const AvailabilityQuerystring = Type.Object(
     // Stryker disable next-line BooleanLiteral : same boundary as above — removeAdditional
     // already strips unknown keys whether this reads false or true (I-08-6).
     additionalProperties: false,
-    description:
-      'What is free for this dealership and service type over [from, to). TypeBox validates ' +
-      'each instant on its own; to <= from is rejected by the route (400), not by this schema, ' +
-      'because a schema cannot compare two of its own properties.',
+    description: AVAILABILITY_QUERYSTRING_DESCRIPTION,
   },
 );
 
@@ -110,6 +130,10 @@ export function registerAvailabilityRoute(
     '/availability',
     {
       schema: {
+        // Operation-level, sibling of `querystring`/`response` — see the file docblock. Fastify
+        // maps this to the OpenAPI operation's own `description`, which survives where the
+        // querystring's own (identical) copy above does not.
+        description: AVAILABILITY_QUERYSTRING_DESCRIPTION,
         querystring: AvailabilityQuerystring,
         // Stryker disable next-line ObjectLiteral : {} here drops response-schema validation
         // entirely, but nothing this route ever sends carries a field it would strip (I-08-6) —

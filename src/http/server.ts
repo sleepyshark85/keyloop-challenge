@@ -50,9 +50,36 @@
  * indistinguishable in media type from a domain `404` — which is why the discriminator a client
  * (and `tests/acceptance/cancel-appointment.test.ts`) must read is the `type`, not the content
  * type, once this handler exists.
+ *
+ * ── AC-6b — AN EMPTY BODY MAPS TO `undefined`, THROUGH TYPEBOX, NOT THROUGH A SPECIAL CASE ──────
+ *
+ * `docs/slices/09-observability.md` AC-6b: the cURL harness sets `content-type: application/json`
+ * reflexively on every `POST` (AC-10), so Fastify's OWN default JSON parser turning an empty body
+ * into `FST_ERR_CTP_EMPTY_JSON_BODY` would fire on the harness's happy path against a route that
+ * reads no body — `POST /appointments/{id}/cancellation`. The fix replaces the DEFAULT parser for
+ * `application/json` with one that maps a zero-length body to `undefined` and otherwise behaves
+ * identically (an unparseable body still raises `FST_ERR_CTP_INVALID_JSON_BODY`, still mapped to
+ * `400` by `isMalformedBody` below — the regression control in `tests/acceptance/
+ * empty-body-content-type.test.ts`). What happens to that `undefined` from there is TypeBox's
+ * job, never a branch in this file or in a handler: a route with no `body` schema (cancellation)
+ * never looks at `request.body` at all, so `undefined` is inert; a route WITH one (booking,
+ * reschedule) fails validation against it exactly as it would against any other missing required
+ * property, landing on the SAME `400 /problems/malformed-request` an empty body already produced
+ * there. §8.6's declared owner for "is this body acceptable" stays TypeBox in every case.
+ *
+ * ── `@fastify/swagger` — ADR-0005, registered on every server so `buildOpenApiDocument` can ask
+ * ONE of them for its document rather than building a second, undocumented one ──────────────────
+ *
+ * Registered unconditionally rather than only when generating the document: `@fastify/swagger`
+ * decorates routes as they are added via an `onRoute` hook, so it must be registered BEFORE
+ * `registerAppointmentRoutes`/`registerAvailabilityRoute`/`registerHealthRoute` run — which rules
+ * out registering it only inside `buildOpenApiDocument`, after `buildServer` has already added
+ * every route. It adds no HTTP route of its own (that is `@fastify/swagger-ui`'s job, not used
+ * here) and costs nothing a production server would notice.
  */
-import Fastify from 'fastify';
+import Fastify, { errorCodes } from 'fastify';
 import type { FastifyBaseLogger, FastifyError, FastifyInstance } from 'fastify';
+import fastifySwagger from '@fastify/swagger';
 import { registerHealthRoute } from './routes/health.js';
 import type { HealthRouteDeps } from './routes/health.js';
 import { registerAppointmentRoutes } from './routes/appointments.js';
@@ -60,6 +87,7 @@ import type { AppointmentRouteDeps } from './routes/appointments.js';
 import { registerAvailabilityRoute } from './routes/availability.js';
 import type { AvailabilityRouteDeps } from './routes/availability.js';
 import { PROBLEM_CONTENT_TYPE, problem } from './problem.js';
+import { createLogger } from '../platform/logger.js';
 
 export interface ServerDeps extends HealthRouteDeps, AppointmentRouteDeps, AvailabilityRouteDeps {
   readonly logger: FastifyBaseLogger;
@@ -115,8 +143,51 @@ function isMalformedBody(error: FastifyError): boolean {
   return MALFORMED_BODY_CODES.has(error.code);
 }
 
+/** ADR-0005 — one title, one description, shared between the live server and the emitted document. */
+const OPENAPI_INFO = {
+  title: 'Keyloop Unified Service Scheduler',
+  description:
+    'Service-appointment scheduling for automotive dealerships. No authentication (ADR-0002); ' +
+    'a candidate list is advisory only — every write is adjudicated by PostgreSQL (CLAUDE.md §2.1).',
+  version: '1.0.0',
+};
+
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ loggerInstance: deps.logger });
+
+  // AC-6b — see the file docblock. `parseAs: 'string'` mirrors Fastify's own default JSON
+  // parser; the only change is the zero-length case.
+  app.addContentTypeParser<string>(
+    'application/json',
+    { parseAs: 'string' },
+    (_request, body, done) => {
+      if (body.length === 0) {
+        done(null, undefined);
+        return;
+      }
+      try {
+        done(null, JSON.parse(body));
+      } catch {
+        done(new errorCodes.FST_ERR_CTP_INVALID_JSON_BODY(), undefined);
+      }
+    },
+  );
+
+  // ADR-0005 — registered before any route, so its `onRoute` hook sees every schema.
+  //
+  // BOTH `.register()` CALLS, DELIBERATELY — measured. `@fastify/swagger` attaches its
+  // `onRoute` hook from INSIDE its own plugin body, which `.register()` defers to Fastify's
+  // boot sequence (avvio); the route-registration functions below call `.get()`/`.post()`
+  // directly, which fire `onRoute` SYNCHRONOUSLY, at the moment they run. Calling them as plain
+  // functions at this same top level — as they were before this slice — runs them BEFORE
+  // swagger's plugin body ever executes, so its hook does not exist yet and the emitted document
+  // has an empty `paths`. Wrapping them in their own `.register()` puts them in the SAME
+  // deferred boot queue as swagger, in registration order, so swagger's hook is attached by the
+  // time these routes are added. No `hideUntagged`, no exposed UI route: `buildOpenApiDocument`
+  // below is the only consumer.
+  void app.register(fastifySwagger, {
+    openapi: { openapi: '3.1.0', info: OPENAPI_INFO },
+  });
 
   app.setErrorHandler<FastifyError>(async (error, request, reply) => {
     if (isValidationError(error) || isMalformedBody(error)) {
@@ -159,9 +230,49 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       );
   });
 
-  registerHealthRoute(app, deps);
-  registerAppointmentRoutes(app, deps);
-  registerAvailabilityRoute(app, deps);
+  void app.register(async (instance) => {
+    registerHealthRoute(instance, deps);
+    registerAppointmentRoutes(instance, deps);
+    registerAvailabilityRoute(instance, deps);
+  });
 
   return app;
+}
+
+/**
+ * `T-09-1` / ADR-0005 — the OpenAPI document, generated from the SAME route schemas the live
+ * server registers, via `@fastify/swagger`'s `app.swagger()`. `npm run docs:openapi`
+ * (`tools/docs/openapi.mjs`) is this function's only caller in production; AC-5b needs a second
+ * one — `tests/unit/http/availability.test.ts` — which is the entire reason this is a callable
+ * function and not only a script (design decision 4): the seven `description` mutants in
+ * `routes/availability.ts` are otherwise unreachable from `vitest.mutation.config.ts`'s
+ * `tests/unit/**`-only scope (`D-08-1`).
+ *
+ * The bound use cases are never called: `app.ready()` only runs each route's `onRoute`
+ * registration and schema compilation, never a handler. Every one throws if it somehow were, so a
+ * change that made one reachable fails loudly rather than silently answering with nonsense data.
+ */
+export async function buildOpenApiDocument(): Promise<object> {
+  const unreachable = (name: string): (() => Promise<never>) => {
+    return async () => {
+      throw new Error(`buildOpenApiDocument: ${name} is not callable while generating the document`);
+    };
+  };
+
+  const app = buildServer({
+    logger: createLogger({ logLevel: 'silent' }),
+    checkHealth: unreachable('checkHealth'),
+    bookAppointment: unreachable('bookAppointment'),
+    readAppointment: unreachable('readAppointment'),
+    cancelAppointment: unreachable('cancelAppointment'),
+    rescheduleAppointment: unreachable('rescheduleAppointment'),
+    queryAvailability: unreachable('queryAvailability'),
+  });
+
+  try {
+    await app.ready();
+    return app.swagger();
+  } finally {
+    await app.close();
+  }
 }

@@ -740,45 +740,75 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
     );
   });
 
-  it.each<[string, string | undefined]>([
-    ['an EMPTY body (FST_ERR_CTP_EMPTY_JSON_BODY)', undefined],
-    ['an UNPARSEABLE body (FST_ERR_CTP_INVALID_JSON_BODY)', '{oops'],
-  ])(
-    'AC-5 — %s with content-type: application/json is 400 /problems/malformed-request, on BOTH routes',
-    async (_label, payload) => {
-      // §8.6 CLAIMS TOTALITY, AND THIS IS THE CLAIM BEING KEPT. Measured on the pinned
-      // fastify@5.12.1 — by the architect, the implementer and the test-engineer independently —
-      // both errors carry `statusCode: 400` and NEITHER sets `validation`, so before this they
-      // missed the validation arm and fell to the catch-all: `500 /problems/internal`, live on
-      // the already-merged booking route. §8.6 justifies its 500 row with "a 4xx would tell
-      // the caller to correct something they did not send and cannot see" — here the client
-      // sent exactly that, can see it, and can correct it. The row was inverted.
-      //
-      // The content-type parser runs BEFORE the router (measured: even an unrouted path raises
-      // it), which is why the cancellation route is included: a route reads no body and still
-      // answers this.
-      for (const url of [
-        '/appointments',
-        `/appointments/${APPOINTMENT_ID}/cancellation`,
-      ]) {
-        const response = await serverAnswering({}).inject({
-          method: 'POST',
-          url,
-          headers: { 'content-type': 'application/json' },
-          ...(payload === undefined ? {} : { payload }),
-        });
+  it('AC-5 — an UNPARSEABLE body (FST_ERR_CTP_INVALID_JSON_BODY) with content-type: application/json is 400 /problems/malformed-request, on BOTH routes', async () => {
+    // §8.6 CLAIMS TOTALITY, AND THIS IS THE CLAIM BEING KEPT. Measured on the pinned
+    // fastify@5.12.1 — by the architect, the implementer and the test-engineer independently —
+    // this error carries `statusCode: 400` and does NOT set `validation`, so before AC-5 it
+    // missed the validation arm and fell to the catch-all: `500 /problems/internal`, live on the
+    // already-merged booking route. §8.6 justifies its 500 row with "a 4xx would tell the caller
+    // to correct something they did not send and cannot see" — here the client sent exactly
+    // that, can see it, and can correct it. The row was inverted.
+    //
+    // The content-type parser runs BEFORE the router (measured: even an unrouted path raises
+    // it), which is why the cancellation route is included: a route reads no body and still
+    // answers this for a genuinely malformed one — AC-6b (below) narrows this to EMPTY bodies
+    // only, and this case is the regression control that narrowing must not touch.
+    for (const url of ['/appointments', `/appointments/${APPOINTMENT_ID}/cancellation`]) {
+      const response = await serverAnswering({}).inject({
+        method: 'POST',
+        url,
+        headers: { 'content-type': 'application/json' },
+        payload: '{oops',
+      });
 
-        expect(response.statusCode, url).toBe(400);
-        expect(response.statusCode, `${url} — the row that was inverted`).not.toBe(500);
-        expect(response.headers['content-type']).toMatch(/application\/problem\+json/);
-        expect(response.json().type).toBe('/problems/malformed-request');
-        expect(response.json().status).toBe(400);
-        // The client is told what to fix, which is the entire argument for moving this off the
-        // 500 row. Both Fastify messages name the header that made the body mandatory.
-        expect(String(response.json().detail)).toContain('content-type');
-      }
-    },
-  );
+      expect(response.statusCode, url).toBe(400);
+      expect(response.statusCode, `${url} — the row that was inverted`).not.toBe(500);
+      expect(response.headers['content-type']).toMatch(/application\/problem\+json/);
+      expect(response.json().type).toBe('/problems/malformed-request');
+      expect(response.json().status).toBe(400);
+      // The client is told what to fix, which is the entire argument for moving this off the
+      // 500 row. The message names the header that made the body mandatory.
+      expect(String(response.json().detail)).toContain('content-type');
+    }
+  });
+
+  it('AC-5 / AC-6b — an EMPTY body with content-type: application/json is STILL 400 on the booking route, which reads one — via TypeBox validation now, not the content-type parser', async () => {
+    // Slice 09's fix (AC-6b) maps an empty JSON body to `undefined` in the content-type parser
+    // itself (`server.ts`), rather than special-casing a route in a handler. `undefined` then
+    // fails `BookingBody`'s own required properties exactly as any other missing body would —
+    // §8.6's declared owner for "is this body acceptable" is TypeBox on every route that has one.
+    const response = await serverAnswering({}).inject({
+      method: 'POST',
+      url: '/appointments',
+      headers: { 'content-type': 'application/json' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.headers['content-type']).toMatch(/application\/problem\+json/);
+    expect(response.json().type).toBe('/problems/malformed-request');
+    expect(response.json().status).toBe(400);
+    // No longer the content-type parser's own message — this is now an ordinary ajv validation
+    // failure, which is the point: the row moved from server.ts's parser to TypeBox.
+    expect(String(response.json().detail)).not.toContain('content-type');
+  });
+
+  it('AC-6b — an EMPTY body with content-type: application/json is 200 on the cancellation route, which reads NONE — the row this slice corrects', async () => {
+    // This is the exact friction OQ-05-2 named: `tests/support/booking.ts`'s `postBooking` sets
+    // `content-type: application/json` reflexively, and the cURL harness (AC-10) does too, so a
+    // route that reads no body must not answer 400 on a request naming a header it never
+    // consults. `tests/acceptance/empty-body-content-type.test.ts` asserts the same fact end to
+    // end, against the real compiled service; this is its unit-level twin.
+    const response = await serverAnswering({
+      cancel: { kind: 'cancelled', appointment: { ...VIEW, status: 'cancelled' } },
+    }).inject({
+      method: 'POST',
+      url: `/appointments/${APPOINTMENT_ID}/cancellation`,
+      headers: { 'content-type': 'application/json' },
+    });
+
+    expect(response.statusCode, JSON.stringify(response.json())).toBe(200);
+    expect(response.json().status).toBe('cancelled');
+  });
 
   it('AC-5 — and a malformed body is NOT logged as an unhandled fault', async () => {
     // It is the client's mistake, not the system's. If it reached `request.failed` the one line

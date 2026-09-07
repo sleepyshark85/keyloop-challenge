@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { buildServer } from '../../../src/http/server.js';
+import { buildOpenApiDocument, buildServer } from '../../../src/http/server.js';
 import type { AvailabilityOutcome } from '../../../src/application/queryAvailability.js';
 import type { HealthOutcome } from '../../../src/application/checkHealth.js';
 import { createLogger } from '../../../src/platform/logger.js';
@@ -264,4 +264,45 @@ describe('GET /availability — the whole problem document on both error arms (R
       expect(body['detail']).toBe(`no ${reference} matches the id in this request`);
     },
   );
+});
+
+/**
+ * AC-5b, D-08-1, `docs/slices/09-design.md` "AC-7 does not kill the seven description mutants" —
+ * decision 4's WHOLE REASON: `vitest.mutation.config.ts` scores `tests/unit/**` only, so a
+ * byte-for-byte diff in `tests/contract/openapi-document.test.ts` (the test-engineer's, over the
+ * COMMITTED document) cannot kill a mutant in `routes/availability.ts`'s source. This file calls
+ * `buildOpenApiDocument()` directly — no database, no subprocess — which is the one path that
+ * reaches those seven `description` string literals from a suite Stryker actually scores.
+ */
+describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachable from a unit test (D-08-1)', () => {
+  interface OpenApiOperation {
+    readonly description?: string;
+    readonly responses?: Record<string, { readonly content?: Record<string, { readonly schema?: { readonly description?: string } }> }>;
+  }
+  interface OpenApiDoc {
+    readonly openapi?: string;
+    readonly paths?: Record<string, Record<string, OpenApiOperation>>;
+  }
+
+  it('the operation-level description carries the querystring rule that Fastify drops when exploding it into query parameters', async () => {
+    const doc = (await buildOpenApiDocument()) as OpenApiDoc;
+    const operation = doc.paths?.['/availability']?.['get'];
+
+    expect(operation, 'no GET /availability operation in the generated document').toBeDefined();
+    expect(operation?.description).toContain('What is free for this dealership and service type');
+    expect(operation?.description).toContain('to <= from is rejected by the route (400)');
+    expect(operation?.description).toContain(
+      'because a schema cannot compare two of its own properties',
+    );
+  });
+
+  it("the 200 response schema's own description carries AC-5's two facts", async () => {
+    const doc = (await buildOpenApiDocument()) as OpenApiDoc;
+    const responseSchema =
+      doc.paths?.['/availability']?.['get']?.responses?.['200']?.content?.['application/json']?.schema;
+
+    expect(responseSchema?.description).toContain('Advisory only');
+    expect(responseSchema?.description).toContain('not a reservation');
+    expect(responseSchema?.description).toContain('true only of the interval queried');
+  });
 });

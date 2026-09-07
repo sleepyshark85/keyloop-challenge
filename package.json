@@ -39,6 +39,8 @@
     "docs:budget": "node tools/docs/budget.mjs",
     "docs:budget:check": "node tools/docs/budget.mjs --check --ratchet",
     "docs:refs": "node tools/docs/refs.mjs",
+    "predocs:openapi": "npm run build",
+    "docs:openapi": "node tools/docs/openapi.mjs",
     "docs:adr-check": "node tools/docs/adr-invariants.mjs",
     "defects:check": "node tools/defects/generate.mjs --check",
     "mutation": "stryker run",
