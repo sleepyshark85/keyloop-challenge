@@ -12,11 +12,11 @@ import {
   describeAnswer,
   describeScenario,
   member,
-  occupy,
   postBooking,
   postCancellation,
   postReschedule,
   seedScenario,
+  uuidNamespaceOf,
 } from '../support/booking.js';
 import type { HttpAnswer, Scenario } from '../support/booking.js';
 
@@ -91,13 +91,65 @@ const SHARED_SEED = 7;
 
 async function seedRetryOnceFixture(client: Client, namespace: string): Promise<Scenario> {
   const scenario = await seedScenario(client, namespace, { bays: 2, technicians: 2 });
-  await occupy(client, scenario, {
-    label: 'blocker',
-    bayId: scenario.bayIds[0]!,
-    technicianId: scenario.technicianIds[1]!,
-    startsAt: at(0),
-    endsAt: at(60),
-  });
+
+  // I-09-2: technicians are read `ORDER BY id`, so which one the blocker (technicianIds[1])
+  // sorts to is a per-namespace coin-flip — `SHARED_SEED = 7` was measured against a shuffle
+  // whose technician list did NOT contain the blocker as a live candidate. The architect's
+  // remedy is to remove the blocker's qualification for the scenario's own service type so it
+  // is never drawn at all, leaving the technician list going into the shuffle as the single
+  // remaining qualified technician (I-04-10's permutation-safe singleton), so only the bay
+  // draw decides.
+  //
+  // ADAPTED (still the same remedy, worked around a schema constraint the design didn't
+  // name): `appointment_technician_qualified` is a FOREIGN KEY from
+  // `appointment (technician_id, service_type_id)` to `technician_qualification` (arc42 §8),
+  // with no `ON DELETE CASCADE`. Seeding the blocker's own appointment against
+  // `scenario.serviceTypeId` FIRST and then deleting that same pair's qualification trips
+  // exactly that FK (measured: `update or delete on table "technician_qualification"
+  // violates foreign key constraint "appointment_technician_qualified"`) — the row can't be
+  // removed while the blocker's own appointment still references it. So the qualification is
+  // deleted BEFORE any appointment exists to reference it, and the blocker technician is
+  // re-qualified under a throwaway service type instead, and its occupying appointment is
+  // booked against THAT service type. `no_bay_overlap` and the technician equivalent are
+  // keyed on `bay_id`/`technician_id` and the time range only — never on `service_type_id` —
+  // so this occupies bay 0 and busies `technicianIds[1]` for exactly the same window as
+  // before; only the qualification bookkeeping moved. Net effect unchanged from the ruling:
+  // `technicianIds[0]` is the only technician qualified for the scenario's own service type,
+  // stays free throughout, and only the bay draw decides — `SHARED_SEED = 7` holds.
+  const blockerServiceTypeId = uuidNamespaceOf(scenario, 'service_type/blocker');
+  await client.query('insert into service_type (id, name, duration_minutes) values ($1, $2, $3)', [
+    blockerServiceTypeId,
+    `${namespace} blocker service`,
+    scenario.durationMinutes,
+  ]);
+  await client.query(
+    'insert into technician_qualification (technician_id, service_type_id) values ($1, $2)',
+    [scenario.technicianIds[1], blockerServiceTypeId],
+  );
+  await client.query(
+    'delete from technician_qualification where technician_id = $1 and service_type_id = $2',
+    [scenario.technicianIds[1], scenario.serviceTypeId],
+  );
+
+  const customer = scenario.customers[0];
+  if (customer === undefined) throw new Error('seedRetryOnceFixture needs at least one seeded customer');
+  await client.query(
+    `insert into appointment
+       (id, dealership_id, customer_id, vehicle_id, service_type_id, technician_id, bay_id, starts_at, ends_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      uuidNamespaceOf(scenario, 'occupied/blocker'),
+      scenario.dealershipId,
+      customer.customerId,
+      customer.vehicleId,
+      blockerServiceTypeId,
+      scenario.technicianIds[1],
+      scenario.bayIds[0],
+      at(0).toISOString(),
+      at(60).toISOString(),
+    ],
+  );
+
   return scenario;
 }
 

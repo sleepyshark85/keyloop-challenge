@@ -551,6 +551,14 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
    * they will diverge once the route ships — the second then also asserts that the new route
    * did not arrive with the hole — but no claim here rests on the route being absent.
    *
+   * UPDATE, SLICE 09 (`I-09-3`): AC-6b supersedes the empty-body half OF THE CANCELLATION
+   * ROUTE ONLY, by name — it maps an empty body to `undefined` in the content-type parser
+   * rather than rejecting it, for any route that reads no body, which the cancellation route
+   * is. So the cancellation route's two bodies below split again: the unparseable body stays
+   * in `MALFORMED_BODIES` and 400 here; the empty body leaves it, runs the route, and is
+   * asserted as its own 404 `/problems/appointment-not-found` case just below. The booking
+   * route reads a real body, so both of ITS cases are untouched by AC-6b and stay as one case.
+   *
    * `postRaw` rather than `postBooking`: `JSON.stringify` cannot express "no body at all", and
    * both errors are raised before any route schema runs, so no value of a well-formed body can
    * reach them.
@@ -587,34 +595,61 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
     });
   });
 
-  it('AC-5 — and on the cancellation route, the same two bodies are 400 /problems/malformed-request', async () => {
-    // MEASURED AT THE RED COMMIT: this is a 500, not a 404. Fastify consults the content-type
-    // parser BEFORE the router, so the malformed body is rejected before anything discovers
-    // that no such route exists — which makes this case, too, a claim about behaviour that is
-    // live today rather than one waiting on the route. Once the route ships it keeps the new
-    // route from arriving with the same hole.
+  it('AC-5 — and on the cancellation route, an unparseable body is still 400 /problems/malformed-request', async () => {
+    // MEASURED AT THE RED COMMIT (slice 05): this was a 500, not a 404. Fastify consults the
+    // content-type parser BEFORE the router, so an unparseable body is rejected before
+    // anything discovers that no such route exists — which makes this a claim about behaviour
+    // that is live today rather than one waiting on the route. Once the route ships it keeps
+    // the route from arriving with the same hole.
+    //
+    // The empty-body half of AC-5's original pair moved below (I-09-3): AC-6b superseded it
+    // by name — an empty body on a route that reads no body, like this one, is no longer
+    // malformed at all, so it never reaches this assertion.
     const id = uuidFor('ac5-cancel-malformed', 'never-booked');
 
     await withService(async (service) => {
-      for (const [label, body] of MALFORMED_BODIES) {
-        const answer = await postRaw(service, `/appointments/${id}/cancellation`, {
-          contentType: 'application/json',
-          ...(body === undefined ? {} : { body }),
-        });
+      const answer = await postRaw(service, `/appointments/${id}/cancellation`, {
+        contentType: 'application/json',
+        body: '{oops',
+      });
 
-        // The BODY is malformed, so it is answered before the id is ever looked up: this is
-        // 400 and not the 404 that AC-4's unknown id earns. Two rows of §8.6 that must not
-        // collide on one request.
-        expectProblem(
-          answer,
-          400,
-          '/problems/malformed-request',
-          `AC-5 — ${label}, on POST /appointments/{id}/cancellation. A 500 is the observed ` +
-            `red: the content-type parser answers before the router does, so this is the ` +
-            `same defect as the case above and not a missing-route failure. A 404 would mean ` +
-            `the parser stopped running first, which no version of this fix should cause.`,
-        );
-      }
+      // The BODY is malformed, so it is answered before the id is ever looked up: this is
+      // 400 and not the 404 that AC-4's unknown id earns. Two rows of §8.6 that must not
+      // collide on one request.
+      expectProblem(
+        answer,
+        400,
+        '/problems/malformed-request',
+        `AC-5 — an unparseable body (FST_ERR_CTP_INVALID_JSON_BODY), on POST ` +
+          `/appointments/{id}/cancellation. A 500 is the observed red: the content-type ` +
+          `parser answers before the router does, so this is the same defect as the case ` +
+          `above and not a missing-route failure. A 404 would mean the parser stopped ` +
+          `running first, which no version of this fix should cause.`,
+      );
+    });
+  });
+
+  it('AC-5 / AC-6b — and an empty body on the cancellation route is no longer malformed: it runs the route, which reports the id was never booked', async () => {
+    // I-09-3: AC-6b's remedy maps an empty body to `undefined` in the content-type parser
+    // rather than rejecting it, so a route that reads no body — the cancellation route is one
+    // — legitimately runs on an empty body and answers on the merits. For a never-booked id
+    // that merit is 404 /problems/appointment-not-found, not the 400 this route used to pin.
+    const id = uuidFor('ac5-cancel-malformed', 'never-booked');
+
+    await withService(async (service) => {
+      const answer = await postRaw(service, `/appointments/${id}/cancellation`, {
+        contentType: 'application/json',
+      });
+
+      expectProblem(
+        answer,
+        404,
+        '/problems/appointment-not-found',
+        `AC-5 / AC-6b — no body at all (was FST_ERR_CTP_EMPTY_JSON_BODY, now \`undefined\`), ` +
+          `on POST /appointments/{id}/cancellation. The parser no longer rejects an empty ` +
+          `body, so the route runs and correctly reports that this id was never booked — a ` +
+          `400 here would mean AC-6b's remedy regressed back to rejecting it.`,
+      );
     });
   });
 });
