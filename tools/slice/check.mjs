@@ -733,6 +733,53 @@ if (!onlyReady) {
         : `PR #${prComments.num}: every role that ran is attributed`);
   }
 
+  // O-39 — A DESIGN DOCUMENT MAY NOT BE A FINDING'S ONLY HOME.
+  //
+  // Ruled at slice 06: a finding existing only as a bullet cannot appear in the register, cannot
+  // have an escape distance computed, and — measurably — would have let A-05-5's own check pass
+  // slice 06 while dropping F-05-1. The architect stated the structural cause: §9 has the
+  // orchestrator write the log from STRUCTURED REPORTS, so a finding written into a design file
+  // under "assumptions and open questions" passes through no report field and is BORN UNLOGGED.
+  //
+  // THE RULING SAID `slice:check` SHOULD ENFORCE IT AND I DID NOT BUILD IT. Slice 08 then declared
+  // eight — F-08-1..4, A-08-1..3, OQ-08-1 — and logged none, and I found that only because
+  // `docs:refs` happened to fire on the one of the eight I had cited myself.
+  //
+  // THE TEST IS OWNERSHIP BY NUMBER, not position on the page. A ref whose slice segment matches
+  // this slice is one this slice MINTED, wherever it sits — a bullet, a table cell, or mid-sentence
+  // in bold. Matching on "looks like a definition" would have missed `A-08-3`, whose only
+  // introduction is inside a heading that starts with other words. Refs from other slices are
+  // citations and are already logged where they were raised.
+  const mintedInDesign = (() => {
+    const design = resolve(SLICE_DIR, `${id}-design.md`);
+    if (!existsSync(design)) return null;
+    const text = readFileSync(design, 'utf8');
+    // `D-` is excluded, and the exclusion is the point rather than a convenience. A `D-` id is a
+    // DEBT-REGISTER entry whose home is arc42 §11, which `docs:refs` already checks resolves to a
+    // design definition — so it has the two homes O-39 asks for. Demanding a `finding.raised` for
+    // one would be demanding that the debt register be a defect register, which it is not.
+    const own = new RegExp(`\\b(?:[A-CE-Z][A-Z]?|OQ)-${id}-\\d+\\b`, 'g');
+    return [...new Set(text.match(own) ?? [])].sort();
+  })();
+
+  if (mintedInDesign === null) {
+    check('done', 'design findings reached the log', NA, `no ${id}-design.md`);
+  } else if (!mintedInDesign.length) {
+    check('done', 'design findings reached the log', NA, 'the design mints no refs of its own');
+  } else {
+    // ANY event carrying the ref counts, not only `finding.raised`. `R-06-1` was a DCR and
+    // `OQ-07-1` an open question resolved directly; both reached the log through a different
+    // event, and both are in the register. The rule is that the log knows the ref, not that it
+    // learned it by one route.
+    const raised = new Set(allEvents.filter((e) => e.ref).map((e) => e.ref));
+    const unlogged = mintedInDesign.filter((r) => !raised.has(r));
+    check('done', 'design findings reached the log', unlogged.length ? FAIL : PASS,
+      unlogged.length
+        ? `minted in the design and never raised — ${unlogged.join(', ')}. A finding whose only `
+          + 'home is a document cannot be in the register and has no escape distance (O-39).'
+        : `${mintedInDesign.length} ref(s) minted, each with a finding.raised`);
+  }
+
   const loops = events.filter((e) => e.event === 'loopback').length;
   check('done', 'loopbacks within governor', loops <= 2 ? PASS : FAIL,
     `${loops} of max 2${loops > 2 ? ' — should have been split, not ground through' : ''}`);

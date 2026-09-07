@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `d734502 docs(08): §10 is not satisfied, and the classification that would satisfy it inverts I-06-5` |
+| Last commit | `8cc79e1 docs(08): step 5 ruled — and the architect rejected my classification` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process |
 | Agent runs recorded | 177 |
 | ADRs accepted | 27 |

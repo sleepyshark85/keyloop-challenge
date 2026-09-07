@@ -68,12 +68,13 @@ const mutationRun = (over) => ({
  */
 const git = (dir, args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
 
-const build = (events, { commits = [], slice = SLICE, branch = null, prompts = [] } = {}) => {
+const build = (events, { commits = [], slice = SLICE, branch = null, prompts = [], designText = null } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'slice-check-'));
   mkdirSync(join(dir, 'docs/team-log'), { recursive: true });
   mkdirSync(join(dir, 'docs/slices'), { recursive: true });
   mkdirSync(join(dir, 'docs/arc42'), { recursive: true });
   writeFileSync(join(dir, 'docs/slices/77-fixture.md'), slice, 'utf8');
+  if (designText !== null) writeFileSync(join(dir, 'docs/slices/77-design.md'), designText, 'utf8');
   if (prompts.length) {
     mkdirSync(join(dir, 'docs/team-log/prompts'), { recursive: true });
     for (const f of prompts) writeFileSync(join(dir, 'docs/team-log/prompts', f), '# prompt\n', 'utf8');
@@ -409,6 +410,57 @@ const MARKED = '# 9\n\n<!-- generated:adr-index -->\nold\n<!-- /generated:adr-in
     row(run([ciRun(), raise('R-77-4'), { ts: '2026-01-01T04:00:00Z', slice: '77',
       event: 'review.response', source: 'reported', finding_ref: 'R-77-4', resolution: 'fixed' }]),
       'findings ruled').startsWith('PASS'));
+}
+
+// ------------------------------- O-39: a design may not be a finding's only home --
+//
+// Ruled at slice 06 and NOT BUILT for two slices. Slice 08 then minted eight refs in its design and
+// logged none; I found that only because `docs:refs` fired on the one of the eight I happened to
+// have cited myself. These cases exist because the check's first version had TWO false positives
+// and both are more interesting than the true one.
+{
+  const design = (body) => ({ designText: body });
+  const raised = (ref) => ({
+    ts: '2026-01-01T00:00:00Z', event: 'finding.raised', source: 'reported', slice: '77',
+    actor: 'architect', ref, severity: 'MINOR', step: 1, claim: 'c', scenario: 's',
+  });
+
+  const a = run([raised('F-77-1')], design('- **F-77-1** — a finding.'));
+  ok('a ref minted in the design and logged passes',
+    /PASS.*design findings reached the log/.test(row(a, 'design findings reached the log')),
+    row(a, 'design findings reached the log'));
+
+  const b = run([], design('- **F-77-1** — a finding nobody logged.'));
+  ok('a ref minted and never logged fails', /FAIL/.test(row(b, 'design findings reached the log')));
+  ok('...and names it, so it can be found', /F-77-1/.test(row(b, 'design findings reached the log')));
+
+  // OWNERSHIP BY NUMBER, not position. `A-08-3`'s only introduction was inside a heading that
+  // starts with other words; a "looks like a definition" pattern would have missed it.
+  const c = run([], design('| 6 | mechanic | ... (`A-77-9`) |'));
+  ok('a ref minted only inside a table cell is still minted',
+    /FAIL.*A-77-9/.test(row(c, 'design findings reached the log')));
+
+  // FALSE POSITIVE 1. A `D-` id is a debt-register entry whose home is arc42 §11, which docs:refs
+  // already checks. Demanding a finding.raised for one demands the debt register be a defect
+  // register.
+  const d = run([], design('- **D-77-1** — a debt item, §11\'s.'));
+  ok('a D- debt id is not a finding and is not demanded',
+    /PASS|N\/A/.test(row(d, 'design findings reached the log')), row(d, 'design findings reached the log'));
+
+  // FALSE POSITIVE 2. `R-06-1` was a DCR and `OQ-07-1` an open question resolved directly; both
+  // reached the log by a route other than finding.raised, and both are in the register.
+  const e = run([{ ts: '2026-01-01T00:00:00Z', event: 'finding.resolved', source: 'reported',
+    slice: '77', actor: 'orchestrator', ref: 'OQ-77-1', message: 'm' }],
+    design('- **OQ-77-1** — resolved directly, never raised.'));
+  ok('a ref that reached the log by another event counts',
+    /PASS/.test(row(e, 'design findings reached the log')));
+
+  const f = run([], design('- Cites **F-04-2** from another slice, mints nothing.'));
+  ok("another slice's refs are citations, not this slice's to log",
+    /N\/A|PASS/.test(row(f, 'design findings reached the log')), row(f, 'design findings reached the log'));
+
+  const g = run([]);
+  ok('no design file at all is N/A', /N\/A/.test(row(g, 'design findings reached the log')));
 }
 
 // ------------------------------------------------- O-55: the reasoning is on the PR --

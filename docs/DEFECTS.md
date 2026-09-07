@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **301** |
-| Severity | 12 blocking · 153 major · 136 minor |
+| Findings recorded | **313** |
+| Severity | 12 blocking · 158 major · 143 minor |
 | Verdicts | 19 narrowed · 102 accepted · 3 escalated · 26 deferred · 2 rejected |
-| Raised by | test-engineer 67 · reviewer 66 · orchestrator 55 · architect 52 · implementer 49 · scribe 10 · human 2 |
-| Awaiting a ruling | **149** |
-| Mean escape distance | 1.68 step(s) |
+| Raised by | test-engineer 67 · reviewer 66 · architect 61 · orchestrator 58 · implementer 49 · scribe 10 · human 2 |
+| Awaiting a ruling | **161** |
+| Mean escape distance | 1.69 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1227,6 +1227,9 @@ rather than narrated.*
 | **A-05-8** | MINOR | 7 *(+0)* | architect | R-05-2 committed again by the role that ruled on it, and fixed rather than reported | **open** |
 | **A-05-9** | MINOR | 7 *(+0)* | architect | Three undeclared arc42 sections took pointer-only edits to fund this slice ratchet | **open** |
 | **S-08-4** | MINOR | 6 *(+0)* | scribe | Slice 05 is a clean textbook instance of section 6 reasoned-before-applied rule and should be the retro model case | **open** |
+| **A-05-1** | MINOR | 7 *(+6)* | orchestrator | An assumption minted in slice 05 design and never logged | **open** |
+| **A-05-2** | MINOR | 7 *(+6)* | orchestrator | An assumption minted in slice 05 design and never logged | **open** |
+| **OQ-05-1** | MINOR | 7 *(+6)* | orchestrator | An open question minted in slice 05 design and never logged | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1450,6 +1453,21 @@ rather than narrated.*
 
 - *scenario:* THE ONLY POSITIVE FINDING OF THE RECONSTRUCTION, and recorded because the register is otherwise a record of what went wrong. The architect disagreed, STATED ITS MEASUREMENT, AND DID NOT EDIT; the reviewer answered once, REPRODUCED THE OTHER SIDE, AND CONCEDED. That is section 6 clause working exactly as written — deliberating and conceding as separate acts, with the disagreement opening a review loop the objector answered once. The retro should cite it as the model rather than describing the rule abstractly.
 - *file:* `docs/team-log/events.jsonl`
+
+**A-05-1** — An assumption minted in slice 05 design and never logged
+
+- *scenario:* RECOVERED BY THE O-39 CHECK ON ITS FIRST RUN, and raised today rather than at slice 05, which DISTORTS ITS ESCAPE DISTANCE AND IS SAID HERE SO THE FIGURE IS NOT READ AS REAL. O-39 was ruled at slice 06 on exactly this shape — F-05-1 and A-05-6 existed only as bullets in 05-design.md — and the ruling said slice:check should enforce it. THE ORCHESTRATOR DID NOT BUILD THE CHECK FOR TWO SLICES, so slice 05 three remaining unlogged refs stayed invisible until the check was written at slice 08. The definitions are in 05-design.md and are unchanged; this record gives them a home in the register rather than restating them.
+- *file:* `docs/slices/05-design.md`
+
+**A-05-2** — An assumption minted in slice 05 design and never logged
+
+- *scenario:* RECOVERED BY THE O-39 CHECK ON ITS FIRST RUN, and raised today rather than at slice 05, which DISTORTS ITS ESCAPE DISTANCE AND IS SAID HERE SO THE FIGURE IS NOT READ AS REAL. O-39 was ruled at slice 06 on exactly this shape — F-05-1 and A-05-6 existed only as bullets in 05-design.md — and the ruling said slice:check should enforce it. THE ORCHESTRATOR DID NOT BUILD THE CHECK FOR TWO SLICES, so slice 05 three remaining unlogged refs stayed invisible until the check was written at slice 08. The definitions are in 05-design.md and are unchanged; this record gives them a home in the register rather than restating them.
+- *file:* `docs/slices/05-design.md`
+
+**OQ-05-1** — An open question minted in slice 05 design and never logged
+
+- *scenario:* RECOVERED BY THE O-39 CHECK ON ITS FIRST RUN, and raised today rather than at slice 05, which DISTORTS ITS ESCAPE DISTANCE AND IS SAID HERE SO THE FIGURE IS NOT READ AS REAL. O-39 was ruled at slice 06 on exactly this shape — F-05-1 and A-05-6 existed only as bullets in 05-design.md — and the ruling said slice:check should enforce it. THE ORCHESTRATOR DID NOT BUILD THE CHECK FOR TWO SLICES, so slice 05 three remaining unlogged refs stayed invisible until the check was written at slice 08. The definitions are in 05-design.md and are unchanged; this record gives them a home in the register rather than restating them.
+- *file:* `docs/slices/05-design.md`
 
 </details>
 
@@ -1977,6 +1995,15 @@ rather than narrated.*
 | **R-08-4** | MINOR | 5 *(+1)* | reviewer | One implementer commit shipped 151 lines of route with its unit tests arriving a commit later | accepted |
 | **O-58** | MINOR | 5 *(+0)* | orchestrator | The orchestrator classified 24 survivors as inert and 12 of them were not — the classification inverted the precedent it cited | **open** |
 | **O-59** | MAJOR | 6 *(+1)* | orchestrator | The human closed slice 09 to new deferrals and the architect routed two more there in the same hour — the rulings collide and neither role saw the other | **open** |
+| **F-08-1** | MAJOR | 1 *(+0)* | architect | Section 6.5 has specified candidateRepository.freeResources since phase 2, and an architecture control plants exactly that as a violation | **open** |
+| **F-08-2** | MAJOR | 1 *(+0)* | architect | QS-8 is FALSE AS WRITTEN in section 10.2, over the universe its own words give | **open** |
+| **F-08-3** | MINOR | 1 *(+0)* | architect | AC-6 guarded the window the OPPOSITE WAY ROUND from the database | **open** |
+| **F-08-4** | MAJOR | 5 *(+4)* | architect | The busyResources docblock is wrong a SECOND way the review did not reach | **open** |
+| **A-08-1** | MINOR | 1 *(+0)* | architect | The pair-decomposition claim holds only while no constraint couples bay and technician | **open** |
+| **A-08-2** | MINOR | 1 *(+0)* | architect | Quiescent in QS-8 is a claim about the TEST PROCESS, not a database setting | **open** |
+| **A-08-3** | MAJOR | 1 *(+0)* | architect | status-not-cancelled and status-equals-confirmed are EXTENSIONALLY EQUAL over a two-value enum, so the denylist argument is guarded by nothing that runs | **open** |
+| **OQ-08-1** | MINOR | 1 *(+0)* | architect | The response returns two id lists — whether the booking screen needs names or capacities is unsettled | **open** |
+| **R-08-5** | MAJOR | 5 *(+1)* | architect | Section 10 is NOT satisfied on routes/availability.ts, and the orchestrator classification of its survivors is rejected | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2076,6 +2103,51 @@ rather than narrated.*
 
 - *scenario:* THE HUMAN RULED A-06-4 AT 2026-09-07: accept slice 09 as the close-out and allow it to be large, BUT CLOSE IT TO NEW DEFERRALS — any further deferral needs a different destination or must be built where it arises. THE ARCHITECT, RULING R-08-2 AND I-04-5 IN THE SAME WINDOW AND WITHOUT SIGHT OF THAT DECISION, routed TWO more to slice 09: AC-5b, the OpenAPI half of AC-5, and a re-deferral of I-04-5. It counted them itself — ADR-0033 was the seventh inherited item, AC-5b is the eighth — and called that A-06-4 OWN CURRENCY. ORCHESTRATOR READING, OFFERED RATHER THAN APPLIED: neither is accumulation in the sense A-06-4 named, because NEITHER CAN BE BUILT ANYWHERE ELSE — AC-5b asserts a document slice 09 is the slice that emits, so must-be-built-where-it-arises is impossible, and I-04-5 bias must follow F-06-1 extraction which also happens there. The human ruling closes slice 09 to deferrals that COULD go elsewhere; these are structurally bound to it. BUT THAT IS AN INTERPRETATION OF A HUMAN RULING BY THE ROLE THAT WOULD BENEFIT FROM IT BEING TRUE, so it is recorded as a reading for the gate to confirm or reject rather than acted on. IF THE HUMAN DISAGREES, the honest consequence is that AC-5b and I-04-5 must be built in slice 08 or cut, not quietly parked.
 - *file:* `docs/slices/09-observability.md`
+
+**F-08-1** — Section 6.5 has specified candidateRepository.freeResources since phase 2, and an architecture control plants exactly that as a violation
+
+- *scenario:* arc42 CONTRADICTED ITSELF FOR SIX SLICES. Section 6.5 names candidateRepository.freeResources; section 10.2 QS-12 says the appointment-table-access marker resolves to EXACTLY appointmentRepository.ts by set equality; and tests/architecture/ambiguity-containment.test.ts plants candidateRepository.ts reading appointment as a control it EXPECTS TO FAIL. So arc42 specified the one implementation an existing architecture control is built to reject. NO TOOL COULD HAVE CAUGHT IT — docs:refs checks that links RESOLVE, not that sections AGREE — and neither could anyone reading section 6 alone. ADR-0032 corrects it. Found by applying A-07-3 countermeasure to DOCUMENTS rather than to representations of a value.
+- *file:* `docs/arc42/06-runtime-view.md`
+
+**F-08-2** — QS-8 is FALSE AS WRITTEN in section 10.2, over the universe its own words give
+
+- *scenario:* QS-8 quantifies over EVERY (bay, technician) PAIR. Over that universe an UNQUALIFIED TECHNICIAN is rejected with 23503, not 23P01, so the property as stated is false of pairs it names. AC-1 universe is corrected to THE CANDIDATE SET — candidateResources bays times technicians — which is the universe the property was always about. Section 10.2 is corrected at step 7.
+- *file:* `docs/arc42/10-quality-requirements.md`
+
+**F-08-3** — AC-6 guarded the window the OPPOSITE WAY ROUND from the database
+
+- *scenario:* The database guards ends_at greater than starts_at via appointment_interval_ordered; AC-6 as written rejected only to LESS THAN from. So from EQUALS to passed the route: an EMPTY tstzrange, which overlaps nothing, so the query reports EVERYTHING free — vacuously true — and a probe of that window is refused by 23514 rather than 23P01, putting it OUTSIDE QS-8 universe entirely. AC-6 amended to to LESS-THAN-OR-EQUAL from.
+- *file:* `docs/slices/08-availability-query.md`
+
+**F-08-4** — The busyResources docblock is wrong a SECOND way the review did not reach
+
+- *scenario:* R-08-1 found the docblock overstates QS-8 reach on STATUS. It overstates on DEALERSHIP too, and differently: EACH RUN SEEDS A FRESH DEALERSHIP AND A FOREIGN BAY IS NEVER IN candidateResources OUTPUT, so deleting dealership_id = $1 CHANGES NO ANSWER QS-8 CAN OBSERVE — not because the generator misses a case, but because the fixture makes the predicate unreachable by construction. It is REDUNDANT-BY-COMPOSITE-FK, kept to scope the index. The docblock should claim RANGE AND STATUS and say the third is redundant. Implementer-owned; stated, unmade.
+- *file:* `src/persistence/appointmentRepository.ts`
+
+**A-08-1** — The pair-decomposition claim holds only while no constraint couples bay and technician
+
+- *scenario:* QS-8 decomposes availability into two independent resource sets — free bays and free technicians — and subtracts each separately. That is sound only while NO CONSTRAINT COUPLES THEM. If one ever arrives, QS-8 STOPS DECOMPOSING and the property would need to range over pairs rather than over two sets. Assumption recorded rather than proven.
+- *file:* `docs/slices/08-design.md`
+
+**A-08-2** — Quiescent in QS-8 is a claim about the TEST PROCESS, not a database setting
+
+- *scenario:* Mechanic 3 turns it from an assumption into a MEASUREMENT — the witness re-runs the query and requires a byte-identical answer with unchanged count and max(updated_at) scoped to the run own dealership. WHAT REMAINS ASSUMED is that Testcontainers gives the run an OTHERWISE-IDLE DATABASE. Recorded because the witness measures drift it can see, and cannot measure a writer it shares no dealership with.
+- *file:* `docs/slices/08-design.md`
+
+**A-08-3** — status-not-cancelled and status-equals-confirmed are EXTENSIONALLY EQUAL over a two-value enum, so the denylist argument is guarded by nothing that runs
+
+- *scenario:* Mechanic 6 makes the status conjunct REACHABLE and still cannot separate the DENYLIST spelling from the ALLOWLIST one, because over confirmed and cancelled the two predicates select the same rows. The no_show scenario 0003_appointment.sql own docblock anticipates — where an allowlist becomes A DOUBLE-BOOKING NOBODY WROTE — IS REAL AND NOT ASSERTABLE UNTIL A THIRD STATUS EXISTS. Adding an unused enum value to make a test possible is a data-model change no requirement asks for. BOOKED, NOT BUILT: the denylist forward-safety argument stays prose, guarded by a docblock and by nothing that runs.
+- *file:* `src/persistence/migrations/0003_appointment.sql`
+
+**OQ-08-1** — The response returns two id lists — whether the booking screen needs names or capacities is unsettled
+
+- *scenario:* Section 3.3 did not settle it. Ids match candidateResources own shape and ADR-0007 keeps reference data out of the API, so ids are the consistent choice. RULED IDS, PROVISIONAL AT THE GATE, and recorded because a client question answered by an architect is the kind the gate may want to reopen.
+- *file:* `docs/slices/08-design.md`
+
+**R-08-5** — Section 10 is NOT satisfied on routes/availability.ts, and the orchestrator classification of its survivors is rejected
+
+- *scenario:* MINTED BY THE ARCHITECT WHEN IT RULED THE MUTATION QUESTION AND NEVER RAISED AS A FINDING — recovered by the O-39 check on its first run, which is the defect that check exists for, found in the slice that built it. THE SUBSTANCE: the orchestrator reported 48.94 and argued all 24 survivors fell in classes already ruled inert on routes/appointments.ts, citing I-06-5. THE CITATION INVERTS THE PRECEDENT: I-06-5 removed ONLY what is unkillable BY CONSTRUCTION and left the rest as a STATED GAP. Twelve of the twenty-four are OBSERVABLE TODAY AND ASSERTED BY NOTHING in this repository, four of them RFC 9457 title strings that routes/appointments.ts has also carried unasserted since slice 02. Adjusted score 25 of 47 equals 53.19 on I-06-5 own rule. Remedy is route unit assertions on the whole problem document, ruled (b), home here.
+- *file:* `src/http/routes/availability.ts`
 
 </details>
 
