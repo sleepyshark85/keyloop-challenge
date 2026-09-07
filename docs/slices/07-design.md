@@ -118,8 +118,8 @@ scope by `A-05-6`'s own words; `R-07-10` rejected, repository governance tooling
 and whether it belongs in `CLAUDE.md` §10 the gate's (`A-06-6`); the AC-5 DCR **(a)**, the design
 right and the instrument wrong.
 
-**Step 7** — `D-07-1` is deferred to **slice 09** (`O-53`: slice 11 is a tombstone folded into 09),
-`R-07-12` riding with it in §11's row; `R-07-13` is corrected above, `O-54` goes to the retro.
+**`D-07-1`, booked at step 7** — deferred to **slice 09** (`O-53`: slice 11 is a tombstone folded
+into 09), `R-07-12` riding with it in §11's row. `R-07-13` is corrected above; `O-54` to the retro.
 
 **Third occurrence of one shape**, for the retro: the slice-06 discharge ruling, ADR-0030's symmetry
 claim and `R-07-1` each state something true **within** one transaction as though it were true
