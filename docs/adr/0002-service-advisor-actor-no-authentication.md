@@ -21,24 +21,24 @@ ai-input: >
 
 ## Context and problem statement
 
-The brief says only *"Allow a user to request a service appointment"*, and the two readings of
-"user" produce different APIs — not two implementations of one:
+Someone books a service appointment. Who is holding the phone?
 
-- **Service advisor on behalf of a customer.** The caller is dealership staff, typically on the
-  phone, so `customer_id` is in the request body and ownership is a **validation** rule.
-- **Customer self-service.** The caller is the vehicle owner. `customer_id` must *not* be in the body
-  — that would be the vulnerability. It comes from an authenticated identity, so ownership becomes
-  an **authorisation** control: a `403`, audited, leaking nothing about the vehicle.
+If it is dealership staff taking a call, the customer's id is an ordinary field in the request and
+checking that the car belongs to that customer is validation. If it is the car's owner on a
+website, that same field is the vulnerability — anyone could type someone else's id — so the identity
+has to come from a login, and the same check becomes a security control: a `403`, audited, leaking
+nothing about the vehicle.
 
-The same sentence lands either in validation or in a security boundary, on an answer the
-brief does not give — a scope question `CLAUDE.md` §6 reserves to the human. TC-5 also stubs the
-client layer, and a stubbed client cannot hold a session.
+The brief says only *"Allow a user to request a service appointment"*. The two readings produce
+different APIs, not two implementations of one, and nothing in the brief chooses between them —
+which makes it a scope question only the human may settle. The client layer is stubbed by constraint
+too, and a stubbed client cannot hold a session.
 
 ## Considered options
 
 - **Option A — Service advisor, no authentication.** The caller is trusted.
   *(The architect's recommendation.)*
-  - Good, because it matches the brief's framing — a *manual* process run by staff (§3.1.2).
+  - Good, because it matches the brief's framing — a *manual* process run by staff.
   - Good, because it keeps `customer_id` an ordinary field
   - Good, because it spends no review budget
   - Bad, because the resulting service could not be deployed anywhere reachable
@@ -51,7 +51,7 @@ client layer, and a stubbed client cannot hold a session.
   - Bad, because it requires an identity provider, token issuance and a session story
     for a deliberately stubbed client — mechanism with no counterpart.
   - Bad, because the interesting risk in this system is concurrent resource allocation
-    — it trades a graded goal (§1.2 goals 1 and 2) for an ungraded one.
+    — it trades two graded goals for an ungraded one.
 - **Option C — Service advisor, with a shared API key or token on the boundary.** Authentication of
   the *calling system* without modelling users.
   - Good, because the contract would show a security scheme
@@ -63,39 +63,39 @@ client layer, and a stubbed client cannot hold a session.
 ## Decision
 
 Chosen option: **Option A — service advisor, no authentication**, because the actor the brief's
-wording best supports is dealership staff replacing a paper diary (§3.1.2), and because a control
-built against a stubbed client would be unverifiable theatre (§1.2 goal 2).
+wording best supports is dealership staff replacing a paper diary, and because a control built
+against a stubbed client would be unverifiable theatre.
 
 - **`customer_id` travels in the request body**, alongside vehicle, service type, dealership and
-  desired start; likewise for cancellation and rescheduling (ADR-0003).
+  desired start; likewise for cancellation and rescheduling.
 - **Ownership is a validation rule, not a security control.**
-  Its failure is a `4xx` with a plain reason (A-6), deliberately **not** an authorisation failure:
+  Its failure is a `4xx` with a plain reason, deliberately **not** an authorisation failure:
   no `403`, no studied ambiguity about the vehicle, no audit event.
 - **The caller is trusted.** The stubbed client layer stands in for an authenticated front end
   a real deployment would put in front. The OpenAPI document publishes **no security scheme** —
   the absence is explicit.
-- **Authentication, authorisation, sessions, rate limiting and per-actor audit are out of scope**
-  (§3.3), carried in §11 as debt; the change is not additive.
+- **Authentication, authorisation, sessions, rate limiting and per-actor audit are out of scope**,
+  and carried as debt; the change is not additive.
 
 ## Consequences
 
 **Good**
 
-- The API is fully exercisable by cURL with no credential ceremony
-  — what makes the harness usable under time pressure (TC-5).
-- Every `4xx` on the booking path is about the *domain*
-  — unknown reference, mismatched ownership, opening hours (ADR-0001), contention (ADR-0004).
-- The customer is not an actor, which keeps §3.1's boundary to two human roles
+- The API is fully exercisable by cURL with no credential ceremony, which is what makes the
+  harness usable under time pressure.
+- Every `4xx` on the booking path is about the *domain* — unknown reference, mismatched ownership,
+  opening hours, contention.
+- The customer is not an actor, which keeps the context boundary to two human roles
 - No security mechanism is claimed that is not tested.
 
 **Bad, or deferred**
 
 - **The service is unsafe to expose. Anyone who can reach it can book on any customer's behalf**,
-  read any appointment, cancel any booking. Acceptable only at §7's single local container;
-  stated plainly in §11.
+  read any appointment, cancel any booking. Acceptable only at the single local container this
+  system deploys to; stated plainly as debt.
 - Retrofitting authentication is not purely additive: the ownership check moves layer
   and its status code becomes `403`; its body must stop distinguishing "not yours" from
   "does not exist".
 - There is no actor on an appointment record — no "booked by"
   — so "who cancelled this?" cannot be answered.
-- Rate limiting is absent, so the retry loop of ADR-0004 has no per-caller ceiling
+- Rate limiting is absent, so the booking path's retry loop has no per-caller ceiling

@@ -21,12 +21,12 @@ ai-input: >
 
 ## Context and problem statement
 
-§1.4 OQ-4 is an acceptance-criteria question. §2.1 forbids check-then-act, so the booking path forms
-candidate *(bay, technician)* pairs, picks one and **attempts the write**; the database decides.
+Bays 1 and 2 are both free. Two requests arrive together, both pick bay 1, and the loser is told the
+dealership has nothing available — **while bay 2 sits empty.**
 
-Bays 1 and 2 are free, two requests arrive together, both pick bay 1, and the loser gets a `409`
-**while bay 2 sat empty** — a refusal the physical world did not require, which §1.3's service
-manager objects to.
+Nothing physical required that refusal. It happens because overlap is prevented by the database and
+never by application code: the booking path forms candidate *(bay, technician)* pairs, attempts the
+write, and the database decides. What is undecided is what it does when the database says no.
 
 ## Considered options
 
@@ -45,7 +45,7 @@ manager objects to.
 - **Option C — Retry with a fresh candidate read after each failure.** On `23P01`, re-query
   availability.
   - Good, because each attempt uses the freshest information
-  - Bad, because it has no natural bound: under sustained contention the read can keep returning
+  - Bad, because it has no natural bound: under sustained contention the read keeps returning
     candidates already taken.
   - Bad, because it is the variant that most *resembles* check-then-act
   - Bad, because it multiplies database round trips
@@ -70,26 +70,25 @@ list is exhausted.**
 ### The bound
 
 The list is **read once per request**, never refreshed on failure. **Each candidate is attempted at
-most once**, so the loop ends within
-`|candidates|` attempts (§1.1). A **hard cap** stops it even if candidates remain; its *value*
-is a Gate B parameter, its *existence* fixed here. Exhaustion or cap produces **`409`**, naming
-the contended resource class (§1.3).
+most once**, so the loop ends within `|candidates|` attempts. A **hard cap** stops it even if
+candidates remain; its *value* is a Gate B parameter, its *existence* fixed here. Exhaustion or cap
+produces **`409`**, naming the contended resource class.
 
 ### Supporting rules
 
-- **Only `23P01` retries.** Any other SQLSTATE surfaces as itself — a foreign-key violation means
-  bad references (A-6).
+- **Only `23P01` retries.** Any other SQLSTATE surfaces as itself: a foreign-key violation means
+  bad references.
 - **Each attempt is independently recoverable.** A constraint violation aborts the enclosing
-  transaction, so each needs its own transaction or a savepoint.
-- **Validation is not repeated.** Opening hours (ADR-0001) and reference integrity are properties
-  of the request.
-- **Rescheduling uses the same policy**, with the `UPDATE` of ADR-0003 as the attempted write.
-- **Every conflict is observable.** `booking_conflicts_total{resource}` counts each `23P01`, and an
+  transaction, so each needs its own transaction or savepoint.
+- **Validation is not repeated.** Opening hours and reference integrity are properties of the
+  request.
+- **Rescheduling uses the same policy**, with the move's atomic `UPDATE` as the attempted write.
+- **Every conflict is observable.** A per-resource conflict counter counts each `23P01`, and an
   absorbed conflict must be distinguishable from a refusal.
-- **Candidate ordering is an architecture decision** for Gate B, not a Gate A ruling. It is called
-  out because identical ordering makes requests collide.
+- **Candidate ordering is an architecture decision** for Gate B. It is called out because identical
+  ordering makes requests collide.
 
-### What §10 must assert at Gate B
+### What the quality scenarios must assert at Gate B
 
 - **No overlap.** Under any interleaving of concurrent requests, no two non-cancelled appointments
   share a bay, or a technician, with overlapping intervals.
@@ -100,18 +99,16 @@ the contended resource class (§1.3).
 
 **Good**
 
-- A `409` comes to mean *the dealership had nothing free*, which is what the caller will read it
-  as.
-- Capacity is actually used under burst load — the 08:00-on-Saturday case
-- `booking_conflicts_total` becomes a real signal
-- The invariant stays exactly where `CLAUDE.md` §2.1 put it.
+- A `409` comes to mean *the dealership had nothing free*, which is what the caller reads it as.
+- Capacity is used under burst load — the 08:00-on-Saturday case
+- The conflict counter becomes a real signal
+- The invariant stays where it was put: in the database.
 
 **Bad, or deferred**
 
-- The booking path is materially more complex than a single insert: a loop, per-attempt transaction
-  scoping, a cap.
+- The booking path is more complex than a single insert: a loop, per-attempt transaction scoping,
+  a cap.
 - Latency under contention is worse
-- Retry work grows with the square of concurrency in the worst case if candidate ordering is
-  uniform.
-- The cap introduces a rare outcome — refused while candidates remained — that is a spurious
-  refusal, accepted as a liveness guard.
+- Retry work grows with the square of concurrency if candidate ordering is uniform.
+- The cap introduces a rare outcome — refused while candidates remained — a spurious refusal
+  accepted as a liveness guard.

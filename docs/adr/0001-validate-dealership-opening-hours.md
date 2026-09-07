@@ -24,18 +24,17 @@ ai-input: >
 
 ## Context and problem statement
 
-§1.4 OQ-1 asked whether working time is modelled at all — the largest scope lever, because
-the answer decides what *available* means.
+A service advisor books a car in for 03:00 on a Sunday and the system confirms it: the dealership is
+shut, nobody is there, and *available* has so far meant only *not already booked*.
 
-If it means only *not already booked*, §2.1 has settled enforcement and the system will cheerfully
-confirm 03:00 on a Sunday. If it also means *within a working window*, a second class of correctness
-rule appears that the exclusion constraint does not cover, and the naive mechanism for it — read the
-window, decide, then write — is the check-then-act shape the design exists to eliminate. That
-objection applies unevenly, and the asymmetry is the decision:
+Making it mean *within a working window* too is the largest scope lever in the brief. It adds a
+second class of correctness rule the exclusion constraint does not cover, and the naive way to
+enforce one — read the window, decide, then write — is the check-then-act shape this system exists
+to eliminate. The objection applies unevenly, and the asymmetry is the decision:
 
-- **Dealership opening hours** are a static property of the *request*.
-  The answer is a pure function of reference data, decidable **without reading any other booking**.
-- **Technician shifts, holidays and absence** are properties of a *resource over time*. They are
+- **Dealership opening hours** are a static property of the *request* — a pure function of reference
+  data, decidable **without reading any other booking**.
+- **Technician shifts, holidays and absence** are properties of a *resource over time*:
   per-technician, interacting with allocation — a genuine second availability rule.
 
 ## Considered options
@@ -50,8 +49,7 @@ objection applies unevenly, and the asymmetry is the decision:
   - Good, because it is decidable from the request alone, so it cannot reintroduce check-then-act
   - Good, because it buys the visible half of the credibility
   - Good, because the failure mode is a plain `400`
-  - Bad, because it is a *partial* answer
-    — answered honestly in §11.
+  - Bad, because it is a *partial* answer: the technician half stays unmodelled
   - Bad, because it introduces the only wall-clock/zone reasoning in the system
 - **Option C — Full working-calendar modelling.**
   - Good, because "available" would mean what a service manager means
@@ -67,45 +65,46 @@ Chosen option: **Option B — opening-hours validation only**, because it remove
 behaviour of Option A at a cost that provably cannot touch the concurrency invariant, while Option C's
 cost is a second class of availability rule the constraint does not cover.
 
-Why this is not a retreat from §2.1:
+Why this does not reintroduce check-then-act:
 
 > Opening hours are a **static property of the request**: the check reads reference data and nothing
-> about any other booking, so no concurrent request can invalidate it: no window between check and
-> act. It is validation, like "the end must follow the start". **Availability and
+> about any other booking, so no concurrent request can invalidate it: no window between check
+> and act. It is validation, like "the end must follow the start". **Availability and
 > contention remain entirely the database's business.**
 
 The failure is therefore **`400`**, not `409`: an out-of-hours request is invalid on an empty
-database at any hour, and conflating it with contention corrupts `booking_conflicts_total`.
+database at any hour, and conflating it with contention corrupts the conflict metric.
 
-- The **whole derived interval** must fall within opening hours — both the start and the end
-  derived from the duration (A-1).
-- Opening hours are per dealership and per day of week, held as seeded reference data (A-6, A-7).
-- The dealership carries an IANA time zone. Comparison is: convert the request's instant into the
-  dealership's local time (A-8).
+- The **whole derived interval** must fall within opening hours, both the start and the end
+  derived from the service type's duration.
+- Opening hours are per dealership and per day of week, held as seeded reference data that no
+  endpoint can create or edit.
+- The dealership carries an IANA time zone; comparison converts the request's instant into the
+  dealership's local time.
 - Closures, public holidays and one-off exceptions are **not** modelled.
 - **Technician shifts, holidays and absence are not modelled.**
 
-Rescheduling (ADR-0003) applies the same rule; the retry loop does not re-check it — a property of
+Moving an appointment applies the same rule; the retry loop does not re-check it — a property of
 the request, not the candidate.
 
 ## Consequences
 
 **Good**
 
-- The system no longer books at 03:00, and the rule that stops it is a pure function that a
-  unit test can exercise without a database.
-- Quality goal 1 is untouched. There is exactly one class of availability rule and the database
+- The system no longer books at 03:00, and the rule that stops it is a pure function a unit test
+  can exercise without a database.
+- Nothing about contention changes: there is one class of availability rule, and the database
   owns it.
 - The rejection is cheap and early: it needs no candidate query
-- A-8's instants-at-the-boundary reading is vindicated rather than complicated
+- Treating an instant exactly on the boundary as inside the window is vindicated rather than
+  complicated
 
 **Bad, or deferred**
 
 - A technician can still be booked outside their personal working hours
-  — a real limitation §11 must carry.
+  — a real limitation, carried as debt.
 - Holidays and one-off closures are absent, so a dealership shut on 25 December will accept
   bookings.
-- Reference data gains two fields (opening hours, IANA zone) that A-6's seed and A-7's "no
-  reference CRUD" must cover.
-- Wall-clock comparison against a zone is the one place in the system where a DST transition
-  can bite; §10 should carry a DST-boundary scenario.
+- Reference data gains opening hours and an IANA zone, which the seed must supply.
+- Wall-clock comparison against a zone is the one place a DST transition can bite, so a
+  DST-boundary quality scenario is owed.
