@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **272** |
-| Severity | 12 blocking · 143 major · 117 minor |
+| Findings recorded | **274** |
+| Severity | 12 blocking · 144 major · 118 minor |
 | Verdicts | 18 narrowed · 93 accepted · 3 escalated · 23 deferred · 1 rejected |
-| Raised by | test-engineer 62 · reviewer 60 · orchestrator 50 · architect 49 · implementer 44 · scribe 5 · human 2 |
-| Awaiting a ruling | **134** |
+| Raised by | test-engineer 62 · reviewer 60 · architect 51 · orchestrator 50 · implementer 44 · scribe 5 · human 2 |
+| Awaiting a ruling | **136** |
 | Mean escape distance | 1.70 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -1726,6 +1726,8 @@ rather than narrated.*
 | **T-07-7** | MAJOR | 3 *(+-2)* | test-engineer | The architect R-07-4 prediction is CONFIRMED BY MEASUREMENT WITH NON-OVERLAPPING INTERVALS — bounding in-flight requests to the pool made the mutant control 2 to 4 times stronger | **open** |
 | **T-07-8** | MINOR | 3 *(+-2)* | test-engineer | AC-5 pg_locks witness is deterministic in practice as well as in principle, verified five ways | **open** |
 | **O-54** | MAJOR | 3 *(+3)* | orchestrator | Section 7 EXACTLY ONE RED COMMIT PER SLICE does not contemplate a loopback, and slice 07 now has two | **open** |
+| **A-07-3** | MAJOR | 4 *(+4)* | architect | Four claims in this slice were true in one representation and false in another, and every one survived because what would falsify it sat across a boundary nobody crossed | **open** |
+| **A-07-4** | MINOR | 4 *(+1)* | architect | The file header extra-round-trip account of the low deadlock rate is superseded by measurement and should be retired rather than left standing beside the new number | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1879,6 +1881,16 @@ rather than narrated.*
 
 - *scenario:* RAISED BY THE ORCHESTRATOR AND ANSWERED BY THE ROLE SECTION 7 NAMES AS THE AUTHOR OF THE RED, so both readings are in the record. The declared loopback reopened steps 1 to 4 over a DESIGN defect — R-07-1, ruled against the design rather than the build — so new criteria AC-5 and an amended AC-4 needed a red of their own. The test-engineer view, which the orchestrator shares: the two candidates were to AMEND THE FIRST RED IN PLACE, losing the record that AC-4 original shape was itself measured and superseded for a reasoned cause, or A SECOND RED CARRYING ITS OWN REASONING AND ITS OWN CI-OBSERVED FAILURE at the cost of the rule letter. Its words: I would rather have the git history show WHY the criteria changed than have one commit silently rewritten to look like it was always right — that history is exactly what ADR-0030 and ADR-0031 already do for the design side, AND STEP 3 EVIDENCE DESERVES THE SAME STANDARD. PROPOSED AMENDMENT: exactly one red commit PER DESIGN rather than per slice. Routed to the retro because the architect cannot amend CLAUDE.md by ruling — A-06-6 ground — and because it is a constitution question rather than a slice one.
 - *file:* `CLAUDE.md`
+
+**A-07-3** — Four claims in this slice were true in one representation and false in another, and every one survived because what would falsify it sat across a boundary nobody crossed
+
+- *scenario:* THE VACATED INDEX ENTRY, THE MULTISET SYMMETRY, THE STALE LEAVE, AND A SIGNED HASH IN AN UNSIGNED COLUMN. Three transaction boundaries and one TYPE boundary. WHAT DIFFERS IS THE COST: the first three were defects IN THE SYSTEM, and this one was a defect IN AN INSTRUMENT — and it was caught PRECISELY BECAUSE THE ARCHITECT REQUIRED THE WITNESS TO BE DETERMINISTIC, since a probabilistic witness would have been dismissed as flake. So the retro should read the fourth as THE CONTROL WORKING rather than as a fourth failure. THE COUNTERMEASURE HAS NOW WORKED FOUR TIMES AND IS THE SAME EACH TIME: cross the boundary and read the value in the representation THE SYSTEM ACTUALLY USES, instead of arguing about it from the near side. That is what racing F-02-9 did at step 1, what the reviewer differential-test did over 254 inputs, what the test-engineer positive control did at 0 of 1000, and what the ruled SQL-side comparison will do here.
+- *file:* `docs/slices/07-design.md`
+
+**A-07-4** — The file header extra-round-trip account of the low deadlock rate is superseded by measurement and should be retired rather than left standing beside the new number
+
+- *scenario:* The header explained the fixture 0.5 percent against ADR-0030 117 of 1000 by the extra round trip its forced attempt-1 failure adds. R-07-4 re-measurement falsified that: bounded to the pool the same unfixed build gives 1.87 percent with a 95 percent interval of 1.38 to 2.35 that does NOT overlap the unbounded 0.27 to 0.80, and the test-engineer states it has no case left for its own explanation. THE OLD SHAPE WAS UNDER-RACING. The architect words: thank you for running the falsification rather than the confirmation — 1.87 against 0.5 with disjoint intervals and a 0 of 1000 positive control is A BETTER RESULT THAN THE RULING DESERVED. Leaving a superseded explanation beside the number that superseded it is how a reader later re-derives the wrong cause.
+- *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
 
 </details>
 
