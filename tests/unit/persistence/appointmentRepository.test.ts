@@ -67,9 +67,13 @@ const OTHER_TECHNICIAN = 'tttttttt-1111-4111-8111-111111111111';
 describe('lockResources — ADR-0018, extended by ADR-0030', () => {
   it('booking (leave: null) is ONE statement, DISTINCT-collapsed to the same two keys ADR-0018 always locked', async () => {
     // `vacated = leave ?? { bayId, technicianId }` — a booking's `leave: null` folds `vacated`
-    // back onto `take`, so the four-key array degenerates to two DISTINCT pairs and the
-    // statement's parameters are byte-for-byte what slice 06 sent. This is the pin that a
-    // booking is UNCHANGED by ADR-0030, not merely compatible with it.
+    // back onto `take`, so the four-key array carries the same pair twice and `DISTINCT`
+    // collapses it back to the two locks ADR-0018 always took, class 1 then class 2. R-07-8:
+    // what is genuinely UNCHANGED by ADR-0030 is that SET of advisory locks acquired — not the
+    // raw statement text. Slice 06 sent two parameters; this sends four (deduplicated inside
+    // SQL, never in JS), so "byte-for-byte what slice 06 sent" was never literally true of the
+    // parameter list below. No test executes the deduplicated lock set directly — it is argued
+    // from `DISTINCT`, and this test pins the statement and parameters that argument rests on.
     const { db, recorded } = scriptedDb([{ rows: [{ pg_advisory_xact_lock: null }] }]);
     await lockResources(db, IDS.bay, IDS.technician, null);
 
@@ -107,12 +111,15 @@ describe('lockResources — ADR-0018, extended by ADR-0030', () => {
     expect(sql).toContain('order by cl, hashtext(key)');
   });
 
-  it('the two racers of a mutually-vacating pair send the SAME multiset of keys, take and leave swapped', async () => {
-    // ADR-0030's symmetry argument, exercised against the real call rather than restated in
-    // prose: racer 1 takes P1 and leaves P2; racer 2 takes P2 and leaves P1. Neither statement
-    // sorts its own parameters in JS — the four keys arrive in call order and it is the SQL's
+  it('the two racers of a mutually-vacating pair send the same MULTISET of keys — necessary for the total order, not by itself what rules out a cycle (R-07-2)', async () => {
+    // Racer 1 takes P1 and leaves P2; racer 2 takes P2 and leaves P1. Neither statement sorts
+    // its own parameters in JS — the four keys arrive in call order and it is the SQL's
     // `DISTINCT ... ORDER BY (class, hashtext(key))` that turns them into one sequence, so the
     // only claim a unit test can pin is that both calls hand the database the SAME multiset.
+    // What that multiset does NOT by itself establish is deadlock freedom — the docblock this
+    // pins to (`lockResources`, R-07-2) names two other mechanisms this test does not exercise:
+    // the total order's own acyclicity, and ADR-0030/ADR-0031's completeness for the tuple-wait
+    // half. AC-4's own fixture is not even this symmetric case, and is protected regardless.
     const p1 = { bayId: IDS.bay, technicianId: IDS.technician };
     const p2 = { bayId: OTHER_BAY, technicianId: OTHER_TECHNICIAN };
 

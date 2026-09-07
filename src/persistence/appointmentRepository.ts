@@ -143,11 +143,29 @@ const TECHNICIAN_LOCK_CLASS = 2;
  * The result is `DISTINCT`-ed and `ORDER BY (class, hashtext(key))` — a total order over a
  * shared key space computed FROM A VALUE, inside the statement, rather than maintained by a
  * caller: there is no sort for a human to keep sorted, and no call-site fact (which pair a racer
- * happened to pass as `take` versus `leave`) enters the order at all. That last part is the
- * load-bearing symmetry: for a MUTUALLY-VACATING pair, both racers' {take, leave} sets are THE
- * SAME MULTISET of four keys, so both compute the identical ordered lock sequence regardless of
- * which one calls `take` on which pair — which is what stops the enlarged lock set from cycling
- * on itself. Measured (ADR-0030): 20 mutually-vacating pairs, 25 trials, `23P01` 883/1000 and
+ * happened to pass as `take` versus `leave`) enters the order at all.
+ *
+ * ── R-07-2: DEADLOCK FREEDOM IS TWO MECHANISMS, AND SYMMETRY IS NEITHER OF THEM ───────────────
+ *
+ * A prior version of this docblock claimed the load-bearing fact was that a MUTUALLY-VACATING
+ * pair's two racers compute the SAME MULTISET of four keys. That is true and is not what does
+ * the work — AC-4's own fixture races `{bay0, bay1, tA}` against `{bay0, bay1, tB}`, which is
+ * not that symmetric case, and is protected regardless. What actually holds:
+ *
+ *   (i)   THE ADVISORY WAITS ARE ACYCLIC because the order is TOTAL: a cycle needs some `k1 <
+ *         k2` with each side holding one and waiting on the other, which cannot arise when
+ *         every transaction acquires its whole set in ONE statement walked in that same order —
+ *         nothing ever holds `k2` while still waiting to acquire `k1`.
+ *   (ii)  `DISTINCT` is over `(cl, hashtext(key))`, the SAME tuple `ORDER BY` sorts on, so no
+ *         two rows in the ordered set can tie, and a `hashtext` COLLISION between two different
+ *         keys collapses them to one lock rather than leaving the order ambiguous.
+ *   (iii) THE TUPLE WAITS (the exclusion check blocking on another transaction's live or
+ *         vacated index entry) ARE ACYCLIC because of ADR-0030's completeness — every resource
+ *         a write is in flight against is locked — made ACCURATE by ADR-0031: that resource set
+ *         is now computed FROM STATE READ INSIDE THE TRANSACTION, not carried from before it
+ *         opened. Two mechanisms, not one, and neither is the multiset argument.
+ *
+ * Measured (ADR-0030): 20 mutually-vacating pairs, 25 trials, `23P01` 883/1000 and
  * `40P01` 117/1000 locking the target pair alone; `23P01` 1000/1000 and `40P01` 0 locking the
  * union.
  *
