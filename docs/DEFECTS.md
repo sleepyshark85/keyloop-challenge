@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **274** |
-| Severity | 12 blocking · 144 major · 118 minor |
-| Verdicts | 18 narrowed · 93 accepted · 3 escalated · 26 deferred · 2 rejected |
-| Raised by | test-engineer 62 · reviewer 60 · architect 51 · orchestrator 50 · implementer 44 · scribe 5 · human 2 |
-| Awaiting a ruling | **132** |
+| Findings recorded | **276** |
+| Severity | 12 blocking · 144 major · 120 minor |
+| Verdicts | 19 narrowed · 93 accepted · 3 escalated · 25 deferred · 2 rejected |
+| Raised by | test-engineer 62 · reviewer 62 · architect 51 · orchestrator 50 · implementer 44 · scribe 5 · human 2 |
+| Awaiting a ruling | **134** |
 | Mean escape distance | 1.70 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -1725,9 +1725,11 @@ rather than narrated.*
 | **O-53** | MAJOR | 5 *(+0)* | orchestrator | D-07-1 was routed to SLICE 11, a tombstone Gate D folded into 09 — the THIRD routing to a folded slice, and the second by the same role | **open** |
 | **T-07-7** | MAJOR | 3 *(+-2)* | test-engineer | The architect R-07-4 prediction is CONFIRMED BY MEASUREMENT WITH NON-OVERLAPPING INTERVALS — bounding in-flight requests to the pool made the mutant control 2 to 4 times stronger | **open** |
 | **T-07-8** | MINOR | 3 *(+-2)* | test-engineer | AC-5 pg_locks witness is deterministic in practice as well as in principle, verified five ways | **open** |
-| **O-54** | MAJOR | 3 *(+3)* | orchestrator | Section 7 EXACTLY ONE RED COMMIT PER SLICE does not contemplate a loopback, and slice 07 now has two | deferred |
+| **O-54** | MAJOR | 3 *(+3)* | orchestrator | Section 7 EXACTLY ONE RED COMMIT PER SLICE does not contemplate a loopback, and slice 07 now has two | narrowed |
 | **A-07-3** | MAJOR | 4 *(+4)* | architect | Four claims in this slice were true in one representation and false in another, and every one survived because what would falsify it sat across a boundary nobody crossed | deferred |
 | **A-07-4** | MINOR | 4 *(+1)* | architect | The file header extra-round-trip account of the low deadlock rate is superseded by measurement and should be retired rather than left standing beside the new number | **open** |
+| **R-07-12** | MINOR | 5 *(+2)* | reviewer | POOL_MAX = 10 is a HAND-COPIED DUPLICATE of pg default pool size, and R-07-4 whole remedy depends on it matching the service actual ceiling | **open** |
+| **R-07-13** | MINOR | 5 *(+0)* | reviewer | The stale AC-5 parenthetical exists in TWO files and the step-7 deferral ruling names only one | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1883,7 +1885,7 @@ rather than narrated.*
 
 - *scenario:* RAISED BY THE ORCHESTRATOR AND ANSWERED BY THE ROLE SECTION 7 NAMES AS THE AUTHOR OF THE RED, so both readings are in the record. The declared loopback reopened steps 1 to 4 over a DESIGN defect — R-07-1, ruled against the design rather than the build — so new criteria AC-5 and an amended AC-4 needed a red of their own. The test-engineer view, which the orchestrator shares: the two candidates were to AMEND THE FIRST RED IN PLACE, losing the record that AC-4 original shape was itself measured and superseded for a reasoned cause, or A SECOND RED CARRYING ITS OWN REASONING AND ITS OWN CI-OBSERVED FAILURE at the cost of the rule letter. Its words: I would rather have the git history show WHY the criteria changed than have one commit silently rewritten to look like it was always right — that history is exactly what ADR-0030 and ADR-0031 already do for the design side, AND STEP 3 EVIDENCE DESERVES THE SAME STANDARD. PROPOSED AMENDMENT: exactly one red commit PER DESIGN rather than per slice. Routed to the retro because the architect cannot amend CLAUDE.md by ruling — A-06-6 ground — and because it is a constitution question rather than a slice one.
 - *file:* `CLAUDE.md`
-- *deferred* by orchestrator — DEFERRED TO THE RETRO because it is a CLAUDE.md question and neither the architect nor the orchestrator may amend the constitution by ruling — A-06-6 ground. Both readings are on the record and they agree: the test-engineer, whom section 7 names as the author of the red, and the orchestrator both hold that a second red is right here, and that amending the first red in place would ERASE THE RECORD that AC-4 original shape was measured, superseded and why. Proposed wording, the test-engineer: EXACTLY ONE RED COMMIT PER DESIGN rather than per slice, so a loopback is EXPECTED to cost a second red rather than reading as a violation each time. The reviewer section 7 audit reading is being collected at the re-review and will be attached.
+- *narrowed* by reviewer — THE SECOND RED IS CORRECT AND SECTION 7 TEXT IS WHAT IS WRONG — the reviewer would not block on it and would not have accepted the alternative. SECTION 7 COUNT EXISTS TO SERVE SECTION 2.4, which is a rule about EVIDENCE PER ACCEPTANCE CRITERION: no criterion may be satisfied by code that existed before the criterion was observed failing. Exactly-one-red-per-slice is A PROXY THAT IS EXACT ONLY WHILE A SLICE HAS ONE SET OF CRITERIA FOR ITS WHOLE LIFE. Amending e030f52 in place SATISFIES SECTION 7 LETTER AND BREAKS SECTION 2.4 SUBSTANCE, because the resulting commit CI run would not be the run that observed the amended criteria red — it MANUFACTURES A RED THAT NEVER REDDENED WHAT IT CLAIMS TO HAVE REDDENED. Section 2 is NON-NEGOTIABLE and section 7 is not. BEYOND THAT, SECTION 7 AND SECTION 6 ARE IN DIRECT TEXTUAL TENSION AS WRITTEN: section 6 permits two loopbacks, and a loopback that adds a criterion NECESSARILY owes a red; the tension has been invisible only because no prior loopback introduced one. A CONSTITUTION DEFECT SURFACED, NOT A DISCIPLINE BREACH. ON THE PROPOSED WORDING THE REVIEWER NARROWS IT: per design is right in spirit but HAS NO COMMIT-COUNTABLE DEFINITION, so it moves the rule from auditable to arguable, which is the direction section 2.3 says not to go. Proposed instead — EXACTLY ONE RED COMMIT PER SLICE, PLUS ONE PER DECLARED LOOPBACK THAT ADDS OR AMENDS AN ACCEPTANCE CRITERION, each authored by the test-engineer and each observed red in CI — because that is derivable from artifacts already present: reds on the branch at most 1 plus the loopbacks field slice:check already reads. NOTE red-proof CANNOT ENFORCE EITHER WORDING, judging the head commit only, so whichever wins should land in tools/slice/check.mjs or the rule stays reviewer opinion. AND ONE CAVEAT FOR THE RETRO HONESTY: b555317 red taken alone was NOT clean evidence for AC-5, so the wording should carry section 2.4 second clause explicitly — OBSERVED RED IN CI AGAINST THE BUILD THE CRITERION DISCRIMINATES AGAINST — because a red that fires for an INSTRUMENT defect looks identical in git to one that fires for the build.
 
 **A-07-3** — Four claims in this slice were true in one representation and false in another, and every one survived because what would falsify it sat across a boundary nobody crossed
 
@@ -1895,6 +1897,16 @@ rather than narrated.*
 
 - *scenario:* The header explained the fixture 0.5 percent against ADR-0030 117 of 1000 by the extra round trip its forced attempt-1 failure adds. R-07-4 re-measurement falsified that: bounded to the pool the same unfixed build gives 1.87 percent with a 95 percent interval of 1.38 to 2.35 that does NOT overlap the unbounded 0.27 to 0.80, and the test-engineer states it has no case left for its own explanation. THE OLD SHAPE WAS UNDER-RACING. The architect words: thank you for running the falsification rather than the confirmation — 1.87 against 0.5 with disjoint intervals and a 0 of 1000 positive control is A BETTER RESULT THAN THE RULING DESERVED. Leaving a superseded explanation beside the number that superseded it is how a reader later re-derives the wrong cause.
 - *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
+
+**R-07-12** — POOL_MAX = 10 is a HAND-COPIED DUPLICATE of pg default pool size, and R-07-4 whole remedy depends on it matching the service actual ceiling
+
+- *scenario:* FORWARD-LOOKING AND IT NAMES ITS OWN TRIGGER. Slice 11 — D-07-1 destination — sets max 5 on createPool while measuring capacity. AC-4 then releases RACE_COUNT times 2, which is 10 movers, INTO A 5-CLIENT POOL, reintroducing exactly the queue-serialisation that made the mutant control 2 to 4 times weaker. The guard STILL PASSES, because it compares against the LITERAL 10 rather than against the pool the service built, and the file re-measured 1.87 percent SILENTLY REVERTS TOWARD 0.5 PERCENT WITH NOTHING REPORTING IT. The bound must be derived from the service own pool rather than duplicated as a constant.
+- *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
+
+**R-07-13** — The stale AC-5 parenthetical exists in TWO files and the step-7 deferral ruling names only one
+
+- *scenario:* The architect deferred correcting AC-5 classid-slash-objid-against-hashtext clause to step 7 as-built, naming the slice file. IT IS ALSO AT 07-design.md:136. If step 7 fixes only the one named, THE DESIGN FILE — WHICH IS THE ARTIFACT arc42 ABSORBS AT STEP 7 — states an assertion mechanism the test PROVABLY NO LONGER USES, since it returns resource ids and no objid crosses into JS at all, and a later reader re-derives the signed/unsigned defect the DCR just removed.
+- *file:* `docs/slices/07-design.md`
 
 </details>
 
