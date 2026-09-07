@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `92d78bb docs(09): step 5 ruled (c) — AC-9, QS-11 and AC-6 are nameable, and I-04-5 is declined` |
+| Last commit | `38b7834 test(09): R-09-6, R-09-5, R-09-11, R-09-10 — the (c) remediation's telemetry-half assertions (red)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 208 |
+| Agent runs recorded | 212 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -354,7 +354,11 @@
 | 2026-09-07 20:32 | implementer | 74m19 | 1,132 / 74,381 / 229,096,979 | `derived` |
 | 2026-09-07 21:18 | reviewer | 43m39 | 238 / 19,676 / 12,042,394 | `derived` |
 | 2026-09-07 21:38 | architect | 18m11 | 230 / 27,947 / 12,913,720 | `derived` |
-| | **total** | **7410m15** | **50,198 / 3,594,933 / 4,217,745,934** | |
+| 2026-09-07 22:05 | test-engineer | 23m33 | 432 / 31,075 / 33,190,860 | `derived` |
+| 2026-09-07 22:05 | test-engineer | 23m42 | 434 / 31,076 / 33,211,598 | `derived` |
+| 2026-09-07 22:05 | test-engineer | 23m51 | 436 / 31,078 / 33,450,317 | `derived` |
+| 2026-09-07 22:06 | test-engineer | 24m13 | 444 / 31,150 / 34,408,186 | `derived` |
+| | **total** | **7505m35** | **51,944 / 3,719,312 / 4,352,006,895** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

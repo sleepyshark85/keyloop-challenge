@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **347** |
-| Severity | 14 blocking · 172 major · 161 minor |
+| Findings recorded | **349** |
+| Severity | 14 blocking · 172 major · 163 minor |
 | Verdicts | 20 narrowed · 127 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | test-engineer 73 · architect 72 · orchestrator 68 · reviewer 66 · implementer 54 · scribe 10 · human 4 |
-| Awaiting a ruling | **167** |
-| Mean escape distance | 1.56 step(s) |
+| Raised by | test-engineer 75 · architect 72 · orchestrator 68 · reviewer 66 · implementer 54 · scribe 10 · human 4 |
+| Awaiting a ruling | **169** |
+| Mean escape distance | 1.55 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2304,6 +2304,8 @@ rather than narrated.*
 | **I-09-4** | MINOR | 4 *(+0)* | implementer | THE ABSORBED-CONFLICT COUNTER SEMANTICS ARE A QUESTION THE IMPLEMENTER ASKED RATHER THAN A DEFECT IT CLAIMED | deferred |
 | **O-71** | MAJOR | 5 *(+1)* | orchestrator | SLICE 09 REPAID SLICE 08's GAP AND OPENED THREE MORE — attemptLoop.ts 59.85, server.ts 69.44, telemetry.ts 12.82, all under section 10's 0.75 | **open** |
 | **A-09-4** | BLOCKING | 5 *(+4)* | architect | THIS IS NOT ONE SLICE, AND GATE D's FOLD OF SLICES 10 AND 11 INTO 09 WAS WRONG — THE ARCHITECT SAYS SO AND SAYS IT IS NOT ITS RULING TO MAKE | **open** |
+| **T-09-5** | MINOR | 5 *(+0)* | test-engineer | THE ADJUDICATION TABLE ASSIGNED FINDING 5 TO THE IMPLEMENTER ALONE WHEN ITS OWN TEXT IMPLIES AN OUTSIDE-IN HALF | **open** |
+| **T-09-6** | MINOR | 5 *(+0)* | test-engineer | TWO MUTANTS HAVE NO OUTSIDE-IN CROSS-CHECK AND THE TEST-ENGINEER SAYS SO RATHER THAN LETTING THE COVERAGE READ AS COMPLETE | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2389,6 +2391,16 @@ rather than narrated.*
 
 - *scenario:* THE EVIDENCE IS THE REVIEW ITSELF. Four adjudication rounds, then fifteen findings with THREE BLOCKING, on a slice carrying SEVENTEEN acceptance criteria and SIX inherited obligations. AND THE PATTERN IS NOT RANDOM: ALL THREE BLOCKING FINDINGS SIT ON THE CONTRACT HALF — AC-9's missing media type, A-06-2 asserted by nothing over the emitted document, and the harness certified by a digit count. The telemetry, pool and budget work is sound; the contract work is where the slice broke, and it is the half that was folded in. THE ARCHITECT ARGUED AT STEP 1 THAT THE SEAM WAS FALSER THAN GATE D KNEW, on three couplings, AND IT NOW SAYS THE OPPOSITE ON EVIDENCE — that is the position changing under measurement rather than under pressure. THE SCOPE QUESTION, PUT TO THE HUMAN AND EXPLICITLY NOT RULED: repair everything inside slice 09, OR REOPEN SLICE 10 FOR THE CONTRACT HALF and merge 09's telemetry, pool and budget work once the non-contract findings clear. THE ARCHITECT RECOMMENDS THE SECOND AND SAYS IT IS NOT MINE TO RULE. Note what reopening 10 would cost and what it would buy: slice 10 is a TOMBSTONE folded into 09 at Gate D, so reopening it means un-folding a Gate D decision and the deferral machinery would need its destination re-pointed; what it buys is a close-out slice that can actually close, and a contract half reviewed on its own terms rather than as the fifth item in a seventeen-criterion slice. gate: light is REVOKED BY ITS OWN FRONT-MATTER CONDITION and the architect did not touch the field.
 - *file:* `docs/slices/09-observability.md`
+
+**T-09-5** — THE ADJUDICATION TABLE ASSIGNED FINDING 5 TO THE IMPLEMENTER ALONE WHEN ITS OWN TEXT IMPLIES AN OUTSIDE-IN HALF
+
+- *scenario:* R-09-5's remedy row names ONLY the implementer as owner, while the row's own text says AC-2 READS ONLY db.sqlstate AND db.constraint — which is a statement about an OUTSIDE-IN assertion and therefore about the test-engineer's directories. Findings 6 and 10 SPLIT OWNERSHIP EXPLICITLY between the two roles; finding 5 did not, and the outside-in half would simply have gone unbuilt if the test-engineer had read the table literally. IT BUILT THE HALF ANYWAY AND RAISED THE GAP rather than either skipping the work or silently absorbing it — the span attribute names, per-attempt distinctness, the ERROR status and a closed-set check on db.constraint are now asserted at AC-2. AN OWNERSHIP TABLE THAT IS RIGHT ABOUT THE WORK AND WRONG ABOUT THE OWNER IS THE SHAPE THAT LOSES WORK QUIETLY.
+- *file:* `docs/slices/09-design.md`
+
+**T-09-6** — TWO MUTANTS HAVE NO OUTSIDE-IN CROSS-CHECK AND THE TEST-ENGINEER SAYS SO RATHER THAN LETTING THE COVERAGE READ AS COMPLETE
+
+- *scenario:* FIRST, the foreign-key-mislabelled-as-23P01 mutant from R-09-5 IS A CORRECTNESS CLAIM RATHER THAN A LABEL, and the test-engineer COULD NOT FIND OR CONSTRUCT A RELIABLE BLACK-BOX ROUTE TO A GENUINE FOREIGN-KEY VIOLATION ON THE INSERT PATH, because the application PRE-VALIDATES REFERENCES BEFORE INSERTING. Its coverage therefore RESTS ENTIRELY ON THE IMPLEMENTER'S UNIT-LEVEL STUB, which is stated rather than assumed. SECOND, AND THIS IS THE HONEST QUALIFICATION ON AC-6: the strengthened assertion covers EVERY REQUEST SHAPE THE REVIEWER NAMED AS UNCORRELATED — a plain success, a retry-then-succeed carrying booking.conflict, an exhausted refusal carrying booking.refused, and a GENUINE 500 via the same broken-IANA-zone fixture the error taxonomy already uses — and in each it checks EVERY LOG LINE IN THE REQUEST'S WINDOW rather than one. IT DOES NOT COVER a genuine ADR-0018 deadlock, judged impractical to trigger reliably as black box BECAUSE THE SYSTEM'S OWN LOCK ORDERING IS DESIGNED TO PREVENT ONE, nor the same every-line check on the cancellation and reschedule paths. SO AC-6 IS NOW TRUE OF ANY REQUEST AMONG THE SHAPES THIS SUITE CAN REACH, AND NOT A LITERAL UNIVERSAL PROOF — the distinction the reviewer's original finding turned on, kept rather than quietly closed.
+- *file:* `tests/integration/telemetry-booking.test.ts`
 
 </details>
 
