@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `5f10c4a docs(09): step 1 — the seam is falser than the gate knew, and AC-7 does not kill the seven` |
+| Last commit | `544bc75 docs(09): step 2 — four objections, four AGREEs, one remedy changed` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 195 |
+| Agent runs recorded | 199 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -340,7 +340,11 @@
 | 2026-09-07 14:08 | test-engineer | 1m22 | 44 / 1,404 / 794,855 | `derived` |
 | 2026-09-07 14:09 | implementer | 2m13 | 80 / 1,262 / 1,650,514 | `derived` |
 | 2026-09-07 17:16 | architect | 12m12 | 170 / 12,671 / 9,216,786 | `derived` |
-| | **total** | **7123m45** | **46,706 / 3,307,193 / 3,808,355,862** | |
+| 2026-09-07 17:32 | test-engineer | 8m07 | 102 / 10,788 / 3,472,276 | `derived` |
+| 2026-09-07 17:32 | implementer | 7m59 | 122 / 13,921 / 4,000,936 | `derived` |
+| 2026-09-07 17:33 | test-engineer | 8m59 | 106 / 10,804 / 3,731,744 | `derived` |
+| 2026-09-07 17:43 | architect | 8m32 | 96 / 891 / 3,444,062 | `derived` |
+| | **total** | **7157m22** | **47,132 / 3,343,597 / 3,823,004,880** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
