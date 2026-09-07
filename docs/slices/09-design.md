@@ -134,8 +134,9 @@ not a decision, and minting it is the shape seventeen files were retired for.
 - **AC-5b added: seventeen criteria, not sixteen.** `R-08-2` named it at slice 08 and it was never
   written down. Cost if wrong: the largest slice grows again.
 - **One red commit** (§7), **one observed red run**, and the file set is a *property* rather than a
-  count — a count is precisely what `T-09-2` found wrong. **Every one of the seventeen criteria and
-  both architecture controls fails in that run.** The five files the decisions above commit:
+  count — a count is precisely what `T-09-2` found wrong, and `T-09-4` bounds it. **Every criterion
+  and control whose subject this slice *introduces* fails in that run — sixteen of seventeen, plus
+  both controls; AC-12 is the one exception and is named below.** The five files the decisions above commit:
   `tests/integration/telemetry-booking.test.ts` (QS-13), the contract file over the emitted document
   (QS-11's second half, `A-06-2`), `tests/performance/availability-budget.test.ts` (QS-14),
   `tests/architecture/layering.test.ts` (decision 1's plant, QS-10) and `ambiguity-containment.test.ts`
@@ -147,6 +148,9 @@ not a decision, and minting it is the shape seventeen files were retired for.
   tree already name. Emitted by `buildOpenApiDocument()`, written by `npm run docs:openapi`.
 - **`tests/performance/**` runs alone** (`T-09-3`): its own project, its own invocation, its own
   container.
+- **AC-12 is a standing guard, not a criterion this slice earns** (`T-09-4`); threshold and fixture
+  unchanged, and §11 records the headroom as the regression baseline. Cost if wrong: QS-14's
+  availability half is asserted by a test only a 22× regression can fail.
 - **`D-07-1` split** (decision 5); **`T-06-5` accepted** (decision 6).
 
 ## Step 2 adjudication — four objections, none deferred
@@ -186,12 +190,55 @@ measures slicing pressure, and spending one of two here would report this slice 
 designs deep when it is one. **The gate should check me on that**; `gate: light` is the human's to
 keep or revoke and I have not touched the field.
 
+## Step 3 adjudication — `T-09-4`, the criterion that cannot fail
+
+| # | Verdict | Rule | Why |
+|---|---|---|---|
+| `T-09-4` | **AGREE** entire — **the false claim was mine**, not the test. AC-12 kept and reclassified; both offered remedies refused, and a third | (a) | Below |
+
+**The refusal is the finding.** Lowering the threshold or bolting on unrelated assertions would each
+have bought a red by making AC-12 describe something else; reporting the hole instead is the
+behaviour §2.4 exists to produce, and it is recorded here as correct. **A third route is refused on
+the same ground: inflating the fixture until 200 ms bites.** §10.2 names the fixture — 5 bays, 20
+technicians, 500 appointments, one dealership, one week — *inside* the scenario, so fixture and
+threshold are two operands of one ratio and moving either manufactures a red identically. It would be
+honest only as a *different* scenario, which §1.2's ranking and this slice's Out of scope both bar.
+
+**Is a budget already met evidence?** Of two things, and only one is §2.4's. It is **not** evidence
+that slice 09 built anything, and nothing may claim it is. It **is** evidence of the measurement: a
+real p95 over 100 samples against a stated fixture with the machine class printed beside it, every
+sample asserting `200` (`tests/performance/availability-budget.test.ts:124,130,135`). That test fails
+today on an absent, broken or erroring endpoint and on a 22× regression. A passing test with a live
+oracle is not the vacuous test §2.4 is aimed at.
+
+**Why not withdrawal, given slice 08 withdrew AC-7 on exactly this ground.** The two acts differ in
+what they cost. AC-7's guarantee stayed asserted after it went — `ambiguity-containment.test.ts`
+holds the permitted-file list by exact equality on every commit — so a duplicate was dropped. Nothing
+else asserts AC-12; withdrawing it returns goal 5 to a goal with no number, which is the state §10.2
+minted QS-14 to end. So AC-12 is **reclassified, not reshaped**. A floor at the measured figure is
+refused too: on `A-09-2`'s own terms the class is only *assumed* stable, so a tight floor fails
+ordinary refactors on the goal §1.2 ranks last — the ranking inverted to buy a red.
+
+**The property is restated, because it was stated as covering everything.** Every criterion and
+control whose subject this slice introduces failed in the one observed red run, and nothing outside
+that set failed (`red-proof`: six files red, no unit test failing). **The exclusion is closed, not
+open**: a criterion may sit outside the red set only where it asserts a property of already-merged
+code, and only where it is named. Exactly one does.
+
+**Not (c), and §2.4 is answered rather than passed over.** §2.4 is breached by a *claim*, and the
+claim was my universal quantifier — the test-engineer's work is correct, safe and shippable byte for
+byte as committed, so no clause names it. (c) loops back to step 1, supersedes the ADR at fault and
+revises prior work: no ADR is at fault, and there is nothing to revise, because **(c) and (a) here
+produce the identical diff** — this one. The difference is a counter that measures slicing pressure,
+and I decline to spend it on a sentence of my own. **No test changes; step 3 stands and step 4 is not
+interrupted.** The gate is shown this as an AC ruling.
+
 ## Proposed arc42 edits, made at step 7
 
 §8.4 gains the one-increment-site rule and loses the sentence `A-04-15` says slice 04 made false.
 §5.3's ruleset table gains `otel-sdk-only-in-platform` and QS-10's row its fifth plant (`T-09-2`).
 §10.2's QS-11 loses *"the OpenAPI half is slice 09's and unasserted"*, and QS-14 gains the measurement
-protocol above, exclusivity included. §3.1 gains the harness as the stubbed client. §11 gains R-1's measured figure and
+protocol above, exclusivity included. §3.1 gains the harness as the stubbed client. §11 gains R-1's measured figure, AC-12's headroom beside it (`T-09-4`) and
 `D-07-1`'s stated reason. **§8, §10 and §11 are over budget: every addition names its deletion.**
 
 ## Assumptions and open questions

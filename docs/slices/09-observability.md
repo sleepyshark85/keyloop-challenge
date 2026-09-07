@@ -18,7 +18,8 @@ gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/B
 > **Seventeen acceptance criteria and six inherited obligations: the largest slice in the project,
 > stated rather than hidden.** The three parts are *not* independent — `A-06-4`, plus three further
 > couplings in [the design](09-design.md) — so this is **one red commit**, one observed red run
-> (§7). The red set is a property, not a count (`T-09-2`): every criterion fails in it.
+> (§7). The red set is a property, not a count (`T-09-2`): every criterion this slice
+> *introduces* fails in it (`T-09-4`).
 
 ## Goal
 
@@ -71,8 +72,7 @@ goal with no number is a goal nobody can fail.
 - **AC-6b** — Given `Content-Type: application/json` and an **empty body** on a route that reads no
   body, then the response is `200` rather than the `400` slice 05's AC-5 pins today. Slice 05 sent it
   to **slice 10, a tombstone since 2026-09-04**; corrected to 09, where the harness went —
-  `postBooking` sets that header reflexively, so the assertion runs against the real client emitting
-  it. The remedy is a content-type parser mapping an empty body to `undefined`, routing it through
+  `postBooking` sets that header reflexively, so it runs against the real client emitting it. The remedy is a content-type parser mapping an empty body to `undefined`, routing it through
   TypeBox — §8.6's declared owner for that row — not through a special case in the handler.
 
 ### The performance budget *(carried from slice 11)*
@@ -80,6 +80,8 @@ goal with no number is a goal nobody can fail.
 - **AC-12** — Given a seeded schedule of 5 bays, 20 technicians and 500 appointments in one
   dealership over one week, when a one-day availability query runs 100 times on the CI container,
   then p95 is **under 200 ms**. *(QS-14)*
+  <br>**A guard, not a criterion this slice earns** (`T-09-4`): the endpoint shipped at 08 and met
+  the budget on arrival, ≈9 ms; threshold and fixture unchanged.
 - **AC-13** — Given the same fixture, when an uncontended booking is measured, then p95 is **under
   100 ms** and it issues **exactly one** `INSERT`.
 - **AC-14** — Given the booking path, when its queries are counted, then candidate selection reads
@@ -111,10 +113,10 @@ that lived only in the ruling naming it.
   merely inherited**: `ResourceLock` carries the `Db` it was taken on, so the signature changes once
   over the extracted loop instead of twice. Slice 06 declined it as (b) because nothing fails
   without it; that is still true, and the price has fallen.
-- **I-04-5 — the advisory read must order candidates before AC-13 can pass.** Re-deferred here at
-  slice 08 step 5 on a third argument: the deduction runs through QS-8, which said nothing about a
-  cancelled row until mechanic 6 landed, so shipping the bias earlier rested it on a premise weaker
-  than its own. **Discharged by accepting or superseding that `proposed` decision on measurement**,
+- **I-04-5 — the advisory read must order candidates before AC-13 can pass.** Re-deferred at slice 08
+  step 5: the deduction runs through QS-8, which said nothing about a cancelled row until mechanic 6
+  landed, so shipping the bias earlier rested it on a weaker premise than its own.
+  **Discharged by accepting or superseding that `proposed` decision on measurement**,
   in [`08-design.md`](08-design.md) where the ADR retirement put it — after F-06-1's extraction, so
   the bias lands at one site.
 - **R-07-12 — `POOL_MAX = 10` matches the service's real ceiling only by coincidence**, and
@@ -147,8 +149,8 @@ that lived only in the ruling naming it.
 
 Beyond `CLAUDE.md` §10:
 
-- A screenshot of the waterfall showing the window, for the phase 7 shot list: the clearest single
+- A screenshot of the waterfall showing the window, for the phase 7 shot list: the clearest
   image of what this architecture decided.
 - The README's build-and-run section proven by following it on a clean checkout, not by reading it.
-- The budget asserted on the CI container, with the run's machine class recorded beside the figure so
-  a later regression is comparable rather than merely alarming.
+- The budget **and its headroom** recorded in §11 beside the run's machine class: the ceiling is the
+  alarm, the headroom the baseline a regression is measured against (`T-09-4`).
