@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `5d8a513 test(09): I-09-2/I-09-3 — the retry-once fixture and AC-6b's cancellation split` |
+| Last commit | `e948e36 chore(09): step 4 registered — 37/42 measured, and slice 08's gap is repaid` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 206 |
+| Agent runs recorded | 207 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -352,7 +352,8 @@
 | 2026-09-07 20:27 | test-engineer | 11m59 | 130 / 13,112 / 4,664,632 | `derived` |
 | 2026-09-07 20:30 | test-engineer | 14m50 | 154 / 13,528 / 6,021,468 | `derived` |
 | 2026-09-07 20:32 | implementer | 74m19 | 1,132 / 74,381 / 229,096,979 | `derived` |
-| | **total** | **7348m25** | **49,730 / 3,547,310 / 4,192,789,820** | |
+| 2026-09-07 21:18 | reviewer | 43m39 | 238 / 19,676 / 12,042,394 | `derived` |
+| | **total** | **7392m04** | **49,968 / 3,566,986 / 4,204,832,214** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

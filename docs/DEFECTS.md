@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **345** |
-| Severity | 13 blocking · 171 major · 161 minor |
+| Findings recorded | **346** |
+| Severity | 13 blocking · 172 major · 161 minor |
 | Verdicts | 20 narrowed · 127 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | test-engineer 73 · architect 71 · orchestrator 67 · reviewer 66 · implementer 54 · scribe 10 · human 4 |
-| Awaiting a ruling | **165** |
-| Mean escape distance | 1.56 step(s) |
+| Raised by | test-engineer 73 · architect 71 · orchestrator 68 · reviewer 66 · implementer 54 · scribe 10 · human 4 |
+| Awaiting a ruling | **166** |
+| Mean escape distance | 1.55 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2302,6 +2302,7 @@ rather than narrated.*
 | **I-09-2** | MAJOR | 4 *(+1)* | implementer | THE SHARED_SEED FIXTURE ASSUMED A TECHNICIAN ORDERING THAT DOES NOT TRANSFER ACROSS NAMESPACES | accepted |
 | **I-09-3** | MAJOR | 4 *(+1)* | implementer | A PRE-EXISTING CONTRACT CASE PINNED THE EXACT 400 THAT AC-6b'S OWN TEXT SAYS IT SUPERSEDES | accepted |
 | **I-09-4** | MINOR | 4 *(+0)* | implementer | THE ABSORBED-CONFLICT COUNTER SEMANTICS ARE A QUESTION THE IMPLEMENTER ASKED RATHER THAN A DEFECT IT CLAIMED | deferred |
+| **O-71** | MAJOR | 5 *(+1)* | orchestrator | SLICE 09 REPAID SLICE 08's GAP AND OPENED THREE MORE — attemptLoop.ts 59.85, server.ts 69.44, telemetry.ts 12.82, all under section 10's 0.75 | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2377,6 +2378,11 @@ rather than narrated.*
 - *scenario:* RAISED EXPLICITLY AS A QUESTION AND NOT AS A DEFECT CLAIM, which is worth recording because the distinction is one this project has had to relearn. After F-06-1's extraction the attempt loop can absorb a conflict and retry, so booking_conflicts_total can count EITHER one per exclusion violation OR one per contended request, and the two diverge exactly when a retry succeeds. Ruled (b) DEFERRED IMPROVEMENT: the work merges as-is and ADR-0035 records the alternative with status proposed.
 - *file:* `src/application/attemptLoop.ts`
 - *deferred* by architect — (b) DEFERRED IMPROVEMENT. The counter's absorbed-conflict semantics merge AS-IS and the alternative is recorded in ADR-0035 with status proposed. SECTION 6(b) WANTS A BACKLOG SLICE AND THERE IS NO LATER SLICE TO CUT — slice 09 is the last. That is A-08-3's shape a second time and the gate is the honest destination: the human decides whether a proposed ADR with no slice behind it is an acceptable close-out state, or whether the counter's semantics are settled before merge.
+
+**O-71** — SLICE 09 REPAID SLICE 08's GAP AND OPENED THREE MORE — attemptLoop.ts 59.85, server.ts 69.44, telemetry.ts 12.82, all under section 10's 0.75
+
+- *scenario:* THE FULL STRYKER RUN, 29 MINUTES 46 SECONDS, AGGREGATE 86.52 AGAINST A BREAK THRESHOLD OF 74 — AND THE AGGREGATE IS EXACTLY WHAT MUST NOT BE READ, which is O-64's whole lesson from this week. PER CHANGED FILE the collector reports ELEVEN files and THREE BELOW THRESHOLD. THE GOOD NEWS FIRST AND IT IS REAL: src/http/routes/availability.ts is 88.10, the projected ceiling hit exactly, so SLICE 08's OVERRIDDEN 71.43 IS REPAID and D-08-1 closes. bookAppointment 93.2, rescheduleAppointment 90.36, cancelAppointment 88.89, appointmentRepository 100. THE THREE THAT FAIL: src/platform/telemetry.ts AT 12.82 PERCENT, 5 killed against 34 survived, A BRAND-NEW FILE THIS SLICE INTRODUCED AND BARELY UNIT-TESTED — the integration test exercises it outside-in but vitest.mutation.config.ts includes tests/unit ONLY, which is R-12, so outside-in kills are invisible to the measurement and the file reads as almost wholly unasserted. src/http/server.ts AT 69.44, 47 killed against 22 survived, WORSE THAN THE 91.18 IT SCORED AT SLICE 08 — the telemetry wiring landed there and brought survivors with it. AND src/application/attemptLoop.ts AT 59.85, WHICH IS THE ONE THAT MATTERS MOST: it is the NEW SHARED WRITE PATH that F-06-1's extraction created, merging two paths ADR-0027 says behave differently, and it is the file the reviewer was told to look hardest at because QS-1 through QS-5 are what the whole system exists to defend. A 59.85 ON THE FILE THAT NOW CARRIES EVERY BOOKING AND EVERY RESCHEDULE IS NOT A DOCUMENTATION GAP LIKE SLICE 08's WAS — slice 08's twelve survivors were prose and an unreachable arm, and every behavioural mutant was dead. THIS IS DIFFERENT IN KIND AND MUST NOT BE ARGUED AS THE SAME. THE ORCHESTRATOR IS NOT MERGING ON THE HUMAN'S DELEGATION: they authorised a merge IF THINGS GO RIGHT, and a section 10 failure on the slice that was meant to repay the last section 10 failure is not that.
+- *file:* `src/application/attemptLoop.ts`
 
 </details>
 
