@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **277** |
-| Severity | 12 blocking · 145 major · 120 minor |
-| Verdicts | 18 narrowed · 94 accepted · 3 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 62 · reviewer 62 · architect 52 · orchestrator 50 · implementer 44 · scribe 5 · human 2 |
+| Findings recorded | **278** |
+| Severity | 12 blocking · 146 major · 120 minor |
+| Verdicts | 19 narrowed · 94 accepted · 3 escalated · 27 deferred · 2 rejected |
+| Raised by | test-engineer 62 · reviewer 62 · architect 52 · orchestrator 51 · implementer 44 · scribe 5 · human 2 |
 | Awaiting a ruling | **133** |
-| Mean escape distance | 1.72 step(s) |
+| Mean escape distance | 1.73 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1731,6 +1731,7 @@ rather than narrated.*
 | **R-07-12** | MINOR | 5 *(+2)* | reviewer | POOL_MAX = 10 is a HAND-COPIED DUPLICATE of pg default pool size, and R-07-4 whole remedy depends on it matching the service actual ceiling | deferred |
 | **R-07-13** | MINOR | 5 *(+0)* | reviewer | The stale AC-5 parenthetical exists in TWO files and the step-7 deferral ruling names only one | **open** |
 | **A-07-5** | MAJOR | 7 *(+7)* | architect | THREE src/ comments still assert the premise ADR-0030 falsified, and NOBODY LOOKED AT THE BOOKING PATH | **open** |
+| **O-55** | MAJOR | 6 *(+6)* | orchestrator | Section 6 requires every reply, disagreement and vote on the PR, and the orchestrator stopped doing it after slice 01 — FIVE SLICES, caught by the human and by no check | narrowed |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1915,6 +1916,12 @@ rather than narrated.*
 
 - *scenario:* FOURTH INSTANCE OF D-06-4 SHAPE. rescheduleAppointment.ts:104 says it names the write path that SKIPPED ADR-0018 locks; bookAppointment.ts:146 says a write path skipped them; bookAppointment.ts:427 says a deadlock can ONLY mean some write path did not take them. A-07-2 NAMED TWO SITES AND BOTH WERE FIXED — AND NOBODY LOOKED AT THE BOOKING PATH, WHICH REPEATS IT TWICE. Comment-only: no behaviour, no test, no mutant can see it. But a future reader acting on it REASONS WRONGLY ABOUT THE ONE RULE THIS SLICE EXISTS TO ESTABLISH. The architect cannot edit src/; not in arc42 because section 11 had no room and a stale comment is not architecture; the defect register is its home.
 - *file:* `src/application/bookAppointment.ts`
+
+**O-55** — Section 6 requires every reply, disagreement and vote on the PR, and the orchestrator stopped doing it after slice 01 — FIVE SLICES, caught by the human and by no check
+
+- *scenario:* MEASURED RATHER THAN ESTIMATED. PR 6, slice 00, has 4 comments. PR 10, slice 01, has 3. PR 12 slice 02, PR 13 slice 04, PR 14 slice 05, PR 15 slice 06 and PR 16 slice 07 had ZERO until now. So the practice existed, lapsed after slice 01, and ran five slices without it. SECTION 6 IS EXPLICIT AND STATES ITS OWN REASON: every reply, disagreement and vote goes on the PR under section 9 attribution convention, BECAUSE THE REASONING IS THE GRADED ARTIFACT — the record of HOW a design was argued into shape is worth more than the amended design alone. The orchestrator put all of it in the event log and in commit messages instead, which preserves the CONTENT and loses the PLACE the constitution names. THE HUMAN CAUGHT IT; no check did, and none exists — slice:check reads the log and CI, never the PR. Slice 07 trail is now posted to PR 16 as five role-attributed comments covering step 1, step 2 both roles, the step-4 DCR, step 5 both passes, and the step-7 rulings. WHAT IS NOT DONE AND IS THE HUMAN TO DECIDE: whether the four MERGED PRs are backfilled. The content exists in the log and could be posted faithfully, but a retrospective comment on a merged PR is a record written after the fact and must say so; O-36 declined to rewrite history and this is adjacent to it. THE MECHANISABLE PART IS THE ORCHESTRATOR: a slice:check criterion that the PR carries at least one attributed comment per role that produced a report would have caught this at slice 02.
+- *file:* `docs/team-log/events.jsonl`
+- *narrowed* by orchestrator — ACCEPTED IN FULL AGAINST MYSELF AND SPLIT IN TWO, because the halves have different owners and only one of them is mine. THE HALF I HAVE DONE: slice 07 reasoning trail is now on PR 16 as five role-attributed comments — architect step 1, test-engineer steps 2 and 3, implementer step 2 and its DCR, reviewer both passes, architect adjudication and step 7 — posted BEFORE the gate rather than after it, so the gate reads what section 6 says it should read. THE HALF I AM BUILDING: a slice:check criterion that a slice PR carries at least one attributed comment per role that produced a report. It would have caught this at slice 02 instead of at slice 07, and it is repository governance tooling, which R-07-10 ruled OUT-OF-BAND and needing no slice declaration — so it lands before slice 08 reaches READY, which is the O-41 pattern applied. THE HALF THAT IS THE HUMAN: whether the four merged PRs are backfilled. The content exists in the log and could be posted faithfully, BUT A RETROSPECTIVE COMMENT ON A MERGED PR IS A RECORD WRITTEN AFTER THE FACT AND WOULD HAVE TO SAY SO, which is adjacent to O-36 ruling that rewriting the history of an artifact under assessment is the worse act — and unlike finding.routed, which quoted a ruling that already existed, this would be composing new prose into a closed record. I am not deciding that unilaterally. THE SCOPE IS MEASURED, NOT ESTIMATED: PR 6 slice 00 had 4 comments, PR 10 slice 01 had 3, and PRs 12, 13, 14, 15 and 16 had ZERO — the practice existed, lapsed after slice 01, and ran five slices. The human caught it and no check did, which is the whole finding.
 
 </details>
 

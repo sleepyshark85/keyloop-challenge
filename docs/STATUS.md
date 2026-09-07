@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `aa9673f docs(07): step 7 — arc42 says what merged, and F-02-9 stops overclaiming its own discharge` |
+| Last commit | `90dc1e3 fix(07): correct three deadlock comments to the ADR-0030/0031 reading` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 153 |
+| Agent runs recorded | 154 |
 | ADRs accepted | 26 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -300,7 +300,8 @@
 | 2026-09-07 00:53 | test-engineer | 11m23 | 236 / 8,730 / 9,868,582 | `derived` |
 | 2026-09-07 01:04 | reviewer | 9m59 | 180 / 6,642 / 7,785,896 | `derived` |
 | 2026-09-07 03:24 | architect | 18m03 | 198 / 2,686 / 12,154,711 | `derived` |
-| | **total** | **6254m21** | **38,646 / 2,921,877 / 3,183,175,563** | |
+| 2026-09-07 03:30 | implementer | 2m08 | 80 / 1,313 / 1,469,592 | `derived` |
+| | **total** | **6256m30** | **38,726 / 2,923,190 / 3,184,645,155** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
