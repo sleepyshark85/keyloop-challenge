@@ -15,16 +15,16 @@
 
 | | |
 |---|---|
-| Last commit | `72d5ca9 fix(docs): a superseded ADR says so in its own row — A-R-4` |
+| Last commit | `5f10c4a docs(09): step 1 — the seam is falser than the gate knew, and AC-7 does not kill the seven` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 194 |
+| Agent runs recorded | 195 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Slice [`08`](slices/08-availability-query.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
+- **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
 - **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
 - 2 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
@@ -339,7 +339,8 @@
 | 2026-09-07 14:05 | architect | 9m24 | 150 / 5,275 / 6,292,327 | `derived` |
 | 2026-09-07 14:08 | test-engineer | 1m22 | 44 / 1,404 / 794,855 | `derived` |
 | 2026-09-07 14:09 | implementer | 2m13 | 80 / 1,262 / 1,650,514 | `derived` |
-| | **total** | **7111m33** | **46,536 / 3,294,522 / 3,799,139,076** | |
+| 2026-09-07 17:16 | architect | 12m12 | 170 / 12,671 / 9,216,786 | `derived` |
+| | **total** | **7123m45** | **46,706 / 3,307,193 / 3,808,355,862** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **332** |
-| Severity | 12 blocking · 164 major · 156 minor |
-| Verdicts | 20 narrowed · 119 accepted · 4 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 69 · architect 67 · orchestrator 66 · reviewer 66 · implementer 50 · scribe 10 · human 4 |
-| Awaiting a ruling | **160** |
-| Mean escape distance | 1.60 step(s) |
+| Findings recorded | **336** |
+| Severity | 12 blocking · 165 major · 159 minor |
+| Verdicts | 20 narrowed · 120 accepted · 3 escalated · 27 deferred · 2 rejected |
+| Raised by | architect 70 · test-engineer 69 · orchestrator 67 · reviewer 66 · implementer 50 · scribe 10 · human 4 |
+| Awaiting a ruling | **164** |
+| Mean escape distance | 1.58 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1994,7 +1994,7 @@ rather than narrated.*
 | **R-08-3** | MAJOR | 5 *(+5)* | reviewer | The mutation score measures NOTHING about this slice central risk, and would read as reassurance | narrowed |
 | **R-08-4** | MINOR | 5 *(+1)* | reviewer | One implementer commit shipped 151 lines of route with its unit tests arriving a commit later | accepted |
 | **O-58** | MINOR | 5 *(+0)* | orchestrator | The orchestrator classified 24 survivors as inert and 12 of them were not — the classification inverted the precedent it cited | **open** |
-| **O-59** | MAJOR | 6 *(+1)* | orchestrator | The human closed slice 09 to new deferrals and the architect routed two more there in the same hour — the rulings collide and neither role saw the other | escalated |
+| **O-59** | MAJOR | 6 *(+1)* | orchestrator | The human closed slice 09 to new deferrals and the architect routed two more there in the same hour — the rulings collide and neither role saw the other | accepted |
 | **F-08-1** | MAJOR | 1 *(+0)* | architect | Section 6.5 has specified candidateRepository.freeResources since phase 2, and an architecture control plants exactly that as a violation | accepted |
 | **F-08-2** | MAJOR | 1 *(+0)* | architect | QS-8 is FALSE AS WRITTEN in section 10.2, over the universe its own words give | accepted |
 | **F-08-3** | MINOR | 1 *(+0)* | architect | AC-6 guarded the window the OPPOSITE WAY ROUND from the database | accepted |
@@ -2129,7 +2129,7 @@ rather than narrated.*
 
 - *scenario:* THE HUMAN RULED A-06-4 AT 2026-09-07: accept slice 09 as the close-out and allow it to be large, BUT CLOSE IT TO NEW DEFERRALS — any further deferral needs a different destination or must be built where it arises. THE ARCHITECT, RULING R-08-2 AND I-04-5 IN THE SAME WINDOW AND WITHOUT SIGHT OF THAT DECISION, routed TWO more to slice 09: AC-5b, the OpenAPI half of AC-5, and a re-deferral of I-04-5. It counted them itself — ADR-0033 was the seventh inherited item, AC-5b is the eighth — and called that A-06-4 OWN CURRENCY. ORCHESTRATOR READING, OFFERED RATHER THAN APPLIED: neither is accumulation in the sense A-06-4 named, because NEITHER CAN BE BUILT ANYWHERE ELSE — AC-5b asserts a document slice 09 is the slice that emits, so must-be-built-where-it-arises is impossible, and I-04-5 bias must follow F-06-1 extraction which also happens there. The human ruling closes slice 09 to deferrals that COULD go elsewhere; these are structurally bound to it. BUT THAT IS AN INTERPRETATION OF A HUMAN RULING BY THE ROLE THAT WOULD BENEFIT FROM IT BEING TRUE, so it is recorded as a reading for the gate to confirm or reject rather than acted on. IF THE HUMAN DISAGREES, the honest consequence is that AC-5b and I-04-5 must be built in slice 08 or cut, not quietly parked.
 - *file:* `docs/slices/09-observability.md`
-- *escalated* by architect — NOT THE ARCHITECT'S TO RULE, AND IT SAID SO. The human closed slice 09 to new deferrals and the architect routed AC-5b and I-04-5 there in the same hour — a COLLISION BETWEEN THE HUMAN'S RULING AND ONE OF THE ARCHITECT'S. Section 6 gives the human step 6 and the override; the orchestrator's own reading, that the two refs are STRUCTURALLY BOUND to slice 09 rather than accumulation, is DELIBERATELY NOT APPLIED because it is an interpretation of a human ruling by a role that benefits from it being true. Goes to the gate untouched.
+- *accepted* by human — HUMAN RULING, 2026-09-08, AT THE POINT IT ACTUALLY BLOCKED SOMETHING. The human had closed slice 09 to new deferrals; the architect routed I-04-5 and R-07-12 there in the same hour, each argued on ADR-0019's cheaper-or-stronger test. slice:check's Definition of Ready then FAILED — deferred here but absent from inherits — so the collision stopped being theoretical and became the one thing between slice 09 and READY. THE RULING: ADMIT BOTH. The closure was aimed at ACCUMULATION, and these two belong to slice 09 BY SUBJECT MATTER rather than by convenience — R-07-12 is a pool-ceiling fact that only becomes observable once there are metrics to observe it with, which is what slice 09 IS. THE ORCHESTRATOR HAD RECORDED THIS EXACT READING WEEKS EARLIER AND DELIBERATELY DID NOT APPLY IT, on the ground that it is an interpretation of a human ruling by the role that would benefit from it being true. The human has now confirmed it, which is the difference between a reading and a ruling. Slice 09 starts with SIX inherited refs and SIXTEEN acceptance criteria, the largest slice in the project. The human was offered a split as an alternative and declined it.
 
 **F-08-1** — Section 6.5 has specified candidateRepository.freeResources since phase 2, and an architecture control plants exactly that as a violation
 
@@ -2282,6 +2282,39 @@ rather than narrated.*
 
 - *scenario:* THE HUMAN ASKED, SINCE WE REMOVE THE SERVICE ADVISOR, IS THE ADR STILL VALID — and the answer had two halves the record was conflating. IT IS VALID AS HISTORY: ADR-0002 records what was decided on 3 September, BY THE HUMAN, at Gate A, and why, and section 4 exists precisely so a withdrawn reading and its reasoning survive. IT IS NOT VALID AS A DECISION IN FORCE, and status: accepted read inside the file said otherwise. THIS IS THE SECOND FIELD THE ARCHITECT DECLINED TO TOUCH when it set superseded_by, saying only one was authorised and that flipping a status is a second decision — correct restraint, and this is the ruling it was waiting for. IT IS NOT A NEW DECISION: the supersession was already decided, and the status field merely REPORTS it, so reporting it accurately changes nothing about what was decided. Verified before changing: NO TOOL VALIDATES THE STATUS VALUE and only two consumers branch on it, build.mjs on proposed for the section 11 debt register and status generate.mjs counting ADRs accepted. THE COUNT WAS THE TELL — STATUS.md said 16 ADRs accepted across 17 files, counting a superseded decision among those in force; it now reads 15, which is the number of decisions actually standing. superseded is standard MADR vocabulary, so this is the convention being followed rather than invented. THE RENDERER THEN STUTTERED — the section 9 cell read superseded, superseded by 0034 — fixed so a flipped status reads superseded by 0034 while a record whose status has NOT been flipped still carries the fact beside its status. Thirty-three docs-build assertions, 21 of 21 suites.
 - *file:* `docs/adr/0002-service-advisor-actor-no-authentication.md`
+
+</details>
+
+## Slice 09
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **O-70** | MINOR | 1 *(+0)* | orchestrator | THE CONCURRENCY SUITE WENT RED ON A DOCS-ONLY COMMIT AND GREEN ON RE-RUN — the gate that defends the system's central claim is sensitive to runner load | **open** |
+| **A-09-1** | MINOR | 1 *(+0)* | architect | O-70's racer bound is REFUSED, and what the slice owes instead is telemetry that tells a starved runner from a real fault | **open** |
+| **A-09-2** | MAJOR | 1 *(+0)* | architect | AC-7 DOES NOT KILL THE SEVEN DESCRIPTION MUTANTS slice 08 merged on the promise that it would | **open** |
+| **OQ-09-1** | MINOR | 1 *(+0)* | architect | D-07-1 HAS NO LOG REF, so the bidirectional inherited-scope guard STRUCTURALLY CANNOT SEE IT — R-05-2's shape a fifth time | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**O-70** — THE CONCURRENCY SUITE WENT RED ON A DOCS-ONLY COMMIT AND GREEN ON RE-RUN — the gate that defends the system's central claim is sensitive to runner load
+
+- *scenario:* CI FAILED ON 84f1a97 AND PASSED ON RE-RUN OF THE IDENTICAL COMMIT. THE DIFF WAS VERIFIED BEFORE ANYTHING WAS ASSUMED: between the last green run and the red one, git diff --name-only lists ADR-0002's status field, tools/docs/build.mjs, its test, and generated docs — ZERO FILES UNDER src OR tests. The commit could not have reached runtime behaviour. TWO TESTS FAILED, BOTH IN THE SHAPE CPU STARVATION PRODUCES ON A SHARED RUNNER: no-spurious-refusal at N=8 M=20 reported SOME RACERS NEVER GOT AN ANSWER AT ALL and one AC-2 racer got a 500, and refused-move-leaves-original hit a FLAT 60-SECOND TIMEOUT rather than an assertion failure. WHY THIS IS RECORDED RATHER THAN DISMISSED AS FLAKE: QS-1 through QS-5 are the quality scenarios the entire design exists to defend, and a suite that goes red without a defect trains every reader to ignore it — the same erosion the project has catalogued elsewhere as a guard whose only enforcement is discipline. THE AC-2 MESSAGE IS ALSO UNCOMFORTABLY SPECIFIC: A 500 HERE IS WHAT A RETRY INSIDE AN ABORTED TRANSACTION LOOKS LIKE AT THE EDGE, which is the exact failure mode ADR-0018 and the ADR-0031 correction were written against. A starved runner is by far the likeliest explanation and the re-run supports it, but ALMOST CERTAINLY is doing real work in that sentence. Available work: bound the racer count to the runner's cpu count, or raise the timeout for the move test, or mark the suite as requiring an exclusive runner — none chosen here, because choosing one inside slice 09's step 1 would be scope the architect has not designed.
+- *file:* `tests/concurrency/no-spurious-refusal.test.ts`
+
+**A-09-1** — O-70's racer bound is REFUSED, and what the slice owes instead is telemetry that tells a starved runner from a real fault
+
+- *scenario:* THE ARCHITECT REFUSED THE REMEDY AND KEPT THE PROBLEM. Bounding racer counts to the runner's cpu count WOULD UN-RACE THE THING THE TESTS EXIST TO RACE: QS-1 fixes N at 20 and QS-3 asserts the pairs 20,8 and 8,20, so on a two-vCPU runner that bound takes N to 2 and QS-1's claim that THE OTHER NINETEEN RECEIVE 409 stops being asserted at all. Section 10.2 ALREADY BOUNDS in-flight requests BY THE CONNECTION POOL under R-07-4 — the bound that preserves simultaneity — AND A SECOND, SMALLER BOUND UN-RACES WHAT THE FIRST EXISTS TO RACE. WHAT SLICE 09 DOES OWE INSTEAD: the failed insert carries db.sqlstate on its span, and the machine class is recorded with every budget run, SO THAT A STARVED RUNNER AND A RETRY INSIDE AN ABORTED TRANSACTION STOP BEING INDISTINGUISHABLE FROM A TEST MESSAGE — which is exactly the ambiguity O-70 could not resolve. Nothing in the design depends on this.
+- *file:* `docs/slices/09-design.md`
+
+**A-09-2** — AC-7 DOES NOT KILL THE SEVEN DESCRIPTION MUTANTS slice 08 merged on the promise that it would
+
+- *scenario:* ASKED AT STEP 1 WHETHER SLICE 08's STATED GAP ACTUALLY CLOSES HERE, THE ARCHITECT ANSWERED NO AND SHOWED THE ARITHMETIC. D-08-1 books the seven as UNOBSERVABLE UNTIL SLICE 09 EMITS THE DOCUMENT. HALF TRUE. vitest.mutation.config.ts includes tests/unit ONLY, recorded as R-12 in section 11, so a byte-for-byte assertion written in tests/contract LEAVES THEM KILLABLE AND STILL NOT KILLED — and routes/availability.ts would merge A SECOND TIME AT 71.43 PERCENT, under a human override given on the understanding that this slice closes it. THE DESIGN'S REMEDY, decision 4: the document is emitted by A FUNCTION THE UNIT LAYER CAN ALSO CALL. ARITHMETIC STATED SO STEP 5 CAN FALSIFY IT: 30 of 42 becomes 37 of 42, 88.1 percent. THE THREE DISCLAIMER MUTANTS ARE NOT INCLUDED AND THE DESIGN SAYS SO — they are a runtime body value rather than a schema description, nothing here kills them, and they stay booked in D-08-1 alongside the two unkillable default-arm mutants. THIS IS THE ANSWER ARRIVING AT STEP 1 RATHER THAN STEP 5, which is the whole point of asking.
+- *file:* `docs/slices/09-design.md`
+
+**OQ-09-1** — D-07-1 HAS NO LOG REF, so the bidirectional inherited-scope guard STRUCTURALLY CANNOT SEE IT — R-05-2's shape a fifth time
+
+- *scenario:* RAISED BY THE ARCHITECT AGAINST THE ORCHESTRATOR'S TOOLING WHILE WRITING THE BULLET IT COULD NOT MAKE PASS. The guard's rule was A REF IS A REF BECAUSE THE LOG KNOWS IT, which is right about the refs the log owns AND SILENTLY EXCLUDED THE ONES IT NEVER OWNED. D- identifiers belong to THE DEBT REGISTER — defined in a slice design, cited from arc42 section 11 — which is precisely why O-39's ownership check DELIBERATELY EXCLUDES D- from the refs a slice must have logged. So the two rules were consistent all along and the guard was reading ONLY HALF THE REGISTERS: a bullet discharging D-07-1, a genuine slice-09 obligation booked at slice 07 step 7 and re-routed under O-53 after slice 11 turned out to be a tombstone, COULD NOT CITE IT WITHOUT FAILING, and the honest escape no-ref-reason WOULD HAVE BEEN A LIE because the ref exists.
+- *file:* `tools/slice/check.mjs`
 
 </details>
 

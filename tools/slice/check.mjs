@@ -22,6 +22,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { frontmatter, body } from '../lib/frontmatter.mjs';
 import { refsDeferredTo, deferralMap } from '../lib/deferrals.mjs';
+import { REF, DEFINITION } from '../docs/refs.mjs';
 
 const SLICE_DIR = resolve('docs/slices');
 const LOG = resolve(process.env.TEAM_LOG ?? 'docs/team-log/events.jsonl');
@@ -158,9 +159,41 @@ if (!onlyDone) {
     check('ready', 'inherited scope is traceable', NA,
       'this slice declares no `## Inherited scope` section');
   } else {
-    const knownRefs = new Set(allEvents
-      .filter((e) => ['finding.raised', 'finding.ruled', 'finding.routed', 'finding.resolved'].includes(e.event))
-      .map((e) => e.ref).filter(Boolean));
+    // OQ-09-1, and it is R-05-2's shape a FIFTH time — a real obligation invisible to the
+    // guard built to see obligations.
+    //
+    // "A ref is a ref because the log knows it" was right about the refs the log owns, and
+    // it silently excluded the ones it never owned. `D-` identifiers are the DEBT REGISTER's,
+    // defined in a slice design and cited from arc42 §11 — which is why O-39's ownership
+    // check deliberately excludes `D-` from the refs a slice must have logged. So the two
+    // rules were consistent and this guard was reading only half the registers: a bullet
+    // discharging `D-07-1` — a genuine slice-09 obligation, booked at slice 07 step 7 and
+    // re-routed under O-53 — could not cite it without failing, and the honest escape
+    // `(no ref — …)` would have been a lie, because the ref exists.
+    //
+    // The second source is `refs.mjs`'s own `DEFINITION`, not a new notion of definedness.
+    // That distinction is load-bearing there — "appears in a design" and "is defined in a
+    // design" are different facts, and a checker that collapses them survives the mutant
+    // that renames a definition. Reusing it means `docs:refs` and `slice:check` cannot
+    // disagree about what a ref is.
+    const designDefined = (() => {
+      const out = new Set();
+      if (!existsSync(SLICE_DIR)) return out;
+      for (const f of readdirSync(SLICE_DIR).filter((x) => x.endsWith('-design.md'))) {
+        const text = readFileSync(join(SLICE_DIR, f), 'utf8');
+        for (const ref of new Set(text.match(REF) ?? [])) {
+          if (DEFINITION(ref).test(text)) out.add(ref);
+        }
+      }
+      return out;
+    })();
+
+    const knownRefs = new Set([
+      ...allEvents
+        .filter((e) => ['finding.raised', 'finding.ruled', 'finding.routed', 'finding.resolved'].includes(e.event))
+        .map((e) => e.ref).filter(Boolean),
+      ...designDefined,
+    ]);
 
     // Top-level bullets only: a nested list belongs to the bullet above it.
     const bullets = inheritedScope.split(/\n(?=- )/).map((b) => b.trim()).filter(Boolean);
