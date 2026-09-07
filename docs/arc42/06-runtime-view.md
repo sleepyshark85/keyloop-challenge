@@ -84,16 +84,14 @@ and so no verdict to render as `409`. ADR-0018 holds the measurements and the re
 One `pg_advisory_xact_lock` per bay and per technician now precedes each attempt, so at most one
 inserter is in flight against a given resource, every loser conflicts with a **committed** row, and
 the reported constraint is therefore deterministic. **The serialisation point moved but did not
-multiply**: it is still the only one in the system and still §11.2's write-throughput ceiling, now at
-three round trips per attempt.
+multiply**: still §11.2's write-throughput ceiling, at three round trips per attempt — §6.3 has what
+a move adds.
 
 **The lock decides nothing, and from slice 05 that is measured both ways.** Drop the lock, keep the
 constraints: still exactly one row, with 108 deadlocks. Drop the constraints and **hold** the locks:
 twenty overlapping rows land one at a time, zero refusals, at most **1** racer inside the `INSERT`
-against the unlocked phase's **20**. This section claimed that second cell as measured from slice 02
-when it was only argued; R-02-2 ran it. It matters because twenty rows written *without* the
-locks are equally consistent with *the writes were merely unserialised* — the reading under which a
-reintroduced check-then-act is correct rather than harmless (§11 D-02-1). Perfect mutual exclusion
+against the unlocked phase's **20**. §11 D-02-1 carries why the
+fourth cell matters. Perfect mutual exclusion
 over exactly the contended bay prevents not one overlap. *The lock buys liveness; only the constraint
 makes overlap unrepresentable.* All four cells run in
 `tests/integration/exclusion-constraint-adjudicates.test.ts`.
@@ -107,8 +105,9 @@ makes overlap unrepresentable.* All four cells run in
 | acted on | `src/application/bookAppointment.ts` | prune, count, retry or refuse (ADR-0004, ADR-0009) |
 | rendered | `src/http` | `409` + `problem+json`, naming the resource (§8.6) |
 
-A `40P01` is `no-verdict` and **not retried**: under ADR-0018's locks a deadlock can only mean a
-write path skipped them, so it is an internal fault rendering `500` (§11.2 F-02-9).
+A `40P01` is `no-verdict` and **not retried**: under ADR-0030 a write locks **every resource it is in
+flight against**, so a deadlock means a path locked less than it wrote — an internal fault rendering
+`500` (§11.2 F-02-9). ADR-0018's *"both locks"* was necessary and not sufficient; §6.3 has the move.
 
 ## 6.2 A booking that retries, and succeeds
 
@@ -209,9 +208,15 @@ because none of them is obvious:
 | A move onto an interval overlapping its **own** current interval succeeds | PostgreSQL checks the new row version against *other* rows, not against the version it replaces | QS-6 |
 | The appointment id survives | It is an `UPDATE`. A caller holding the id still holds it | QS-6 |
 
-A move racing another move, or racing a fresh booking, is the §6.1 story with `UPDATE` in place of
-`INSERT`: the same two advisory locks precede it, carried as a value the write takes (ADR-0026). One
-mechanism; rescheduling adds none. **`0 rows` means one thing — not `confirmed`.** Existence was
+**A move is in flight against two pairs, not one.** Its vacated index entry stays live until commit,
+so a move both waits and is waited on. It therefore locks the **union** of both (ADR-0030), the pair
+it leaves re-read inside the attempt's own transaction under the row's lock (ADR-0031): row lock,
+advisory locks, write. Two mechanisms keep that acyclic — `(class, hashtext(key))` total-orders the
+advisory waits, and a complete lock set covers every tuple wait — and no waiter for an appointment
+row lock holds anything while it waits. Measured: 11.7 % of contended moves deadlocked
+before ADR-0030, 0 / 1000 after.
+
+**`0 rows` means one thing — not `confirmed`.** Existence was
 settled by the read above, so there is no follow-up read and §6.6 shows two deciders where it once
 showed one (ADR-0025).
 

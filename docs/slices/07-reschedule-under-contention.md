@@ -52,8 +52,10 @@ every test in slice 06.
   observed.** Given a confirmed appointment at pair *P*, when a move of it is in flight between
   `lockResources` and its `UPDATE`, then the transaction holds advisory locks on ***P* as the row
   currently stands** — never on a pair read before the transaction opened. Asserted
-  **deterministically off `pg_locks`** (`classid`/`objid` against `hashtext`), not by racing four
-  movers into the stale interleaving: a probabilistic witness for a rule is the thing ADR-0030
+  **deterministically off `pg_locks`**, joined against `hashtext` **inside one SQL statement** so that
+  only resource ids cross into JavaScript — pulling `objid` out compares the catalogue's unsigned
+  `oid` against `hashtext`'s signed `int4`, the same bits read two ways *(corrected at step 7,
+  `R-07-13`)* — not by racing four movers into the stale interleaving: a probabilistic witness for a rule is the thing ADR-0030
   exists to replace, and ADR-0031's claim is about *where a value is read*, which `pg_locks` reads
   directly. *(QS-4; [ADR-0031](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md)'s control)*
   <br>**Mutant control:** restore the pre-loop read and relocate the row between it and the attempt

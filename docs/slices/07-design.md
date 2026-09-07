@@ -1,280 +1,132 @@
-# Slice 07 — design
+# Slice 07 — design, as built
 
-Slice file: [`07-reschedule-under-contention.md`](07-reschedule-under-contention.md).
-New: [**ADR-0030**](../adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md),
-`accepted`. Provisional until this slice's gate, like every mid-slice ruling.
+Slice file: [`07-reschedule-under-contention.md`](07-reschedule-under-contention.md). Merged with
+[**ADR-0030**](../adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) and
+[**ADR-0031**](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md), both
+`accepted`. arc42 §5.2, §6.1, §6.3, §8.6, §10 and §11 now describe the system; this file is the
+record of what was decided, measured and ruled.
 
-**This slice was accepted as potentially proof-only. It is not.** The race that `F-02-9` asked for
-was run at step 1 and came back negative: **11.7 % of contended move attempts return `40P01` and
-therefore `500`**, with every ADR-0018 lock taken and none skipped. The fix is ADR-0030 and it is
-about fifteen lines of production code. Declared here rather than discovered at step 5, which is
-what the slice file asked for.
+## What the slice turned out to be
 
-## 1 · The measurement, before the design
+Accepted as potentially proof-only, and it was not. `F-02-9` asked for ADR-0018's locks to be
+**raced** rather than argued; the race was run at step 1 and came back negative — **11.7 % of
+contended move attempts returned `40P01`, and so `500`**, with every ADR-0018 lock taken and none
+skipped. ADR-0030 holds the measurement and the rule that followed. Step 5 then found that rule
+itself violable: the lock set was computed from a read taken *before* the transaction opened, so a
+row moved underneath left a mover holding a stale set, and two such movers cycle. ADR-0031 closed
+it, and the loopback is declared (`loopbacks: 1`).
 
-Two moves past attempt 1, each targeting the pair the other currently occupies over an overlapping
-interval. Each holds ADR-0018's two advisory locks **on its target pair**. Each `UPDATE` runs an
-exclusion check that finds the other's *vacated but uncommitted* index entry, whose `xmax` is a
-live transaction, and waits on it. Both wait. PostgreSQL breaks the cycle with `40P01`.
+## Decisions, and the shape of the proof
 
-`postgres:16-alpine`, this repository's constraint definitions, 20 mutually-vacating pairs from one
-barrier, 25 trials:
+**Three independent witnesses for *never opens a window***, because a before/after read of the row is
+satisfied by an implementation that released the slot and put it back: the racing bookings themselves
+(AC-2 — only a *committed* release is observable, which is why QS-5 is a race and not a poll); `xmin`
+and `ctid` on the refused row (AC-1 — *not written*, which a compensating cancel-then-restore fails
+and application code cannot forge); and slice 06's statement-count trigger, re-run under contention.
 
-| Locks a move takes | `23P01` | `40P01` |
-|---|---|---|
-| the target pair — as built | 883 / 1000 | **117** |
-| the union of incumbent and target | **1000 / 1000** | 0 |
+**Two test files, no third.** The racing-move cases land in
+`tests/concurrency/refused-move-leaves-original.test.ts` under QS-4 — a third file would need a §10
+row to name it, and §10 had no headroom.
 
-The deadlock report is a mutual `ShareLock on transaction`, not an advisory key. Uncontended cost:
-600 moves, p50 2.25 ms target-only against 1.90 ms union — one statement either way.
+**Production code did change**: `lockResources` and the new `lockAppointmentRow` in
+`appointmentRepository.ts`, one argument at each of the two call sites. No migration, no data-model
+delta, no `.dependency-cruiser.js` change, no endpoint or field.
 
-**The slice-06 discharge ruling got this wrong, and this is the correction.** It said *"no cycle is
-possible… vacating writes no index entry another transaction waits on"*. Vacating writes no **new**
-entry; the **old** one stays live until commit, and ADR-0023's own M1 had already measured a
-conflicting writer waiting on exactly that. A move is both a waiter and a wait-upon. ADR-0030 holds
-the rule that follows.
+**The barrier harness is reusable; its fixture is not.** AC-2 races a move against bookings, which is
+one-directional and cannot close a cycle — measured, 660 / 660 `23P01`, zero `40P01`. Racing *moves*
+needs a mutual-vacate fixture with both movers past attempt 1. And the barrier must be released
+**before** the advisory locks: the locks are themselves a serialisation point, so a barrier placed
+after them never fires.
 
-## 2 · The three decisions
-
-**2.1 — What "never opens a window" is asserted by.** Three independent witnesses, each able to
-fail, because a before/after read of the row is satisfied by an implementation that released the
-slot and put it back.
-
-1. **The racing bookings are the observer** (AC-2). A release that ever *commits* is observed by
-   somebody taking the slot. Nothing else can see a committed window: an observer polling under
-   `READ COMMITTED` cannot see an uncommitted one, and a release that never commits is not a
-   window. This is why QS-5 is written as a race and not as a poll.
-2. **`xmin` on the refused row** (AC-1, new). A refused move must leave the row's `xmin` and `ctid`
-   unchanged — **nothing was written**, not merely *nothing differs*. A compensating
-   cancel-then-restore passes a column-equality assertion and fails this one, and `xmin` is not
-   forgeable by application code. An aborted transaction also leaves them unchanged, which is
-   correct: an abort is not a window.
-3. **The statement-count trigger already merged** for slice 06 AC-2, re-run under contention.
-
-**2.2 — One test or two, and does either need production code.** *Two files, as the slice file
-already names, and no third.* The racing-moves cases (`A-06-3`) go into
-`tests/concurrency/refused-move-leaves-original.test.ts` under **QS-4**, because both of them are
-that scenario's adversarial instance: the loser of a shared-target race, and both losers of a
-mutual-vacate race, must be *unchanged* — and "refused" must mean `409`, not `500`. A third file
-would need a §10 row to name it, §10 has no headroom, and an unnamed test file breaks `docs:refs`.
-
-**Production code: yes.** ADR-0030, in `src/persistence/appointmentRepository.ts` (the lock
-statement and `lockResources`' signature), one argument at `bookAppointment.ts`'s call site and one
-at `rescheduleAppointment.ts`'s. No migration, no data-model delta, no `.dependency-cruiser.js`
-change, no new module, no endpoint or field.
-
-**2.3 — What the barrier harness actually is.** Measured, not assumed:
-
-- **Reusable:** the mechanism — *N* in-flight requests over pooled connections, one barrier, assert
-  over the **table** and the emitted `booking.conflict` lines rather than over responses, seed fixed
-  and printed (AC-3).
-- **Not reusable, and this is the correction:** the **fixture**. AC-2 races a move against
-  bookings, which is one-directional — a booking is in flight against one pair and cannot close a
-  cycle. Measured: 60 trials of one move against 10 bookings gave 660 / 660 `23P01`, zero `40P01`,
-  and A's slot occupied in 60 / 60. Racing *moves* needs a mutual-vacate fixture with **both**
-  movers past attempt 1, which under ADR-0027 means both incumbent pairs must already be contended.
-- **A constraint nobody had written down:** the barrier must be released **before** ADR-0018's
-  locks are taken. The locks are themselves a serialisation point, so a racer that must wait for
-  one never reaches a barrier placed after them and the barrier never fires. Found by hanging a
-  harness on it. The existing concurrency tests race whole HTTP requests and are already on the
-  right side of this; the racing-moves fixture must stay there.
-
-## 3 · Interfaces and building blocks
-
-Only `§5.2`'s persistence row changes shape:
+## Interfaces, as built
 
 ```ts
-// src/persistence/appointmentRepository.ts
-export interface ResourcePair { readonly bayId: string; readonly technicianId: string }
-
-/** ADR-0030 — `leave` is REQUIRED so omission is TS2554, and is `null` only where the write
- *  vacates nothing. `ResourceLock` is unchanged: it still carries the pair the write writes. */
 export function lockResources(db: Db, take: ResourcePair, leave: ResourcePair | null): Promise<ResourceLock>;
+export function lockAppointmentRow(db: Db, id: string): Promise<ResourcePair>;
 ```
 
-```sql
-SELECT pg_advisory_xact_lock(cl, k)
-FROM (SELECT DISTINCT cl, hashtext(key) AS k
-      FROM unnest($1::int[], $2::text[]) AS t(cl, key)
-      ORDER BY cl, hashtext(key)) o;   -- verified: 4 keys → 3 locks, deduplicated and ordered
-```
+`leave` is required, so omission is `TS2554`, and `null` only where the write vacates nothing. Keys
+are deduplicated and acquired in one statement ordered by `(class, hashtext(key))` — a total order
+over a shared key space, which is what stops the enlarged lock set cycling on itself. A move reads
+`leave` through `lockAppointmentRow` inside its own transaction: **row lock, advisory locks, write**.
+`cancelAppointmentById` still takes nothing (ADR-0023).
 
-`bookAppointment` passes `null`. **`rescheduleAppointment` passes the pair read inside the
-attempt's own transaction under the row's own lock — [ADR-0031](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md),
-and this paragraph is what it corrects.** It said the pair could be read once before the loop
-"because every prior attempt aborted", which is true of one request's attempts and silent about
-another request's commit; §11's `R-07-1` ruling carries the cycle that reopens. At attempt 1 the
-two pairs coincide and dedupe to today's two keys, so booking and first attempts are byte-for-byte
-unchanged. `cancelAppointmentById` still calls nothing (ADR-0023).
+## Acceptance criteria — what moved, and what proves it
 
-The parameter's exact spelling is the implementer's inside three constraints: **omission must not
-compile**, the keys are **deduplicated**, and they are acquired in **one statement ordered by
-`(class, hashtext(key))`** — a total order over a shared key space, which is what stops the
-enlarged lock set from cycling on itself.
+AC-1 gained `xmin` and `ctid`; AC-2 a seed clause; **AC-4** (racing moves) was added at step 1 and
+amended at step 5 under `R-07-4` to bound in-flight requests by the connection pool; **AC-5** was
+added at step 5 as ADR-0031's control. The slice file carries their text. Each was ruled under the
+architect's mid-slice authority and is provisional until the gate.
 
-## 4 · Acceptance criteria
+**AC-5's assertion mechanism, corrected here (`R-07-13`).** `pg_locks` is joined against `hashtext`
+**inside one SQL statement**, and what crosses into JavaScript is the resource ids. Pulling `objid`
+and `hashtext(...)` into JavaScript instead compares the catalogue's unsigned `oid` against a signed
+`int4` — the same bits read two ways, false whenever the hash is negative. The earlier wording
+(*"`classid`/`objid` against `hashtext`"*) described the instrument the DCR removed.
 
-AC-1 to AC-3 stand. Two amendments and one addition, under the architect's mid-slice authority,
-provisional until the gate:
+**Mutant controls.** AC-4's: revert `lockResources` to the target pair only. Re-measured at the
+bounded shape — 56 / 3000 ≈ **1.87 %** (95 % CI 1.38–2.35) against the unbounded 41 / 7800 ≈ 0.5 %
+(0.27–0.80), disjoint intervals, with a 0 / 1000 positive control on the fixed build. AC-5's: restore
+the pre-loop read and relocate the row between it and the attempt; executed by the reviewer at step 5
+against a reverted build — the P2 claim fails with the P1 witness intact.
 
-- **AC-1 gains `xmin`** — *"…with the same id, bay and technician, **and the same `xmin` and
-  `ctid`**"*. §2.1 above is why.
-- **AC-2 gains a seed clause** only to match AC-3; no change of substance.
-- **AC-4 (new) — racing moves.** Given A and B confirmed on **different** incumbent pairs, each
-  contended at its own pair, so that each move's remaining candidate is the pair the other occupies
-  over an overlapping interval, when both are rescheduled simultaneously from a barrier over
-  **≥ 1000 contended attempts, with no more requests in flight at once than the service's
-  connection pool can serve** *(amended at step 5, `R-07-4`)*, then **every attempt receives a database verdict — `23P01`,
-  never `40P01`** — no response is `500`, no two confirmed rows overlap on a bay or a technician,
-  and every refused move's row is unchanged including its `xmin`. *(QS-4, QS-5; ADR-0003's
-  never-asserted claim; ADR-0030's control)*
-
-- **AC-5 (new, step 5) — the lock set is derived from state the transaction itself observed.**
-  Given a confirmed appointment at pair *P*, when a move of it is in flight between `lockResources`
-  and its `UPDATE`, then the transaction holds advisory locks on ***P* as the row currently
-  stands** — never on a pair read before the transaction opened. Asserted **deterministically off
-  `pg_locks`** (`classid`/`objid` against `hashtext`), not by racing four movers into the stale
-  interleaving: a probabilistic witness for a rule is the thing ADR-0030 exists to replace, and
-  ADR-0031's claim is about where a value is read, which `pg_locks` reads directly. A mechanism
-  witness under QS-4's scenario, so §10 gains no row. *(QS-4;
-  [ADR-0031](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md)'s control.)*
-  <br>**Mutant control:** restore the pre-loop read and relocate the row between it and the
-  attempt — the transaction then holds the old pair's keys, which the same assertion reads.
-
-**AC-4's mutant control is already measured**: reverting `lockResources` to lock the target pair
-only produces ~117 `40P01` in 1000 attempts, so the criterion discriminates rather than passing
-vacuously. A `40P01` from a *lock-ordering* mistake is caught by the same assertion.
-
-## 5 · Inherited obligations — disposition
+## Inherited obligations
 
 | Ref | Disposition |
 |---|---|
-| **O-41** | **Discharged.** Built before Ready, bidirectional, and `slice:check 07` reports *"4 bullet(s), every ref in `inherits:` named in one"*. Nothing to build |
-| **A-06-3** | **Landed here**, in `refused-move-leaves-original.test.ts` as AC-4. Its two premises are re-measured in §6 below |
-| **F-02-9** | **Discharged by measurement, and the rule it states is corrected** — *take both locks* was necessary, not sufficient. ADR-0030 restates it as *lock every resource the write is in flight against*. §11's entry is rewritten, not extended |
-| **A-05-6** | Unchanged and still the implementer's: two unit cases in `tests/unit/persistence/pgError.test.ts` for `pgError.ts:80:9` and `103:39`. No production change expected. **One is now due anyway**: `classify`'s docblock repeats the premise ADR-0030 falsifies (*"a deadlock can only mean a write path skipped them"*), as does `rescheduleAppointment.ts`'s `no-verdict` arm. `src/` is not the architect's to edit — D-06-4's shape, and both belong in the implementer's pass |
+| **O-41** | Discharged before Ready, bidirectional, and it bit on this file |
+| **A-06-3** | Landed as AC-4; both premises re-measured below |
+| **F-02-9** | **Discharged** — by measurement *and* by two fixes. The rule it stated is corrected: *take both locks* was necessary, not sufficient. §11 carries it |
+| **A-05-6** | **Discharged.** Two directed unit cases for `pgError.ts:80:9` and `103:39`. Both mutants survive as ADR-0016's equivalent-mutant residue: predicted at step 2 before code existed, argued analytically at step 4, differential-tested over 254 adversarial inputs at step 5 with no distinguishing input. `R-07-7` is the production change the obligation said would be the finding if one were needed |
 
-## 6 · A-06-3's two premises, re-measured (D-05-3's remedy)
+**A-06-3's two premises, re-measured (D-05-3's remedy).** *Cheaper* — **false**: the barrier mechanism
+is shared, the fixture is not, and AC-4 reaches a failure AC-2 provably cannot. The deferral was still
+right, for a reason nobody wrote down — slice 06 had no barrier at all, so the test was not cheaper
+here, it was impossible there. *Stronger* — **true**, and more than claimed: `xmin` upgrades
+*untouched* from *unchanged values* to *not written*.
 
-- **"Cheaper — AC-2 already builds the harness, and racing moves is that harness with `UPDATE` on
-  both sides." FALSE.** The barrier mechanism is shared; the fixture is not, and the failure mode
-  AC-4 reaches is one AC-2 provably cannot (§2.3, 660 / 660). The deferral was still right, for a
-  reason nobody wrote down: slice 06 had no barrier at all, so this test was not merely cheaper
-  here, it was impossible there.
-- **"Stronger — it can assert alongside AC-1 that the loser's original is untouched." TRUE**, and
-  stronger than claimed: `xmin` upgrades *untouched* from *unchanged values* to *not written*.
+## arc42, and what paid for it
 
-## 7 · arc42, and what pays for it
-
-§5, §8, §10 and §11 are at or over their ceilings and **may not grow**; §6 has 30 words. Every edit
-below is a correction in place, and three of them delete a sentence that is now false.
-
-| Section | Edit | Paid by |
+| Section | What changed | Paid by |
 |---|---|---|
-| **§6.1** | *"a deadlock can only mean a write path skipped them"* → the ADR-0030 reading | the same sentence |
-| **§6.3** | *"A move racing another move… is the §6.1 story with `UPDATE` in place of `INSERT`: the same two advisory locks precede it. One mechanism; rescheduling adds none."* is **false** and is replaced by the two-pair rule | itself, and it shortens |
-| **§5.2** | `lockResources`' row gains *"and, for a move, the pair it vacates"* | trimming the same row's `F-05-1` recap, which ADR-0026 already holds |
-| **§8.6** | the `500` row's *"as does a `40P01` under ADR-0018's locks"* is re-grounded | the same clause |
-| **§10** | QS-4 gains the `xmin` witness and the racing-moves instance; QS-5 gains *"and no move ever answers `500`"* | QS-5's *"This is the scenario that would catch a cancel-then-insert move…"*, which §6.3's table and this slice's goal both already say |
-| **§11** | `F-02-9`'s entry is **rewritten to discharged**, carrying the corrected rule | itself; no new row, and the deadlock is closed rather than booked |
+| §5.2 | `lockResources` locks every resource the write is in flight against; `lockAppointmentRow` added | the F-05-1 recap, which ADR-0026 holds |
+| §6.1 | *"a deadlock can only mean a write path skipped them"* re-grounded on ADR-0030 | §6.1's re-narration of the fourth lock cell, which §11 D-02-1 holds |
+| §6.3 | the one-mechanism claim replaced by the two-pair rule, the in-transaction read, and the two mechanisms that keep it acyclic | the sentence it replaces |
+| §8.6 | the `500` row's `40P01` clause re-grounded | `GET /nope`'s before-and-after narration |
+| §10 | QS-4 gains `xmin`/`ctid` and the racing-move instance, QS-5 *no move answers `500`*, the preamble the in-flight bound | QS-5's cancel-then-insert sentence and QS-1's observer recap, which §8.5 holds |
+| §11 | F-02-9 rewritten to discharged; `D-07-1` booked; R-1 and R-7i corrected | the register-reading preamble, R-12's survivor-list line, two provenance clauses |
 
-## 8 · Front matter, for the orchestrator
+## Rulings
 
-Do not take these from prose; this is the list.
+**Step 5** — the reviewer returned changes-requested with no DCR, so these are findings on the diff,
+ruled under mid-slice authority and provisional until the gate. `R-07-1` **upheld against the design
+rather than the build** — §3 specified the stale read in the words the implementer built, so what
+departed was ADR-0030; remedy ADR-0031, plus a declared loopback. `R-07-2` upheld in full: deadlock
+freedom rests on **two** mechanisms and the docblock collapsed them into one. `R-07-4` upheld with
+the remedy re-aimed — not fewer racers to dodge a flake, but a bound that stops the pool queueing a
+pair's two movers apart; the prediction was put up to be falsified and was confirmed. `R-07-7`
+upheld and in scope by `A-05-6`'s own words. `R-07-10` rejected: repository governance tooling is
+out-of-band, and whether that belongs in `CLAUDE.md` §10 is the gate's (`A-06-6`). The AC-5 DCR was
+ruled **(a)** — the design was right and the instrument was wrong.
 
-- `arc42: ["§5.2", "§6.1", "§6.3", "§8.6", "§10", "§11"]` — was `["§6.3"]`
-- `adr: [3, 18, 23, 26, 27, 29, 30]` — was `[3]`
-- `quality_scenarios: [QS-4, QS-5]` — unchanged
-- `inherits: ["F-02-9", "A-05-6", "A-06-3", "O-41"]` — unchanged
-- `loopbacks: 0` — unchanged; nothing here is a loopback, because nothing was built to loop back to
+**Step 7** — `D-07-1` is deferred to **slice 09** (`O-53`: slice 11 is a tombstone Gate D folded into
+09). `R-07-12` rides with it in §11's `D-07-1` row. `R-07-13` is corrected above and in the slice
+file. `O-54` goes to the retro with the reviewer's narrowing.
 
-## 9 · Risks this slice carries
+**Third occurrence of one shape**, for the retro: the slice-06 discharge ruling, ADR-0030's symmetry
+claim, and `R-07-1`. Each states something true **within** one transaction as though it were true
+**across** them. `A-07-3` generalises it to four boundaries, one of them a type boundary.
 
-- **The lock statement relies on evaluation order** following the subquery's `ORDER BY`. So did
-  ADR-0018's `unnest`; the difference is that a violation now costs an advisory cycle rather than
-  nothing. AC-4 catches it, since that is a `40P01` too. Measured 0 / 1000.
-- **A move past attempt 1 serialises against four keys**, up to twice ADR-0018's ceiling. Bookings
-  are the volume and are untouched; QS-14's budget is a booking budget.
+## Open questions and risks
 
-## 10 · Open questions
-
-- **`OQ-07-1` — the 893 / 800 budget report was not a flake, and the tool was right every time.
-  RESOLVED.** The first `docs:budget --check --ratchet` run of this step reported
-  `slices/07-reschedule-under-contention.md` at 893 / 800 and *"1 document GREW past its ceiling"*;
-  four later runs exited 0. The architect recorded it as unexplained. The cause was the
-  orchestrator adding inherited-scope bullets to slices 07 and 08 to satisfy O-41's new guard —
-  07 to 893, 08 to 802 — and trimming both back under at `33d2e52`, **between the two runs**. The
-  tree changed under a running agent. The tool reported what was true when it ran, twice.
-
-  Kept rather than deleted for two reasons. An unreproducible failure that nobody explains is how
-  a real one gets dismissed the second time it appears, and this one was one run away from being
-  filed as tool flakiness in a repository whose most important guarantees are measurements. And
-  the shape is worth naming beside `A-07-1`: **a shared file edited while an agent is reading it
-  produces an observation that is correct and unrepeatable**, which is indistinguishable from a
-  bad tool right up until someone finds the commit.
-
-## 11 · Step-5 rulings
-
-The reviewer returned changes-requested with **no DCR**, so the DCR table is not what these are
-decided under; they are step-5 findings on the diff, ruled under the architect's mid-slice
-authority and **provisional until the gate**. Mutation was 93.85 overall and 100.00 with zero
-survivors on `appointmentRepository.ts`, and no survivor sits on a line this slice changed.
-
-**`R-07-1` — UPHELD, and it is against the design rather than the implementation.** The reviewer
-framed it as "the implementation departs from the design"; it does not. §3 above specified the
-stale read in the words the implementer built. What departed is **ADR-0030**, whose rule the design
-then failed to hold. Had this been raised as a DCR it would be **(c)**: the named failure is
-ADR-0030's own decision statement, and §11's `F-02-9` "discharged by measurement" with it. The
-remedy is [ADR-0031](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md),
-which also records the cycle that actually closes — **two** stale movers, not the reviewer's one
-stale mover plus a booking, which cannot close because a transaction only tuple-waits inside its
-own take pair's scope. Cost against ADR-0027: none to its ordering, one statement per attempt, and
-four keys instead of two at attempt 1 in the stale case only. **A loopback is owed and is declared**
-(`loopbacks: 0 → 1`) — the fix reopens steps 1 through 4 and is testable, so §2.4 is servable:
-`pg_locks` can witness that the transaction holds a lock on the pair the row occupies *now*.
-
-**Third occurrence of one shape**, which is the retro's to carry: the slice-06 discharge ruling,
-ADR-0030's symmetry claim, and this. Each states something true **within** one transaction as
-though it were true **across** them.
-
-**`R-07-2` — UPHELD in full.** The claim is false, AC-4's own fixture falsifies it
-(`{bay0, bay1, tA}` against `{bay0, bay1, tB}`), and both conclusions a reader would draw from it
-are wrong. Deadlock freedom here rests on **two** mechanisms and the docblock collapsed them into
-one: the total order makes the *advisory* waits acyclic, and ADR-0030's completeness — under
-ADR-0031, computed inside the transaction — makes the *tuple* waits acyclic. Symmetry is neither
-necessary nor sufficient for either.
-
-**`R-07-4` — UPHELD, and the remedy is test-side but not "fewer racers to dodge a flake".** 40 in
-flight against a 10-client pool does two things, and the second is the one that matters: it
-manufactures the codeless-acquire `500` the reviewer measured, **and it serialises the very
-simultaneity AC-4 is about** — a pair's two movers can be queued apart by the pool and never race.
-That is the likelier reading of this fixture's 41/7800 against ADR-0030's 117/1000, better than the
-extra-round-trip explanation the file's header currently gives. So bounding in-flight requests to
-the pool should make the mutant control **stronger**; the unfixed-build rate must be re-measured at
-the new shape under `R-07-6`'s own discipline, and if it does not rise, say so. Attempt volume is
-held at ADR-0030's scale by trading pairs for trials. Separately, the assertion must stop naming a
-cause it did not measure: with `deadlocks.length` at zero it must report what it saw.
-
-- **`D-07-1` — a saturated pool answers `500`, and nobody decided that.** `createPool` sets no
-  `max`, so pg's default of 10 is in force by omission, and `CONNECTION_TIMEOUT_MS` — decided for
-  AC-2's unreachable database — silently also bounds queue waits, one timer doing two jobs of which
-  one was chosen. §8.6 renders the result as the system's fault; saturation is a capacity fault and
-  `503` is its answer. **Out of slice 07** — it is in no AC here and its fix touches the error
-  taxonomy — with **slice 11** as the destination, where capacity is measured. §11 debt row at
-  step 7.
-
-**`R-07-7` — UPHELD, and it is in scope by the slice file's own words.** `A-05-6` says *"no
-production change is expected, and if one is needed that is the finding"*. This is that finding:
-the lookup reaches `Object.prototype`, which contradicts both `classify`'s totality claim and what
-`pgError.test.ts:55` asserts, inside the one site ADR-0016 permits a `ContendedResource` to be
-minted from. Fix it here.
-
-**`R-07-10` — no declaration needed, and the boundary is worth writing down.** Two categories, not
-one. Anything changing what the system does or what a slice *proves* is declared in an AC, an
-`inherits:` ref or an In-scope bullet. Repository **governance** tooling — `slice:check`,
-`log:check`, the budget ratchet — is out-of-band: it has no acceptance criterion because there is
-no behaviour to accept, and forcing it into `inherits:` would turn every slice's front matter into
-a changelog of the harness. Out-of-band is not unrecorded: the condition is its own commit carrying
-its obligation ref, which `f757baf` met, plus the event log. The reviewer's asymmetry is real and
-the proposed cure is worse. Whether this belongs in `CLAUDE.md` §10 is **the gate's**, not mine —
-`A-06-6`'s ground.
+- **`OQ-07-1` — resolved.** A `docs:budget` failure at 893 / 800 that four later runs did not
+  reproduce was the orchestrator editing slices 07 and 08 between runs (`33d2e52`). The tool reported
+  what was true when it ran, twice. Kept because an unreproducible failure nobody explains is how a
+  real one gets dismissed the second time, and because the shape is worth naming: **a shared file
+  edited while an agent reads it produces an observation that is correct and unrepeatable.**
+- The lock statement relies on evaluation order following the subquery's `ORDER BY`, as ADR-0018's
+  `unnest` already did; the difference is that a violation now costs an advisory cycle. AC-4 catches
+  it, a `40P01` either way — measured 0 / 1000.
+- A move past attempt 1 serialises against four keys and takes a row lock ahead of the advisory
+  queue, so a cancel of the same appointment waits behind a mover. Bookings are the volume and are
+  untouched; §11 R-1 carries it.
