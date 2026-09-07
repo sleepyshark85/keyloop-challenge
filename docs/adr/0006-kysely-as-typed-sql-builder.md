@@ -22,21 +22,20 @@ ai-input: >
 
 ## Context and problem statement
 
-The query layer can silently destroy this system's central property. §2.1 puts correctness in an
-exclusion constraint and maps `23P01` to `409`; three decisions sharpen that into a specification:
+A booking is refused. To answer the caller honestly the code must learn two things only PostgreSQL
+knows — that the failure was `23P01` (overlap) and not `23503` (a bad reference), and *which*
+constraint fired, the bay's or the technician's. Most libraries throw both away.
 
-- **ADR-0003** — a reschedule is one atomic `UPDATE` on the existing row, with *no* `AND id <> :id`
-  predicate.
-- **ADR-0004** — on `23P01` the next candidate is attempted, and each attempt must be independently
-  recoverable, so the loop cannot sit inside a transaction.
-- **§1.3, §8.4** — the refusal must name *which* resource was contended, and
-  `booking_conflicts_total{resource}` is labelled from `err.constraint`.
+> **A layer that wraps the driver error is disqualified**, because `err.code` and `err.constraint`
+> must arrive unaltered.
 
-> **A layer that wraps the driver error is disqualified.** Without `err.code` and `err.constraint`
-> arriving unaltered, the system cannot tell contention from a bad reference (`23503`), label its
-> conflict metric, or prune candidates.
+That is how a query layer can silently destroy this system's central property. Three decisions
+sharpen it: a reschedule is **one atomic `UPDATE`** on the existing row with *no* `AND id <> :id`
+predicate; on `23P01` the next candidate is attempted, each independently recoverable, so the loop
+cannot sit inside a transaction; and the refusal must name *which* resource was contended, the
+conflict metric labelled from `err.constraint`.
 
-Against that, A-1, A-4, A-9 and goal 3 say the schema *will* move.
+Against that, modifiability is a graded goal and the schema *will* move.
 
 ## Considered options
 
@@ -45,9 +44,9 @@ Against that, A-1, A-4, A-9 and goal 3 say the schema *will* move.
   - Good, because it is one dependency
   - Good, because it most obviously cannot hide the invariant
   - Bad, because row and parameter types are hand-maintained assertions
-  - Bad, because the availability query (multi-table, dealership-scoped, qualification-joined,
-    range-predicated) risks a silent A-9 bug
-  - **This was the architect's first choice and is the closest runner-up.** It loses only on goal 3
+  - Bad, because the availability query — multi-table, dealership-scoped, qualification-joined,
+    range-predicated — risks a silent bug
+  - **The architect's first choice, and the closest runner-up.** It loses only on modifiability
 - **Option B — Kysely** over the `pg` driver: a typed query builder that compiles to SQL, with an
   `sql` tag. **Chosen.**
   - Good, because it satisfies the disqualifying test outright
@@ -65,7 +64,7 @@ Against that, A-1, A-4, A-9 and goal 3 say the schema *will* move.
   - Bad, because the retry loop's per-attempt statement scoping fights Prisma's interactive-transaction
 - **Option D — Drizzle ORM.**
   - Good, because like Kysely it keeps the driver error intact
-  - Good, because `drizzle-kit` would fold ADR-0007 into this
+  - Good, because `drizzle-kit` would fold the migration decision in
   - Bad, because that folding is the problem: `drizzle-kit generate` derives migrations from the
     TypeScript schema, where exclusion constraints are inexpressible
   - Bad, because range types require a custom type definition
@@ -85,28 +84,28 @@ system.**
    migrations.
 2. **The driver error reaches the repository unaltered**: Kysely rethrows what `pg` throws.
    SQLSTATE translation happens in **exactly one module**, `src/persistence/pgError.ts`;
-   `.dependency-cruiser.js` forbids `pg`/`kysely` outside it (ADR-0008).
+   `.dependency-cruiser.js` forbids `pg`/`kysely` outside `src/persistence`.
 3. **PostgreSQL-specific SQL is written as SQL**, through Kysely's `sql` tag.
-4. **The booking loop runs outside any transaction.** A booking is one `INSERT` (A-6) and a move one
-   `UPDATE` (ADR-0003), so each attempt is its own transaction: ADR-0004's independently-recoverable
-   attempt holds by construction. **The retry loop must not be wrapped in
-   `db.transaction()`**, or attempt two fails with `25P02` — caught by §10, not by a tool.
+4. **The booking loop runs outside any transaction.** A booking is one `INSERT` and a move one
+   `UPDATE`, so each attempt is its own transaction and independently recoverable by construction.
+   **The retry loop must not be wrapped in `db.transaction()`**, or attempt two fails with `25P02`
+   — caught by a quality scenario, not a tool.
 
 ## Consequences
 
 **Good**
 
-- The two statements that carry the invariant — the guarded `INSERT` and the guarded `UPDATE` — are
+- The two statements carrying the invariant, the guarded `INSERT` and the guarded `UPDATE`, are
   readable as SQL.
-- `err.constraint` survives, so the `409` names the contended resource (§1.3),
-  and ADR-0004's loop prunes by it.
-- A column renamed by a migration for A-1 or A-4 fails the build
+- `err.constraint` survives, so the `409` names the contended resource and the retry loop prunes
+  by it.
+- A column renamed by a migration fails the build
 - `23503` (foreign key) stays distinguishable from `23P01` (exclusion)
 
 **Bad, or deferred**
 
 - The `Database` interface is a second statement of the schema beside the migrations, and nothing
-  forces them to agree; §11 carries it.
+  forces them to agree. Debt.
 - Kysely is less widely known than Prisma or TypeORM
 - No migration story of its own — Kysely's own migrator is deliberately *not* used
 - Nothing prevents an implementer from wrapping the retry loop in a transaction. It is prohibited
