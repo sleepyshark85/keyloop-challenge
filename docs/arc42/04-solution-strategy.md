@@ -46,7 +46,7 @@ design:
 - **The write is the decision.** A booking exists if and only if PostgreSQL accepted the statement.
   Nothing upstream is authorised to conclude anything.
 - **Availability queries become advisory**, and the API says so out loud (§3.1, §8.6). They exist for
-  the service advisor's user experience. Requirement 2 of the brief is honoured as a UX affordance;
+  the caller's user experience. Requirement 2 of the brief is honoured as a UX affordance;
   requirement 3's integrity is honoured by the database.
 - **The failure mode is a specific, catchable one.** SQLSTATE `23P01` with the violated constraint
   named, which §8.6 maps to `409 Conflict` and §8.4 counts as `booking_conflicts_total{resource}`.

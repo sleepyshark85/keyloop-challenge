@@ -19,7 +19,6 @@ Domain terms only. Process vocabulary lives in `docs/METHODOLOGY.md`.
 | Absolute duration | Minutes added on the timeline, not on the wall clock. Sixty minutes from 00:30 local on a spring-forward night ends at 02:30 local (AC-3) |
 | Wall-clock duration | What a clock on the wall shows between two instants. Differs from the absolute duration across a DST transition, and is **not** what occupies a bay |
 | Ambiguous local time | A wall-clock time that occurs twice, on a fall-back night. Ambiguous only for local → instant; this system never performs that conversion (§8.3) |
-| Service advisor | Dealership staff who book, cancel and reschedule on a customer's behalf, typically by phone — the system's only human user. The brief says only *"a user"*: reading that as this role rather than as the vehicle owner is ADR-0002's ruling, and it is what puts authentication out of scope (§1.3, §3.1.1). *Added 2026-09-07; not a slice-01 term* |
 
 *The twelve domain terms below the first four were proposed in `docs/slices/01-design.md` §12.1 and
 applied by the architect at slice 01 step 7, under that slice's declared arc42 scope — slice 01 is

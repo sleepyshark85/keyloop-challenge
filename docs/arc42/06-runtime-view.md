@@ -17,7 +17,7 @@ Two conventions hold throughout, and both are load-bearing:
 
 ## 6.1 Concurrent booking — the database decides
 
-**Mandatory scenario.** Two service advisors book the same service, dealership and start at the same
+**Mandatory scenario.** Two users book the same service, dealership and start at the same
 instant. There is exactly one free bay.
 
 ![Two racing bookings and where PostgreSQL rejects the second](../diagrams/concurrent-booking.svg)
