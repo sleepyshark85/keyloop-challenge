@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  busyResources,
   cancelAppointmentById,
   findAppointmentById,
   insertAppointment,
@@ -526,5 +527,63 @@ describe('rescheduleAppointmentById — slice 06, ADR-0025 and ADR-0026', () => 
     });
     const { db } = scriptedDb([{ error: refusal }]);
     await expect(rescheduleAppointmentById(db, MOVE, LOCK)).rejects.toBe(refusal);
+  });
+});
+
+describe('busyResources — slice 08, ADR-0032 Option D', () => {
+  const FROM = new Date('2026-09-08T09:00:00.000Z');
+  const TO = new Date('2026-09-08T10:00:00.000Z');
+
+  it('is EXACTLY the constraint\'s own predicate: dealership, not cancelled, tstzrange overlap', async () => {
+    // Design §2 gives this SQL verbatim, one file removed from `0003_appointment.sql`'s own
+    // `EXCLUDE` predicate — pinned whole so a reviewer can diff the two texts directly.
+    const { db, recorded } = scriptedDb([{ rows: [] }]);
+    await busyResources(db, IDS.dealership, FROM, TO);
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.sql).toBe(
+      'select "bay_id", "technician_id" from "appointment" ' +
+        'where "dealership_id" = $1 and "status" <> $2 ' +
+        'and tstzrange(starts_at, ends_at) && tstzrange($3, $4)',
+    );
+    expect(recorded[0]?.parameters).toEqual([IDS.dealership, 'cancelled', FROM, TO]);
+  });
+
+  it('reads no other table and no other appointment column', async () => {
+    const { db, recorded } = scriptedDb([{ rows: [] }]);
+    await busyResources(db, IDS.dealership, FROM, TO);
+    expect(recorded[0]?.sql).not.toMatch(/service_bay|technician_qualification|customer|vehicle/i);
+  });
+
+  it('collapses repeated bay and technician ids — two overlapping rows, one id each', async () => {
+    // A dealership with two confirmed jobs occupying the SAME bay across the window must not
+    // report that bay twice; `queryAvailability`'s subtraction only needs membership.
+    const { db } = scriptedDb([
+      {
+        rows: [
+          { bay_id: IDS.bay, technician_id: IDS.technician },
+          { bay_id: IDS.bay, technician_id: OTHER_TECHNICIAN },
+        ],
+      },
+    ]);
+    const busy = await busyResources(db, IDS.dealership, FROM, TO);
+    expect(busy).toEqual({
+      bays: [IDS.bay],
+      technicians: [IDS.technician, OTHER_TECHNICIAN],
+    });
+  });
+
+  it('returns empty lists rather than throwing when nothing overlaps', async () => {
+    const { db } = scriptedDb([{ rows: [] }]);
+    expect(await busyResources(db, IDS.dealership, FROM, TO)).toEqual({
+      bays: [],
+      technicians: [],
+    });
+  });
+
+  it('is exactly one statement — the whole answer in one round trip', async () => {
+    const { db, recorded } = scriptedDb([{ rows: [] }]);
+    await busyResources(db, IDS.dealership, FROM, TO);
+    expect(recorded).toHaveLength(1);
   });
 });
