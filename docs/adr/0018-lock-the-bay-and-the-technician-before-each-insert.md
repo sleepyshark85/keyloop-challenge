@@ -7,6 +7,13 @@ supersedes: null
 superseded_by: null
 arc42: ["§5.2", "§6.1", "§8.2", "§8.6", "§11"]
 
+# `contested: true` on the criterion ADR-0016 states — the decision turns on measurements this
+# record is the only home for. Four of them: 400 inserts across 20 trials, five retry
+# configurations, the two lock-versus-constraint controls, and 56 locked races. Flagged
+# 2026-09-07, during the readability pass rather than at the ruling; the flag postdates the
+# record, which is the whole reason it was missing. Not claimed because the file needed room.
+contested: true
+
 # AI provenance — evidence for the assessment's verification criterion.
 proposed-by: architect
 decided-by: architect
@@ -35,22 +42,22 @@ ai-input: >
 Twenty people try to book the same bay at the same second. Exactly one should get it and nineteen
 should be told the bay is full.
 
-Most of them got a `500`. PostgreSQL refuses simultaneous inserters with `40P01`
-(`deadlock_detected`) rather than `23P01` (`exclusion_violation`): the constraint check inserts its
-index tuple *first* and scans *second*, so the racers wait on each other's in-progress tuples until
-the lock manager breaks the cycle. Twenty racers, one bay, twenty trials from a hard barrier:
+Most got a `500`. PostgreSQL refuses simultaneous inserters with `40P01` (`deadlock_detected`)
+rather than `23P01` (`exclusion_violation`): the constraint check inserts its index tuple *first*
+and scans *second*, so racers wait on each other's in-progress tuples until the lock manager breaks
+the cycle. Twenty racers, one bay, twenty trials from a hard barrier:
 **285 of 400 inserts returned `40P01`, 95 returned `23P01`, and exactly one row survived every
 trial.**
 
-The database was right throughout, so the rule that overlap is prevented by the database and never by
-application code is untouched. What broke is the *answer*: this endpoint's criteria require every
-loser to receive `409 /problems/no-capacity`, and a deadlock was classified as an unknown error, so
-it became a `500`.
+The database was right throughout: the rule that overlap is prevented by the database, never by
+application code, is untouched. What broke is the *answer*: the criteria require every loser to
+receive `409 /problems/no-capacity`, and a deadlock was classified as an unknown error, so it became
+a `500`.
 
 **A deadlock is not a capacity verdict.** The lock manager aborted before the constraint
-adjudicated anything, and the error carries no `constraint` field. The system's branded
-"contended resource" type can only be built *from* that field, so *"is `409` honest here?"* was
-answered by the type system rather than by preference: no.
+adjudicated anything, and the error carries no `constraint` field. The branded "contended resource"
+type can only be built *from* that field, so *"is `409` honest here?"* was answered by the type
+system, not by preference: no.
 
 ## Considered options
 
@@ -88,9 +95,15 @@ into a silent total loss of capacity, and returns no constraint name to map.
 
 Chosen option: **H.**
 
+Each attempt is its own transaction and takes both locks before its write. **They cannot deadlock
+against each other by construction**: bay and technician keys sit in **different lock classes**, so
+they never collide; *bay then technician* is a **total order no attempt can reverse**, so there is no
+sort to keep sorted; and both are **transaction-scoped**, released when the attempt ends, never held
+across candidates.
+
 A deadlock can then only mean some write path did not take these locks, so it is **not retried**
-and is not client-visible contention: `500 /problems/internal`, logged at `error`, and the public
-error taxonomy gains no row.
+and is not client-visible contention: `500 /problems/internal`, logged at `error`, and the error
+taxonomy gains no row.
 
 ### The lock decides nothing, and two controls say so
 
@@ -103,7 +116,7 @@ error taxonomy gains no row.
 Drop the constraints and the lock lets twenty overlapping rows through: it prevents nothing. Drop the
 lock and one row still survives: it decides nothing. **The constraint makes overlap unrepresentable;
 the lock only stops the losers deadlocking before it can say so** — liveness against correctness,
-measured rather than asserted.
+measured not asserted.
 
 Across 56 locked races at twenty and forty racers — bay, technician, both — **0 deadlocks, 0 retries,
 every racer a verdict, the expected constraint name**; twenty racers resolve in 76 ms median, and an
@@ -114,7 +127,7 @@ uncontended booking costs 3.60 ms against 3.22 ms unlocked.
 **Good**
 
 - Every loser now conflicts with a **committed** row, so the constraint name it reports is
-  deterministic rather than a property of who won — which is what makes the `409` assertable.
+  deterministic rather than a property of who won — which makes the `409` assertable.
 - No superuser setting and no operator step: `hashtext` and `pg_advisory_xact_lock` are callable by
   an ordinary role, measured.
 - A hash collision costs serialisation and never correctness, because the lock decides nothing.
@@ -123,9 +136,9 @@ uncontended booking costs 3.60 ms against 3.22 ms unlocked.
 
 - **Under a per-resource lock, a reintroduced check-then-act would be *correct* rather than merely
   harmless.** The argument for making capacity refusals a database verdict gets *weaker* here, not
-  stronger; what still carries it is the branded type, the architecture test on table access, and the
-  two controls above. Recorded as debt.
-- **Every write path to `appointment` must take these two locks in this order** — the slices adding
+  stronger; what carries it is the branded type, the architecture test on table access, and the two
+  controls above. Debt.
+- **Every write path to `appointment` must take both locks in this order** — the slices adding
   rescheduling and contended moves inherit it, and one that skips it reintroduces the deadlock.
 - `hashtext` is undocumented and internal; any deterministic `int4` would serve.
 - Three round trips per attempt instead of one, and per-bay throughput is serialised.
