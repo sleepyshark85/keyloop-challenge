@@ -5,10 +5,10 @@ status: done
 depends_on: ["01"]
 absorbs: ["03", "12", "13"]
 arc42: ["§5.2", "§6.1", "§8.6", "§10.2"]
-adr: [1, 2, 4, 5, 6, 8, 14, 15]
+adr: [1, 2, 4, 5, 6, 8]
 quality_scenarios: [QS-1, QS-2, QS-11, QS-9, QS-12]
 loopbacks: 0
-deferred_from: ["R-01-1:0014", "R-01-4:0015"]
+deferred_from: ["R-01-1", "R-01-4"]
 ---
 
 > **Absorbs slice 03** (Gate D, 2026-09-04) and **slices 12 and 13** (the human's cost ruling,

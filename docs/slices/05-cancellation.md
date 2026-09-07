@@ -7,7 +7,7 @@ arc42: ["§5.2", "§6.1", "§6.4", "§6.6", "§8.6", "§10", "§11"]
                      # §6.6 and §8.6 amended at step 2; §6.1 at step 7, R-02-2 having been
                      # built in this slice. §6.2, §6.3 and §6.5 took pointer-only edits to
                      # pay the ratchet for the additions — one home per fact, no fact lost.
-adr: [3, 23, 24]
+adr: [3, 24]
 quality_scenarios: [QS-7]
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING

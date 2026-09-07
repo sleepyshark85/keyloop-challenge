@@ -4,7 +4,7 @@ title: Availability — advisory by contract, and provably in agreement with the
 status: done
 depends_on: ["07"]
 arc42: ["§5.2", "§6.5", "§8.6", "§10.2", "§11.2"]
-adr: [8, 32, 33]
+adr: [8]
 quality_scenarios: [QS-8, QS-12]
 inherits: ["I-04-5", "A-06-4"]   # deferred here by ruling; slice:check enforces it (A-05-5)
 loopbacks: 0

@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| Last commit | `f27d03a Merge pull request #17 from sleepyshark85/slice/08-availability-query` |
+| Last commit | `f826a8c docs(adr): every citation of the seventeen becomes the fact it pointed at` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
 | Agent runs recorded | 186 |
-| ADRs accepted | 27 |
+| ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
@@ -133,29 +133,12 @@
 | [0008](adr/0008-module-decomposition.md) | Decompose into five layered modules around a dependency-free policy core | accepted | — |
 | [0009](adr/0009-candidate-ordering-and-attempt-cap.md) | Order candidates by a seeded shuffle, prune by the constraint that fired, and cap attempts at 16 | accepted | — |
 | [0010](adr/0010-github-actions-and-check-run-collection.md) | Run CI on GitHub Actions, and collect check.run from the API rather than commit it from the workflow | accepted | — |
-| [0011](adr/0011-health-is-an-operational-probe.md) | Treat /health as an operational probe outside the API contract, not as a sixth operation | proposed | — |
-| [0012](adr/0012-seed-fixtures-are-a-test-owned-loader.md) | Seed reference data from a test-engineer-owned loader, per case, and defer the demo dataset | proposed | — |
-| [0013](adr/0013-outside-in-tests-exercise-the-built-artifact.md) | Outside-in tests reach a pure module through the built artifact, and the test run is split so no project's results can be silently lost | accepted | — |
-| [0014](adr/0014-an-instant-is-renderable-by-construction.md) | An Instant is renderable by construction — bound the epoch-millisecond range in instant() and again at withinOpeningHours' boundary | accepted | — |
-| [0015](adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) | An interval ending at local midnight ends on the day it started — normalise the exclusive endpoint to 86400 rather than rejecting it as spans-local-days | accepted | — |
 | [0016](adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | proposed | — |
-| [0017](adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | proposed | — |
 | [0018](adr/0018-lock-the-bay-and-the-technician-before-each-insert.md) | Lock the bay and the technician before each insert, and treat a deadlock as an internal fault | accepted | — |
 | [0019](adr/0019-defer-a-control-only-to-the-slice-that-makes-it-cheaper-or-stronger.md) | Defer a control only to the slice that makes it cheaper or stronger | accepted | — |
-| [0020](adr/0020-test-the-attempt-cap-inside-the-conflict-arm.md) | Test the attempt cap inside the conflict arm, so a capped refusal still carries a database verdict | accepted | — |
-| [0021](adr/0021-the-booking-seed-is-overridable-by-environment.md) | The booking seed is overridable by environment, unset by default, and announces itself | accepted | — |
-| [0022](adr/0022-application-configuration-is-prefixed-booking.md) | Prefix this application's own configuration with `BOOKING_`, and make §7.3's table the contract | accepted | — |
-| [0023](adr/0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md) | A write that leaves the exclusion constraints' scope takes no advisory lock — narrow F-02-9 to an iff | accepted | — |
 | [0024](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) | The error taxonomy's residual is a property, not a row | accepted | — |
 | [0025](adr/0025-existence-is-the-reads-legality-is-the-statements.md) | Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE | accepted | — |
-| [0026](adr/0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md) | The lock is a value the write takes, and it carries the keys it took | accepted | — |
-| [0027](adr/0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md) | A move attempts the pair it already holds before it shuffles | accepted | — |
-| [0028](adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | The lock carries the transaction it was taken on | proposed | — |
-| [0029](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) | A deadlock event names the write path it happened on; a conflict event does not | accepted | — |
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
-| [0031](adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md) | A move reads the pair it leaves inside its own transaction | accepted | — |
-| [0032](adr/0032-availability-is-two-reads-composed-in-the-use-case.md) | Compose availability from two reads in the use case, so only appointmentRepository names the table | accepted | — |
-| [0033](adr/0033-the-advisory-read-orders-candidates-it-never-removes-them.md) | The advisory read orders candidates; it never removes them | proposed | — |
 
 ## Agent runs
 
