@@ -16,6 +16,7 @@ real and consciously not fixed under §6 **(b)**.
 | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | [ADR-0016](../adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | proposed — not yet agreed |
 | Disambiguate the composite ownership foreign key after it fires, not before — three failures share one constraint name and only a post-failure read separates them | [ADR-0017](../adr/0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md) | proposed — not yet agreed |
 | The lock carries the transaction it was taken on | [ADR-0028](../adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | proposed — not yet agreed |
+| The advisory read orders candidates; it never removes them | [ADR-0033](../adr/0033-the-advisory-read-orders-candidates-it-never-removes-them.md) | proposed — not yet agreed |
 <!-- /generated:debt-register -->
 
 **A row states what is owed, never that anything is correct.**

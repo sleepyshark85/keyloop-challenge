@@ -400,5 +400,23 @@
    "Option C \u2014 Book it; four concurrent moves on two rows is rare"
   ],
   "decision": ""
+ },
+ "0032-availability-is-two-reads-composed-in-the-use-case.md": {
+  "options": [
+   "A \u2014 one joined query in candidateRepository.ts (freeResources, as \u00a76.5 says).",
+   "B \u2014 a NOT EXISTS clause added to candidateResources itself, so one function serves both pa",
+   "C \u2014 a new availabilityRepository.ts naming the table.",
+   "D \u2014 busyResources in appointmentRepository.ts, subtracted in src/application/queryAvailabi"
+  ],
+  "decision": "Chosen option: D. appointmentRepository.busyResources(db, dealershipId, from, to) returns the"
+ },
+ "0033-the-advisory-read-orders-candidates-it-never-removes-them.md": {
+  "options": [
+   "A \u2014 filter, falling back to the unfiltered list when it empties.",
+   "B \u2014 filter, refusing when it empties.",
+   "C \u2014 order free-first; never remove.",
+   "D \u2014 raise the cap above the bound instead."
+  ],
+  "decision": "Chosen option: C. busyResources (ADR-0032) is read once on the booking path and its answer"
  }
 }
