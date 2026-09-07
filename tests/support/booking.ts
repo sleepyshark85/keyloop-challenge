@@ -448,6 +448,34 @@ export async function getAppointment(service: StartedService, id: string): Promi
   return await request(`${service.baseUrl}/appointments/${id}`, { method: 'GET' });
 }
 
+// ─────────────────────────────────────────────────────── slice 08: GET /availability ──
+
+/**
+ * `GET /availability?dealershipId&serviceTypeId&from&to` — `docs/slices/08-availability-query.md`,
+ * `docs/slices/08-design.md` §2. `from` and `to` are sent VERBATIM — including a reversed or
+ * equal pair — so AC-6 (`to <= from`) is reachable through this one helper rather than needing
+ * a second raw-query path the way `postRaw` exists beside `postBooking`.
+ */
+export interface AvailabilityQuery {
+  readonly dealershipId: string;
+  readonly serviceTypeId: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+export async function getAvailability(
+  service: StartedService,
+  query: AvailabilityQuery,
+): Promise<HttpAnswer> {
+  const params = new URLSearchParams({
+    dealershipId: query.dealershipId,
+    serviceTypeId: query.serviceTypeId,
+    from: query.from,
+    to: query.to,
+  });
+  return await request(`${service.baseUrl}/availability?${params.toString()}`, { method: 'GET' });
+}
+
 /** A one-line rendering of an answer, for a failure message. */
 export function describeAnswer(answer: HttpAnswer): string {
   if (answer.transportFailure !== undefined) return answer.transportFailure;

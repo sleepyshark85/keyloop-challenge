@@ -53,7 +53,9 @@ export interface AppointmentRouteDeps {
   readonly rescheduleAppointment: (command: RescheduleCommand) => Promise<RescheduleOutcome>;
 }
 
-const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+/** Exported for `routes/availability.ts` (slice 08): one pattern, so the two routes cannot drift. */
+export const UUID_PATTERN =
+  '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
 
 /**
  * RFC 3339, with an explicit offset required.
@@ -67,8 +69,11 @@ const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{
  * `2026-02-30T10:00:00Z` is accepted and `Date.parse` silently yields 2026-03-02. Fixing it means
  * a leap-year calculation in `src/http`, and slice 01 already ruled that a second calendar
  * implementation is a risk this design rejects. OQ-02-1 carries it.
+ *
+ * Exported for `routes/availability.ts`: `from`/`to` are RFC 3339 instants too, and a second
+ * hand-copied literal is how the two routes' notion of "a valid instant" would drift apart.
  */
-const RFC3339_PATTERN =
+export const RFC3339_PATTERN =
   '^\\d{4}-\\d{2}-\\d{2}[Tt]\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([Zz]|[+-]\\d{2}:\\d{2})$';
 
 const BookingBody = Type.Object(

@@ -118,6 +118,7 @@ the duplication that costs is *across* artifacts. A budget is not raised to fit 
 needs more room shows the enumeration, because an estimate loses to a measurement.
 <!-- /agents:concision -->
 
+
 **ADRs.** Immutability is `CLAUDE.md` §4. MADR, extended with `proposed-by` / `decided-by` /
 `ai-input` as direct evidence for the AI-verification criterion. *Considered Options* must be
 populated honestly — one option considered is a note, not a decision record.
@@ -289,11 +290,10 @@ in §9's coverage table rather than `agent.finish`.
 ### What the PR thread must carry
 
 The prompt library records what each agent was *asked* and what it *returned*, not what the team
-**decided between those two points** — and that reasoning is a graded artifact, since the brief asks
-for the process of guiding and verifying AI output, not only its results. The thread is the one place
-a decision sits beside the diff it applies to, with its own timestamp. So every slice PR opens as a
-**draft at step 1**, when the design is committed: opened after the work it is a publication, opened
-before it a venue. The orchestrator posts every row but the gate, on a role's behalf.
+**decided between those two points** — and that reasoning is a graded artifact. The thread is the one
+place a decision sits beside the diff it applies to. So every slice PR opens as a **draft at step 1**:
+opened after the work it is a publication, opened before it a venue. The orchestrator posts every row
+but the gate, on a role's behalf.
 
 | Step | Carries |
 |---|---|
@@ -308,18 +308,25 @@ Step 2 is the easiest to skip, and skipping it is measured: `process-criteria.md
 who produces no substance as a failure, and by the same reasoning **an agree step that has never
 produced an objection is rubber-stamping**.
 
+<!-- agents:pr-comment -->
+**Short *and* self-contained**, ~100–150 words. The second failure is worse: a long comment goes
+unread, but a short one that assumes context is *unreadable* — a reader does not know what "Option D"
+means. Open with one italic framing line, then gloss each reference as you use it. Keep the
+**leading** bold role — named in prose is not attribution — and the citations: span ids, `file:line`,
+shas. Cut narration and any sentence explaining a fact's *significance* rather than stating it.
+Lapsed for six slices, caught by the human and not a check (`O-55`); `slice:check` now fails a slice
+whose PR lacks a comment from each role that reported.
+<!-- /agents:pr-comment -->
+
 ### Answering an objection
 
-The rule is `CLAUDE.md` §6, NON-NEGOTIABLE. *It was added on 2026-09-04, after the first real use of
-step 2 produced five objections and the adjudicating prompt asked the architect to rule and amend in
-one run* — a defect in the process, not in the architect: an adjudicator drafting the amendment while
-deciding whether it is warranted has already conceded.
+The rule is `CLAUDE.md` §6, NON-NEGOTIABLE: an adjudicator drafting the amendment while deciding
+whether it is warranted has already conceded.
 
-Why the extra round earns its cost: the brief grades *the process for verifying and refining* AI
-output, and a design argued into shape with the losing arguments preserved is stronger evidence than
-the same design reached by an agent agreeing with whoever spoke last. **A vote is also the only
-mechanism here that lets a role be outnumbered rather than overruled**, which keeps the architect's
-authority from collapsing into the last reviewer's preference.
+A design argued into shape with the losing arguments preserved is stronger evidence than the same
+design reached by agreeing with whoever spoke last. **A vote is the only mechanism here that lets a
+role be outnumbered rather than overruled**, which keeps the architect's authority from collapsing
+into the last reviewer's preference.
 
 ---
 
@@ -438,13 +445,12 @@ It does not — directly. This is a human artifact carrying rationale, and agent
 imperative, role-scoped instructions: one given rules *plus the arguments for them* follows them less
 reliably than one given the rules alone, and pays for the tokens on every call.
 
-**Exactly three things are generated** from this file by `tools/agents/generate.mjs`
-(`npm run agents:build`, checked in CI): each role's `model:` frontmatter and its Decides / Never
-constraints from §2's table, and the committing rule marked in §8. The narrowness is the point, and it
-is measured — `generate.mjs`'s header carries the count and the reasoning. This section once claimed
-more than any tool did, at a time when there was no tool at all, so its "regenerate" instruction named
-a process that did not exist while the files drifted. **A generated block that claims less than it
-does is worth more than a header that claims more.**
+**Four things are generated** from this file by `tools/agents/generate.mjs` (`npm run agents:build`,
+checked in CI): each role's `model:` frontmatter and its Decides / Never constraints from §2's table,
+the committing rule marked in §8, the concision rule in §4, and §8's PR-comment rule. *This sentence
+said "three" and omitted concision until slice 08 — a count maintained by hand beside a generator
+that could have derived it.* **A rule delivered by briefing is a rule enforced by whoever remembers**,
+which is why each of these is generated rather than restated in a dispatch.
 
 Everything else machine-facing is hand-maintained and related by citation, not derivation: `CLAUDE.md`
 is the human's and normative; `.claude/settings.json` and its hooks are the enforcement §7 and §9

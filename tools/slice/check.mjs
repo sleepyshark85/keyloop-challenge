@@ -84,7 +84,11 @@ const NA = 'N/A';
 
 // --- Definition of Ready ---
 if (!onlyDone) {
-  const acs = [...slice.text.matchAll(/^\s*[-*]\s*\*\*AC-\d+\*\*/gm)];
+  // `AC-5a` is a criterion. The pattern demanded digits followed immediately by `**`, so when
+  // R-08-2 split AC-5 into an assertable half and one deferred to the slice that can fail it,
+  // slice:check reported five criteria where there were six — a counter that stops counting the
+  // moment a criterion is split is a counter that discourages splitting.
+  const acs = [...slice.text.matchAll(/^\s*[-*]\s*\*\*AC-\d+[a-z]?\*\*/gm)];
   check('ready', 'acceptance criteria present', acs.length ? PASS : FAIL,
     acs.length ? `${acs.length} criteria` : 'no **AC-n** entries found in the body');
 
@@ -473,15 +477,38 @@ if (!onlyReady) {
   // A slice that changed no mutable file gets UNVERIFIED, not PASS. That is the
   // same answer `slice:check` already gives for every other absent evidence: the
   // gate says what it does not know rather than passing on what it cannot see.
+  // O-64, and it is this criterion's THIRD reading of a number that answered a different
+  // question. §10's clause is "on changed fileS", and the aggregate over that set is not
+  // the same claim as the threshold holding for each of them. At slice 08 the changed set
+  // scored 85.71 while `routes/availability.ts` sat at 71.43 — a file the architect had
+  // ruled fails §10 across three rulings and booked into arc42 §11 as debt. THIS GATE
+  // WOULD HAVE SAID PASS. The per-file truth existed the whole time, in prose, in the
+  // `note` of a hand-written record: the honesty in a field the gate never opened, exactly
+  // as in the vacuous-score bug above.
+  //
+  // `mutation_per_file` comes from `collect-mutation.mjs`, which computes it from
+  // Stryker's own report — so the threshold is applied to a fact no one typed. A record
+  // without that field is OLDER than the collector, and is read the way it always was
+  // rather than retroactively failed: the aggregate, with the reading named in the detail
+  // so nobody mistakes it for the per-file one.
   const mut = [...events].reverse().find((e) => e.checks?.mutation_score !== undefined);
   const vacuous = mut?.checks?.mutation_measures_changed_files === false;
+  const below = mut?.checks?.mutation_below_threshold;
+  const perFile = mut?.checks?.mutation_per_file;
+  const worst = perFile && Object.entries(perFile).sort((a, b) => a[1] - b[1])[0];
   check('done', `mutation score ≥ ${MUTATION_THRESHOLD}`,
     !mut ? UNVERIFIED
       : vacuous ? NA
-      : mut.checks.mutation_score >= MUTATION_THRESHOLD ? PASS : FAIL,
+      : below ? (below.length ? FAIL : PASS)
+        : mut.checks.mutation_score >= MUTATION_THRESHOLD ? PASS : FAIL,
     !mut ? 'Stryker has not run for this slice'
       : vacuous ? `this slice changed no mutable file — ${mut.checks.mutation_score} measures the slice before it`
-      : `${mut.checks.mutation_score}`);
+      : below?.length
+        ? `${below.join(', ')} below ${MUTATION_THRESHOLD} — worst ${worst[1]}; `
+          + `the changed set aggregates to ${mut.checks.mutation_score} and §10 is per file`
+        : below
+          ? `every changed file at or above ${MUTATION_THRESHOLD} — worst ${worst ? `${worst[0]} ${worst[1]}` : 'none measured'}`
+          : `${mut.checks.mutation_score} — AGGREGATE, recorded before per-file collection`);
 
   const depcruiseConfigured = ['.dependency-cruiser.js', '.dependency-cruiser.cjs', '.dependency-cruiser.json']
     .some((f) => existsSync(resolve(f)));
@@ -548,6 +575,19 @@ if (!onlyReady) {
   // an orchestrator decision is precisely the misreport this check exists to prevent, one
   // level up — so the label names the actor, and a delegated gate is visibly not a human
   // one at a glance rather than eleven words into the rationale.
+  // O-66. This row said "auto-approved — DoD green" WITHOUT EVER CHECKING DoD. At slice 08
+  // it printed exactly that while §10 was failing at 71.43 and the CI record was stale —
+  // the two rows directly above it.
+  //
+  // THE VERDICT IS LEFT ALONE AND ONLY THE CLAIM IS FIXED. Coupling PASS to the other rows
+  // was tried and reverted: the docblock above states the safety deliberately lives in the
+  // summary — "a light gate cannot carry a slice over a red suite, a stale CI run or an
+  // unreconciled arc42" — and three tests assert the revocation rule in isolation from
+  // unrelated red rows. Overriding a documented decision to fix its wording would be the
+  // adjudicate-and-edit-in-one-pass move §6 forbids. So the row now REPORTS what it sees:
+  // no open MAJOR, and whether DoD is actually green. Whether the verdict itself should be
+  // coupled is the architect's call, recorded as O-66.
+  const doneRedRows = results.filter((r) => r.phase === 'done' && r.verdict === FAIL);
   const gateActor = gateE?.actor ?? (light ? 'light gate' : null);
   const approvedBy = gateActor === 'human' ? 'human approved'
     : gateActor === 'light gate' ? 'gate approved (light)'
@@ -559,8 +599,12 @@ if (!onlyReady) {
       : FAIL,
     gateE ? `${gateE.decision} — ${gateE.rationale}`
       : light && !openSerious.length
-        ? 'light gate (human ruling 2026-09-05): auto-approved — DoD green and no open MAJOR/BLOCKING'
-      : light
+        ? 'light gate (human ruling 2026-09-05): no open MAJOR/BLOCKING'
+          + (doneRedRows.length
+            ? ` — but the Definition of Done is NOT green (${doneRedRows.map((r) => r.name).join(', ')}), `
+              + 'so this slice does not auto-approve'
+            : ' and every other Done check passes — auto-approved')
+      : light && openSerious.length
         ? `light gate REVOKED — ${openSerious.length} open MAJOR/BLOCKING finding(s): `
           + `${openSerious.map((e) => e.ref).join(', ')}. This slice needs a human.`
       : 'no Gate E gate.decided event');
@@ -664,6 +708,117 @@ if (!onlyReady) {
           + 'A role dispatched a role without the orchestrator seeing it; if any ruling in that '
           + 'run was (c), the loopback governor is owed one it did not count.'
         : `${captures.length} capture(s), each with an agent event`);
+
+  // O-55 — THE REASONING HAS TO BE ON THE PR, AND FOR SIX SLICES IT WAS NOT.
+  //
+  // §6: "Every reply, disagreement and vote goes on the PR under §9's attribution
+  // convention, because THE REASONING IS THE GRADED ARTIFACT — the record of *how* a design
+  // was argued into shape is worth more than the amended design alone."
+  //
+  // Measured when the human noticed: PR #6 (slice 00) had 4 comments, PR #10 (slice 01) had
+  // 3, and slices 02, 04, 05, 06 and 07 had ZERO. The orchestrator had been putting all of it
+  // in the event log and in commit messages, which keeps the CONTENT and loses the PLACE the
+  // constitution names. Every role read those PRs at review and at as-built; none remarked
+  // they were empty. A rule every role can satisfy itself is being obeyed by nobody is worse
+  // evidence about the process than one role forgetting it.
+  //
+  // No check existed because `slice:check` reads the log and CI and never the PR. This is
+  // that check. It compares against the log rather than a fixed list: the roles that OWE a
+  // comment are exactly the roles that produced an agent event for this slice, so a slice
+  // that never ran a scribe is not failed for a scribe's silence.
+  //
+  // IT SAYS WHEN IT CANNOT LOOK. No `gh`, no network, or no PR for this branch is
+  // UNVERIFIED — never PASS. A gate reporting green because it could not see is the defect
+  // this whole file is built against, and a check that needs the network must be able to
+  // admit the network was not there.
+  const prComments = (() => {
+    const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+    if (!branch || branch === 'HEAD') return { known: false, why: 'no branch' };
+    const gh = spawnSync('gh', ['pr', 'list', '--head', branch, '--state', 'all',
+      '--json', 'number', '--jq', '.[0].number'], { encoding: 'utf8' });
+    if (gh.status !== 0) return { known: false, why: 'gh unavailable' };
+    const num = gh.stdout.trim();
+    if (!num) return { known: false, why: `no PR for ${branch}` };
+    const body = spawnSync('gh', ['pr', 'view', num, '--json', 'comments',
+      '--jq', '.comments[].body'], { encoding: 'utf8' });
+    if (body.status !== 0) return { known: false, why: `PR #${num} unreadable` };
+    return { known: true, num, bodies: body.stdout.split('\n').filter(Boolean) };
+  })();
+
+  const rolesThatRan = [...new Set(events
+    .filter((e) => String(e.event).startsWith('agent.') && e.actor)
+    .map((e) => e.actor))].sort();
+
+  if (!rolesThatRan.length) {
+    check('done', 'reasoning is on the PR', NA, 'no role produced an agent event for this slice');
+  } else if (!prComments.known) {
+    check('done', 'reasoning is on the PR', UNVERIFIED,
+      `${prComments.why} — cannot read the PR, and §6 puts the reasoning there`);
+  } else {
+    // The attribution convention is a LEADING bold role. It is deliberately not an exact
+    // `**role**`: the convention as practised is `**architect · step 1 — DESIGN**`, one bold
+    // span carrying the role and its context, and the first version of this check demanded
+    // the bare form and failed a genuine, correctly attributed comment on its first run.
+    //
+    // What it must still refuse is a role NAMED IN PROSE — "the architect ruled …" — because
+    // counting that would let a mention stand in for a report, which is the whole distinction
+    // §9's convention exists to draw. So: bold, at the start of a line, opening with the role.
+    const spoke = new Set(rolesThatRan.filter((r) =>
+      prComments.bodies.some((b) => new RegExp(`^\\s*\\*\\*${r}\\b`, 'm').test(b))));
+    const silent = rolesThatRan.filter((r) => !spoke.has(r));
+    check('done', 'reasoning is on the PR', silent.length ? FAIL : PASS,
+      silent.length
+        ? `PR #${prComments.num}: no attributed comment from ${silent.join(', ')} — `
+          + '§6 puts the reasoning on the PR because it is the graded artifact'
+        : `PR #${prComments.num}: every role that ran is attributed`);
+  }
+
+  // O-39 — A DESIGN DOCUMENT MAY NOT BE A FINDING'S ONLY HOME.
+  //
+  // Ruled at slice 06: a finding existing only as a bullet cannot appear in the register, cannot
+  // have an escape distance computed, and — measurably — would have let A-05-5's own check pass
+  // slice 06 while dropping F-05-1. The architect stated the structural cause: §9 has the
+  // orchestrator write the log from STRUCTURED REPORTS, so a finding written into a design file
+  // under "assumptions and open questions" passes through no report field and is BORN UNLOGGED.
+  //
+  // THE RULING SAID `slice:check` SHOULD ENFORCE IT AND I DID NOT BUILD IT. Slice 08 then declared
+  // eight — F-08-1..4, A-08-1..3, OQ-08-1 — and logged none, and I found that only because
+  // `docs:refs` happened to fire on the one of the eight I had cited myself.
+  //
+  // THE TEST IS OWNERSHIP BY NUMBER, not position on the page. A ref whose slice segment matches
+  // this slice is one this slice MINTED, wherever it sits — a bullet, a table cell, or mid-sentence
+  // in bold. Matching on "looks like a definition" would have missed `A-08-3`, whose only
+  // introduction is inside a heading that starts with other words. Refs from other slices are
+  // citations and are already logged where they were raised.
+  const mintedInDesign = (() => {
+    const design = resolve(SLICE_DIR, `${id}-design.md`);
+    if (!existsSync(design)) return null;
+    const text = readFileSync(design, 'utf8');
+    // `D-` is excluded, and the exclusion is the point rather than a convenience. A `D-` id is a
+    // DEBT-REGISTER entry whose home is arc42 §11, which `docs:refs` already checks resolves to a
+    // design definition — so it has the two homes O-39 asks for. Demanding a `finding.raised` for
+    // one would be demanding that the debt register be a defect register, which it is not.
+    const own = new RegExp(`\\b(?:[A-CE-Z][A-Z]?|OQ)-${id}-\\d+\\b`, 'g');
+    return [...new Set(text.match(own) ?? [])].sort();
+  })();
+
+  if (mintedInDesign === null) {
+    check('done', 'design findings reached the log', NA, `no ${id}-design.md`);
+  } else if (!mintedInDesign.length) {
+    check('done', 'design findings reached the log', NA, 'the design mints no refs of its own');
+  } else {
+    // ANY event carrying the ref counts, not only `finding.raised`. `R-06-1` was a DCR and
+    // `OQ-07-1` an open question resolved directly; both reached the log through a different
+    // event, and both are in the register. The rule is that the log knows the ref, not that it
+    // learned it by one route.
+    const raised = new Set(allEvents.filter((e) => e.ref).map((e) => e.ref));
+    const unlogged = mintedInDesign.filter((r) => !raised.has(r));
+    check('done', 'design findings reached the log', unlogged.length ? FAIL : PASS,
+      unlogged.length
+        ? `minted in the design and never raised — ${unlogged.join(', ')}. A finding whose only `
+          + 'home is a document cannot be in the register and has no escape distance (O-39).'
+        : `${mintedInDesign.length} ref(s) minted, each with a finding.raised`);
+  }
 
   const loops = events.filter((e) => e.event === 'loopback').length;
   check('done', 'loopbacks within governor', loops <= 2 ? PASS : FAIL,

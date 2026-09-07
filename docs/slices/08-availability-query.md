@@ -3,9 +3,9 @@ id: "08"
 title: Availability — advisory by contract, and provably in agreement with the constraint
 status: ready
 depends_on: ["07"]
-arc42: ["§6.5", "§8.6"]
-adr: [8]
-quality_scenarios: [QS-8]
+arc42: ["§5.2", "§6.5", "§8.6", "§10.2", "§11.2"]
+adr: [8, 32, 33]
+quality_scenarios: [QS-8, QS-12]
 inherits: ["I-04-5", "A-06-4"]   # deferred here by ruling; slice:check enforces it (A-05-5)
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
@@ -22,37 +22,67 @@ it reports free is exactly what the constraint accepts.
 
 ## Acceptance criteria
 
-- **AC-1** — Given an arbitrary generated schedule over one dealership and an arbitrary query
-  interval, with no concurrent writer, then **every** (bay, technician) pair the query reports free is
-  accepted by an `INSERT`, and **every** pair it omits is rejected with `23P01`. *(QS-8)*
+- **AC-1** — *(amended at step 1; scope corrected at step 2 under `T-08-1`)* Given an arbitrary
+  generated schedule over one dealership and an arbitrary query interval, with no concurrent writer,
+  then over the **candidate universe** for the queried (dealership, service type) —
+  `candidateResources`' bays × technicians — **every** pair the query reports free is accepted by an
+  `INSERT` of exactly `[from, to)`, and **every** pair it omits is rejected with SQLSTATE `23P01`.
+  Each probe is a `SAVEPOINT` that is rolled back; a verdict of `23503`, `23514` or `40P01` fails the
+  run **distinctly**; the two directions are counted apart and the shrunk counterexample names which
+  failed; the generator is biased to produce appointments ending exactly at `from` and starting
+  exactly at `to`; and *(added at step 5 under `R-08-1`, corrected in round 2 under `T-08-7`)*
+  **every run carries a cancelled witness** — one generated item written `cancelled`, overlapping
+  `[from, to)`, on a bay and a technician **no other in-window item uses**; the remaining items are
+  drawn `confirmed`:`cancelled` at 4:1. A query and a constraint can agree on the range and disagree
+  on the predicate that scopes it, and without this the `status <> 'cancelled'` conjunct is
+  unreachable. A *weight* alone was not enough: exposure needs a cancelled item that is in-window
+  **and** unmasked by a confirmed one, and three coincidences multiply into a 1-in-4 miss. As a
+  construction the kill is deterministic — the witness's pair is reported busy while its probe is
+  accepted. Offered shape, not mandated: draw the witness at index 0 starting inside the window, the
+  other items from the remaining indices, restricted to the two `boundary` kinds when a count is 1,
+  since mechanic 5 already pins those outside the window. **Quiescence is witnessed, not declared:** the query is re-run after the probes and
+  must return a byte-identical answer, and `count(*)` with `max(updated_at)` over
+  `appointment WHERE dealership_id = $1` — the fixture's own dealership, since no other dealership
+  shares a bay or a technician with it — must be unchanged. A case failing the witness is discarded
+  through **`fc.pre()`**, never swallowed by a `try/catch`, so a systemic leak trips fast-check's
+  too-many-discards error and fails loud rather than passing quietly. *(QS-8)*
 - **AC-2** — Given a bay with a confirmed appointment `[09:00, 10:00)`, when availability is queried
   for `[09:30, 10:30)`, then that bay is not returned; when queried for `[10:00, 11:00)`, it is.
 - **AC-3** — Given a technician qualified for a service type at dealership X only, when availability
   is queried at dealership Y, then that technician is not returned (A-3, A-9).
 - **AC-4** — Given a cancelled appointment, when availability is queried over its interval, then the
   resources it held are reported free.
-- **AC-5** — Given any availability response, when it is read, then it carries an explicit advisory
-  flag, and the OpenAPI description states that a free result is not a reservation.
-- **AC-6** — Given a query whose `to` precedes its `from`, then `400` with
+- **AC-5a** — *(amended at step 1; split at step 5 under `R-08-2`)* Given any availability response,
+  when it is read, then it carries an explicit advisory flag and a disclosure carrying **both** facts:
+  that a free result is **not a reservation**, and that it is true **only of the interval queried**.
+  The wire shape is pinned (`T-08-5`): `{ bays, technicians, advisory: boolean, disclaimer: string }`,
+  and neither field may be a `Type.Literal` (`I-08-5`).
+  <br>**AC-5b — the same two facts in the OpenAPI description — is deferred to slice 09**, beside
+  AC-9, where the document is emitted and the assertion can therefore fail. Not slice 10, which is a
+  tombstone. AC-5 as written bundled an assertable half with one that cannot fail, and survived only
+  because bundling hid it — the same ground AC-7 was withdrawn on at step 2.
+
+- **AC-6** — *(amended at step 1)* Given a query where **`to <= from`**, then `400` with
   `type=/problems/malformed-request`.
+  <br>Not `to < from`. `from == to` is an empty `tstzrange`, which overlaps nothing, so the query
+  would report **everything** free — vacuously true — and a probe of that window is refused by
+  `23514` rather than `23P01`, putting it outside QS-8's universe entirely. The database guards
+  `ends_at > starts_at`; the route must guard the same way round (`F-08-3`).
 
 ## Inherited scope — from slice 05, ruled at its step 5 (R-05-2)
 
-- **AC-1 of slice 05 rests on a fact this slice deletes** (no ref — this obligation was ruled at
-  slice 05 step 5 as R-05-2's third routing and recorded in the ruling's prose rather than as a
-  finding of its own; O-39's rule, made at slice 06, would require one today).
-  ** What makes cancellation's freed-slot proof
-attributable is that `candidateResources` reads only `service_bay`, `technician` and
-`technician_qualification` — **never `appointment`** — so the candidate list is *identical* before and
-after the cancel, and the only thing that moved between the `409` and the `201` is the constraint's
-verdict on ADR-0004's retry attempts. The advisory pre-filter named in Out of scope below makes the
-candidate path read `appointment`, and that attribution stops holding: a `201` after a cancel could
-then come from a changed candidate order rather than from the predicate.
-
-**So slice 08 owes slice 05's AC-1 a re-derivation**, not a deletion. The cheapest form is to keep the
-1×1 fixture, where a pre-filter cannot change an order of one — but that must be *asserted* here
-rather than left true by accident, because the trap slice 05 closed by shape reopens the moment the
-fixture widens. Its AC-4 above is the availability-side mirror and does not substitute for it.
+- **AC-1 of slice 05 rests on a fact this slice deletes** (no ref — ruled at slice 05 step 5 as
+  R-05-2's third routing, recorded in the ruling's prose rather than as a finding of its own; O-39's
+  rule, made at slice 06, would require one today).
+  **Discharged by citation rather than by a new criterion** (`T-08-2`): slice 05's AC-1 attribution
+  rests on the `appointment-table-access` marker resolving to exactly
+  `src/persistence/appointmentRepository.ts`, and
+  `tests/architecture/ambiguity-containment.test.ts:507-524` already asserts that against the **real
+  `src/` tree by exact-file equality, in CI, on every commit** — `candidateRepository.ts` is absent
+  from `PERMITTED_FILE`. **ADR-0032's Option D is the only considered option that leaves that list
+  unchanged**, so slice 08 need only avoid breaking a guarantee that already holds. AC-7 was minted
+  at step 1 to assert this and **withdrawn at step 2**: a criterion satisfied before the slice opens
+  cannot fail it, and a criterion that cannot fail is not evidence — §2.4's own argument.
 
 - **I-04-5 — the advisory pre-filter, and the reason it waits for this slice.** Ruled (b) at slice 04
   with both halves upheld, and the surviving argument is the implementer's: *the pre-filter is
@@ -75,7 +105,7 @@ fixture widens. Its AC-4 above is the availability-side mirror and does not subs
 
 ## In scope
 
-- The availability query and its route; `tests/property/availability-agrees-with-constraint.test.ts`
+- The availability query and its route; `tests/property/availability-agrees-with-constraint.db.test.ts` (`T-08-4`)
   using `fast-check`.
 
 ## Out of scope

@@ -68,12 +68,13 @@ const mutationRun = (over) => ({
  */
 const git = (dir, args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
 
-const build = (events, { commits = [], slice = SLICE, branch = null, prompts = [] } = {}) => {
+const build = (events, { commits = [], slice = SLICE, branch = null, prompts = [], designText = null } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'slice-check-'));
   mkdirSync(join(dir, 'docs/team-log'), { recursive: true });
   mkdirSync(join(dir, 'docs/slices'), { recursive: true });
   mkdirSync(join(dir, 'docs/arc42'), { recursive: true });
   writeFileSync(join(dir, 'docs/slices/77-fixture.md'), slice, 'utf8');
+  if (designText !== null) writeFileSync(join(dir, 'docs/slices/77-design.md'), designText, 'utf8');
   if (prompts.length) {
     mkdirSync(join(dir, 'docs/team-log/prompts'), { recursive: true });
     for (const f of prompts) writeFileSync(join(dir, 'docs/team-log/prompts', f), '# prompt\n', 'utf8');
@@ -195,6 +196,44 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
     row(run([ciRun({}), low]), 'mutation score').startsWith('FAIL'),
     row(run([ciRun({}), low]), 'mutation score'));
 
+  // O-64. The aggregate over changed files is NOT the claim §10 makes, and slice 08 is
+  // the case that proves the difference matters: 0.8571 across five changed files while
+  // one of them sat at 71.43, a file the architect had ruled fails §10 three times over.
+  // The old reading passed it.
+  const perFile = mutationRun({ checks: {
+    mutation_score: 0.8571,
+    mutation_measures_changed_files: true,
+    mutation_per_file: { 'src/a.ts': 100, 'src/b.ts': 71.43 },
+    mutation_below_threshold: ['src/b.ts'],
+  } });
+  ok('a passing AGGREGATE fails when one changed file is below threshold',
+    row(run([ciRun({}), perFile]), 'mutation score').startsWith('FAIL'),
+    row(run([ciRun({}), perFile]), 'mutation score'));
+  ok('...and names the file rather than only the number',
+    row(run([ciRun({}), perFile]), 'mutation score').includes('src/b.ts'),
+    row(run([ciRun({}), perFile]), 'mutation score'));
+  ok('...and says the aggregate is not the reading, so the two numbers cannot be confused',
+    /aggregates to 0\.8571/.test(row(run([ciRun({}), perFile]), 'mutation score'))
+      && /per file/.test(row(run([ciRun({}), perFile]), 'mutation score')),
+    row(run([ciRun({}), perFile]), 'mutation score'));
+
+  const allAbove = mutationRun({ checks: {
+    mutation_score: 0.8,
+    mutation_measures_changed_files: true,
+    mutation_per_file: { 'src/a.ts': 100, 'src/b.ts': 76 },
+    mutation_below_threshold: [],
+  } });
+  ok('every changed file at or above threshold passes, and names the worst one',
+    row(run([ciRun({}), allAbove]), 'mutation score').startsWith('PASS')
+      && row(run([ciRun({}), allAbove]), 'mutation score').includes('src/b.ts 76'),
+    row(run([ciRun({}), allAbove]), 'mutation score'));
+
+  // A record older than the collector must not be retroactively failed — but it must not
+  // be mistaken for a per-file reading either, so it says which reading it is.
+  ok('a pre-collector record keeps the aggregate reading AND declares it',
+    row(run([ciRun({}), real]), 'mutation score').includes('AGGREGATE'),
+    row(run([ciRun({}), real]), 'mutation score'));
+
   ok('a missing score is UNVERIFIED and DOES block done',
     row(run([ciRun({})]), 'mutation score').startsWith('UNVERIFIED') && run([ciRun({})]).includes('unverified'),
     row(run([ciRun({})]), 'mutation score'));
@@ -305,6 +344,17 @@ const raised = (over) => ({ ts: '2026-01-01T02:00:00Z', slice: '77', event: 'fin
     row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'approved').startsWith('PASS'),
     row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'approved'));
 
+  // O-66. The row used to assert "DoD green" without checking, and printed it at slice 08
+  // while §10 was failing two rows above. The verdict is deliberately unchanged — the
+  // safety lives in the summary — so what is asserted here is that the row STOPS CLAIMING
+  // a fact it did not check, and says which rows are red when they are.
+  {
+    const line = row(run([ciRun()], { slice: LIGHT }), 'approved');
+    ok('the light gate never claims "DoD green"', !/DoD green/.test(line), line);
+    ok('...and names the red rows when the Definition of Done is not green',
+      !line.includes('auto-approved') && /NOT green \(/.test(line), line);
+  }
+
   ok('a MINOR never revokes it',
     row(run([ciRun(), raised({ severity: 'MINOR', ref: 'R-77-2' })], { slice: LIGHT }), 'approved').startsWith('PASS'));
 
@@ -409,6 +459,89 @@ const MARKED = '# 9\n\n<!-- generated:adr-index -->\nold\n<!-- /generated:adr-in
     row(run([ciRun(), raise('R-77-4'), { ts: '2026-01-01T04:00:00Z', slice: '77',
       event: 'review.response', source: 'reported', finding_ref: 'R-77-4', resolution: 'fixed' }]),
       'findings ruled').startsWith('PASS'));
+}
+
+// ------------------------------- O-39: a design may not be a finding's only home --
+//
+// Ruled at slice 06 and NOT BUILT for two slices. Slice 08 then minted eight refs in its design and
+// logged none; I found that only because `docs:refs` fired on the one of the eight I happened to
+// have cited myself. These cases exist because the check's first version had TWO false positives
+// and both are more interesting than the true one.
+{
+  const design = (body) => ({ designText: body });
+  const raised = (ref) => ({
+    ts: '2026-01-01T00:00:00Z', event: 'finding.raised', source: 'reported', slice: '77',
+    actor: 'architect', ref, severity: 'MINOR', step: 1, claim: 'c', scenario: 's',
+  });
+
+  const a = run([raised('F-77-1')], design('- **F-77-1** — a finding.'));
+  ok('a ref minted in the design and logged passes',
+    /PASS.*design findings reached the log/.test(row(a, 'design findings reached the log')),
+    row(a, 'design findings reached the log'));
+
+  const b = run([], design('- **F-77-1** — a finding nobody logged.'));
+  ok('a ref minted and never logged fails', /FAIL/.test(row(b, 'design findings reached the log')));
+  ok('...and names it, so it can be found', /F-77-1/.test(row(b, 'design findings reached the log')));
+
+  // OWNERSHIP BY NUMBER, not position. `A-08-3`'s only introduction was inside a heading that
+  // starts with other words; a "looks like a definition" pattern would have missed it.
+  const c = run([], design('| 6 | mechanic | ... (`A-77-9`) |'));
+  ok('a ref minted only inside a table cell is still minted',
+    /FAIL.*A-77-9/.test(row(c, 'design findings reached the log')));
+
+  // FALSE POSITIVE 1. A `D-` id is a debt-register entry whose home is arc42 §11, which docs:refs
+  // already checks. Demanding a finding.raised for one demands the debt register be a defect
+  // register.
+  const d = run([], design('- **D-77-1** — a debt item, §11\'s.'));
+  ok('a D- debt id is not a finding and is not demanded',
+    /PASS|N\/A/.test(row(d, 'design findings reached the log')), row(d, 'design findings reached the log'));
+
+  // FALSE POSITIVE 2. `R-06-1` was a DCR and `OQ-07-1` an open question resolved directly; both
+  // reached the log by a route other than finding.raised, and both are in the register.
+  const e = run([{ ts: '2026-01-01T00:00:00Z', event: 'finding.resolved', source: 'reported',
+    slice: '77', actor: 'orchestrator', ref: 'OQ-77-1', message: 'm' }],
+    design('- **OQ-77-1** — resolved directly, never raised.'));
+  ok('a ref that reached the log by another event counts',
+    /PASS/.test(row(e, 'design findings reached the log')));
+
+  const f = run([], design('- Cites **F-04-2** from another slice, mints nothing.'));
+  ok("another slice's refs are citations, not this slice's to log",
+    /N\/A|PASS/.test(row(f, 'design findings reached the log')), row(f, 'design findings reached the log'));
+
+  const g = run([]);
+  ok('no design file at all is N/A', /N\/A/.test(row(g, 'design findings reached the log')));
+}
+
+// ------------------------------------------------- O-55: the reasoning is on the PR --
+//
+// §6 puts every reply, disagreement and vote on the PR because THE REASONING IS THE GRADED
+// ARTIFACT. Six slices went without it and no check looked, because slice:check reads the
+// log and CI and never the PR. The human found it.
+//
+// WHAT THESE CASES CAN AND CANNOT COVER, said plainly rather than left to be discovered:
+// the PASS and FAIL paths need a real PR with real comments, so they are exercised against
+// the live repository at slice level and not here. What IS covered here is the half that
+// decides whether the check can lie — that it reports N/A when nothing is owed, and
+// UNVERIFIED rather than PASS when it cannot look. A check that answers green because the
+// network was absent is the defect this whole file exists against.
+{
+  const agent = (actor, n) => ({
+    ts: '2026-01-01T00:00:00Z', event: 'agent.finish', source: 'derived', slice: '77',
+    actor, outcome: 'completed', span_id: `s-77-${actor}-${n}`,
+  });
+
+  const noRoles = run([{ ts: '2026-01-01T00:00:00Z', event: 'slice.ready', source: 'reported', slice: '77' }]);
+  ok('no role ran, so no reasoning is owed — N/A, not a failure',
+    /N\/A.*reasoning is on the PR/.test(row(noRoles, 'reasoning is on the PR')),
+    row(noRoles, 'reasoning is on the PR'));
+
+  const roles = run([agent('architect', 1), agent('reviewer', 1)]);
+  ok('a fixture repo has no PR, so the check says it cannot look',
+    /UNVERIFIED/.test(row(roles, 'reasoning is on the PR')), row(roles, 'reasoning is on the PR'));
+  ok('...and never reports PASS when it could not read the PR',
+    !/PASS/.test(row(roles, 'reasoning is on the PR')));
+  ok('...and says WHY it could not, so the gate is not left guessing',
+    /no PR|gh unavailable|unreadable|no branch/.test(row(roles, 'reasoning is on the PR')));
 }
 
 // --------------------------------------------- O-44: every dispatch reached the log --

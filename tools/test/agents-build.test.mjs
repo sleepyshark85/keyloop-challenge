@@ -35,6 +35,10 @@ const METHODOLOGY = `# Methodology
 Every document has a word budget, enforced as a ratchet.
 <!-- /agents:concision -->
 
+<!-- agents:pr-comment -->
+Short and self-contained; leading bold role.
+<!-- /agents:pr-comment -->
+
 ## 8. Commits
 
 <!-- agents:committing -->
@@ -60,6 +64,9 @@ Role-specific craft that must survive untouched.
 
 <!-- generated:concision -->
 <!-- /generated:concision -->
+
+<!-- generated:pr-comment -->
+<!-- /generated:pr-comment -->
 
 ## Committing
 

@@ -505,3 +505,78 @@ export async function rescheduleAppointmentById(
 
   return row === undefined ? null : toAppointmentRow(row);
 }
+
+/** The bay and technician ids `busyResources` reports occupied. Two lists, nothing else. */
+export interface BusyResources {
+  readonly bays: readonly string[];
+  readonly technicians: readonly string[];
+}
+
+/**
+ * Slice 08 (ADR-0032, Option D) — `GET /availability`'s ADVISORY read.
+ *
+ * ── THE RANGE EXPRESSION IS THE CONSTRAINT'S OWN, RESTATED IN ONE PLACE ───────────────────────
+ *
+ * `tstzrange(starts_at, ends_at) && tstzrange($from, $to)` is `0003_appointment.sql`'s own
+ * predicate, scoped by `dealership_id` (a candidate pair is never asked about a resource at
+ * another dealership) and `status <> 'cancelled'` (the same denylist the two exclusion
+ * constraints use, for the same reason: a status added later is inside this query's scope by
+ * default, never silently treated as occupying nothing).
+ *
+ * ADR-0032 is precise about how much of that QS-8 actually proves: "the range expression QS-8
+ * pins" — and, after mechanic 6 (T-08-7's cancelled witness), the `status <> 'cancelled'`
+ * conjunct as well, now that the generator writes a `cancelled` row BY CONSTRUCTION, not often
+ * enough for the property to see one.
+ * The `dealership_id` conjunct is **not** pinned by QS-8 or by anything else — it is
+ * redundant-by-composite-FK instead: `technician` and `service_bay` each carry `dealership_id
+ * NOT NULL`, and `appointment`'s composite foreign keys make `appointment.dealership_id`
+ * functionally determined by `technician_id`/`bay_id`, so this predicate and the constraint's
+ * dealership-free one cannot diverge — unless a technician is ever allowed at two dealerships,
+ * which nothing here tests (the reviewer's finding, step 5).
+ *
+ * ── STILL THE ONLY MODULE NAMING `appointment` ────────────────────────────────────────────────
+ *
+ * This is a SECOND query against the table this file already owns, not a second file: the
+ * `appointment-table-access` marker in `tests/architecture/ambiguity-containment.test.ts` asserts
+ * EXACTLY `src/persistence/appointmentRepository.ts`, unchanged by this slice (§3, AC-7 of slice
+ * 05, discharged by citation rather than a new criterion). `candidateRepository.ts` still cannot
+ * see this table — `queryAvailability.ts` composes the two reads, and only this file executes
+ * either of them.
+ *
+ * ── DISTINCT IN APPLICATION CODE, NOT SQL ─────────────────────────────────────────────────────
+ *
+ * A dealership with several confirmed appointments occupying the SAME bay across the queried
+ * window (two back-to-back jobs, say) returns that bay's id once per overlapping row; `Set`
+ * collapses it before this function returns, so the caller never has to. A `SELECT DISTINCT`
+ * would do the identical job in SQL — this file already has one row `bay_id`/`technician_id`
+ * pair to de-duplicate per side, and either place is equally correct; JS is where the existing
+ * mappers in this file already do their shaping (`toAppointmentRow`), so the query itself stays
+ * the same three-predicate shape a reviewer can compare line-by-line against `0003_appointment.sql`.
+ *
+ * ── ADVISORY, STRUCTURALLY — NOT MERELY BY THE RESPONSE'S OWN FLAG ────────────────────────────
+ *
+ * This function's result reaches nowhere near an `INSERT`: `bookAppointment.ts` and
+ * `rescheduleAppointment.ts` call `candidateResources` and `lockResources`/`insertAppointment`,
+ * never this. Design §1.3: what makes "advisory" true is that there is no representation of a
+ * hold anywhere in this system for a caller to mistakenly trust — not a promise kept by this
+ * function's caller.
+ */
+export async function busyResources(
+  db: Db,
+  dealershipId: string,
+  from: Date,
+  to: Date,
+): Promise<BusyResources> {
+  const rows = await db
+    .selectFrom('appointment')
+    .select(['bay_id', 'technician_id'])
+    .where('dealership_id', '=', dealershipId)
+    .where('status', '<>', CANCELLED)
+    .where(sql<boolean>`tstzrange(starts_at, ends_at) && tstzrange(${from}, ${to})`)
+    .execute();
+
+  return {
+    bays: [...new Set(rows.map((row) => row.bay_id))],
+    technicians: [...new Set(rows.map((row) => row.technician_id))],
+  };
+}

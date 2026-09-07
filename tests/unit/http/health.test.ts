@@ -48,6 +48,9 @@ const unusedBookingDeps = {
   rescheduleAppointment: (): never => {
     throw new Error('GET /health must not reschedule an appointment');
   },
+  queryAvailability: (): never => {
+    throw new Error('GET /health must not query availability');
+  },
 };
 
 function serverReporting(outcome: HealthOutcome | (() => Promise<HealthOutcome>)): FastifyInstance {

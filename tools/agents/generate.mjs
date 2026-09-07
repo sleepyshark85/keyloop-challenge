@@ -77,6 +77,7 @@ export function sourceBlock(text, name) {
 }
 
 export const committingRule = (text) => sourceBlock(text, 'committing');
+export const prCommentRule = (text) => sourceBlock(text, 'pr-comment');
 
 const replaceBlock = (text, marker, body) => {
   const open = `<!-- generated:${marker} -->`;
@@ -86,7 +87,7 @@ const replaceBlock = (text, marker, body) => {
   return { text: text.replace(re, `${open}\n${body}\n${close}`), found: true };
 };
 
-export function render(agentText, role, roles, committing, concision) {
+export function render(agentText, role, roles, committing, concision, prComment) {
   const spec = roles[role];
   if (!spec) throw new Error(`docs/METHODOLOGY.md §2 has no row for role "${role}"`);
   let out = agentText;
@@ -99,8 +100,13 @@ export function render(agentText, role, roles, committing, concision) {
   // if it lives only in the document nobody re-reads. It drifted straight back after the
   // condensation pass precisely because each agent learned about the budget from a prompt
   // (O-32), and a rule delivered by briefing is a rule enforced by whoever remembers.
+  // `pr-comment` reaches every role for the same reason `concision` does, and for a reason
+  // measured rather than assumed: §6 has required PR reasoning since the start, every role read
+  // those PRs at review and at as-built, and none remarked they were empty for six slices. A rule
+  // every role can satisfy itself is being obeyed by nobody is worse evidence about the process
+  // than one role forgetting — the architect's own words, O-55.
   for (const [marker, body] of [['role-constraints', constraints], ['committing', committing],
-    ['concision', concision]]) {
+    ['concision', concision], ['pr-comment', prComment]]) {
     const r = replaceBlock(out, marker, body);
     if (!r.found) throw new Error(`${role}.md has no <!-- generated:${marker} --> block`);
     out = r.text;
@@ -112,13 +118,14 @@ const methodology = readFileSync(METHODOLOGY, 'utf8');
 const roles = parseRoles(methodology);
 const committing = committingRule(methodology);
 const concision = sourceBlock(methodology, 'concision');
+const prComment = sourceBlock(methodology, 'pr-comment');
 
 const stale = [];
 for (const file of readdirSync(AGENTS).filter((f) => f.endsWith('.md') && !f.startsWith('_'))) {
   const path = join(AGENTS, file);
   const current = readFileSync(path, 'utf8');
   const role = file.replace(/\.md$/, '');
-  const next = render(current, role, roles, committing, concision);
+  const next = render(current, role, roles, committing, concision, prComment);
   if (next === current) continue;
   stale.push(file);
   if (!CHECK) writeFileSync(path, next, 'utf8');

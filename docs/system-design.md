@@ -96,6 +96,8 @@ without taking anyone's word for it.
 - [**ADR-0029**](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) — A deadlock event names the write path it happened on; a conflict event does not *(accepted)*
 - [**ADR-0030**](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) — A move locks the pair it leaves as well as the pair it takes *(accepted)*
 - [**ADR-0031**](adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md) — A move reads the pair it leaves inside its own transaction *(accepted)*
+- [**ADR-0032**](adr/0032-availability-is-two-reads-composed-in-the-use-case.md) — Compose availability from two reads in the use case, so only appointmentRepository names the table *(accepted)*
+- [**ADR-0033**](adr/0033-the-advisory-read-orders-candidates-it-never-removes-them.md) — The advisory read orders candidates; it never removes them *(proposed)*
 
 ---
 

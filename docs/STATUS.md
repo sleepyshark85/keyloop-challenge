@@ -15,18 +15,17 @@
 
 | | |
 |---|---|
-| Last commit | `6169054 chore(07): gate E approved jointly — slice 07 done` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E |
-| Agent runs recorded | 155 |
-| ADRs accepted | 26 |
+| Last commit | `b151234 fix(08): the light gate said "DoD green" without checking it — O-66` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process |
+| Agent runs recorded | 186 |
+| ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Next: slice [`08`](slices/08-availability-query.md) — Availability — advisory by contract, and provably in agreement with the constraint**
-- Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
-- It claims QS-8.
+- **Slice [`08`](slices/08-availability-query.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
+- **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
 - 2 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
@@ -112,6 +111,10 @@
 
 > APPROVED JOINTLY BY THE ORCHESTRATOR AND THE ARCHITECT under the human delegation, and merged on the human instruction to go for the merge if everything is good now. WHAT THIS IS NOT: no human exploratory testing was performed. EVIDENCE, all collected rather than narrated: red b555317 at 18:21 and green after, both derived; CI 34079845394 green on all three jobs at merge head 90dc1e3; MUTATION 0.9625 ON CHANGED FILES with appointmentRepository.ts — the file that gained the union statement and lockAppointmentRow, and the one file section 2.1 actually rests on — AT 100.00 WITH ZERO SURVIVORS, and every survivor across all four changed files accounted for by a prior classification or a prior prediction with none on a line this slice added; depcruise clean; arc42 reconciled across eight sections with every addition paid for by a named deletion; four inherited obligations discharged; 14 of 14 captured prompts accounted for; ONE LOOPBACK OF A MAXIMUM TWO, declared by the architect against its own design unprompted. THE ARCHITECT WAS ASKED THE (c) QUESTION DIRECTLY and answered that it can name no acceptance criterion, QS or section 2 invariant that would fail, which under section 6 makes (c) unavailable and (b) the honest reading of everything still open. ITS OWN SUMMARY OF THE POSITION: ADR-0030 is measured on both sides, 11.7 percent to zero; ADR-0031 rule is WITNESSED DETERMINISTICALLY OFF pg_locks RATHER THAN RACED; and that is THE STRONGEST EVIDENCE POSITION ANY SLICE HERE HAS SHIPPED WITH, and stronger than slice 06, WHICH SHIPPED THE MOVE PATH WITH ZERO CONCURRENCY EVIDENCE AND WAS HIDING A LIVE DEFECT. SEVEN GATE ITEMS ARE RECORDED AS NOT CHECKED RATHER THAN AS PASSED, and the architect classes all seven as gaps in EVIDENCE DURABILITY or in DECISIONS NOT YET TAKEN rather than defects in merged behaviour. THE TWO MOST SERIOUS: AC-5 DISCRIMINATION EVIDENCE EXISTS AS A REVIEWER HAND-RUN IN A THROWAWAY WORKTREE RATHER THAN AS A REPOSITORY ARTIFACT, so nothing re-runs it and slice:check reads that a red happened rather than what it reddened; and a saturated pool 500 is UNDECIDED rather than decided wrongly. Also recorded: ADR-0029 reads standalone on a premise ADR-0030 re-grounded, with nothing flagging that to a reader who opens it first; AC-4 mutant-control rate is a number in a test header rather than a threshold, so if the control weakens nothing reports it, and R-07-12 is the specific way it will weaken; and docs/diagrams/concurrent-booking.svg predates ADR-0018 and now ADR-0030 and 0031 too.
 
+**Gate process** · 2026-09-07 · retire-non-architectural-adrs-after-slice-08
+
+> HUMAN RULING, 2026-09-07, on reading ADR-0032 and then the whole set. Its words: I am not saying this ADR is trivial, but it does not seem to be in the level of decision that require an ADR, where I think only important decisions should be addressed — and then, we can just remove them, and make sure they are recorded in the slice designs. SCHEDULED AFTER SLICE 08 MERGES so the retirement is its own clean PR rather than entangled with slice work. THE MEASUREMENT THAT PROMPTED IT: 33 ADRs across 8 slices, about four per slice. On the orchestrator reading roughly 12 are genuinely architectural — the Gate A and B decisions, 0016 capacity-refusal-requires-a-database-verdict, 0018 lock-before-insert, 0025 existence-is-the-read, and 0030 a-write-locks-every-resource-it-is-in-flight-against — and roughly 20 record a naming convention, a config prefix, a test assertion site, a numeric bound, which file a function lives in, or a bug fix to a previous ADR. THE COST IS NOT NOISE ALONE: ADRs are immutable and pinned, so a naming convention carries the same ceremony as the exclusion-constraint decision, AND ADR-0030 — the one that found a live defect and changed the central invariant — SITS BURIED BETWEEN TWO CLERICAL ONES. THE ORCHESTRATOR SHARE IS RECORDED: every dispatch said ADR IF A DECISION IS NEEDED, which is no bar at all, and it never once pushed back on one being minted. PROPOSED BAR, for the architect to rule: an ADR is warranted when the decision CLOSES OFF AN ALTERNATIVE SOMEONE WOULD OTHERWISE REASONABLY TAKE and would be EXPENSIVE TO REVERSE. THE CONSTRAINT THE HUMAN WAS SHOWN BEFORE DECIDING: the 17 candidates are cited about 190 times — 85 in src/ and tests/ as code comments explaining why code is shaped as it is, 75 in arc42 and slice files, AND 106 IN THE APPEND-ONLY EVENT LOG, which cannot be rewritten. Plan agreed: fold each retired decision into its slice design, rewrite the roughly 160 changeable references to point there, and append one mapping record per retired ADR so the permanent log citations resolve — the finding.routed pattern. TWO FLAGGED AS JUDGEMENT CALLS RATHER THAN OBVIOUS: 0023 and 0027 are behavioural rather than cosmetic, and 0031 is the correction that made ADR-0030 actually true, so retiring it would leave 0030 stating a rule that was insufficient as written — it should be folded INTO 0030 story rather than dropped.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -147,6 +150,8 @@
 | [0029](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) | A deadlock event names the write path it happened on; a conflict event does not | accepted | — |
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
 | [0031](adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md) | A move reads the pair it leaves inside its own transaction | accepted | — |
+| [0032](adr/0032-availability-is-two-reads-composed-in-the-use-case.md) | Compose availability from two reads in the use case, so only appointmentRepository names the table | accepted | — |
+| [0033](adr/0033-the-advisory-read-orders-candidates-it-never-removes-them.md) | The advisory read orders candidates; it never removes them | proposed | — |
 
 ## Agent runs
 
@@ -307,7 +312,38 @@
 | 2026-09-07 03:24 | architect | 18m03 | 198 / 2,686 / 12,154,711 | `derived` |
 | 2026-09-07 03:30 | implementer | 2m08 | 80 / 1,313 / 1,469,592 | `derived` |
 | 2026-09-07 03:50 | architect | 43m41 | 202 / 2,692 / 12,154,711 | `derived` |
-| | **total** | **6300m11** | **38,928 / 2,925,882 / 3,196,799,866** | |
+| 2026-09-07 04:04 | scribe | 5m16 | 52 / 638 / 1,148,937 | `derived` |
+| 2026-09-07 04:09 | scribe | 10m05 | 56 / 736 / 1,325,807 | `derived` |
+| 2026-09-07 04:09 | architect | 12m19 | 146 / 13,220 / 6,455,408 | `derived` |
+| 2026-09-07 04:11 | scribe | 11m24 | 58 / 737 / 1,416,264 | `derived` |
+| 2026-09-07 04:12 | scribe | 12m37 | 60 / 738 / 1,508,667 | `derived` |
+| 2026-09-07 04:13 | scribe | 14m12 | 78 / 4,920 / 2,367,031 | `derived` |
+| 2026-09-07 04:15 | scribe | 15m32 | 80 / 4,921 / 2,464,566 | `derived` |
+| 2026-09-07 04:15 | scribe | 15m37 | 82 / 4,922 / 2,568,576 | `derived` |
+| 2026-09-07 04:15 | scribe | 16m01 | 84 / 4,956 / 2,673,552 | `derived` |
+| 2026-09-07 04:15 | scribe | 16m09 | 86 / 4,957 / 2,779,211 | `derived` |
+| 2026-09-07 04:16 | scribe | 16m41 | 88 / 4,958 / 2,885,817 | `derived` |
+| 2026-09-07 04:16 | scribe | 16m49 | 90 / 4,959 / 2,992,940 | `derived` |
+| 2026-09-07 04:18 | scribe | 18m27 | 102 / 4,972 / 3,644,851 | `derived` |
+| 2026-09-07 04:19 | scribe | 20m15 | 108 / 5,427 / 3,975,612 | `derived` |
+| 2026-09-07 04:25 | implementer | 2m27 | 80 / 3,173 / 2,235,810 | `derived` |
+| 2026-09-07 04:26 | test-engineer | 3m21 | 82 / 5,066 / 2,059,448 | `derived` |
+| 2026-09-07 04:28 | architect | 31m02 | 150 / 13,230 / 6,455,408 | `derived` |
+| 2026-09-07 04:51 | scribe | 14m36 | 294 / 31,910 / 18,288,830 | `derived` |
+| 2026-09-07 05:34 | test-engineer | 16m14 | 236 / 4,982 / 15,966,417 | `derived` |
+| 2026-09-07 05:54 | implementer | 18m51 | 396 / 11,964 / 34,032,502 | `derived` |
+| 2026-09-07 06:07 | reviewer | 10m36 | 196 / 9,490 / 9,935,094 | `derived` |
+| 2026-09-07 07:18 | architect | 12m11 | 172 / 8,533 / 7,020,464 | `derived` |
+| 2026-09-07 07:37 | implementer | 9m43 | 180 / 6,711 / 7,459,769 | `derived` |
+| 2026-09-07 07:37 | test-engineer | 9m58 | 168 / 4,788 / 4,818,651 | `derived` |
+| 2026-09-07 08:00 | architect | 17m18 | 176 / 8,428 / 9,314,056 | `derived` |
+| 2026-09-07 08:12 | implementer | 8m29 | 178 / 6,913 / 5,361,168 | `derived` |
+| 2026-09-07 08:13 | test-engineer | 10m34 | 158 / 2,009 / 6,412,148 | `derived` |
+| 2026-09-07 08:46 | architect | 5m50 | 98 / 1,232 / 2,560,671 | `derived` |
+| 2026-09-07 08:49 | implementer | 2m12 | 52 / 771 / 861,276 | `derived` |
+| 2026-09-07 09:13 | architect | 23m21 | 260 / 25,445 / 17,081,978 | `derived` |
+| 2026-09-07 09:23 | architect | 32m54 | 354 / 25,785 / 28,688,216 | `derived` |
+| | **total** | **6731m11** | **43,328 / 3,157,373 / 3,413,559,011** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
