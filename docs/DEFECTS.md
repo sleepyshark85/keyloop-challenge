@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **278** |
-| Severity | 12 blocking · 146 major · 120 minor |
+| Findings recorded | **280** |
+| Severity | 12 blocking · 146 major · 122 minor |
 | Verdicts | 18 narrowed · 95 accepted · 3 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 62 · reviewer 62 · architect 52 · orchestrator 51 · implementer 44 · scribe 5 · human 2 |
-| Awaiting a ruling | **133** |
-| Mean escape distance | 1.73 step(s) |
+| Raised by | test-engineer 62 · reviewer 62 · orchestrator 53 · architect 52 · implementer 44 · scribe 5 · human 2 |
+| Awaiting a ruling | **135** |
+| Mean escape distance | 1.72 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1922,6 +1922,27 @@ rather than narrated.*
 - *scenario:* MEASURED RATHER THAN ESTIMATED. PR 6, slice 00, has 4 comments. PR 10, slice 01, has 3. PR 12 slice 02, PR 13 slice 04, PR 14 slice 05, PR 15 slice 06 and PR 16 slice 07 had ZERO until now. So the practice existed, lapsed after slice 01, and ran five slices without it. SECTION 6 IS EXPLICIT AND STATES ITS OWN REASON: every reply, disagreement and vote goes on the PR under section 9 attribution convention, BECAUSE THE REASONING IS THE GRADED ARTIFACT — the record of HOW a design was argued into shape is worth more than the amended design alone. The orchestrator put all of it in the event log and in commit messages instead, which preserves the CONTENT and loses the PLACE the constitution names. THE HUMAN CAUGHT IT; no check did, and none exists — slice:check reads the log and CI, never the PR. Slice 07 trail is now posted to PR 16 as five role-attributed comments covering step 1, step 2 both roles, the step-4 DCR, step 5 both passes, and the step-7 rulings. WHAT IS NOT DONE AND IS THE HUMAN TO DECIDE: whether the four MERGED PRs are backfilled. The content exists in the log and could be posted faithfully, but a retrospective comment on a merged PR is a record written after the fact and must say so; O-36 declined to rewrite history and this is adjacent to it. THE MECHANISABLE PART IS THE ORCHESTRATOR: a slice:check criterion that the PR carries at least one attributed comment per role that produced a report would have caught this at slice 02.
 - *file:* `docs/team-log/events.jsonl`
 - *accepted* by architect — THE ARCHITECT IMPLICATED ITSELF UNPROMPTED AND ASKED THAT IT BE RECORDED. Its words: this is not only yours — MY REASONING WAS AMONG WHAT WENT UNPOSTED FOR SIX SLICES, AND I READ THOSE PRs AT STEP 5 AND STEP 7 AND NEVER ONCE REMARKED THAT THEY WERE EMPTY OF EVERYTHING SECTION 6 SAYS IS THE GRADED ARTIFACT. A RULE THAT EVERY ROLE CAN SATISFY ITSELF IS BEING OBEYED BY NOBODY IS WORSE EVIDENCE ABOUT THE PROCESS THAN ONE ROLE FORGETTING, and the retro should read it that way. Building the slice:check criterion before slice 08 reaches READY is the right remedy and it would not defer it further; the backfill of the four merged PRs is genuinely the human records question and SHOULD NOT HOLD SLICE 08.
+
+</details>
+
+## Slice 08
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **O-56** | MINOR | 1 *(+0)* | orchestrator | The O-55 check demanded a bare double-asterisk role and FAILED A GENUINE, CORRECTLY ATTRIBUTED COMMENT ON ITS FIRST LIVE RUN | **open** |
+| **O-57** | MINOR | 1 *(+0)* | orchestrator | Cross-slice work was logged under slice 08 scope, so the scribe now owes a comment on a PR whose slice it did no work on | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**O-56** — The O-55 check demanded a bare double-asterisk role and FAILED A GENUINE, CORRECTLY ATTRIBUTED COMMENT ON ITS FIRST LIVE RUN
+
+- *scenario:* The architect posted its step-1 reasoning to PR 17 opening with a leading bold span reading architect, then a separator, then step 1 DESIGN — which is the convention AS PRACTISED, one bold span carrying the role and its context, and is what slice 07 five comments on PR 16 also do. The check regex required the role name bolded ALONE and reported no attributed comment from architect over a comment that was correctly attributed. FIXED: bold, at the start of a line, OPENING WITH the role, rather than the role and nothing else. WHAT IT STILL REFUSES IS THE THING THE CONVENTION EXISTS TO DRAW — a role NAMED IN PROSE, the architect ruled that, which would let a mention stand in for a report. THE LESSON IS THE ONE THIS PROJECT KEEPS RE-LEARNING: a check written from the rule as stated rather than from the artifact as produced fails the first honest instance it meets, and I wrote its tests against fixtures I invented rather than against the comments that already existed on PR 16.
+- *file:* `tools/slice/check.mjs`
+
+**O-57** — Cross-slice work was logged under slice 08 scope, so the scribe now owes a comment on a PR whose slice it did no work on
+
+- *scenario:* The scribe was dispatched to backfill role reasoning onto merged PRs 12, 13, 14 and 15 — O-55 remediation spanning slices 02 to 06 — while docs/team-log/.scope read slice 08. Three agent.finish events are therefore recorded as s-08-scribe-1 through 3, and the new O-55 check correctly reports that a role which RAN for slice 08 has posted nothing to PR 17. THE CHECK IS RIGHT AND THE LOG IS WRONG: the work was not slice 08 work. THE ORCHESTRATOR DID NOT SET THE SCOPE BEFORE DISPATCHING CROSS-SLICE WORK, and the log is append-only so the attribution stands. REMEDY, and it is the honest one rather than the suppressing one: the scribe posts a short note to PR 17 saying what it actually did and why it appears in slice 08 record, which tells a reader something true instead of hiding it. The mechanical remedy is that a dispatch whose work spans slices must set the scope first, and there is no check for that.
+- *file:* `docs/team-log/events.jsonl`
 
 </details>
 

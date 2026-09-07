@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| Last commit | `59ee9e2 Merge pull request #16 from sleepyshark85/slice/07-reschedule-under-contention` |
+| Last commit | `ee279e7 docs(08): front matter for step 1 — arc42, ADRs 0032/0033, QS-12` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E |
-| Agent runs recorded | 155 |
-| ADRs accepted | 26 |
+| Agent runs recorded | 160 |
+| ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
@@ -146,6 +146,8 @@
 | [0029](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) | A deadlock event names the write path it happened on; a conflict event does not | accepted | — |
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
 | [0031](adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md) | A move reads the pair it leaves inside its own transaction | accepted | — |
+| [0032](adr/0032-availability-is-two-reads-composed-in-the-use-case.md) | Compose availability from two reads in the use case, so only appointmentRepository names the table | accepted | — |
+| [0033](adr/0033-the-advisory-read-orders-candidates-it-never-removes-them.md) | The advisory read orders candidates; it never removes them | proposed | — |
 
 ## Agent runs
 
@@ -306,7 +308,12 @@
 | 2026-09-07 03:24 | architect | 18m03 | 198 / 2,686 / 12,154,711 | `derived` |
 | 2026-09-07 03:30 | implementer | 2m08 | 80 / 1,313 / 1,469,592 | `derived` |
 | 2026-09-07 03:50 | architect | 43m41 | 202 / 2,692 / 12,154,711 | `derived` |
-| | **total** | **6300m11** | **38,928 / 2,925,882 / 3,196,799,866** | |
+| 2026-09-07 04:04 | scribe | 5m16 | 52 / 638 / 1,148,937 | `derived` |
+| 2026-09-07 04:09 | scribe | 10m05 | 56 / 736 / 1,325,807 | `derived` |
+| 2026-09-07 04:09 | architect | 12m19 | 146 / 13,220 / 6,455,408 | `derived` |
+| 2026-09-07 04:11 | scribe | 11m24 | 58 / 737 / 1,416,264 | `derived` |
+| 2026-09-07 04:12 | scribe | 12m37 | 60 / 738 / 1,508,667 | `derived` |
+| | **total** | **6351m52** | **39,300 / 2,941,951 / 3,208,654,949** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

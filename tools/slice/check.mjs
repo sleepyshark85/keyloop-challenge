@@ -711,10 +711,16 @@ if (!onlyReady) {
     check('done', 'reasoning is on the PR', UNVERIFIED,
       `${prComments.why} — cannot read the PR, and §6 puts the reasoning there`);
   } else {
-    // The attribution convention is a leading `**role**`; anything else is prose that
-    // happens to name a role, and counting that would let a mention stand in for a report.
+    // The attribution convention is a LEADING bold role. It is deliberately not an exact
+    // `**role**`: the convention as practised is `**architect · step 1 — DESIGN**`, one bold
+    // span carrying the role and its context, and the first version of this check demanded
+    // the bare form and failed a genuine, correctly attributed comment on its first run.
+    //
+    // What it must still refuse is a role NAMED IN PROSE — "the architect ruled …" — because
+    // counting that would let a mention stand in for a report, which is the whole distinction
+    // §9's convention exists to draw. So: bold, at the start of a line, opening with the role.
     const spoke = new Set(rolesThatRan.filter((r) =>
-      prComments.bodies.some((b) => new RegExp(`^\\s*\\*\\*${r}\\*\\*`, 'm').test(b))));
+      prComments.bodies.some((b) => new RegExp(`^\\s*\\*\\*${r}\\b`, 'm').test(b))));
     const silent = rolesThatRan.filter((r) => !spoke.has(r));
     check('done', 'reasoning is on the PR', silent.length ? FAIL : PASS,
       silent.length
