@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `8447887 docs(08): pay for the PR-comment block, and fix a count METHODOLOGY maintained by hand` |
+| Last commit | `193db2d test(08): unit coverage for GET /availability's own switch and schema` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process |
-| Agent runs recorded | 173 |
+| Agent runs recorded | 175 |
 | ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -330,7 +330,9 @@
 | 2026-09-07 04:26 | test-engineer | 3m21 | 82 / 5,066 / 2,059,448 | `derived` |
 | 2026-09-07 04:28 | architect | 31m02 | 150 / 13,230 / 6,455,408 | `derived` |
 | 2026-09-07 04:51 | scribe | 14m36 | 294 / 31,910 / 18,288,830 | `derived` |
-| | **total** | **6553m01** | **40,704 / 3,040,322 / 3,264,046,601** | |
+| 2026-09-07 05:34 | test-engineer | 16m14 | 236 / 4,982 / 15,966,417 | `derived` |
+| 2026-09-07 05:54 | implementer | 18m51 | 396 / 11,964 / 34,032,502 | `derived` |
+| | **total** | **6588m06** | **41,336 / 3,057,268 / 3,314,045,520** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

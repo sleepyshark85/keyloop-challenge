@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **291** |
-| Severity | 12 blocking · 149 major · 130 minor |
+| Findings recorded | **295** |
+| Severity | 12 blocking · 150 major · 133 minor |
 | Verdicts | 18 narrowed · 98 accepted · 3 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 65 · reviewer 62 · orchestrator 53 · architect 52 · implementer 47 · scribe 10 · human 2 |
-| Awaiting a ruling | **143** |
-| Mean escape distance | 1.68 step(s) |
+| Raised by | test-engineer 67 · reviewer 62 · orchestrator 53 · architect 52 · implementer 49 · scribe 10 · human 2 |
+| Awaiting a ruling | **147** |
+| Mean escape distance | 1.67 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1967,6 +1967,10 @@ rather than narrated.*
 | **T-08-1** | MAJOR | 2 *(+1)* | test-engineer | The quiescence witness as literally written is TABLE-WIDE and would invalidate near-continuously under this suite own isolation model | accepted |
 | **T-08-2** | MAJOR | 2 *(+1)* | test-engineer | AC-7 NEEDS NO NEW TEST — the claim is already continuously asserted against the real src/ tree in CI | accepted |
 | **T-08-3** | MINOR | 2 *(+1)* | test-engineer | Two ways the witness could pass while meaning nothing, answered rather than assumed | accepted |
+| **T-08-4** | MINOR | 3 *(+2)* | test-engineer | QS-8 evidence path in arc42 and the slice file names a file that CANNOT RUN — the nodb/db split has no globalSetup for a plain .test.ts under tests/property/ | **open** |
+| **T-08-5** | MAJOR | 3 *(+2)* | test-engineer | AC-5 is unpinned on the wire and HALF UNASSERTABLE — the design AvailabilityOutcome sketch carries no advisory field, and no OpenAPI emission mechanism exists to assert the other half | **open** |
+| **I-08-4** | MINOR | 4 *(+0)* | implementer | The two reads are composed SEQUENTIALLY rather than concurrently, which the design sketch did not say — disclosed rather than absorbed | **open** |
+| **I-08-5** | MINOR | 4 *(+0)* | implementer | AC-5 schema fields are deliberately NOT Type.Literal, so the assertion can actually fail against a broken implementation | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2012,6 +2016,26 @@ rather than narrated.*
 - *scenario:* ANSWERING THE ORCHESTRATOR QUESTION — could an INVALID run be mistaken for a PASS. FIRST: the re-run must issue a GENUINELY FRESH QUERY rather than reuse the first answer in-memory value, or the witness trivially passes regardless of real drift. SECOND, AND THIS IS THE GOOD NEWS: a SYSTEMIC leak — mechanic 1 SAVEPOINT not truly rolling back — would make quiescence fail on MOST OR ALL cases, which if discarded via fc.pre() TRIPS FAST-CHECK OWN TOO-MANY-DISCARDS ERROR AND FAILS LOUD rather than passing quietly. So the framework supplies the backstop the design did not name. THE CONDITION: that backstop must not be defeated by a bare try/catch swallowing discards, which is the one way the loud failure becomes silent.
 - *file:* `docs/slices/08-design.md`
 - *accepted* by architect — ACKNOWLEDGED, AND ITS ONE CONDITION IS RULED INTO AC-1. The backstop is the test-engineer, not the design, AND IT IS STRONGER THAN WHAT THE ARCHITECT SPECIFIED: a systemic leak makes quiescence fail on most cases, which discarded via fc.pre() trips fast-check own too-many-discards error and FAILS LOUD rather than passing quietly. Its condition — that a bare try/catch must not swallow the discards — IS NOW A REQUIREMENT IN THE CRITERION RATHER THAN AN OBSERVATION IN A REPORT.
+
+**T-08-4** — QS-8 evidence path in arc42 and the slice file names a file that CANNOT RUN — the nodb/db split has no globalSetup for a plain .test.ts under tests/property/
+
+- *scenario:* The property test is committed as availability-agrees-with-constraint.DB.test.ts rather than at the path arc42 section 10.2 and the slice file give, because vitest.config.ts nodb and db split under ADR-0013 provides NO globalSetup in the project a plain .test.ts under tests/property/ would run in — so the specified path would have no database. FLAGGED IN THE FILE HEADER AND ON THE PR rather than silently renamed, for the architect as-built reconciliation at step 7. The deviation is forced by the test harness rather than chosen, and arc42 names the evidence path, so section 10.2 is what must move.
+- *file:* `docs/arc42/10-quality-requirements.md`
+
+**T-08-5** — AC-5 is unpinned on the wire and HALF UNASSERTABLE — the design AvailabilityOutcome sketch carries no advisory field, and no OpenAPI emission mechanism exists to assert the other half
+
+- *scenario:* AC-5 requires the response AND the OpenAPI description to carry both facts — not a reservation, and true only of the interval queried. TWO PROBLEMS FOUND BY TRYING TO WRITE IT. FIRST, THE WIRE SHAPE IS UNPINNED: the design AvailabilityOutcome sketch carries no such field, so the test-engineer had to choose one. It recorded the assumption — advisory: true plus a keyword-matched disclosure — IN THE FILE HEADER RATHER THAN DECIDING IT SILENTLY, which leaves the implementer free to disagree and the architect to rule. SECOND, THE OPENAPI HALF CANNOT BE ASSERTED AT ALL: there is no docs:openapi script and no docs/api/openapi.json, so no doc-emission mechanism exists yet. Left unasserted, MATCHING QS-11 OWN PRECEDENT where the OpenAPI half is likewise unasserted for the same reason. So AC-5 as written is half a criterion until slice 09 emits the document — the same shape as slice 06 AC-4, whose metric half waited for slice 09 too.
+- *file:* `docs/slices/08-design.md`
+
+**I-08-4** — The two reads are composed SEQUENTIALLY rather than concurrently, which the design sketch did not say — disclosed rather than absorbed
+
+- *scenario:* ADR-0032 sketch says queryAvailability calls the two reads ALONGSIDE each other. The implementer built them SEQUENTIALLY and found the reason while unit-testing: concurrent execution makes the WIRE ORDER OF STATEMENTS AN ARTIFACT OF EVENT-LOOP INTERLEAVING rather than a fact the module states — candidateResources two queries and busyResources one interleave unpredictably, so a test pinning statement order pins the scheduler. Sequential costs nothing measurable and keeps the unit tests deterministic. DISCLOSED ON THE PR AS AN INTERNAL-DESIGN CHOICE RATHER THAN A DEFECT, and recorded here so step 5 and step 7 see it rather than discover it.
+- *file:* `src/application/queryAvailability.ts`
+
+**I-08-5** — AC-5 schema fields are deliberately NOT Type.Literal, so the assertion can actually fail against a broken implementation
+
+- *scenario:* A MUTATION-AWARE CHOICE MADE WITHOUT BEING ASKED. advisory and disclaimer are declared Type.Boolean() and Type.String() rather than Type.Literal(true) and a fixed string. With literals the schema itself would guarantee the values and AC-5 assertion COULD NOT FAIL AGAINST A BROKEN IMPLEMENTATION — it would be pinned by the type rather than by the code. The implementer states it mirrors problem.ts OWN MEASURED WARNING, where F-06-2 established that a taxonomy declared as const carries ZERO MUTANTS and is therefore invisible to the mutation score. Same trap, avoided in advance rather than measured afterwards.
+- *file:* `src/http/routes/availability.ts`
 
 </details>
 
