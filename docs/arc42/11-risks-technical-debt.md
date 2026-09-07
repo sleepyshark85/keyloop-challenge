@@ -12,11 +12,11 @@ real and not fixed, under §6 **(b)**.
 | Item | Origin | Status |
 |---|---|---|
 | A capacity refusal requires a database verdict — make the contended resource constructible only by SQLSTATE classification | [ADR-0016](../adr/0016-a-capacity-refusal-requires-a-database-verdict.md) | proposed — not yet agreed |
+| Count one conflict per exclusion violation, not one per contended request | [ADR-0035](../adr/0035-one-conflict-counted-per-exclusion-violation.md) | proposed — not yet agreed |
 <!-- /generated:debt-register -->
 
-**A row states what is owed, never that anything is correct.** Seventeen ADRs were retired into their
-slice designs on 2026-09-07, five `proposed`; where one said a decision was **ruled by the
-architect and never put to the human**, its design says so now.
+**A row states what is owed, never that anything is correct.** Where a retired ADR said a decision
+was **ruled by the architect and never put to the human**, its design says so now.
 
 ### The cost of the literal AC-6 ruling — slice 01
 
@@ -48,8 +48,6 @@ Enforced by committed tests is not the same as fully evidenced:
 - **The `Intl` global is an ICU dependency the purity rule cannot see**, there being no module
   specifier to record, so a small-icu build would change `withinOpeningHours`'s answers without
   changing a line of `src/`. TC-10's version pin is not aimed at it.
-- **QS-12's corpus is small** — twenty-odd files in `src/`, four of them the domain — so a one-file
-  marker is a stronger claim than at slice 01 and still not a strong one.
 
 ### The cost of ADR-0018's locks — slice 02
 
@@ -102,14 +100,18 @@ Ordered by the cost of being wrong, not likelihood.
 §1.2 ranks integrity first and performance last with the cost stated; this is it. Two limits,
 routinely confused. **Per contended key**, conflicting inserts serialise — three round trips per
 attempt since ADR-0018, four for a contended move — but only one succeeds, so what it caps is how fast
-losers are told *no*. **In aggregate**, every insert maintains two partial GiST
-indexes, costlier than a btree: low thousands of inserts per second on modest hardware. Against
-§1.1's load profile, two orders of magnitude of headroom in aggregate, about five on the contended
-path.
+losers are told *no*. **Measured write throughput there: 229.47 attempts/s** — 20 racers from one
+barrier onto one `(bay, technician)` pair in 87.2 ms, one `201` and nineteen `409`;
+`cpus=16 i5-13400F, 15801 MB` (AC-15). **In aggregate**, every insert maintains two partial GiST
+indexes, costlier than a btree: low thousands per second on modest hardware.
 
-**Revisit when** sustained bookings exceed a few hundred per second, or `appointment` passes
-single-digit millions of rows. **The first move is partitioning by `dealership_id`**, which works
-because of A-9: an exclusion constraint cannot span partitions and need not.
+**Binding scale.** Against §1.1's *tens of appointments a day*, the contended
+figure binds at roughly two hundred simultaneous bookers on one slot — no dealership generates that
+organically, so it arrives as a campaign or an integration funnelling many at one advertised slot.
+The aggregate limit binds first, at sustained bookings in the low thousands per
+second or `appointment` past single-digit millions of rows. **The first move is partitioning by
+`dealership_id`**, which works because of A-9: an exclusion constraint cannot span partitions and
+need not.
 
 ### R-2 · A capacity-*n* resource would need a different mechanism (A-2)
 
@@ -152,9 +154,8 @@ An unenforced enforcement claim stops everyone checking by hand (ADR-0010, §7.4
 ### R-12 · The mutation gate's failure mode is silence, and it is held by a workaround
 
 The tool producing §8.5's score has a demonstrated mode in which it reports survivors it never
-tested — twice, the second a `Stryker restore all` the instrumenter never reads, ignoring 93 mutants
-where 8 were ruled, behind a green gate (§8.5 carries both measurements). **Each was caught by a low
-score, which is luck**: a broken runner reporting 0.81 against a 0.75 threshold satisfies every check
+tested — twice, the second behind a green gate; §8.5 carries both measurements. **Each was caught by
+a low score, which is luck**: a broken runner reporting 0.81 against a 0.75 threshold satisfies every check
 `slice:check` makes. The remedy is §5.3's — assert **inside the thing that produces the pass**, a
 `mutation.json` check on `testsCompleted` and the ignored count.
 
