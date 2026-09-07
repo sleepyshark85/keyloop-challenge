@@ -143,7 +143,8 @@ export type BookOutcome =
        */
       readonly exit: 'exhausted' | 'capped';
     }
-  /** `40P01` under ADR-0018's locks — a write path skipped them. T-02-9. */
+  /** `40P01` under ADR-0018/ADR-0030's locks — some write path did not lock every resource it
+   * was in flight against. T-02-9. */
   | { readonly kind: 'no-verdict' }
   | { readonly kind: 'reference-data-invalid'; readonly detail: string };
 
@@ -423,10 +424,11 @@ export async function bookAppointment(
         }
 
         case 'no-verdict': {
-          // T-02-9 / ADR-0018. NOT RETRIED, and that is a deliberate choice to fail loudly.
-          // Under the locks a deadlock can only mean some write path did not take them, and a
-          // retry would convert that into a latency blip nobody investigates — a guard hiding
-          // the fault it exists to detect. F-02-9 makes it a live risk from slice 06 onward.
+          // T-02-9 / ADR-0018, ADR-0030. NOT RETRIED, and that is a deliberate choice to fail
+          // loudly. Under the locks a deadlock can only mean some write path did not lock every
+          // resource it was in flight against, and a retry would convert that into a latency
+          // blip nobody investigates — a guard hiding the fault it exists to detect. F-02-9
+          // makes it a live risk from slice 06 onward.
           deps.logger.error(
             { event: DEADLOCK_EVENT, bayId, technicianId, attempt: attempts },
             DEADLOCK_EVENT,
