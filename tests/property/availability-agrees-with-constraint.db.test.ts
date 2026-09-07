@@ -43,7 +43,7 @@ import type { HttpAnswer, Scenario } from '../support/booking.js';
  *
  * `GET /availability` is advisory by contract (design §1.1): nothing refuses a wrong answer,
  * so a query that is subtly wrong produces no `23P01`, increments no counter and fails no
- * other test. Five mechanics close five distinct ways a wrong implementation could pass this
+ * other test. Six mechanics close six distinct ways a wrong implementation could pass this
  * property anyway; each is called out at the assertion it protects, below.
  *
  *   1. every probe is a SAVEPOINT, rolled back                — a committed probe would make
@@ -59,8 +59,12 @@ import type { HttpAnswer, Scenario } from '../support/booking.js';
  *      at `from` and starting exactly at `to`, because `[)` vs `[]` is the likeliest place two
  *      independently written range expressions diverge and uniform generation hits it with
  *      probability ≈ 0
+ *   6. every run carries a CANCELLED WITNESS, BY CONSTRUCTION  — one item written `cancelled`,
+ *      inside `[from, to)`, on a bay and technician no other in-window item uses; delete
+ *      `status <> 'cancelled'` from the busy-resources predicate and that pair reports busy
+ *      while its probe is accepted — direction B, every run, not a weighted probability (T-08-7)
  *
- * WHAT WOULD STILL PASS WHILE WRONG, beyond these five — see this role's step-3 report. In
+ * WHAT WOULD STILL PASS WHILE WRONG, beyond these six — see this role's step-3 report. In
  * short: a bug that moves BOTH the query's answer and every probe's fixture data the same way
  * (there is no such shared code path — ADR-0032 keeps the range expression's two copies in two
  * files with no shared constant a bug could move once and have both sides agree on), or a bug
@@ -107,6 +111,17 @@ interface ScheduleItemSpec {
   readonly technicianIndex: number;
   readonly randomStartOffsetMinutes: number;
   readonly durationMinutes: number;
+  // Mechanic 6 (R-08-1, corrected by T-08-7): a query and the constraint can agree on the
+  // range and disagree on the predicate that scopes it — `status <> 'cancelled'` — and no run
+  // can distinguish an allowlist (`status = 'confirmed'`) from the denylist the constraint
+  // actually uses unless a cancelled item is BOTH in-window and unmasked by a confirmed one on
+  // the same bay or technician. A weight alone missed that: 8/35 mutation trials survived
+  // because the two conditions coincide only 1033/5000 times under uniform generation. This
+  // field, and the witness's placement, are now set BY CONSTRUCTION below
+  // (`witnessItemArbitrary` / `otherScheduleItemArbitrary`), not sampled independently per
+  // item. The probe is still the oracle: no expectation is recomputed, this only changes what
+  // gets written.
+  readonly status: 'confirmed' | 'cancelled';
 }
 
 interface RunSpec {
@@ -117,21 +132,76 @@ interface RunSpec {
   readonly items: readonly ScheduleItemSpec[];
 }
 
-const scheduleItemArbitrary = (bayCount: number, technicianCount: number): fc.Arbitrary<ScheduleItemSpec> =>
-  fc.record({
-    // Boundary-biased (mechanic 5): a third of items are pinned to end exactly at the query's
-    // `from` or start exactly at its `to`, which uniform random generation would hit only by
-    // chance. AC-2 (the acceptance file) pins the concrete example this exists to reach by
-    // design rather than by luck.
-    kind: fc.oneof(
-      { weight: 2, arbitrary: fc.constant<'boundaryEnd'>('boundaryEnd') },
-      { weight: 2, arbitrary: fc.constant<'boundaryStart'>('boundaryStart') },
-      { weight: 4, arbitrary: fc.constant<'random'>('random') },
-    ),
-    bayIndex: fc.nat({ max: bayCount - 1 }),
-    technicianIndex: fc.nat({ max: technicianCount - 1 }),
+/**
+ * Mechanic 6, corrected (T-08-7): every OTHER item (i.e. every item but the witness, below)
+ * must leave the witness's (bay, technician) pair — index 0 of each — unshared while it could
+ * be in-window, or the witness's discriminating power is masked: a confirmed item that
+ * independently makes the pair busy is indistinguishable, at this pair, from the mutant this
+ * mechanic exists to kill. With more than one bay or technician to choose from, other items
+ * simply draw their index from the REMAINING ones (1..count-1), leaving index 0 to the witness
+ * alone regardless of kind. With only one bay or one technician there IS no remaining index —
+ * every item is forced onto it — so the only way to stay clear of the window is the kind
+ * itself: mechanic 5 already places 'boundaryEnd'/'boundaryStart' items outside `[from, to)`
+ * by construction, so restricting to those two kinds keeps the pair unshared without an index
+ * to fall back on.
+ */
+const otherScheduleItemArbitrary = (
+  bayCount: number,
+  technicianCount: number,
+): fc.Arbitrary<ScheduleItemSpec> => {
+  const mustStayOutOfWindow = bayCount === 1 || technicianCount === 1;
+  return fc.record({
+    // Boundary-biased (mechanic 5): pinned to end exactly at the query's `from` or start
+    // exactly at its `to`, which uniform random generation would hit only by chance. AC-2 (the
+    // acceptance file) pins the concrete example this exists to reach by design rather than by
+    // luck.
+    kind: mustStayOutOfWindow
+      ? fc.oneof(
+          fc.constant<'boundaryEnd'>('boundaryEnd'),
+          fc.constant<'boundaryStart'>('boundaryStart'),
+        )
+      : fc.oneof(
+          { weight: 2, arbitrary: fc.constant<'boundaryEnd'>('boundaryEnd') },
+          { weight: 2, arbitrary: fc.constant<'boundaryStart'>('boundaryStart') },
+          { weight: 4, arbitrary: fc.constant<'random'>('random') },
+        ),
+    bayIndex: bayCount > 1 ? fc.integer({ min: 1, max: bayCount - 1 }) : fc.constant(0),
+    technicianIndex:
+      technicianCount > 1 ? fc.integer({ min: 1, max: technicianCount - 1 }) : fc.constant(0),
     randomStartOffsetMinutes: fc.integer({ min: -240, max: 240 }),
     durationMinutes: fc.integer({ min: 15, max: 90 }),
+    // AC-1: "the remaining items are drawn confirmed:cancelled at 4:1" — kept verbatim from the
+    // architect's wording. The witness below is no longer part of this population; it is
+    // guaranteed, not sampled.
+    status: fc.oneof(
+      { weight: 4, arbitrary: fc.constant<'confirmed'>('confirmed') },
+      { weight: 1, arbitrary: fc.constant<'cancelled'>('cancelled') },
+    ),
+  });
+};
+
+/**
+ * The witness itself (T-08-7): always `cancelled`, always at (bayIndex=0, technicianIndex=0),
+ * and always starting inside `[from, to)` — `randomStartOffsetMinutes` is the ABSOLUTE offset
+ * from t=0 that a 'random'-kind item reads (see the assembly loop below), so it is drawn
+ * directly from `[windowStartMinutes, windowStartMinutes + windowDurationMinutes)` here rather
+ * than shifted later. Any positive duration keeps the interval overlapping the window, since
+ * only the START needs to land inside it.
+ */
+const witnessItemArbitrary = (
+  windowStartMinutes: number,
+  windowDurationMinutes: number,
+): fc.Arbitrary<ScheduleItemSpec> =>
+  fc.record({
+    kind: fc.constant<'random'>('random'),
+    bayIndex: fc.constant(0),
+    technicianIndex: fc.constant(0),
+    randomStartOffsetMinutes: fc.integer({
+      min: windowStartMinutes,
+      max: windowStartMinutes + windowDurationMinutes - 1,
+    }),
+    durationMinutes: fc.integer({ min: 15, max: 90 }),
+    status: fc.constant<'cancelled'>('cancelled'),
   });
 
 const runArbitrary: fc.Arbitrary<RunSpec> = fc
@@ -143,11 +213,16 @@ const runArbitrary: fc.Arbitrary<RunSpec> = fc
   })
   .chain((base) =>
     fc
-      .array(scheduleItemArbitrary(base.bayCount, base.technicianCount), {
-        minLength: 0,
-        maxLength: MAX_SCHEDULE_ITEMS,
+      .record({
+        witness: witnessItemArbitrary(base.windowStartMinutes, base.windowDurationMinutes),
+        // MAX_SCHEDULE_ITEMS bounds the run's total size; the witness now occupies one slot of
+        // it, so the other population's own ceiling drops by one to keep that total unchanged.
+        others: fc.array(otherScheduleItemArbitrary(base.bayCount, base.technicianCount), {
+          minLength: 0,
+          maxLength: MAX_SCHEDULE_ITEMS - 1,
+        }),
       })
-      .map((items) => ({ ...base, items })),
+      .map(({ witness, others }) => ({ ...base, items: [witness, ...others] })),
   );
 
 /** Every SQLSTATE this file must be able to tell apart, distinctly (mechanic 2). */
@@ -309,6 +384,7 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
                 technicianId,
                 startsAt,
                 endsAt,
+                item.status,
               );
               if (!verdict.accepted && verdict.code !== '23P01') {
                 throw new Error(
@@ -447,14 +523,20 @@ async function probeInsertCommitted(
   technicianId: string,
   startsAt: Date,
   endsAt: Date,
+  // Mechanic 6 (R-08-1, corrected by T-08-7): written explicitly rather than left at its
+  // column default, so the guaranteed witness occupies a slot the constraint does not police
+  // and a query that used the allowlist spelling (`status = 'confirmed'`) instead of the
+  // denylist (`status <> 'cancelled'`) would disagree on. No expectation is recomputed here —
+  // the probe stays the oracle regardless of which status a schedule item carries.
+  status: 'confirmed' | 'cancelled',
 ): Promise<ProbeVerdict> {
   const customer = scenario.customers[0];
   if (customer === undefined) throw new Error('probeInsertCommitted() needs at least one seeded customer');
   try {
     await client.query(
       `insert into appointment
-         (id, dealership_id, customer_id, vehicle_id, service_type_id, technician_id, bay_id, starts_at, ends_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         (id, dealership_id, customer_id, vehicle_id, service_type_id, technician_id, bay_id, starts_at, ends_at, status)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         id,
         scenario.dealershipId,
@@ -465,6 +547,7 @@ async function probeInsertCommitted(
         bayId,
         startsAt.toISOString(),
         endsAt.toISOString(),
+        status,
       ],
     );
     return { accepted: true };
