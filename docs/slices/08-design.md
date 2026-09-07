@@ -249,10 +249,10 @@ would swallow the `description` strings slice 09's AC-7 kills. Per-construct and
 as line 143's `never`-arm directive already is. **Criterion, so this is not a one-off:** permitted only
 where (i) the `dist/` recipe measures no observable difference at the module's boundary and (ii) the
 only killer restates the literal. `to` is the case that shows it has teeth — it looked structural and is
-not. **32 of 42 = 76.19%**, over §10's 0.75 and thinly; the ten survivors left in the denominator on
-purpose — 3 killed outside-in but invisible to a `tests/unit/**` config, 7 waiting on the document — are
-the stated gap, in I-06-5's shape, booked into §11 at step 7. Ruled `(d)` because moving a denominator
-flatters its author: the gate reviews it.
+not. ~~**32 of 42 = 76.19%, over §10's 0.75**~~ — **wrong, and mine; measured at 71.43%. See §9.** The ten
+survivors I did name stay in the denominator on purpose: 3 killed outside-in but invisible to a
+`tests/unit/**` config, 7 waiting on the document. Ruled `(d)` — moving a denominator flatters its
+author, so the gate reviews it.
 
 **The rest.** `F-08-1` **(a)** — §6.5 corrected at step 7; the control was right and arc42 wrong, and
 ADR-0032's Option D leaves the marker list untouched (`I-08-1` verified the citation exact).
@@ -270,3 +270,45 @@ the reason found while unit-testing is better than the sketch's. `I-08-1`, `I-08
 step 1 and is built; `OQ-08-1` stands as ruled. **`O-59` is not mine** — a collision between the human's
 ruling and one of mine, so the gate has it. **`gate: light` is revoked by its own terms**: two MAJORs
 were open at step 5.
+
+## 9. Step 5, round 3 — `O-62`, and the arithmetic error is mine
+
+**Upheld whole; the remedy offered with it is rejected. `(d)`.** `routes/availability.ts` is **30 of
+42 = 71.43%**, under §10's 0.75. The directive at `161` reaches `164`'s `throw` and not the `default:`
+arm at `159` containing it — `disable next-line` counts from the end of the comment block — so two
+mutants I never counted (`ConditionalExpression`, `BlockStatement`) sit in the denominator. §8's
+figure is struck in place, not rewritten.
+
+**A third directive is refused on my own record.** `I-06-5` met these exact two mutants at slice 06 —
+*"eight structurally unkillable mutants remain on the `default: {` line above each `throw`, and the
+suppression was **deliberately not widened** to reach them"* — and gave a general reason: raising a
+score by suppressing more is the failure `R-05-9` exists to prevent. A rule stated where it costs
+nothing that lapses where it costs something is not a rule, and suppressing to clear a **failing**
+number is the worse case, because the suppression becomes load-bearing on the verdict. It also lands
+on **75.00 exactly**, forcing me to rule `R-05-7`'s knife-edge to escape a hole I dug; and
+`routes/appointments.ts` carries **eight** of the identical construct today (118/155 = 76.13), so a
+directive here either classifies one construct two ways in one layer or lifts a merged file to
+118/147 = 80.27. Neither is available.
+
+**Widening `vitest.mutation.config.ts` is already ruled** (`R-08-3`): outside-in suites run the built
+artifact, so each mutant costs a `tsc` plus a container. One round; not re-opened.
+
+**The numerator cannot honestly move either.** `159`'s two are unkillable by construction; `68`–`70`
+and `96`–`99` are the seven schema `description` literals unobservable until slice 09 emits the
+document; `48`–`50` are `DISCLAIMER` prose **beyond** AC-5a, whose two required facts live at `47`
+and *are* killed (`tests/unit/http/availability.test.ts:98-99`). Asserting `48`–`50` restates literal
+prose no AC demands — criterion (ii)'s pathology.
+
+**Ruling: the file does not meet §10 at 71.43, it merges with the shortfall stated, and the gate is
+shown the number rather than a number.** No AC, no `QS-*`, no §2 clause fails, so `(c)` is unavailable
+under §6's own test; `slice:check` reads the aggregate (93.32, break 74) and passes. Loopbacks stay at
+**0**. The difference from `I-06-5` is the one the gate should see named: **it stated a gap on a
+passing file; this states one on a failing file.** §11 at step 7 books twelve, not ten, with the
+per-file figure and `appointments.ts`'s eight beside it.
+
+**One implementer change; it moves no number.** `src/http/routes/availability.ts:161–163` — the
+comment claims *"an exhaustive switch's `never` arm"* and reaches only the `throw`. Leave the
+directive where it is; add a clause naming what it does not cover and that `159`'s two mutants are
+left in the denominator deliberately, citing `O-62`. A comment asserting a reach it does not have is
+this project's most-counted defect shape, and it is what produced `O-62`. Nothing is added, moved or
+removed; the score stays 71.43.
