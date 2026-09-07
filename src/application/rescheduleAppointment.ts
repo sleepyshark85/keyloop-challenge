@@ -12,7 +12,7 @@
  *
  * ADR-0027: ATTEMPT 1 IS THE APPOINTMENT'S OWN `(bay_id, technician_id)`, tried directly — no
  * SHUFFLE and no seed draw for it, not no lock: it is locked exactly like every other attempt
- * (line 201 below is unconditional), and ADR-0030 locks it against itself, so `lockResources`'
+ * (line 210 below is unconditional), and ADR-0030 locks it against itself, so `lockResources`'
  * `DISTINCT` collapses the statement back to today's two keys. On that pair's `23P01`, ADR-0009
  * applies unchanged from attempt 2 onward:
  * a full seeded shuffle is drawn over ALL candidates (the incumbent pair among them, so it may
@@ -53,6 +53,7 @@ import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
 import {
   findAppointmentById,
+  lockAppointmentRow,
   lockResources,
   rescheduleAppointmentById,
 } from '../persistence/appointmentRepository.js';
@@ -193,9 +194,6 @@ export async function rescheduleAppointment(
   // outside the shuffle; attempts 2.. traverse the full candidate lists exactly as booking's
   // loop does, bounded at |bays| + |technicians|.
   const structuralBound = 1 + candidates.bays.length + candidates.technicians.length;
-  // ADR-0030's `leave` — the pair this row is IN FLIGHT AGAINST until this move commits.
-  // CONSTANT across every attempt, because every prior attempt aborted and left the row here.
-  const incumbent: ResourcePair = { bayId: existing.bayId, technicianId: existing.technicianId };
   let order: CandidateOrder | null = null;
   let bayId = existing.bayId;
   let technicianId = existing.technicianId;
@@ -204,7 +202,12 @@ export async function rescheduleAppointment(
   for (let attempts = 1; attempts <= structuralBound; attempts += 1) {
     try {
       const row = await db.transaction().execute(async (trx) => {
-        const lock = await lockResources(trx, bayId, technicianId, incumbent);
+        // ADR-0031 — the pair this row is IN FLIGHT AGAINST until this move commits, read
+        // INSIDE this attempt's own transaction under the row's own lock: never a value
+        // carried from the pre-loop existence read, which is stale the instant another
+        // request commits a move of the same row (R-07-1).
+        const leaves: ResourcePair = await lockAppointmentRow(trx, move.id);
+        const lock = await lockResources(trx, bayId, technicianId, leaves);
         return await rescheduleAppointmentById(trx, move, lock);
       });
 
@@ -279,11 +282,15 @@ export async function rescheduleAppointment(
         }
 
         case 'no-verdict': {
-          // T-02-9 / ADR-0018 and ADR-0030. NOT a write path skipping a lock — a move past
-          // attempt 1 is legitimately in flight against TWO pairs (the one it holds, the one
-          // it is trying to take), and `lockResources`' `leave` argument above locks both. A
-          // `40P01` reaching here means a resource this move was in flight against went
-          // unlocked, which under ADR-0030's rule is an internal fault either way. Not retried.
+          // T-02-9 / ADR-0018, ADR-0030 and ADR-0031. NOT a write path skipping a lock — a
+          // move past attempt 1 is legitimately in flight against TWO pairs (the one it
+          // holds, the one it is trying to take), and `lockResources`' `leave` argument above
+          // locks both, read INSIDE this attempt's own transaction (`lockAppointmentRow`)
+          // rather than carried from before it opened. A `40P01` reaching here means a
+          // resource this move was in flight against went unlocked — which now also covers a
+          // regression to a lock set COMPUTED FROM STATE READ OUTSIDE THE TRANSACTION,
+          // ADR-0031's own failure mode — and under ADR-0030's rule is an internal fault
+          // either way. Not retried.
           deps.logger.error(
             { event: DEADLOCK_EVENT, bayId, technicianId, attempt: attempts },
             DEADLOCK_EVENT,

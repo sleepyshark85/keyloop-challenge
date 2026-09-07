@@ -3,6 +3,7 @@ import {
   cancelAppointmentById,
   findAppointmentById,
   insertAppointment,
+  lockAppointmentRow,
   lockResources,
   rescheduleAppointmentById,
 } from '../../../src/persistence/appointmentRepository.js';
@@ -160,6 +161,44 @@ describe('lockResources — ADR-0018, extended by ADR-0030', () => {
     await lockResources(db, IDS.bay, IDS.technician, null);
     expect(recorded[0]?.sql).not.toMatch(/appointment/i);
     expect(recorded[0]?.sql).not.toMatch(/\bselect\b[\s\S]*\bfrom\b\s+"/);
+  });
+});
+
+describe('lockAppointmentRow — ADR-0031', () => {
+  it('is a `SELECT … FOR UPDATE` reading exactly bay_id and technician_id by id', async () => {
+    const { db, recorded } = scriptedDb([
+      { rows: [{ bay_id: IDS.bay, technician_id: IDS.technician }] },
+    ]);
+    await lockAppointmentRow(db, IDS.appointment);
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.sql).toBe(
+      'select "bay_id", "technician_id" from "appointment" where "id" = $1 for update',
+    );
+    expect(recorded[0]?.parameters).toEqual([IDS.appointment]);
+  });
+
+  it('maps the row to a ResourcePair, camelCased', async () => {
+    const { db } = scriptedDb([{ rows: [{ bay_id: IDS.bay, technician_id: IDS.technician }] }]);
+    const pair = await lockAppointmentRow(db, IDS.appointment);
+    expect(pair).toEqual({ bayId: IDS.bay, technicianId: IDS.technician });
+  });
+
+  it('returns the pair the DATABASE holds NOW, not a value the caller already had', async () => {
+    // The whole point of ADR-0031: whatever this statement returns is what `lockResources`
+    // locks against, so a row relocated underneath a stale caller-held value is exactly what
+    // a fresh read here corrects.
+    const { db } = scriptedDb([{ rows: [{ bay_id: OTHER_BAY, technician_id: OTHER_TECHNICIAN }] }]);
+    const pair = await lockAppointmentRow(db, IDS.appointment);
+    expect(pair).toEqual({ bayId: OTHER_BAY, technicianId: OTHER_TECHNICIAN });
+  });
+
+  it('throws rather than returning null on zero rows — the read is TOTAL (ADR-0003: ids are minted, rows are never deleted)', async () => {
+    // `executeTakeFirstOrThrow`, deliberately, not `| null`: an id this function is called
+    // with is always the id `findAppointmentById` already found a row at, so zero rows here
+    // is unreachable rather than a case to branch on.
+    const { db } = scriptedDb([{ rows: [] }]);
+    await expect(lockAppointmentRow(db, IDS.appointment)).rejects.toBeDefined();
   });
 });
 

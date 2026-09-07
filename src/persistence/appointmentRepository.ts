@@ -189,8 +189,11 @@ export async function lockResources(
   technicianId: string,
   /**
    * ADR-0030 — REQUIRED so omission is `TS2554`, and `null` only where the write vacates
-   * nothing (booking). A move passes the pair its row already occupies, constant across
-   * attempts because every prior attempt aborted.
+   * nothing (booking). A move passes the pair its row CURRENTLY occupies, read inside this
+   * same transaction under the row's own lock ({@link lockAppointmentRow}, ADR-0031) — never a
+   * value carried from before the transaction opened, which is what "constant across attempts
+   * because every prior attempt aborted" turned out to be silent about (another request's
+   * commit; R-07-1).
    */
   leave: ResourcePair | null,
 ): Promise<ResourceLock> {
@@ -212,6 +215,51 @@ export async function lockResources(
   // The ONE cast this brand costs, confined to this function — the ADR-0016 shape one layer
   // down, and the same house pattern `candidates.ts`'s three casts already use.
   return { bayId, technicianId } as ResourceLock;
+}
+
+/**
+ * ADR-0031 — read the pair a move is about to LEAVE from inside the attempt's OWN
+ * transaction, under the row's own lock, so `lockResources`' `leave` argument is derived from
+ * state this transaction itself observed rather than a value read before it opened.
+ *
+ * ── WHY THIS EXISTS: THE CLAIM `lockResources`' DOCBLOCK USED TO MAKE WAS FALSE ───────────────
+ *
+ * `rescheduleAppointment` used to compute the pair a move leaves ONCE, before the attempt
+ * loop, off the pre-loop existence read — true of that ONE request's own attempts, silent
+ * about another request committing a move of the SAME row in between. R-07-1 named the cycle
+ * that reopens: two stale movers, each locking a pair the row has already left, reach their
+ * writes and tuple-wait on each other's vacated-but-uncommitted index entries — `40P01`
+ * where ADR-0030 promised a database verdict. `SELECT … FOR UPDATE` under this row's own lock
+ * is the fix: nothing can move the row again until this transaction commits or rolls back, so
+ * the pair read here is the pair `lockResources` and the subsequent `UPDATE` will act against.
+ *
+ * ── LOCK ORDER: ROW LOCK, THEN ADVISORY LOCKS, THEN THE WRITE ─────────────────────────────────
+ *
+ * That order is what keeps this addition free of a NEW cycle: a transaction holding an
+ * advisory lock never afterwards waits for a row lock, so the two lock kinds cannot wait on
+ * each other in both directions (ADR-0031).
+ *
+ * `FOR UPDATE`, not `FOR NO KEY UPDATE`: acceptable either way here, since this row's own
+ * `UPDATE` takes at least as strong a lock a moment later regardless — but `FOR UPDATE` is
+ * what {@link rescheduleAppointmentById}'s own guarded `UPDATE` takes on any row it actually
+ * writes, so this read asks for nothing the write would not have asked for itself.
+ *
+ * `executeTakeFirstOrThrow`, DELIBERATELY, NOT `| null`: this read is TOTAL. Appointment ids
+ * are minted by `deps.newId()` and never client-supplied (ADR-0003), and a row is NEVER
+ * deleted, only transitioned to `cancelled` — so an id this function is called with (always
+ * the id `findAppointmentById` already found `existing` at) names exactly one row, always. An
+ * `| null` branch here would be unreachable and therefore an unkillable mutation survivor in a
+ * file `appointmentRepository.ts` currently holds at 100.00 with zero survivors.
+ */
+export async function lockAppointmentRow(db: Db, id: string): Promise<ResourcePair> {
+  const row = await db
+    .selectFrom('appointment')
+    .select(['bay_id', 'technician_id'])
+    .where('id', '=', id)
+    .forUpdate()
+    .executeTakeFirstOrThrow();
+
+  return { bayId: row.bay_id, technicianId: row.technician_id };
 }
 
 /**
