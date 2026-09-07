@@ -1,7 +1,7 @@
 ---
 id: "07"
 title: Rescheduling under contention — a refused move changes nothing, and never opens a window
-status: ready
+status: done
 depends_on: ["06"]
 arc42: ["§5.2", "§6.1", "§6.3", "§8.6", "§10", "§11"]
 adr: [3, 18, 23, 26, 27, 29, 30, 31]
