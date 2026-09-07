@@ -81,6 +81,7 @@ without taking anyone's word for it.
 - [**ADR-0024**](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) — The error taxonomy's residual is a property, not a row *(accepted)*
 - [**ADR-0025**](adr/0025-existence-is-the-reads-legality-is-the-statements.md) — Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE *(accepted)*
 - [**ADR-0030**](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) — A move locks the pair it leaves as well as the pair it takes *(accepted)*
+- [**ADR-0034**](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) — The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed *(accepted)*
 
 ---
 

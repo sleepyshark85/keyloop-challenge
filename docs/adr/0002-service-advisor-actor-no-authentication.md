@@ -4,7 +4,7 @@ title: Treat the service advisor as the actor and leave authentication out of sc
 status: accepted
 date: 2026-09-03
 supersedes: null
-superseded_by: null
+superseded_by: "0034"
 arc42: ["§1.3", "§1.4", "§2.4", "§3.1", "§3.2", "§3.3", "§11"]
 
 # AI provenance — evidence for the assessment's verification criterion.
