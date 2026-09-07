@@ -8,7 +8,7 @@ arc42: ["§3.1", "§5.3", "§8.4", "§8.6", "§10.2", "§11.1", "§11.2"]
 adr: [5, 6, 10]
 quality_scenarios: [QS-13, QS-11, QS-14, QS-10, QS-12]
 inherits: ["OQ-05-2", "F-06-1", "A-06-2", "T-06-5", "I-04-5", "R-07-12"]   # deferred here by ruling; slice:check enforces it (A-05-5). I-04-5 and R-07-12 admitted by the human at O-59, 2026-09-08
-loopbacks: 0
+loopbacks: 1   # (c) at step 5 — AC-9, QS-11 and AC-6 nameable; architect declined (a)
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
 ---
 

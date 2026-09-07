@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **346** |
-| Severity | 13 blocking · 172 major · 161 minor |
+| Findings recorded | **347** |
+| Severity | 14 blocking · 172 major · 161 minor |
 | Verdicts | 20 narrowed · 127 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | test-engineer 73 · architect 71 · orchestrator 68 · reviewer 66 · implementer 54 · scribe 10 · human 4 |
-| Awaiting a ruling | **166** |
-| Mean escape distance | 1.55 step(s) |
+| Raised by | test-engineer 73 · architect 72 · orchestrator 68 · reviewer 66 · implementer 54 · scribe 10 · human 4 |
+| Awaiting a ruling | **167** |
+| Mean escape distance | 1.56 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2303,6 +2303,7 @@ rather than narrated.*
 | **I-09-3** | MAJOR | 4 *(+1)* | implementer | A PRE-EXISTING CONTRACT CASE PINNED THE EXACT 400 THAT AC-6b'S OWN TEXT SAYS IT SUPERSEDES | accepted |
 | **I-09-4** | MINOR | 4 *(+0)* | implementer | THE ABSORBED-CONFLICT COUNTER SEMANTICS ARE A QUESTION THE IMPLEMENTER ASKED RATHER THAN A DEFECT IT CLAIMED | deferred |
 | **O-71** | MAJOR | 5 *(+1)* | orchestrator | SLICE 09 REPAID SLICE 08's GAP AND OPENED THREE MORE — attemptLoop.ts 59.85, server.ts 69.44, telemetry.ts 12.82, all under section 10's 0.75 | **open** |
+| **A-09-4** | BLOCKING | 5 *(+4)* | architect | THIS IS NOT ONE SLICE, AND GATE D's FOLD OF SLICES 10 AND 11 INTO 09 WAS WRONG — THE ARCHITECT SAYS SO AND SAYS IT IS NOT ITS RULING TO MAKE | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2383,6 +2384,11 @@ rather than narrated.*
 
 - *scenario:* THE FULL STRYKER RUN, 29 MINUTES 46 SECONDS, AGGREGATE 86.52 AGAINST A BREAK THRESHOLD OF 74 — AND THE AGGREGATE IS EXACTLY WHAT MUST NOT BE READ, which is O-64's whole lesson from this week. PER CHANGED FILE the collector reports ELEVEN files and THREE BELOW THRESHOLD. THE GOOD NEWS FIRST AND IT IS REAL: src/http/routes/availability.ts is 88.10, the projected ceiling hit exactly, so SLICE 08's OVERRIDDEN 71.43 IS REPAID and D-08-1 closes. bookAppointment 93.2, rescheduleAppointment 90.36, cancelAppointment 88.89, appointmentRepository 100. THE THREE THAT FAIL: src/platform/telemetry.ts AT 12.82 PERCENT, 5 killed against 34 survived, A BRAND-NEW FILE THIS SLICE INTRODUCED AND BARELY UNIT-TESTED — the integration test exercises it outside-in but vitest.mutation.config.ts includes tests/unit ONLY, which is R-12, so outside-in kills are invisible to the measurement and the file reads as almost wholly unasserted. src/http/server.ts AT 69.44, 47 killed against 22 survived, WORSE THAN THE 91.18 IT SCORED AT SLICE 08 — the telemetry wiring landed there and brought survivors with it. AND src/application/attemptLoop.ts AT 59.85, WHICH IS THE ONE THAT MATTERS MOST: it is the NEW SHARED WRITE PATH that F-06-1's extraction created, merging two paths ADR-0027 says behave differently, and it is the file the reviewer was told to look hardest at because QS-1 through QS-5 are what the whole system exists to defend. A 59.85 ON THE FILE THAT NOW CARRIES EVERY BOOKING AND EVERY RESCHEDULE IS NOT A DOCUMENTATION GAP LIKE SLICE 08's WAS — slice 08's twelve survivors were prose and an unreachable arm, and every behavioural mutant was dead. THIS IS DIFFERENT IN KIND AND MUST NOT BE ARGUED AS THE SAME. THE ORCHESTRATOR IS NOT MERGING ON THE HUMAN'S DELEGATION: they authorised a merge IF THINGS GO RIGHT, and a section 10 failure on the slice that was meant to repay the last section 10 failure is not that.
 - *file:* `src/application/attemptLoop.ts`
+
+**A-09-4** — THIS IS NOT ONE SLICE, AND GATE D's FOLD OF SLICES 10 AND 11 INTO 09 WAS WRONG — THE ARCHITECT SAYS SO AND SAYS IT IS NOT ITS RULING TO MAKE
+
+- *scenario:* THE EVIDENCE IS THE REVIEW ITSELF. Four adjudication rounds, then fifteen findings with THREE BLOCKING, on a slice carrying SEVENTEEN acceptance criteria and SIX inherited obligations. AND THE PATTERN IS NOT RANDOM: ALL THREE BLOCKING FINDINGS SIT ON THE CONTRACT HALF — AC-9's missing media type, A-06-2 asserted by nothing over the emitted document, and the harness certified by a digit count. The telemetry, pool and budget work is sound; the contract work is where the slice broke, and it is the half that was folded in. THE ARCHITECT ARGUED AT STEP 1 THAT THE SEAM WAS FALSER THAN GATE D KNEW, on three couplings, AND IT NOW SAYS THE OPPOSITE ON EVIDENCE — that is the position changing under measurement rather than under pressure. THE SCOPE QUESTION, PUT TO THE HUMAN AND EXPLICITLY NOT RULED: repair everything inside slice 09, OR REOPEN SLICE 10 FOR THE CONTRACT HALF and merge 09's telemetry, pool and budget work once the non-contract findings clear. THE ARCHITECT RECOMMENDS THE SECOND AND SAYS IT IS NOT MINE TO RULE. Note what reopening 10 would cost and what it would buy: slice 10 is a TOMBSTONE folded into 09 at Gate D, so reopening it means un-folding a Gate D decision and the deferral machinery would need its destination re-pointed; what it buys is a close-out slice that can actually close, and a contract half reviewed on its own terms rather than as the fifth item in a seventeen-criterion slice. gate: light is REVOKED BY ITS OWN FRONT-MATTER CONDITION and the architect did not touch the field.
+- *file:* `docs/slices/09-observability.md`
 
 </details>
 

@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `e948e36 chore(09): step 4 registered — 37/42 measured, and slice 08's gap is repaid` |
+| Last commit | `92d78bb docs(09): step 5 ruled (c) — AC-9, QS-11 and AC-6 are nameable, and I-04-5 is declined` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 207 |
+| Agent runs recorded | 208 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -353,7 +353,8 @@
 | 2026-09-07 20:30 | test-engineer | 14m50 | 154 / 13,528 / 6,021,468 | `derived` |
 | 2026-09-07 20:32 | implementer | 74m19 | 1,132 / 74,381 / 229,096,979 | `derived` |
 | 2026-09-07 21:18 | reviewer | 43m39 | 238 / 19,676 / 12,042,394 | `derived` |
-| | **total** | **7392m04** | **49,968 / 3,566,986 / 4,204,832,214** | |
+| 2026-09-07 21:38 | architect | 18m11 | 230 / 27,947 / 12,913,720 | `derived` |
+| | **total** | **7410m15** | **50,198 / 3,594,933 / 4,217,745,934** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
