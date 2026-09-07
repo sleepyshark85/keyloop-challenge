@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `2da4ec6 docs(adr): §11's debt register regenerates without the five retired proposals` |
+| Last commit | `72d5ca9 fix(docs): a superseded ADR says so in its own row — A-R-4` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 187 |
+| Agent runs recorded | 194 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -124,7 +124,7 @@
 | ADR | Title | Status | AI input |
 |---|---|---|---|
 | [0001](adr/0001-validate-dealership-opening-hours.md) | Validate dealership opening hours, do not model technician shifts | accepted | — |
-| [0002](adr/0002-service-advisor-actor-no-authentication.md) | Treat the service advisor as the actor and leave authentication out of scope | accepted | — |
+| [0002](adr/0002-service-advisor-actor-no-authentication.md) | Treat the service advisor as the actor and leave authentication out of scope | superseded | — |
 | [0003](adr/0003-cancellation-and-rescheduling-in-scope.md) | Support cancellation and rescheduling, and move an appointment with one atomic UPDATE | accepted | — |
 | [0004](adr/0004-retry-across-remaining-candidates.md) | On exclusion violation, try the next candidate and refuse only when the list is exhausted | accepted | — |
 | [0005](adr/0005-fastify-with-typebox-schemas.md) | Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them | accepted | — |
@@ -139,6 +139,7 @@
 | [0024](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) | The error taxonomy's residual is a property, not a row | accepted | — |
 | [0025](adr/0025-existence-is-the-reads-legality-is-the-statements.md) | Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE | accepted | — |
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
+| [0034](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) | The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed | accepted | — |
 
 ## Agent runs
 
@@ -331,7 +332,14 @@
 | 2026-09-07 09:13 | architect | 23m21 | 260 / 25,445 / 17,081,978 | `derived` |
 | 2026-09-07 09:23 | architect | 32m54 | 354 / 25,785 / 28,688,216 | `derived` |
 | 2026-09-07 11:33 | architect | 74m32 | 786 / 17,213 / 131,176,729 | `derived` |
-| | **total** | **6805m43** | **44,114 / 3,174,586 / 3,544,735,740** | |
+| 2026-09-07 12:30 | architect | 50m57 | 462 / 27,487 / 46,964,047 | `derived` |
+| 2026-09-07 12:36 | architect | 57m22 | 528 / 28,077 / 59,574,813 | `derived` |
+| 2026-09-07 12:39 | architect | 60m18 | 550 / 28,146 / 63,934,599 | `derived` |
+| 2026-09-07 13:43 | architect | 124m14 | 608 / 28,285 / 75,192,181 | `derived` |
+| 2026-09-07 14:05 | architect | 9m24 | 150 / 5,275 / 6,292,327 | `derived` |
+| 2026-09-07 14:08 | test-engineer | 1m22 | 44 / 1,404 / 794,855 | `derived` |
+| 2026-09-07 14:09 | implementer | 2m13 | 80 / 1,262 / 1,650,514 | `derived` |
+| | **total** | **7111m33** | **46,536 / 3,294,522 / 3,799,139,076** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

@@ -165,7 +165,7 @@ describe('POST /appointments — the exhaustive status mapping (§8.6)', () => {
   it('AC-9 — the 422 names WHICH reference was unknown', async () => {
     for (const reference of ['dealership', 'service-type', 'customer', 'vehicle'] as const) {
       const response = await post(serverAnswering({ book: { kind: 'unknown-reference', reference } }), VALID_BODY);
-      // Four failures share one `type`; without `reference` a service advisor is told only that
+      // Four failures share one `type`; without `reference` the caller is told only that
       // "something" was unknown.
       expect(response.json().reference).toBe(reference);
       expect(response.statusCode).not.toBe(404);
@@ -750,8 +750,8 @@ describe('setErrorHandler — §8.6\'s "Anything else" row is where totality is 
       // fastify@5.12.1 — by the architect, the implementer and the test-engineer independently —
       // both errors carry `statusCode: 400` and NEITHER sets `validation`, so before this they
       // missed the validation arm and fell to the catch-all: `500 /problems/internal`, live on
-      // the already-merged booking route. §8.6 justifies its 500 row with "a 4xx would tell a
-      // service advisor to correct something they did not send and cannot see" — here the client
+      // the already-merged booking route. §8.6 justifies its 500 row with "a 4xx would tell
+      // the caller to correct something they did not send and cannot see" — here the client
       // sent exactly that, can see it, and can correct it. The row was inverted.
       //
       // The content-type parser runs BEFORE the router (measured: even an unrouted path raises

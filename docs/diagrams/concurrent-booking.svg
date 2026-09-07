@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="1000" height="680" viewBox="0 0 1000 680" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="concurrent-booking-title concurrent-booking-desc">
       <title id="concurrent-booking-title">Two racing bookings</title>
-      <desc id="concurrent-booking-desc">Sequence diagram in which two service advisors request the same appointment slot simultaneously: both availability reads report the bay free, both inserts are attempted, PostgreSQL commits the first and rejects the second with SQLSTATE 23P01 naming the no_bay_overlap exclusion constraint, and the scheduler returns 201 to one advisor and 409 to the other.</desc>
+      <desc id="concurrent-booking-desc">Sequence diagram in which two users request the same appointment slot simultaneously: both availability reads report the bay free, both inserts are attempted, PostgreSQL commits the first and rejects the second with SQLSTATE 23P01 naming the no_bay_overlap exclusion constraint, and the scheduler returns 201 to one and 409 to the other.</desc>
 
       <defs>
   <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap');</style>
@@ -82,14 +82,14 @@
       <rect x="60" y="40" width="160" height="64" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
       <rect x="68" y="48" width="40" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.50)" stroke-width="0.8"/>
       <text x="88" y="57" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ACTOR</text>
-      <text x="140" y="78" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Advisor A</text>
+      <text x="140" y="78" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">User A</text>
       <text x="140" y="93" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">wants 09:00</text>
 
       <rect x="260" y="40" width="160" height="64" rx="6" fill="#f5f5f5"/>
       <rect x="260" y="40" width="160" height="64" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
       <rect x="268" y="48" width="40" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.50)" stroke-width="0.8"/>
       <text x="288" y="57" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ACTOR</text>
-      <text x="340" y="78" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Advisor B</text>
+      <text x="340" y="78" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">User B</text>
       <text x="340" y="93" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">wants 09:00</text>
 
       <rect x="488" y="40" width="184" height="64" rx="6" fill="#f5f5f5"/>

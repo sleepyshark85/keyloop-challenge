@@ -63,10 +63,20 @@ recorded in §11 as debt rather than silently absorbed.
 
 ## 1.3 Stakeholders
 
+**The system does not name its primary actor, and that is deliberate.** The brief says only
+*"allow **a user** to request a service appointment"*. OQ-2 asked who that user is and
+[ADR-0002](../adr/0002-service-advisor-actor-no-authentication.md) answered *dealership staff*,
+then rested the scope of authentication on that answer.
+[ADR-0034](../adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) withdraws
+the naming and keeps the scope: authentication is out because the client layer is stubbed, which
+is a fact about what was built rather than an inference about who uses it. `customer_id` still
+travels in the request body and a mismatched vehicle is still a `4xx` rather than a `403` — but
+those follow from a stubbed caller, not from a role. Both readings of *a user* stay open.
+
 | Role | Expectation |
 |---|---|
-| **Service advisor** (primary actor, ADR-0002) | Books, cancels and reschedules on a customer's behalf during a phone call. Wants a yes/no in seconds and, on a no, to be told *which* resource was unavailable |
-| **Customer / vehicle owner** | An appointment honoured on arrival — entirely quality goal 1. Never touches the system; the advisor acts for them (ADR-0002) |
+| **A user** (primary actor, ADR-0034) | Books, cancels and reschedules for a customer named in the request. Wants a yes/no in seconds and, on a no, to be told *which* resource was unavailable |
+| **Customer / vehicle owner** | An appointment honoured on arrival — entirely quality goal 1. Named by the request rather than identified by it (ADR-0034) |
 | **Service manager** | No technician double-committed, and no bay left idle by a scheduler refusing bookings it could have accepted (ADR-0004). Owns the reference data, including opening hours (ADR-0001) |
 | **Technician** | A *resource*, not a user. Committed to one job at a time (`CLAUDE.md` §2.1, A-2) |
 | **Operator** | Runs the service from a clean checkout, tells whether it is healthy, and sees conflicts and latency without attaching a debugger |
@@ -108,7 +118,7 @@ recommendation was accepted, modified or overridden.
 | id | The question that was open | Ruling | Record |
 |---|---|---|---|
 | **OQ-1** | Are opening hours and technician shifts modelled, or is time unbounded? | **Opening hours are validated; shifts are not modelled.** Validating them cannot reintroduce check-then-act, because they are a static property of the *request* | [ADR-0001](../adr/0001-validate-dealership-opening-hours.md) — *architect's "unbounded" recommendation overridden* |
-| **OQ-2** | Who is the actor, and is authentication in scope? | **Service advisor, no authentication.** Vehicle ownership is **validation**, not a security control | [ADR-0002](../adr/0002-service-advisor-actor-no-authentication.md) — *accepted as recommended* |
+| **OQ-2** | Who is the actor, and is authentication in scope? | **No authentication, and the actor is not named.** Vehicle ownership is **validation**, not a security control | [ADR-0002](../adr/0002-service-advisor-actor-no-authentication.md) — *accepted as recommended*, then superseded by [ADR-0034](../adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md), which keeps the scope and drops the role |
 | **OQ-3** | Are cancellation and rescheduling in scope? | **Both.** Cancellation is a `confirmed → cancelled` transition, which is what makes the constraint's `WHERE (status <> 'cancelled')` predicate testable; rescheduling is a **single atomic `UPDATE`**, never a cancel followed by an insert | [ADR-0003](../adr/0003-cancellation-and-rescheduling-in-scope.md) — *architect recommended deferring rescheduling; the human expanded scope and fixed the mechanism* |
 | **OQ-4** | When a request conflicts but capacity remained, is a refusal acceptable? | **No — retry across the remaining candidates, then refuse.** The candidate read stays **advisory**, so this is not check-then-act | [ADR-0004](../adr/0004-retry-across-remaining-candidates.md) — *accepted as recommended* |
 

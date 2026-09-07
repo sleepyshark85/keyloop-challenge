@@ -21,7 +21,7 @@ ai-input: >
 
 ## Context and problem statement
 
-The most important artifact here is eight lines of DDL:
+Everything this system claims about double booking rests on eight lines of DDL:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS btree_gist;
@@ -30,14 +30,13 @@ ALTER TABLE appointment ADD CONSTRAINT no_bay_overlap
   WHERE (status <> 'cancelled');
 ```
 
-An assessor under time pressure (§1.3) must read that as written, not reconstruct it.
-Four requirements follow:
+A reviewer under time pressure has to read them as written, not reconstruct them from a model or a
+builder call. Four requirements follow:
 
-1. **The SQL must be verbatim and first-class** — not a string in a builder call, not generated
-   from a model.
-2. **The tool must be independent of the query layer.** ADR-0006 chose Kysely *without* its
+1. **The SQL must be verbatim and first-class.**
+2. **The tool must be independent of the query layer.** That decision took Kysely *without* its
    migrator; `prisma migrate` and `drizzle-kit` fall with their query layers.
-3. **It must run in-process against a Testcontainers database** (§2.2).
+3. **It must run in-process against a Testcontainers database**, since tests use real PostgreSQL.
 4. **It must not be hand-rolled.** A runner is a small program with a large blast radius: ordering,
    locking, partial application, a state table that must never be wrong.
 
@@ -72,9 +71,9 @@ Four requirements follow:
   - Bad, because its centre of gravity is Sequelize
 - **Option F — the query layer's own migrator**
   - Good, because it is one fewer dependency and one fewer concept
-  - Bad, because it couples two decisions that ADR-0006 deliberately separated
-  - Bad, in the `drizzle-kit` and `prisma migrate` cases, for the reason ADR-0006 rejected them
-    — it cannot express the exclusion constraint.
+  - Bad, because it couples two decisions deliberately kept separate
+  - Bad, in the `drizzle-kit` and `prisma migrate` cases, because neither can express the exclusion
+    constraint.
   - Bad, in the Kysely case, because Kysely's migrations are TypeScript modules
 
 ## Decision
@@ -88,9 +87,8 @@ dissolves the conflict between 1 and 4.
   filename order, tracked in a `pgmigrations` table.
 - **Every migration is plain SQL. The DSL is not used**
   even where it would serve: a mixed corpus is worse than either.
-- The runner is invoked **programmatically** (`node-pg-migrate`'s Node API) both by
-  `npm run db:migrate` and by the Testcontainers fixture, so the tested schema is the shipped
-  schema (§2.2, §8.5).
+- The runner is invoked **programmatically** by both the migrate script and the Testcontainers
+  fixture, so the tested schema is the shipped schema.
 - **Down migrations are written but are not part of any recovery story.**
   They exist so a migration is reviewable as a reversible change.
 - Migrations are **never edited after merge**, on the same reasoning that makes ADRs immutable:
@@ -100,18 +98,17 @@ dissolves the conflict between 1 and 4.
 
 **Good**
 
-- The exclusion-constraint DDL of `CLAUDE.md` §2.1 appears in this repository exactly as written
-  there.
+- The exclusion-constraint DDL the constitution specifies appears here exactly as written there.
 - The migration corpus is legible to anyone who reads SQL
-- Independent of ADR-0006: swapping Kysely for something else touches no migration.
+- Independent of the query layer: swapping Kysely for something else touches no migration.
 - Applying migrations from the test fixture is a function call
 
 **Bad, or deferred**
 
-- `.sql` files carry no types, so nothing links a migration to the `Database` interface ADR-0006
-  keeps — mitigated as ADR-0006 says: regenerate the interface in CI.
+- `.sql` files carry no types, so nothing links a migration to the typed `Database` interface the
+  query layer keeps — mitigated by regenerating that interface in CI.
 - `node-pg-migrate` is chosen partly for a feature (`.sql` file support) that is not its headline
   use, so most documentation shows the DSL this forbids.
 - No schema-diffing and no drift detection: nothing notices if someone changes a database by hand.
-  Noted in §11.
+  Noted as debt.
 - Down migrations are written and never exercised, so they are unverified by construction.

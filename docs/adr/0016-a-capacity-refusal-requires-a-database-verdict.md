@@ -39,19 +39,21 @@ ai-input: >
 
 ## Context and problem statement
 
-`CLAUDE.md` §2.1 forbids check-then-act. Slice 02 is where that rule stops being a document and
-becomes a program, so the question is not whether this booking path contains a check — it does not —
-but **what happens in six months when someone adds one.** The honest answer today is: nothing.
+In six months someone adds three lines to the booking path: read the availability, decide, then
+write. Every test still passes, and nothing in this system objects. Nothing can — which is the
+question this slice has to answer, because check-then-act is forbidden and the booking path does not
+contain one *today*.
 
 > The exclusion constraint makes check-then-act **harmless**. A booking path that reads availability
 > and then decides still never double-books, because the constraint still adjudicates the write. It
-> is slower, it refuses more often than it should, and it is exactly the shape §2.1 names — but it is
-> not *incorrect*. **QS-1 and QS-2 would pass over it**, and so would every other test in the suite.
+> is slower, it refuses more often than it should, and it is exactly the forbidden shape — but it is
+> not *incorrect*. **The concurrency scenarios would pass over it**, and so would every other test in
+> the suite.
 
-The safety net hides the thing it was supposed to make visible. AC-5 already recognises that by being
-phrased as a source-tree *inspection* rather than a runtime assertion — but a scan is a text scan, and
-arc42 §11 already records twice what text scans cannot see. So: **is there a mechanism stronger than a
-scan?**
+The safety net hides the thing it was supposed to make visible. The acceptance criterion already
+concedes as much, by being phrased as a source-tree *inspection* rather than a runtime assertion —
+but a scan is a text scan, and the debt register records twice what text scans cannot see. So: **is
+there a mechanism stronger than a scan?**
 
 There is, and it comes from what a check-then-act refusal has to *produce*. That path ends in
 `409 /problems/no-capacity` carrying `resource`. Correctly, that value comes from `err.constraint` on
@@ -62,32 +64,23 @@ conclusion, before one. **Those two are the same string, and nothing distinguish
 
 | | Option | Why not, in a clause |
 |---|---|---|
-| **A** | Do nothing structural; rely on AC-5's source scan and reviewer attention | It is the weakest available mechanism for a NON-NEGOTIABLE rule. Not rejected as an *alternative*: C is what makes A a backstop rather than the whole defence, and this ADR keeps both |
-| **B** | A `dependency-cruiser` rule | `dependency-cruiser` reasons about module *edges*, and the use case is already permitted to import the repository (ADR-0008 removed the port on purpose). There is no forbidden import to forbid, and the nearest expressible rule would forbid the correct design too |
+| **A** | Do nothing structural; rely on the source scan and review | It is the weakest available mechanism for a NON-NEGOTIABLE rule. Not rejected as an *alternative*: C is what makes A a backstop rather than the whole defence, and this ADR keeps both |
+| **B** | A `dependency-cruiser` rule | `dependency-cruiser` reasons about module *edges*, and the use case is already permitted to import the repository, the port having been removed on purpose. There is no forbidden import to forbid, and the nearest expressible rule would forbid the correct design too |
 | **C** | **Brand the contended resource**, minted only by the SQLSTATE classifier | **Chosen** |
-| **D** | Carry the whole `PgOutcome` conflict object into the `no-capacity` outcome | Strictly more evidence, but it puts a persistence-shaped value into the HTTP layer's `switch` — the leakage `sql-only-in-persistence` exists to prevent — and fabricating a plausible error object is barely harder than writing a cast. **Partially adopted**: `constraint` is carried on `PgOutcome`, because AC-3 and AC-4 assert on the name; it is not carried into `BookOutcome` |
-| **E** | Assert at runtime that a `409` followed a `23P01`, through slice 09's span or metric | The only option that catches the defect behaviourally, and it cannot exist until slice 09 — a guard arriving seven slices after the code it guards has already failed. It also asserts on telemetry, so deleting a span deletes the guard. **Deferred, not rejected**: once `booking_conflicts_total` distinguishes absorbed from refused, a refusal with no counted conflict is exactly this check, and it belongs there as a second line of defence |
+| **D** | Carry the whole `PgOutcome` conflict object into the `no-capacity` outcome | Strictly more evidence, but it puts a persistence-shaped value into the HTTP layer's `switch` — the leakage the SQL-confinement rule exists to prevent — and fabricating a plausible error object is barely harder than writing a cast. **Partially adopted**: the constraint name is carried on `PgOutcome`, because the acceptance criteria assert on it; not into `BookOutcome` |
+| **E** | Assert at runtime that a `409` followed a `23P01`, through the observability slice's span or metric | The only option that catches the defect behaviourally, and it cannot exist until that slice — a guard arriving seven slices after the code it guards. It also asserts on telemetry, so deleting a span deletes the guard. **Deferred, not rejected**: once the conflict counter distinguishes absorbed from refused, a refusal with no counted conflict is exactly this check, and it belongs there as a second line of defence |
 
 ## Decision
 
 Chosen option: **C — `ContendedResource` is a branded type minted only inside
 `src/persistence/pgError.ts`, and `BookOutcome`'s `no-capacity` variant carries it.**
 
-```ts
-// src/persistence/pgError.ts — the ONLY minting site
-export type ContendedResource = ('bay' | 'technician') & { readonly __brand: 'ContendedResource' };
-
-export type PgOutcome =
-  | { readonly kind: 'conflict'; readonly resource: ContendedResource; readonly constraint: string }
-  | { readonly kind: 'bad-reference'; readonly constraint: string }
-  | { readonly kind: 'other'; readonly cause: unknown };
-```
-
-The sentence to carry away: **you cannot refuse a booking for capacity reasons without holding a value
-PostgreSQL produced.** The refusal is not *justified* by a database verdict in a comment; it is
-*constructed from* one, and the compiler checks it. It is the pattern the domain already uses —
-`Instant` and `DurationMinutes` are branded with one constructor each, so possession of the type is
-evidence about the value.
+The brand is a `'bay' | 'technician'` union no other module can construct: it is minted on the
+`PgOutcome` the SQLSTATE classifier returns, and nowhere else. The sentence to carry away: **you
+cannot refuse a booking for capacity reasons without holding a value PostgreSQL produced.** The
+refusal is not *justified* by a database verdict in a comment; it is *constructed from* one, and the
+compiler checks it. It is the pattern the domain already uses: `Instant` and `DurationMinutes` are
+branded with one constructor each, so possession of the type is evidence about the value.
 
 ### What was measured, and the claim narrowed to fit it
 
@@ -102,10 +95,10 @@ evidence about the value.
 > **The brand forecloses every shape that does not cast.** A cast is a single greppable token,
 > confined to `pgError.ts` by a marker in `tests/architecture/`, and visible in any diff that adds one.
 
-That narrowing is the precedent arc42 §5.2 set at slice 00a, where *"no other shape compiles"* became
-*"the ruleset forecloses every shape that names the handle"*: a claim the tooling does not support is
-worse than a smaller true one, because the next person to need an escape hatch finds it and concludes
-the rule was decorative.
+That narrowing follows the precedent set at the walking skeleton, where *"no other shape compiles"*
+became *"the ruleset forecloses every shape that names the handle"*: a claim the tooling does not
+support is worse than a smaller true one, because the next person needing an escape hatch finds it
+and concludes the rule was decorative.
 
 ### The scope of the rule
 
@@ -120,15 +113,15 @@ that reading, and the reading is better than the one it replaced.**
 
 **Good.** The system's most important invariant acquires a **compile-time** guard exactly where no
 behavioural test can help. It is free at runtime, and it composes with the layering already enforced:
-`sql-only-in-persistence` keeps the minting site inside `src/persistence`, and `domain-is-pure` means
+the SQL-confinement rule keeps the minting site inside `src/persistence`, and the purity rule means
 the policy core cannot mint one at all. The failure mode is the best available kind — a compiler error
 at the exact line, naming the exact type.
 
 **Bad, or deferred.** A cast defeats it, measured; the residue is a scan plus review, with the usual
-named gaps, and arc42 §11 carries it. A brand on a two-member string union may read as ceremony, which
-is the second time this project has paid that cost (D-01-2 is the first). It adds a type-only
-`src/application` → `src/persistence` edge — already permitted and deliberate, but one more thing to
-move if the repository port ever returns. And **it cannot be tested by the test suite that matters**:
-its evidence is a `tsc` exit code over a planted mutant, the same evidence class as
+named gaps, carried as debt. A brand on a two-member string union may read as ceremony, which is the
+second time this project has paid that cost. It adds a type-only `src/application` →
+`src/persistence` edge — already permitted and deliberate, but one more thing to move if the
+repository port ever returns. And **it cannot be tested by the test suite that matters**: its
+evidence is a `tsc` exit code over a planted mutant, the same evidence class as
 `.dependency-cruiser.js`'s planted controls, which is why the measurement is recorded rather than
 asserted.

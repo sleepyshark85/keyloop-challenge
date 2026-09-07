@@ -65,7 +65,7 @@ export type Derivation =
 /**
  * The two verdicts that are the SYSTEM's fault rather than the client's: a dealership whose
  * `time_zone` does not resolve and one whose `opens_at` does not parse. Both become
- * `500 /problems/internal` (OQ-02-2, closed) — a `4xx` would tell a service advisor to correct
+ * `500 /problems/internal` (OQ-02-2, closed) — a `4xx` would tell the caller to correct
  * something they did not send and cannot see.
  */
 function isBrokenReferenceData(verdict: OpeningHoursVerdict): boolean {

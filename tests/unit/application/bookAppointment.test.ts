@@ -725,7 +725,7 @@ describe('bookAppointment — the reference taxonomy', () => {
 
   it('ZERO BAYS is reference-data-invalid — a 500, and the OTHER half of the same ruling', async () => {
     // A dealership with no bays cannot perform ANY service. That is a mis-seeded dealership and
-    // the system's fault, so a 422 would tell a service advisor to correct something they did
+    // the system's fault, so a 422 would tell the caller to correct something they did
     // not send and cannot see. The two empty cases are different failures and collapsing them
     // was the design defect ruled at step 2.
     const { db } = scriptedDb(bookingScript({ bays: [], technicians: ['tech-0'], attempts: [] }));

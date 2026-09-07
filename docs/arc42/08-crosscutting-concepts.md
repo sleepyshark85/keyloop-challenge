@@ -511,7 +511,7 @@ Four deliberate choices in that table:
 - **The `500` row is reachable, and it is not only a fallback.** Four reference-data faults route to
   it — a dealership whose `time_zone` does not resolve, one whose `opens_at` does not parse, one with
   no service bays, and a candidate refused by a composite foreign key — as does a `40P01` (ADR-0030: a
-  path locked less than it wrote). A `4xx` would tell a service advisor to correct something they did not send and
+  path locked less than it wrote). A `4xx` would tell the caller to correct something they did not send and
   cannot see, so the body says nothing actionable and the detail goes to the log. **The residual is
   an invariant rather than this row: every response with status ≥ 400 is `problem+json` carrying a
   `type` from the closed set** — asserted ∀responses ∃row over a hostile corpus, the direction that

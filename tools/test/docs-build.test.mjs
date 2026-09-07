@@ -63,12 +63,14 @@ function makeFixture() {
     '# 11. Risks and technical debt\n\n> Owner: architect\n\nDebt is derived.\n\n'
     + '<!-- generated:debt-register -->\n<!-- /generated:debt-register -->\n');
 
-  const adrFile = (id, title, status) =>
+  const adrFile = (id, title, status, extra = '') =>
     writeFileSync(join(adr, `${id}-${title.toLowerCase().replace(/\W+/g, '-')}.md`),
-      `---\nid: "${id}"\ntitle: ${title}\nstatus: ${status}\nsupersedes: null\n---\n\n## Decision\n`);
+      `---\nid: "${id}"\ntitle: ${title}\nstatus: ${status}\n${extra || 'supersedes: null\n'}---\n\n## Decision\n`);
 
-  adrFile('0002', 'Second decision', 'accepted');   // deliberately out of order
+  adrFile('0002', 'Second decision', 'accepted', 'supersedes: null\nsuperseded_by: "0004"\n');   // deliberately out of order
   adrFile('0001', 'First decision', 'accepted');
+  adrFile('0004', 'Replacement decision', 'accepted', 'supersedes: "0002"\n');
+  adrFile('0005', 'Flipped decision', 'superseded', 'supersedes: null\nsuperseded_by: "0004"\n');
   adrFile('0003', 'A deferred idea', 'proposed');   // must reach the debt register
   writeFileSync(join(adr, '_template.md'), '---\nid: "NNNN"\n---\n');  // must be ignored
 
@@ -143,6 +145,31 @@ check('↩ §9 source carries the ADR table, not just the assembly',
   s09.includes('0001-first-decision.md') && s09.includes('| ADR |'));
 check('§9 table is inside the markers',
   /<!-- generated:adr-index -->[\s\S]*0001[\s\S]*<!-- \/generated:adr-index -->/.test(s09));
+
+// A-R-4 ↩. The index rendered `supersedes` and not `superseded_by`, so a SUPERSEDED
+// record's own row said nothing. ADR-0034 superseding ADR-0002 was the first
+// supersession this project ever had, which is why the gap survived nine slices: a
+// reader scanning §9 would have found the withdrawn decision reading `accepted` with an
+// empty Supersedes cell and no sign it had been withdrawn.
+//
+// The fix is in the RENDERER, not the record. `status: accepted` stays true — the
+// decision WAS accepted, and an ADR that stops saying so has lost the history §4 exists
+// to protect. What was wrong is that one cell could not carry both facts.
+check('a superseded ADR says so in its own row, not only in its successor\'s',
+  /0002[^\n]*accepted · superseded by 0004/.test(s09),
+  (s09.split('\n').find((l) => l.includes('0002')) ?? 'no 0002 row'));
+check('...and the successor still shows what it supersedes, so it reads both ways',
+  /Replacement decision[^\n]*\|\s*accepted\s*\|\s*0002\s*\|/.test(s09),
+  (s09.split('\n').find((l) => l.includes('Replacement')) ?? 'no successor row'));
+// And once `status: superseded` says the word itself, the cell must not stutter.
+check('...a flipped status reads "superseded by N", not "superseded · superseded by N"',
+  /Flipped[^\n]*\|\s*superseded by 0004\s*\|/.test(s09)
+    && !/superseded · superseded/.test(s09),
+  (s09.split('\n').find((l) => l.includes('Flipped')) ?? 'no flipped row'));
+
+check('...and an ADR with no supersession is unchanged',
+  /0001[^\n]*\|\s*accepted\s*\|\s*—\s*\|/.test(s09),
+  (s09.split('\n').find((l) => l.includes('0001')) ?? 'no 0001 row'));
 check('ADRs are sorted by id despite filesystem order',
   s09.indexOf('0001-') < s09.indexOf('0002-'));
 check('the ADR template is not indexed', !s09.includes('_template'));

@@ -86,8 +86,8 @@ function isValidationError(error: FastifyError): boolean {
  * `content-type: application/json` with no body raises `FST_ERR_CTP_EMPTY_JSON_BODY`, and with an
  * unparseable body `FST_ERR_CTP_INVALID_JSON_BODY`. Both carry `statusCode: 400`; NEITHER sets
  * `validation`. So both missed the arm above and fell to the catch-all — `500 /problems/internal`,
- * live on the already-merged booking route. §8.6 justifies its `500` row with *"a 4xx would tell a
- * service advisor to correct something they did not send and cannot see"*, and here the client
+ * live on the already-merged booking route. §8.6 justifies its `500` row with *"a 4xx would tell
+ * the caller to correct something they did not send and cannot see"*, and here the client
  * sent exactly that, can see it, and can correct it. The row was inverted, not missing: this maps
  * to the `/problems/malformed-request` that already exists, and the taxonomy gains nothing.
  *

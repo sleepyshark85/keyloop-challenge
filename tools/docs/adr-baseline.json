@@ -190,7 +190,7 @@
    "Good, because a doomed request skips the opening-hours derivation",
    "Good, because one statement still does the writing",
    "Good, because one statement's output decides both, unambiguously",
-   "Option A \u2014 guarded UPDATE, plus a follow-up read on zero rows. §6.3 as designed.",
+   "Option A \u2014 guarded UPDATE, plus a follow-up read on zero rows. \u00a76.3 as designed.",
    "Option B \u2014 unguarded UPDATE, the status guard moved into the SET, slice 05's CASE",
    "Option C \u2014 the read decides existence; the guarded UPDATE decides legality. Chosen.",
    "Option D \u2014 Option C, and the read short-circuits on cancelled too."
@@ -205,5 +205,22 @@
    "Option D \u2014 Lock the whole dealership for a move"
   ],
   "decision": "Chosen option: C. A write acquires a pgadvisoryxactlock for every resource it is in"
+ },
+ "0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md": {
+  "options": [
+   "Bad, because it builds an identity provider for a client that is deliberately stubbed",
+   "Bad, because it is exactly as unlicensed as A: the brief chooses neither",
+   "Bad, because it narrows the product for a gain no test can see",
+   "Bad, because one shared credential authenticates nobody in particular, so ownership stays",
+   "Bad, because the brief does not license it, while a corpus that says the term eighty-five ",
+   "Good, because a named actor makes \"no authentication\" feel obviously safe",
+   "Good, because it is the only reading under which the service is safe on its own",
+   "Good, because the contract would then publish a security scheme",
+   "Option A \u2014 keep the reading. The caller is dealership staff, and no authentication follows",
+   "Option B \u2014 take the other reading. The caller is the vehicle owner; identity arrives with ",
+   "Option C \u2014 name no role. The caller is a user, and the trust decision rests on the stubbed",
+   "Option D \u2014 Option C, plus a shared API key on the boundary."
+  ],
+  "decision": "Chosen option: C."
  }
 }

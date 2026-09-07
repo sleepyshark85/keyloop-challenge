@@ -66,7 +66,7 @@ superseded by a later one that references it. Each carries `proposed-by`, `decid
 without taking anyone's word for it.
 
 - [**ADR-0001**](adr/0001-validate-dealership-opening-hours.md) — Validate dealership opening hours, do not model technician shifts *(accepted)*
-- [**ADR-0002**](adr/0002-service-advisor-actor-no-authentication.md) — Treat the service advisor as the actor and leave authentication out of scope *(accepted)*
+- [**ADR-0002**](adr/0002-service-advisor-actor-no-authentication.md) — Treat the service advisor as the actor and leave authentication out of scope *(superseded)*
 - [**ADR-0003**](adr/0003-cancellation-and-rescheduling-in-scope.md) — Support cancellation and rescheduling, and move an appointment with one atomic UPDATE *(accepted)*
 - [**ADR-0004**](adr/0004-retry-across-remaining-candidates.md) — On exclusion violation, try the next candidate and refuse only when the list is exhausted *(accepted)*
 - [**ADR-0005**](adr/0005-fastify-with-typebox-schemas.md) — Use Fastify with TypeBox route schemas, and generate the OpenAPI document from them *(accepted)*
@@ -81,6 +81,7 @@ without taking anyone's word for it.
 - [**ADR-0024**](adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md) — The error taxonomy's residual is a property, not a row *(accepted)*
 - [**ADR-0025**](adr/0025-existence-is-the-reads-legality-is-the-statements.md) — Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE *(accepted)*
 - [**ADR-0030**](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) — A move locks the pair it leaves as well as the pair it takes *(accepted)*
+- [**ADR-0034**](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) — The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed *(accepted)*
 
 ---
 

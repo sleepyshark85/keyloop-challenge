@@ -221,7 +221,7 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
           `AC-9 — an unknown ${reference}\n${describeScenario(scenario)}`,
         );
         // `reference` is what makes the row usable by a client: four failures share one
-        // `type`, and without the member a service advisor is told only that "something" was
+        // `type`, and without the member the caller is told only that "something" was
         // unknown.
         expect(
           member(answer, 'reference'),
@@ -400,7 +400,7 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
       endsAt: at(60),
     });
     // T-02-4's route to the `500`: broken reference data, which is the SYSTEM's fault and so
-    // `/problems/internal` rather than a `4xx` telling a service advisor to correct something
+    // `/problems/internal` rather than a `4xx` telling the caller to correct something
     // they did not send and cannot see (design §2.7, OQ-02-2 closed).
     const brokenZone = await seedScenario(client, 'tax-total-zone', {
       bays: 1,
@@ -529,7 +529,7 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
    * `server.ts`'s `400` arm keys on `validation !== undefined`, so both miss it and fall to the
    * catch-all: `500 /problems/internal`, TODAY, on the already-merged booking route.
    *
-   * §8.6 justifies its `500` row with "a 4xx would tell a service advisor to correct something
+   * §8.6 justifies its `500` row with "a 4xx would tell the caller to correct something
    * they did not send and cannot see". Here the client sent exactly that, can see it, and can
    * correct it. The row is inverted, and AC-5 is the ruling: both codes map to the EXISTING
    * `400 /problems/malformed-request`. No new status, no new type, no new `Problem` member —

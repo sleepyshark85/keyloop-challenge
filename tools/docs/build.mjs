@@ -46,11 +46,38 @@ const adrList = existsSync(ADR)
       .sort((a, b) => String(a.id).localeCompare(String(b.id)))
   : [];
 
+/**
+ * SUPERSESSION IS VISIBLE FROM BOTH ENDS, OR IT IS NOT VISIBLE — A-R-4.
+ *
+ * This table rendered `supersedes` and not `superseded_by`, so a superseded record's own
+ * row said nothing. ADR-0034 superseded ADR-0002 on 2026-09-07 — the first supersession
+ * this project has ever had, which is why the gap survived nine slices — and ADR-0002's
+ * row still read `accepted` with an empty Supersedes cell. A reader scanning §9 for what
+ * the system decided would have found the withdrawn reading and no sign it was withdrawn.
+ *
+ * The architect set `superseded_by` and declined to touch `status`, correctly: only one
+ * field was authorised, and flipping a status is a second decision. THE FIX BELONGS HERE
+ * RATHER THAN IN THE RECORD. `status: accepted` is true — the decision WAS accepted, and
+ * an ADR that stops saying so has lost its history, which is the whole thing §4 protects.
+ * What was wrong is that the INDEX could not show both facts at once.
+ *
+ * So the status cell now carries the supersession beside the status rather than instead of
+ * it, and the column reads both ways.
+ */
+const supersessionOf = (a) => {
+  if (!a.superseded_by) return a.status ?? '';
+  // `status: superseded` already says the word, so appending it again reads as a stutter.
+  // A record whose status has NOT been flipped still needs the fact carried beside it.
+  return a.status === 'superseded'
+    ? `superseded by ${a.superseded_by}`
+    : `${a.status ?? ''} · superseded by ${a.superseded_by}`;
+};
+
 // Paths are written relative to docs/arc42/, where these tables live.
 const adrTable = adrList.length
   ? ['| ADR | Title | Status | Supersedes |', '|---|---|---|---|',
      ...adrList.map((a) =>
-       `| [${a.id}](../${ADR_REL}/${a.file}) | ${a.title ?? ''} | ${a.status ?? ''} | ${a.supersedes ?? '—'} |`)].join('\n')
+       `| [${a.id}](../${ADR_REL}/${a.file}) | ${a.title ?? ''} | ${supersessionOf(a)} | ${a.supersedes ?? '—'} |`)].join('\n')
   : '_No decisions recorded yet._';
 
 // AB-01-7. The register has TWO sources, and for a long time it claimed two and read
