@@ -52,11 +52,18 @@ export const VEHICLE_OWNERSHIP_CONSTRAINT = 'appointment_vehicle_owned_by_custom
  * resource for a constraint nobody has seen is how the metric ADR-0009 depends on starts lying —
  * and `0003_appointment.sql` says outright that the names are behaviour, so a rename is a
  * behaviour change and must show up as one.
+ *
+ * A `Map`, not a `Record`/object literal — R-07-7. `constraint` is a driver-supplied string read
+ * off `unknown`, and an object literal's lookup by bracket notation resolves a key like
+ * `'constructor'` to `Object.prototype.constructor` rather than to `undefined`, minting
+ * `resource: <the Object constructor>` for a name this migration never defined. A `Map` has no
+ * prototype chain to walk, so that key space does not exist to be reached — the bad state is
+ * unrepresentable rather than guarded against, the same habit §2.1 already asks of the insert.
  */
-const RESOURCE_BY_CONSTRAINT: Readonly<Record<string, 'bay' | 'technician'>> = {
-  no_bay_overlap: 'bay',
-  no_technician_overlap: 'technician',
-};
+const RESOURCE_BY_CONSTRAINT = new Map<string, 'bay' | 'technician'>([
+  ['no_bay_overlap', 'bay'],
+  ['no_technician_overlap', 'technician'],
+]);
 
 /** SQLSTATEs this classifier recognises. Only those MEASURED to reach this path (design §5.1). */
 const EXCLUSION_VIOLATION = '23P01';
@@ -88,8 +95,12 @@ function fieldsOf(error: unknown): { code?: string; constraint?: string } {
  * `40P01` is `no-verdict` and `no-verdict` is `40P01` ALONE. It carries no constraint, no
  * resource and no cause, because a deadlock reports none — and that absence is the point. It is
  * the one variant a capacity refusal cannot be built from, which is ADR-0016 doing its job at the
- * moment it was most likely to be argued around: under ADR-0018's locks a deadlock can only mean
- * a write path skipped them, so it is an internal fault and not contention.
+ * moment it was most likely to be argued around: under ADR-0018/ADR-0030's locks a deadlock can
+ * only mean some write path did not lock every resource it was in flight against — its own pair,
+ * and, where it also vacates one (a move past attempt 1), that pair too — so it is an internal
+ * fault and not contention. (ADR-0018 alone was not sufficient for this: a move is in flight
+ * against two pairs at once, and locking only one of them still deadlocks — measured at slice 07,
+ * ADR-0030.)
  *
  * `40001` (serialization_failure) is deliberately NOT included: at READ COMMITTED it cannot arise
  * here, and adding an unmeasured SQLSTATE to the one classifier this design calls total is how a
@@ -101,7 +112,7 @@ export function classify(error: unknown): PgOutcome {
   if (code === DEADLOCK_DETECTED) return { kind: 'no-verdict' };
 
   if (code === EXCLUSION_VIOLATION && constraint !== undefined) {
-    const resource = RESOURCE_BY_CONSTRAINT[constraint];
+    const resource = RESOURCE_BY_CONSTRAINT.get(constraint);
     if (resource !== undefined) {
       return { kind: 'conflict', resource: resource as ContendedResource, constraint };
     }

@@ -18,9 +18,7 @@ real and consciously not fixed under §6 **(b)**.
 | The lock carries the transaction it was taken on | [ADR-0028](../adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | proposed — not yet agreed |
 <!-- /generated:debt-register -->
 
-**A row states what is owed, never that anything is correct.** A `proposed` row leaves when the human
-rules, an *agreed and unbuilt* one when its slice reaches `done`; a merge moves neither, and what is
-live in `main` meanwhile is behaviour, recorded where the behaviour is described.
+**A row states what is owed, never that anything is correct.**
 
 ### The cost of the literal AC-6 ruling — slice 01
 
@@ -46,8 +44,7 @@ QS-12 defines `duration-arithmetic` as a *concept* against an open spelling set.
 | any computed form | `Math.pow(10, 3)` | gap |
 | a quantity whose name says neither minutes nor seconds | `elapsed * 1000` | **deliberate** — scoping by the quantity's name keeps `kilobytes * 1000` out; widening trades a gap for false positives |
 
-The first three are gaps, not licences: a spelling not listed is a finding to raise. §8.5 describes
-the matching hole one level up.
+A spelling not listed is a finding to raise; §8.5 has the matching hole one level up.
 
 ### What the domain tests still do not evidence
 
@@ -69,7 +66,7 @@ Two advisory locks now precede every `INSERT` on the booking path (§6.1), and t
 | id | The cost |
 |---|---|
 | **D-02-1** | **ADR-0018 weakens ADR-0016's argument, as ADR-0016's own Consequences record**: inside a per-resource lock a reintroduced check-then-act would be *correct* rather than merely harmless. What survives is the brand, the `appointment-table-access` marker and §6.1's fourth cell — twenty overlapping rows land under perfect mutual exclusion over the bay |
-| **F-02-9** | **Every write path that leaves a row *inside* the constraints' scope must take both locks, in the bay-then-technician order** — narrowed to that *iff* by ADR-0023 at slice 05, and scoped to the transaction rather than the statement. A path that skips them reintroduces the deadlock against a concurrent booking, and a `40P01` being deliberately unretried it surfaces as a `500`, not a latency blip. **ADR-0026 makes it structural for the two writes inside the scope** — the lock is a required parameter — leaving slice 07's paths, and the transaction-identity hole ADR-0028 would close |
+| **F-02-9** | **Discharged at slice 07 — by measurement *and* by two fixes.** *Take both locks* was necessary and not sufficient: a write must lock **every resource it is in flight against** (ADR-0030; 11.7 % of contended moves deadlocked without it), computed from a read inside its own transaction, ADR-0030 alone having left the move path violable until `da68d67` (ADR-0031). ADR-0026 keeps the rule structural; ADR-0028's transaction-identity hole stays open |
 | **F-02-8** | `hashtext` is an **undocumented internal function**; ADR-0018 needs only a deterministic `int4` per id, so an application-side hash would serve. Cheap and unowned |
 
 ### The cost of slice 05
@@ -92,6 +89,12 @@ OQ-05-2 stays slice 09's.
 | **F-06-1** | Two attempt loops, one design; extraction deferred to slice 09, which instruments both anyway |
 | **D-06-4** | A `rescheduleAppointment.ts` docblock cites I-02-6 for a principle it does not hold; ADR-0029 does. D-05-1's shape: `src/` is not the architect's to edit |
 
+### The cost of slice 07
+
+| id | The cost |
+|---|---|
+| **D-07-1** | **A saturated pool answers `500`, and nobody decided that.** `createPool` sets no `max`, so `pg`'s default 10 stands by omission, and `CONNECTION_TIMEOUT_MS` also bounds queue waits — one timer doing two jobs. Saturation is a capacity fault and `503` its answer (§8.6). **Slice 09**, where capacity is measured — and AC-4's racer bound is a literal copy of that 10, so it breaks with it |
+
 ## 11.2 Known risks
 
 Ordered by the cost of being wrong, not by likelihood.
@@ -100,7 +103,7 @@ Ordered by the cost of being wrong, not by likelihood.
 
 §1.2 ranks integrity first and performance last with the cost stated, and this is it. Two limits are
 confused. **Per contended key**, conflicting inserts serialise — since ADR-0018 on the advisory
-lock, at three round trips per attempt (§6.1) — but only one can succeed, so what it caps is how fast
+lock, at three round trips per attempt, four for a contended move (§6.1, §6.3) — but only one can succeed, so what it caps is how fast
 losers are told *no*. **In aggregate**, every insert maintains two partial GiST indexes, materially
 costlier than a btree: low thousands of inserts per second on modest hardware. Against §1.1's load
 profile, two orders of magnitude of headroom in aggregate and about five on the contended path.
@@ -123,7 +126,7 @@ code, against §2.1.
 | id | The coupling | What holds it, and what does not |
 |---|---|---|
 | R-3 | **The constraint names are behaviour, not documentation.** ADR-0009 prunes from `err.constraint` and §8.4 labels `booking_conflicts_total{resource}` from it | Renaming `no_bay_overlap` degrades the retry loop to a multiplicative bound and mislabels the metric — without failing to compile or looking wrong in a single-threaded test. QS-1 and QS-2 assert the names; nothing else does |
-| R-4 | **The attempt cap refuses while capacity exists, and this row said the opposite until slice 04 (D-04-1).** ADR-0004 accepted a residual refusal as a liveness guard; ADR-0009 set the cap at 16 | ADR-0009 set the cap **below the bound its own Bound-2 paragraph computed** — `\|bays\| + \|technicians\| − 1`, which at §1.1 scale exceeds 16 either way. So *"a non-zero `capped` counter means the cap is wrong"* is already false: it is expected. Slice 09's **AC-13** is the sibling that cannot pass until this closes. Two remedies, neither chosen: the pre-filter after slice 08's QS-8, or a cap above the bound. The number is ADR-0009's and human-decided |
+| R-4 | **The attempt cap refuses while capacity exists (D-04-1).** ADR-0004 accepted a residual refusal as a liveness guard; ADR-0009 set the cap at 16 | ADR-0009 set the cap **below the bound its own Bound-2 paragraph computed** — `\|bays\| + \|technicians\| − 1`, which at §1.1 scale exceeds 16 either way. So *"a non-zero `capped` counter means the cap is wrong"* is already false: it is expected. Slice 09's **AC-13** is the sibling that cannot pass until this closes. Two remedies, neither chosen: the pre-filter after slice 08's QS-8, or a cap above the bound. The number is ADR-0009's and human-decided |
 | D-04-2 | **ADR-0020's cap placement is a rule about where a `return` goes**, stated only by `tsc` | No test can help: a refusal minted in the arm and one cast outside it render identically (ADR-0020) |
 | R-5 | **The exclusion constraint's range expression and the availability query's are one idea in two files** | §4.2 records why a shared `IMMUTABLE` SQL function cannot hold them together; QS-8 is load-bearing, and weakening it leaves no other signal |
 | R-6 | **The `Database` interface can drift from the migrations.** ADR-0006 keeps schema types in `schema.ts` and the schema in `.sql` | Nothing, until a CI check regenerates from a migrated database and diffs. Until then a migration merged without a matching type edit compiles and is wrong |
@@ -137,7 +140,7 @@ code, against §2.1.
 | R-7c | `src/platform` is importable-by-all and imports nothing, exactly the shape of a junk drawer | The leaf rule stops it acquiring behaviour, not contents |
 | R-7d | Down migrations are exercised by no test (ADR-0007); the corpus was reversed once by hand on 2026-09-04 — a dated measurement, not a guarantee | A fresh container each deployment; rollback in anger is not a story this system has |
 | R-7e | **The transaction boundary must be exactly one attempt wide**, enforced by nothing structural. Wider and the second attempt fails `25P02` instead of retrying; narrower and `pg_advisory_xact_lock` has no transaction to scope to | QS-3 fails immediately on the first; the second does not compile, both calls taking the same handle |
-| R-7i | `exclusion-constraint-adjudicates.test.ts` phases 1–3 measure simultaneity without asserting it; their verdicts hold for sequential inserts too. Phase 4 asserts it, discriminating by **one unit** — the mutant releasing the locks before the write is caught at 2 against 1 | Ruled adequate at slice 05: an equality at the boundary is the tightest assertion available, and asserting a nondeterministic value trades evidence for flake. The residual: a control silently ceasing to discriminate |
+| R-7i | `exclusion-constraint-adjudicates.test.ts` phases 1–3 measure simultaneity without asserting it; their verdicts hold for sequential inserts too. Phase 4 asserts it, discriminating by **one unit** — the mutant releasing the locks before the write is caught at 2 against 1 | Ruled adequate at slice 05: an equality at the boundary is the tightest assertion available, and asserting a nondeterministic value trades evidence for flake. The residual: a control silently ceasing to discriminate. **Slice 07's is worse** — AC-5's corrected instrument was never observed failing, the control being run by hand at review |
 | R-7h | The RFC 3339 request pattern is a regex, so `2026-02-30T10:00:00Z` is accepted and `Date.parse` yields 2 March | Fixing it needs a leap-year calculation in `src/http` — the second calendar implementation slice 01 ruled against. **OQ-02-1** carries the trade |
 | R-7g | Case 0's constraint-set assertion filters `contype <> 'p'`, but **PostgreSQL 18 surfaces `NOT NULL` as `contype = 'n'`** — twelve extra rows on `appointment`. The fix is an allowlist, `contype IN ('c','f','u','x')` | Cannot fail today: the image is pinned and `postgres-harness.test.ts` asserts `^16\.`. **The direction of the failure is the finding** — a denylist breaks with a dozen names nobody added, so a version bump reads as *"too strict"* and invites loosening §8.1's seven-and-only-seven |
 
@@ -159,8 +162,7 @@ by a low score, which is luck**: a broken runner producing 0.81 against a 0.75 t
 every check `slice:check` makes. **Slice 06 supplied the second instance**: a `Stryker restore all`
 the instrumenter never reads, ignoring 93 mutants where 8 were ruled, behind a green gate. The remedy
 is §5.3's — assert **inside the thing that produces the pass**: a `mutation.json` check on
-`testsCompleted` and on the ignored count. Until then a reviewer reads the
-survivor list, which is not a mechanism.
+`testsCompleted` and on the ignored count.
 
 **And it is blind to `src/main.ts` by construction.** `vitest.mutation.config.ts` includes
 `tests/unit/**` only and `main.ts` is unimportable by a unit test, so every line there is guarded by an
@@ -226,5 +228,5 @@ marked **†** or a Gate A ruling.
 | **High availability, backup, recovery** (§3.3) | One container. A lost volume is a lost schedule | Ordinary PostgreSQL operations; the application is stateless (§7.1) |
 | **Vehicle-dependent durations (A-1), buffers (A-4), search-style booking (A-5)** | The three most likely real-world corrections | The first two are one domain function plus one migration each, by construction (ADR-0008, QS-12). A-5 turns the advisory read into something that drives allocation, and is materially larger |
 | **Reference-data management** (A-7) | Bays, technicians and opening hours change only by migration | Conventional CRUD, no interesting risk |
-| **Waitlists, overbooking, priority jobs** (§3.3) | No scheduling policy beyond first-come-first-served | Policy is where a real scheduler earns its keep, and needs a real dealership's data. ADR-0009's Order-D is the first honest step |
+| **Waitlists, overbooking, priority jobs** (§3.3) | No scheduling policy beyond first-come-first-served | Policy is where a real scheduler earns its keep; ADR-0009's Order-D is the first honest step |
 | **GDPR-grade PII handling** (§3.3) | Customer names are stored; logs carry ids only (§8.4), a mitigation rather than a policy | Retention, subject access and erasure, the last interacting with the history table above |

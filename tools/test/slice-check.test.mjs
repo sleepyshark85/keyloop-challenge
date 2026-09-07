@@ -68,12 +68,16 @@ const mutationRun = (over) => ({
  */
 const git = (dir, args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
 
-const build = (events, { commits = [], slice = SLICE, branch = null } = {}) => {
+const build = (events, { commits = [], slice = SLICE, branch = null, prompts = [] } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'slice-check-'));
   mkdirSync(join(dir, 'docs/team-log'), { recursive: true });
   mkdirSync(join(dir, 'docs/slices'), { recursive: true });
   mkdirSync(join(dir, 'docs/arc42'), { recursive: true });
   writeFileSync(join(dir, 'docs/slices/77-fixture.md'), slice, 'utf8');
+  if (prompts.length) {
+    mkdirSync(join(dir, 'docs/team-log/prompts'), { recursive: true });
+    for (const f of prompts) writeFileSync(join(dir, 'docs/team-log/prompts', f), '# prompt\n', 'utf8');
+  }
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf8');
 
   git(dir, ['init', '-q', '-b', 'main']);
@@ -405,6 +409,53 @@ const MARKED = '# 9\n\n<!-- generated:adr-index -->\nold\n<!-- /generated:adr-in
     row(run([ciRun(), raise('R-77-4'), { ts: '2026-01-01T04:00:00Z', slice: '77',
       event: 'review.response', source: 'reported', finding_ref: 'R-77-4', resolution: 'fixed' }]),
       'findings ruled').startsWith('PASS'));
+}
+
+// --------------------------------------------- O-44: every dispatch reached the log --
+//
+// At slice 06 a role dispatched another role directly. The ruling was (a), so nothing was
+// lost — but had it been (c), a loopback would have been due and the max-2 governor would
+// not have counted it, because the governor is worth exactly what the log is.
+//
+// The reconciliation runs ONE WAY on purpose, and the asymmetry is the interesting half:
+// every capture needs an event, but events without captures are normal — `SendMessage`
+// resumes an agent from its transcript and produces an `agent.finish` with no new prompt.
+{
+  const agent = (actor, n) => ({
+    ts: '2026-01-01T00:00:00Z', event: 'agent.finish', source: 'derived', slice: '77',
+    actor, outcome: 'completed', span_id: `s-77-${actor}-${n}`,
+  });
+
+  const a = run([agent('architect', 1)], { prompts: ['s77-architect-1.md'] });
+  ok('a capture with a matching agent event passes',
+    /PASS.*every dispatch reached the log/.test(row(a, 'every dispatch reached the log')), row(a, 'every dispatch'));
+
+  const b = run([agent('architect', 1)], { prompts: ['s77-architect-1.md', 's77-implementer-2.md'] });
+  ok('a capture with NO agent event fails — the self-dispatch case',
+    /FAIL/.test(row(b, 'every dispatch reached the log')));
+  ok('...and it names the file, so the run can be found',
+    /s77-implementer-2\.md/.test(row(b, 'every dispatch reached the log')));
+
+  // MUST NOT FIRE. Four of slice 06's eighteen agent events were SendMessage resumes with
+  // no prompt of their own; failing those would punish the cheap way to continue an agent.
+  const c = run([agent('implementer', 1), agent('implementer', 2), agent('implementer', 3)],
+    { prompts: ['s77-implementer-1.md'] });
+  ok('events without captures are resumes, not failures',
+    /PASS/.test(row(c, 'every dispatch reached the log')));
+
+  // A `.report.md` is the RESULT of a run, not a dispatch — counting it would demand an
+  // event per report and slice 05 has two reports for one prompt.
+  const d = run([agent('architect', 1)],
+    { prompts: ['s77-architect-1.md', 's77-architect-1.report.md', 's77-architect-1.report.2.md'] });
+  ok('a report capture is not a dispatch', /PASS/.test(row(d, 'every dispatch reached the log')));
+
+  const e = run([agent('architect', 1)], { prompts: ['s06-architect-9.md'] });
+  ok('another slice\'s captures are not this slice\'s problem',
+    /N\/A|PASS/.test(row(e, 'every dispatch reached the log')), row(e, 'every dispatch'));
+
+  const f = run([agent('architect', 1)], {});
+  ok('no captures at all is N/A, not a pass and not a failure',
+    /N\/A/.test(row(f, 'every dispatch reached the log')));
 }
 
 console.log(`\n${pass}/${pass + fail} passed`);

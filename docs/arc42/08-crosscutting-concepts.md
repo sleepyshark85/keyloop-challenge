@@ -510,13 +510,12 @@ Four deliberate choices in that table:
   quietly harmonised; changing it means superseding the ADR.
 - **The `500` row is reachable, and it is not only a fallback.** Four reference-data faults route to
   it — a dealership whose `time_zone` does not resolve, one whose `opens_at` does not parse, one with
-  no service bays, and a candidate refused by a composite foreign key — as does a `40P01` under
-  ADR-0018's locks. A `4xx` would tell a service advisor to correct something they did not send and
+  no service bays, and a candidate refused by a composite foreign key — as does a `40P01` (ADR-0030: a
+  path locked less than it wrote). A `4xx` would tell a service advisor to correct something they did not send and
   cannot see, so the body says nothing actionable and the detail goes to the log. **The residual is
   an invariant rather than this row: every response with status ≥ 400 is `problem+json` carrying a
   `type` from the closed set** — asserted ∀responses ∃row over a hostile corpus, the direction that
-  can fail (ADR-0024). `GET /nope` was the one response outside it and now answers
-  `404 /problems/route-not-found`; `content-type: application/xml` still renders
+  can fail (ADR-0024). `GET /nope` answers `404 /problems/route-not-found`; `content-type: application/xml` still renders
   `500 /problems/internal`, 415 having no row, which is the invariant holding rather than a gap.
 
 Two members of `BookOutcome` render as that row, apart for §5.2's reason. Symmetrically, a dealership with **no technician qualified for the requested

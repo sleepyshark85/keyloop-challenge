@@ -53,7 +53,7 @@ export function checkDestinations(record, sliceDir = SLICE_DIR()) {
         `deferred_to names slice ${id}, folded into ${r.resolved} (${r.slice.file}). `
         + `Name ${r.resolved}: \`inherits:\` is declared by the slice that does the work, and `
         + 'nothing declares it on a tombstone. The reasoning is probably right and only the '
-        + 'label is stale — this is the second time work has been routed to a folded slice.',
+        + 'label is stale, which is what this has been every time.',
       );
     }
   }

@@ -3,6 +3,7 @@ import {
   cancelAppointmentById,
   findAppointmentById,
   insertAppointment,
+  lockAppointmentRow,
   lockResources,
   rescheduleAppointmentById,
 } from '../../../src/persistence/appointmentRepository.js';
@@ -61,27 +62,84 @@ const RETURNED_ROW = {
   status: 'confirmed',
 };
 
-describe('lockResources — ADR-0018', () => {
-  it('is ONE statement taking both locks, bay in class 1 and technician in class 2', async () => {
-    // The classes are the whole mechanism: disjoint key spaces make bay-then-technician a total
-    // order no attempt can take in reverse, so there is no sort for anyone to keep sorted. A
-    // mutant that swaps 1 and 2 leaves the order total and is harmless; one that makes both
-    // classes the same collapses the two key spaces into one, and THAT is what this pins.
+const OTHER_BAY = 'bbbbbbbb-1111-4111-8111-111111111111';
+const OTHER_TECHNICIAN = 'tttttttt-1111-4111-8111-111111111111';
+
+describe('lockResources — ADR-0018, extended by ADR-0030', () => {
+  it('booking (leave: null) is ONE statement, DISTINCT-collapsed to the same two keys ADR-0018 always locked', async () => {
+    // `vacated = leave ?? { bayId, technicianId }` — a booking's `leave: null` folds `vacated`
+    // back onto `take`, so the four-key array carries the same pair twice and `DISTINCT`
+    // collapses it back to the two locks ADR-0018 always took, class 1 then class 2. R-07-8:
+    // what is genuinely UNCHANGED by ADR-0030 is that SET of advisory locks acquired — not the
+    // raw statement text. Slice 06 sent two parameters; this sends four (deduplicated inside
+    // SQL, never in JS), so "byte-for-byte what slice 06 sent" was never literally true of the
+    // parameter list below. No test executes the deduplicated lock set directly — it is argued
+    // from `DISTINCT`, and this test pins the statement and parameters that argument rests on.
     const { db, recorded } = scriptedDb([{ rows: [{ pg_advisory_xact_lock: null }] }]);
-    await lockResources(db, IDS.bay, IDS.technician);
+    await lockResources(db, IDS.bay, IDS.technician, null);
 
     expect(recorded).toHaveLength(1);
     const sql = (recorded[0]?.sql ?? '').replace(/\s+/g, ' ').trim();
     expect(sql).toBe(
-      'select pg_advisory_xact_lock(c, k) from unnest( array[1, 2], ' +
-        'array[hashtext($1), hashtext($2)] ) as t(c, k)',
+      'select pg_advisory_xact_lock(cl, k) from ( select distinct cl, hashtext(key) as k ' +
+        'from unnest( array[1, 2, 1, 2], array[$1, $2, $3, $4] ) as t(cl, key) ' +
+        'order by cl, hashtext(key) ) o',
     );
-    expect(recorded[0]?.parameters).toEqual([IDS.bay, IDS.technician]);
+    expect(recorded[0]?.parameters).toEqual([IDS.bay, IDS.technician, IDS.bay, IDS.technician]);
   });
 
-  it('ADR-0026 — returns a lock carrying the pair it took, not the values a caller could disagree with', async () => {
+  it('a move (leave: the incumbent pair) locks the union — up to four keys, classes repeated 1, 2, 1, 2', async () => {
+    // ADR-0030's whole mechanism: the pair the write TAKES and the pair it LEAVES both go in,
+    // in that order, and `DISTINCT ... ORDER BY (class, hashtext(key))` is what turns that into
+    // a total order rather than a coin flip between two racers who took the two pairs in
+    // opposite roles.
+    const { db, recorded } = scriptedDb([{ rows: [{}] }]);
+    await lockResources(db, IDS.bay, IDS.technician, {
+      bayId: OTHER_BAY,
+      technicianId: OTHER_TECHNICIAN,
+    });
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.parameters).toEqual([
+      IDS.bay,
+      IDS.technician,
+      OTHER_BAY,
+      OTHER_TECHNICIAN,
+    ]);
+    const sql = (recorded[0]?.sql ?? '').replace(/\s+/g, ' ').trim();
+    expect(sql).toContain('array[1, 2, 1, 2]');
+    expect(sql).toContain('distinct');
+    expect(sql).toContain('order by cl, hashtext(key)');
+  });
+
+  it('the two racers of a mutually-vacating pair send the same MULTISET of keys — necessary for the total order, not by itself what rules out a cycle (R-07-2)', async () => {
+    // Racer 1 takes P1 and leaves P2; racer 2 takes P2 and leaves P1. Neither statement sorts
+    // its own parameters in JS — the four keys arrive in call order and it is the SQL's
+    // `DISTINCT ... ORDER BY (class, hashtext(key))` that turns them into one sequence, so the
+    // only claim a unit test can pin is that both calls hand the database the SAME multiset.
+    // What that multiset does NOT by itself establish is deadlock freedom — the docblock this
+    // pins to (`lockResources`, R-07-2) names two other mechanisms this test does not exercise:
+    // the total order's own acyclicity, and ADR-0030/ADR-0031's completeness for the tuple-wait
+    // half. AC-4's own fixture is not even this symmetric case, and is protected regardless.
+    const p1 = { bayId: IDS.bay, technicianId: IDS.technician };
+    const p2 = { bayId: OTHER_BAY, technicianId: OTHER_TECHNICIAN };
+
+    const racer1 = scriptedDb([{ rows: [{}] }]);
+    await lockResources(racer1.db, p1.bayId, p1.technicianId, p2);
+    const racer2 = scriptedDb([{ rows: [{}] }]);
+    await lockResources(racer2.db, p2.bayId, p2.technicianId, p1);
+
+    const keysOf = (recorded: typeof racer1.recorded): unknown[] =>
+      [...((recorded[0]?.parameters ?? []) as unknown[])].sort();
+    expect(keysOf(racer1.recorded)).toEqual(keysOf(racer2.recorded));
+  });
+
+  it('ADR-0026 — returns a lock carrying the pair it TOOK, never the pair it left', async () => {
     const { db } = scriptedDb([{ rows: [{}] }]);
-    const lock = await lockResources(db, IDS.bay, IDS.technician);
+    const lock = await lockResources(db, IDS.bay, IDS.technician, {
+      bayId: OTHER_BAY,
+      technicianId: OTHER_TECHNICIAN,
+    });
     expect(lock).toEqual({ bayId: IDS.bay, technicianId: IDS.technician });
   });
 
@@ -90,19 +148,57 @@ describe('lockResources — ADR-0018', () => {
     // turns the retry loop into a lock accumulator and deadlocks on the second attempt. The two
     // functions differ by one word, so the word is asserted.
     const { db, recorded } = scriptedDb([{ rows: [{}] }]);
-    await lockResources(db, IDS.bay, IDS.technician);
+    await lockResources(db, IDS.bay, IDS.technician, null);
     expect(recorded[0]?.sql).toContain('pg_advisory_xact_lock');
     expect(recorded[0]?.sql).not.toMatch(/pg_advisory_lock\b/);
   });
 
   it('reads no table — the lock decides nothing (§4.5, ADR-0018)', async () => {
-    // The keys are `hashtext` of two REFERENCE ids. If this statement ever grew a read of
+    // The keys are `hashtext` of REFERENCE ids. If this statement ever grew a read of
     // `appointment` the lock would stop being liveness and start being correctness, which is
     // precisely the reading ADR-0018's two controls exist to keep true.
     const { db, recorded } = scriptedDb([{ rows: [{}] }]);
-    await lockResources(db, IDS.bay, IDS.technician);
+    await lockResources(db, IDS.bay, IDS.technician, null);
     expect(recorded[0]?.sql).not.toMatch(/appointment/i);
     expect(recorded[0]?.sql).not.toMatch(/\bselect\b[\s\S]*\bfrom\b\s+"/);
+  });
+});
+
+describe('lockAppointmentRow — ADR-0031', () => {
+  it('is a `SELECT … FOR UPDATE` reading exactly bay_id and technician_id by id', async () => {
+    const { db, recorded } = scriptedDb([
+      { rows: [{ bay_id: IDS.bay, technician_id: IDS.technician }] },
+    ]);
+    await lockAppointmentRow(db, IDS.appointment);
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.sql).toBe(
+      'select "bay_id", "technician_id" from "appointment" where "id" = $1 for update',
+    );
+    expect(recorded[0]?.parameters).toEqual([IDS.appointment]);
+  });
+
+  it('maps the row to a ResourcePair, camelCased', async () => {
+    const { db } = scriptedDb([{ rows: [{ bay_id: IDS.bay, technician_id: IDS.technician }] }]);
+    const pair = await lockAppointmentRow(db, IDS.appointment);
+    expect(pair).toEqual({ bayId: IDS.bay, technicianId: IDS.technician });
+  });
+
+  it('returns the pair the DATABASE holds NOW, not a value the caller already had', async () => {
+    // The whole point of ADR-0031: whatever this statement returns is what `lockResources`
+    // locks against, so a row relocated underneath a stale caller-held value is exactly what
+    // a fresh read here corrects.
+    const { db } = scriptedDb([{ rows: [{ bay_id: OTHER_BAY, technician_id: OTHER_TECHNICIAN }] }]);
+    const pair = await lockAppointmentRow(db, IDS.appointment);
+    expect(pair).toEqual({ bayId: OTHER_BAY, technicianId: OTHER_TECHNICIAN });
+  });
+
+  it('throws rather than returning null on zero rows — the read is TOTAL (ADR-0003: ids are minted, rows are never deleted)', async () => {
+    // `executeTakeFirstOrThrow`, deliberately, not `| null`: an id this function is called
+    // with is always the id `findAppointmentById` already found a row at, so zero rows here
+    // is unreachable rather than a case to branch on.
+    const { db } = scriptedDb([{ rows: [] }]);
+    await expect(lockAppointmentRow(db, IDS.appointment)).rejects.toBeDefined();
   });
 });
 

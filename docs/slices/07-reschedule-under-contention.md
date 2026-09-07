@@ -1,13 +1,13 @@
 ---
 id: "07"
 title: Rescheduling under contention — a refused move changes nothing, and never opens a window
-status: ready
+status: done
 depends_on: ["06"]
-arc42: ["§6.3"]
-adr: [3]
+arc42: ["§5.2", "§6.1", "§6.3", "§8.6", "§10", "§11"]
+adr: [3, 18, 23, 26, 27, 29, 30, 31]
 quality_scenarios: [QS-4, QS-5]
 inherits: ["F-02-9", "A-05-6", "A-06-3", "O-41"]   # deferred here by ruling; slice:check enforces it (A-05-5)
-loopbacks: 0
+loopbacks: 1
 ---
 
 ## Goal
@@ -23,13 +23,43 @@ every test in slice 06.
 
 - **AC-1** — Given A confirmed `[09:00, 10:00)` and the dealership fully booked at `[11:00, 12:00)`,
   when A is rescheduled to 11:00, then the request is refused **and** A is still `confirmed` at
-  `[09:00, 10:00)` with the same id, bay and technician. Asserted by reading the row, not the
-  response. *(QS-4)*
+  `[09:00, 10:00)` with the same id, bay and technician, **and the same `xmin` and `ctid`**.
+  Asserted by reading the row, not the response. *(QS-4)*
+  <br>`xmin` was added at step 1 and it is what makes *"unchanged"* mean **not written** rather than
+  *no column differs*: a compensating cancel-then-restore passes column equality and fails this,
+  `xmin` is not forgeable by application code, and an aborted attempt correctly leaves it untouched.
 - **AC-2** — Given A holds the only bay at `[09:00, 10:00)`, when a reschedule of A to a fully-booked
-  interval races *N* fresh bookings for `[09:00, 10:00)`, then **no fresh booking is ever confirmed**
-  — at every moment, under every interleaving, A's slot is occupied. *(QS-5)*
+  interval races *N* fresh bookings for `[09:00, 10:00)` **from a recorded seed**, then **no fresh
+  booking is ever confirmed** — at every moment, under every interleaving, A's slot is occupied.
+  *(QS-5)*
 - **AC-3** — Given the racing scenario of AC-2, when it is run repeatedly with recorded seeds, then
   the result is stable across runs and a failure names the seed that produced it.
+- **AC-4** — *(added at step 1; amended at step 5 under R-07-4)* Given A and B confirmed on
+  **different** incumbent pairs, each contended at its own pair, so that each move's remaining
+  candidate is the pair the other occupies over an overlapping interval, when both are rescheduled
+  simultaneously from a barrier over **≥ 1000 contended attempts, with no more requests in flight at
+  once than the service's connection pool can serve**, then **every attempt receives a database
+  verdict — `23P01`, never `40P01`** — no response is `500`, no two confirmed rows overlap on a bay
+  or a technician, and every refused move's row is unchanged including its `xmin`. *(QS-4, QS-5;
+  ADR-0003's never-asserted claim; ADR-0030's control)*
+  <br>**The in-flight bound is not a flake dodge.** 40 racers against a 10-client pool serialises
+  the very simultaneity this criterion measures — a pair's two movers can be queued apart and never
+  race — as well as manufacturing a codeless `500` the assertion then blames on a deadlock. So
+  bounding concurrency should make the mutant control **stronger**; the unfixed-build rate is
+  re-measured at the new shape, and **if it does not rise, that falsifies the reading and must be
+  said.**
+- **AC-5** — *(added at step 5)* **The lock set is derived from state the transaction itself
+  observed.** Given a confirmed appointment at pair *P*, when a move of it is in flight between
+  `lockResources` and its `UPDATE`, then the transaction holds advisory locks on ***P* as the row
+  currently stands** — never on a pair read before the transaction opened. Asserted
+  **deterministically off `pg_locks`**, joined against `hashtext` **inside one SQL statement** so that
+  only resource ids cross into JavaScript — pulling `objid` out compares the catalogue's unsigned
+  `oid` against `hashtext`'s signed `int4`, the same bits read two ways *(corrected at step 7,
+  `R-07-13`)* — not by racing four movers into the stale interleaving: a probabilistic witness for a rule is the thing ADR-0030
+  exists to replace, and ADR-0031's claim is about *where a value is read*, which `pg_locks` reads
+  directly. *(QS-4; [ADR-0031](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md)'s control)*
+  <br>**Mutant control:** restore the pre-loop read and relocate the row between it and the attempt
+  — the transaction then holds the *old* pair's keys, which the same assertion reads.
 
 ## Inherited scope — written here, not only where it was deferred
 
@@ -59,19 +89,20 @@ every test in slice 06.
   one is refused"* mean something rather than count to one. **If either premise is false on
   arrival, say so in the PR**; that is what D-05-3 asked for.
 
-- **O-41 — the `Inherited scope` guard becomes bidirectional, and this file is where it first
-  bites.** A-05-5's check is a *subset* guard (every ref deferred here appears in `inherits:`) and
-  not a *completeness* guard: slice 06 listed five obligations in prose while three of its four
-  `inherits:` refs appeared nowhere but the front-matter line, so a silent drop would have left
-  `slice:check` green. Ruled at slice 06 step 2 with **one correction to the proposed remedy**:
-  requiring every bullet to carry a ref is false against slice 06 today, because the retired
-  `appointment.ts` bullet is a §5.2 prediction that was never a logged finding and has no ref to
-  carry — a rule demanding one would invent a false ref to satisfy a rule that exists to stop false
-  refs. So the guard runs **both ways**: every ref in `inherits:` appears in a body bullet, and
-  every body bullet carries a ref **or** an explicit no-ref-with-reason escape. Bare bullets fail;
-  escaped bullets pass and are visible. **Built at this slice's dispatch, before it reaches Ready**,
-  so a Definition-of-Ready rule first bites on a file written under it rather than on one already
-  declared ready. The tool is `tools/slice/check.mjs` and the edit is the orchestrator's.
+- **F-02-9 — the second half: ADR-0018's two locks *raced* rather than argued.** Slice 06
+  discharged its half with a stronger mechanism than the obligation asked for — `lockResources` is
+  the only minting site for a value both writes require, so *"skipped the locks"* is a compile
+  error. What it could not do is race it. Its discharge ruling surfaced one fact §3's deadlock
+  argument never stated: **on attempts ≥ 2 a move vacates its incumbent pair while holding only the
+  target pair's locks.** That is an argument today; here it meets two `UPDATE`s at once.
+
+- **O-41 — the `Inherited scope` guard, built before this slice reached Ready.** A-05-5's check was
+  a *subset* guard, not a *completeness* guard: slice 06 listed five obligations in prose while
+  three of its four `inherits:` refs appeared nowhere but the front-matter line. The guard now runs
+  **both ways**, with an explicit no-ref escape so it cannot demand an invented ref. Ruled at slice
+  06 step 2 to land at this slice's dispatch so a Definition-of-Ready rule first bites on a file
+  written under it — **it did, on this file, for `F-02-9`.** Nothing to build; the ruling and
+  `tools/slice/check.mjs` carry the reasoning.
 
 ## In scope
 

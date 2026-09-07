@@ -15,19 +15,19 @@
 
 | | |
 |---|---|
-| Last commit | `659186d docs(06): two sentences in §6 still described the table they had just changed` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 135 |
-| ADRs accepted | 24 |
+| Last commit | `6169054 chore(07): gate E approved jointly — slice 07 done` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E |
+| Agent runs recorded | 155 |
+| ADRs accepted | 26 |
 | Slices defined | 10 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Next: slice [`07`](slices/07-reschedule-under-contention.md) — Rescheduling under contention — a refused move changes nothing, and never opens a window**
+- **Next: slice [`08`](slices/08-availability-query.md) — Availability — advisory by contract, and provably in agreement with the constraint**
 - Nothing is in flight. Start at **step 1 of the slice loop**: the architect states building blocks, interfaces, the data-model delta and the applicable §10 scenarios.
-- It claims QS-4, QS-5.
-- 3 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
+- It claims QS-8.
+- 2 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
 ## Gate decisions
@@ -108,6 +108,10 @@
 
 > APPROVED BY THE ORCHESTRATOR AND THE ARCHITECT JOINTLY, under the human delegation of 2026-09-06 — you and the architect decide if the PR is good to go — which is a WIDER GRANT THAN THE gate: light RULING AND IS NOT THAT RULING: slice 06 never declared light. WHAT THIS IS NOT: no human exploratory testing was performed on any of it. EVIDENCE, all collected rather than narrated: test-first proven with red ec37a20 at 13:56 and green after, both source derived; CI run 34047340059 green on all three jobs at merge head 659186d; mutation 0.8933 aggregate AND EVERY CHANGED FILE CLEARING 0.75 ON THE PER-FILE READING the architect and reviewer ruled independently — repository 100.00, booking 96.80, reschedule 92.50, server 90.91, routes 76.13, problem 75.00; depcruise clean over both roots; arc42 reconciled across ten sections with every addition paid for by a named deletion; four inherited obligations discharged; ZERO LOOPBACKS OF A MAXIMUM TWO across one DCR ruled (a) and twenty-nine architect rulings. THE ARCHITECT WAS ASKED THE (c) QUESTION DIRECTLY and answered I CANNOT NAME ONE — no acceptance criterion, no QS, no section 2 invariant that what merged would fail — and section 6 requires exactly that naming to block. THE STRONGEST THING IN THE SLICE, in the architect words: AC-5 was found unimplementable BY TRYING TO WRITE THE STATEMENT rather than by preferring a different shape, and the amendment is stricter than what it replaced. THE WEAKEST, also its words and recorded as owed rather than closed: SLICE 06 SHIPS THE MOVE WITH ZERO CONCURRENCY EVIDENCE FOR THE MOVE — QS-4 and QS-5 are argued from statement atomicity and asserted by nothing, deferred to slice 07 as A-06-3. If slice 07 slips, that is the debt that matters. FIVE THINGS NO TEST COVERS, recorded VERBATIM AS NOT CHECKED RATHER THAN AS PASSED: QS-4 and QS-5 asserted by nothing; updated_at advancing neither asserted nor on the wire, so no human tester could see it either; OQ-06-1, a move to the same instant is a 200 that rewrites the row, ruled out of scope and a reasonable person could want a 400; ADR-0025 ruled consequence that a CANCELLED appointment moved OUT OF HOURS answers 400 outside-opening-hours rather than 409, because the domain rule runs before the status is consulted; and content-type application/xml still returning 500 rather than 415, which means a client-caused error renders as a server fault. THE TEN-MINUTE MANUAL THE ARCHITECT ASKED A HUMAN TO RUN AND NOBODY HAS: in a two-bay dealership book A and B at different times, then move A onto B interval — it should land in the OTHER BAY with a booking.conflict line, not a 409. That re-allocation path is the largest new behaviour and only tests have seen its responses. A-06-4 IS DEFERRED TO THE HUMAN, NOT ABSORBED: slice 09 now holds four deferrals and ADR-0019 has no aggregate criterion, and re-cutting the backlog is a Gate C decision a merge delegation does not reach. Slices 07 and 08 come first, so it can be overruled at either gate without costing work.
 
+**Gate E** · 2026-09-07 · approved
+
+> APPROVED JOINTLY BY THE ORCHESTRATOR AND THE ARCHITECT under the human delegation, and merged on the human instruction to go for the merge if everything is good now. WHAT THIS IS NOT: no human exploratory testing was performed. EVIDENCE, all collected rather than narrated: red b555317 at 18:21 and green after, both derived; CI 34079845394 green on all three jobs at merge head 90dc1e3; MUTATION 0.9625 ON CHANGED FILES with appointmentRepository.ts — the file that gained the union statement and lockAppointmentRow, and the one file section 2.1 actually rests on — AT 100.00 WITH ZERO SURVIVORS, and every survivor across all four changed files accounted for by a prior classification or a prior prediction with none on a line this slice added; depcruise clean; arc42 reconciled across eight sections with every addition paid for by a named deletion; four inherited obligations discharged; 14 of 14 captured prompts accounted for; ONE LOOPBACK OF A MAXIMUM TWO, declared by the architect against its own design unprompted. THE ARCHITECT WAS ASKED THE (c) QUESTION DIRECTLY and answered that it can name no acceptance criterion, QS or section 2 invariant that would fail, which under section 6 makes (c) unavailable and (b) the honest reading of everything still open. ITS OWN SUMMARY OF THE POSITION: ADR-0030 is measured on both sides, 11.7 percent to zero; ADR-0031 rule is WITNESSED DETERMINISTICALLY OFF pg_locks RATHER THAN RACED; and that is THE STRONGEST EVIDENCE POSITION ANY SLICE HERE HAS SHIPPED WITH, and stronger than slice 06, WHICH SHIPPED THE MOVE PATH WITH ZERO CONCURRENCY EVIDENCE AND WAS HIDING A LIVE DEFECT. SEVEN GATE ITEMS ARE RECORDED AS NOT CHECKED RATHER THAN AS PASSED, and the architect classes all seven as gaps in EVIDENCE DURABILITY or in DECISIONS NOT YET TAKEN rather than defects in merged behaviour. THE TWO MOST SERIOUS: AC-5 DISCRIMINATION EVIDENCE EXISTS AS A REVIEWER HAND-RUN IN A THROWAWAY WORKTREE RATHER THAN AS A REPOSITORY ARTIFACT, so nothing re-runs it and slice:check reads that a red happened rather than what it reddened; and a saturated pool 500 is UNDECIDED rather than decided wrongly. Also recorded: ADR-0029 reads standalone on a premise ADR-0030 re-grounded, with nothing flagging that to a reader who opens it first; AC-4 mutant-control rate is a number in a test header rather than a threshold, so if the control weakens nothing reports it, and R-07-12 is the specific way it will weaken; and docs/diagrams/concurrent-booking.svg predates ADR-0018 and now ADR-0030 and 0031 too.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -141,6 +145,8 @@
 | [0027](adr/0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md) | A move attempts the pair it already holds before it shuffles | accepted | — |
 | [0028](adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) | The lock carries the transaction it was taken on | proposed | — |
 | [0029](adr/0029-a-deadlock-names-the-write-path-a-conflict-does-not.md) | A deadlock event names the write path it happened on; a conflict event does not | accepted | — |
+| [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
+| [0031](adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md) | A move reads the pair it leaves inside its own transaction | accepted | — |
 
 ## Agent runs
 
@@ -281,7 +287,27 @@
 | 2026-09-06 16:03 | implementer | 11m01 | 294 / 20,657 / 17,395,424 | `derived` |
 | 2026-09-06 17:03 | architect | 19m06 | 278 / 3,146 / 20,927,858 | `derived` |
 | 2026-09-06 17:06 | architect | 21m30 | 280 / 3,147 / 21,155,552 | `derived` |
-| | **total** | **5574m49** | **34,094 / 2,453,260 / 2,843,554,541** | |
+| 2026-09-06 17:32 | architect | 22m53 | 212 / 6,591 / 11,685,535 | `derived` |
+| 2026-09-06 17:35 | architect | 25m57 | 230 / 6,650 / 12,959,899 | `derived` |
+| 2026-09-06 17:43 | implementer | 5m26 | 52 / 23,956 / 1,329,712 | `derived` |
+| 2026-09-06 17:45 | test-engineer | 7m52 | 148 / 44,489 / 6,247,403 | `derived` |
+| 2026-09-06 18:19 | test-engineer | 33m20 | 384 / 59,074 / 44,871,947 | `derived` |
+| 2026-09-06 18:23 | test-engineer | 37m11 | 388 / 65,103 / 45,550,489 | `derived` |
+| 2026-09-06 18:37 | implementer | 15m12 | 286 / 21,012 / 20,104,146 | `derived` |
+| 2026-09-06 19:15 | reviewer | 36m53 | 240 / 7,900 / 13,792,485 | `derived` |
+| 2026-09-06 19:28 | test-engineer | 9m44 | 170 / 22,763 / 7,156,037 | `derived` |
+| 2026-09-06 19:33 | architect | 14m58 | 148 / 19,719 / 8,107,627 | `derived` |
+| 2026-09-07 00:19 | test-engineer | 28m47 | 356 / 45,475 / 30,873,068 | `derived` |
+| 2026-09-07 00:20 | test-engineer | 30m06 | 376 / 46,124 / 33,405,201 | `derived` |
+| 2026-09-07 00:21 | test-engineer | 30m32 | 378 / 46,125 / 33,664,141 | `derived` |
+| 2026-09-07 00:39 | implementer | 18m33 | 418 / 15,847 / 31,956,516 | `derived` |
+| 2026-09-07 00:40 | architect | 322m44 | 152 / 19,731 / 8,107,627 | `derived` |
+| 2026-09-07 00:53 | test-engineer | 11m23 | 236 / 8,730 / 9,868,582 | `derived` |
+| 2026-09-07 01:04 | reviewer | 9m59 | 180 / 6,642 / 7,785,896 | `derived` |
+| 2026-09-07 03:24 | architect | 18m03 | 198 / 2,686 / 12,154,711 | `derived` |
+| 2026-09-07 03:30 | implementer | 2m08 | 80 / 1,313 / 1,469,592 | `derived` |
+| 2026-09-07 03:50 | architect | 43m41 | 202 / 2,692 / 12,154,711 | `derived` |
+| | **total** | **6300m11** | **38,928 / 2,925,882 / 3,196,799,866** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

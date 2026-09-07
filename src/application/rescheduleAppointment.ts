@@ -11,7 +11,10 @@
  * case must not silently change another's exhaustiveness check.
  *
  * ADR-0027: ATTEMPT 1 IS THE APPOINTMENT'S OWN `(bay_id, technician_id)`, tried directly — no
- * lock/`23P01` for it. On that pair's `23P01`, ADR-0009 applies unchanged from attempt 2 onward:
+ * SHUFFLE and no seed draw for it, not no lock: it is locked exactly like every other attempt
+ * (line 210 below is unconditional), and ADR-0030 locks it against itself, so `lockResources`'
+ * `DISTINCT` collapses the statement back to today's two keys. On that pair's `23P01`, ADR-0009
+ * applies unchanged from attempt 2 onward:
  * a full seeded shuffle is drawn over ALL candidates (the incumbent pair among them, so it may
  * be re-tried paired with a different partner — bounded at one extra attempt, ADR-0027
  * "Consequences"), with Bound-2 pruning and the same attempt cap. The structural bound is
@@ -50,10 +53,11 @@ import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
 import {
   findAppointmentById,
+  lockAppointmentRow,
   lockResources,
   rescheduleAppointmentById,
 } from '../persistence/appointmentRepository.js';
-import type { Move } from '../persistence/appointmentRepository.js';
+import type { Move, ResourcePair } from '../persistence/appointmentRepository.js';
 import { candidateResources } from '../persistence/candidateRepository.js';
 import { findDealership, findServiceType } from '../persistence/referenceRepository.js';
 import { classify } from '../persistence/pgError.js';
@@ -97,7 +101,8 @@ const REFUSED_EVENT = 'booking.refused';
  * R-06-E: DISTINCT from `bookAppointment.ts`'s own `DEADLOCK_EVENT`, unlike `CONFLICT_EVENT`,
  * `REFUSED_EVENT` and `REFERENCE_DATA_EVENT` above, which are deliberately the SAME event
  * booking writes (I-02-6 — "one taxonomy of log lines, not two"). A deadlock is not one taxonomy
- * shared on purpose: it names the write path that skipped ADR-0018's locks, and slice 09's
+ * shared on purpose: under ADR-0030/ADR-0031 it means some write path did not lock every resource
+ * it was in flight against — not that a path skipped its locks — and slice 09's
  * observability work counts deadlocks per path. Sharing `'booking.deadlock'` here would fold
  * every reschedule deadlock into booking's count silently — the two would still SUM correctly,
  * but nothing could tell them apart, and no test anywhere pinned the shared string (measured: a
@@ -198,7 +203,12 @@ export async function rescheduleAppointment(
   for (let attempts = 1; attempts <= structuralBound; attempts += 1) {
     try {
       const row = await db.transaction().execute(async (trx) => {
-        const lock = await lockResources(trx, bayId, technicianId);
+        // ADR-0031 — the pair this row is IN FLIGHT AGAINST until this move commits, read
+        // INSIDE this attempt's own transaction under the row's own lock: never a value
+        // carried from the pre-loop existence read, which is stale the instant another
+        // request commits a move of the same row (R-07-1).
+        const leaves: ResourcePair = await lockAppointmentRow(trx, move.id);
+        const lock = await lockResources(trx, bayId, technicianId, leaves);
         return await rescheduleAppointmentById(trx, move, lock);
       });
 
@@ -273,8 +283,15 @@ export async function rescheduleAppointment(
         }
 
         case 'no-verdict': {
-          // T-02-9 / ADR-0018, extended to this path (ADR-0026's deadlock argument): a
-          // `40P01` under the locks can only mean a write path skipped them. Not retried.
+          // T-02-9 / ADR-0018, ADR-0030 and ADR-0031. NOT a write path skipping a lock — a
+          // move past attempt 1 is legitimately in flight against TWO pairs (the one it
+          // holds, the one it is trying to take), and `lockResources`' `leave` argument above
+          // locks both, read INSIDE this attempt's own transaction (`lockAppointmentRow`)
+          // rather than carried from before it opened. A `40P01` reaching here means a
+          // resource this move was in flight against went unlocked — which now also covers a
+          // regression to a lock set COMPUTED FROM STATE READ OUTSIDE THE TRANSACTION,
+          // ADR-0031's own failure mode — and under ADR-0030's rule is an internal fault
+          // either way. Not retried.
           deps.logger.error(
             { event: DEADLOCK_EVENT, bayId, technicianId, attempt: attempts },
             DEADLOCK_EVENT,

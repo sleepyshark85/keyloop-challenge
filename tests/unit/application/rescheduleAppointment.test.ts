@@ -116,9 +116,24 @@ function rescheduleScript(options: {
   return steps;
 }
 
-/** One attempt: the advisory-lock statement, then the guarded UPDATE. */
-function attempt(update: ScriptedStep): readonly ScriptedStep[] {
-  return [{ rows: [{}] }, update];
+/**
+ * One attempt: ADR-0031's row-lock read (the pair this attempt's transaction leaves, as it
+ * stands NOW), then the advisory-lock statement, then the guarded UPDATE. `leave` defaults to
+ * `EXISTING_ROW`'s own pair, which is what every test not deliberately relocating the row
+ * underneath an attempt should see.
+ */
+function attempt(
+  update: ScriptedStep,
+  leave: { readonly bayId: string; readonly technicianId: string } = {
+    bayId: 'bay-0',
+    technicianId: 'tech-0',
+  },
+): readonly ScriptedStep[] {
+  return [
+    { rows: [{ bay_id: leave.bayId, technician_id: leave.technicianId }] },
+    { rows: [{}] },
+    update,
+  ];
 }
 
 describe('rescheduleAppointment — the happy path', () => {
@@ -146,13 +161,14 @@ describe('rescheduleAppointment — the happy path', () => {
   it('R-06-C group C — the UPDATE writes the interval the domain DERIVED, not merely what the scripted row echoes', async () => {
     // The test above reads its outcome off the SCRIPTED row alone, so a `Move` built as `{}`
     // (sending `undefined` for id/startsAt/endsAt to the statement) would pass it unnoticed.
-    // This asserts on the STATEMENT itself: recorded[7] is the guarded UPDATE — the six
-    // reference reads, then the lock (recorded[6]), then this.
+    // This asserts on the STATEMENT itself: recorded[8] is the guarded UPDATE — the six
+    // reference reads, then ADR-0031's row-lock read (recorded[6]), then the advisory lock
+    // (recorded[7]), then this.
     const { db, recorded } = scriptedDb(
       rescheduleScript({ attempts: [...attempt({ rows: [movedRow('bay-0', 'tech-0')] })] }),
     );
     await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
-    expect(recorded[7]?.parameters).toEqual([
+    expect(recorded[8]?.parameters).toEqual([
       'bay-0',
       'tech-0',
       new Date(COMMAND.startsAtMillis),
@@ -173,10 +189,31 @@ describe('rescheduleAppointment — the happy path', () => {
     );
     const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
     expect(outcome.kind).toBe('moved');
-    // The lock statement (the first query after the six reference reads) must lock bay-0 and
-    // tech-0 — the row's own pair — not a drawn candidate.
-    const lockCall = recorded[6];
-    expect(lockCall?.parameters).toEqual(['bay-0', 'tech-0']);
+    // The advisory-lock statement (after the six reference reads and ADR-0031's row-lock read)
+    // must lock bay-0 and tech-0 — the row's own pair — not a drawn candidate. ADR-0030:
+    // attempt 1's `leave` is the same pair as `take`, so all four positional parameters name it.
+    const lockCall = recorded[7];
+    expect(lockCall?.parameters).toEqual(['bay-0', 'tech-0', 'bay-0', 'tech-0']);
+  });
+
+  it('ADR-0031 — the pair locked as `leave` is READ INSIDE the transaction, not carried from the pre-loop existence read', async () => {
+    // The pre-loop read still finds the row at bay-0/tech-0, so attempt 1's TAKE (ADR-0027) is
+    // unaffected. But this attempt's own `lockAppointmentRow` read (ADR-0031) is scripted to
+    // see the row already relocated to bay-9/tech-9 — standing in for another request's
+    // committed move landing between the pre-loop read and this attempt. `leave` in the
+    // advisory-lock call must be bay-9/tech-9, never the pre-loop bay-0/tech-0 R-07-1 named
+    // stale.
+    const { db, recorded } = scriptedDb(
+      rescheduleScript({
+        attempts: [
+          ...attempt({ rows: [movedRow('bay-0', 'tech-0')] }, { bayId: 'bay-9', technicianId: 'tech-9' }),
+        ],
+      }),
+    );
+    const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
+    expect(outcome.kind).toBe('moved');
+    const lockCall = recorded[7];
+    expect(lockCall?.parameters).toEqual(['bay-0', 'tech-0', 'bay-9', 'tech-9']);
   });
 
   it('ADR-0027 — on the incumbent pair\'s 23P01, the SHUFFLE runs over all candidates for the remainder', async () => {
@@ -202,8 +239,9 @@ describe('rescheduleAppointment — the happy path', () => {
     );
     const outcome = await rescheduleAppointment(db, collectingDeps().deps, COMMAND);
     expect(outcome).toEqual({ kind: 'not-confirmed' });
-    // Exactly the six reference reads plus the lock and the UPDATE — no eighth read.
-    expect(recorded).toHaveLength(8);
+    // Exactly the six reference reads plus ADR-0031's row-lock read, the advisory lock and the
+    // UPDATE — no tenth read.
+    expect(recorded).toHaveLength(9);
   });
 
   it('AC-5 — an unknown id is not-found, decided by the READ, and the guarded UPDATE is never issued', async () => {
