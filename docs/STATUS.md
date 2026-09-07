@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `bea888d docs(09): T-09-4 — AC-12 becomes a guard, and the coverage property is bounded` |
+| Last commit | `5d8a513 test(09): I-09-2/I-09-3 — the retry-once fixture and AC-6b's cancellation split` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 201 |
+| Agent runs recorded | 206 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -140,6 +140,7 @@
 | [0025](adr/0025-existence-is-the-reads-legality-is-the-statements.md) | Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE | accepted | — |
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
 | [0034](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) | The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed | accepted | — |
+| [0035](adr/0035-one-conflict-counted-per-exclusion-violation.md) | Count one conflict per exclusion violation, not one per contended request | proposed | — |
 
 ## Agent runs
 
@@ -346,7 +347,12 @@
 | 2026-09-07 17:43 | architect | 8m32 | 96 / 891 / 3,444,062 | `derived` |
 | 2026-09-07 19:15 | test-engineer | 58m34 | 744 / 57,809 / 111,091,312 | `derived` |
 | 2026-09-07 19:24 | architect | 6m15 | 84 / 10,536 / 2,596,387 | `derived` |
-| | **total** | **7222m11** | **47,960 / 3,411,942 / 3,936,692,579** | |
+| 2026-09-07 20:19 | architect | 12m09 | 174 / 17,171 / 7,948,987 | `derived` |
+| 2026-09-07 20:20 | architect | 12m57 | 180 / 17,176 / 8,365,175 | `derived` |
+| 2026-09-07 20:27 | test-engineer | 11m59 | 130 / 13,112 / 4,664,632 | `derived` |
+| 2026-09-07 20:30 | test-engineer | 14m50 | 154 / 13,528 / 6,021,468 | `derived` |
+| 2026-09-07 20:32 | implementer | 74m19 | 1,132 / 74,381 / 229,096,979 | `derived` |
+| | **total** | **7348m25** | **49,730 / 3,547,310 / 4,192,789,820** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

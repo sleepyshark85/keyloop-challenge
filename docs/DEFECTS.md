@@ -19,10 +19,10 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **342** |
-| Severity | 13 blocking · 169 major · 160 minor |
-| Verdicts | 20 narrowed · 125 accepted · 3 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 73 · architect 71 · orchestrator 67 · reviewer 66 · implementer 51 · scribe 10 · human 4 |
+| Findings recorded | **345** |
+| Severity | 13 blocking · 171 major · 161 minor |
+| Verdicts | 20 narrowed · 127 accepted · 3 escalated · 28 deferred · 2 rejected |
+| Raised by | test-engineer 73 · architect 71 · orchestrator 67 · reviewer 66 · implementer 54 · scribe 10 · human 4 |
 | Awaiting a ruling | **165** |
 | Mean escape distance | 1.56 step(s) |
 
@@ -2299,6 +2299,9 @@ rather than narrated.*
 | **T-09-3** | BLOCKING | 2 *(+1)* | test-engineer | QS-14's BUDGET CANNOT FAIL HONESTLY ON CI — the performance suite can run concurrently with the 20-racer concurrency suite against the one shared database | accepted |
 | **A-09-3** | MINOR | 2 *(+1)* | architect | THE ARCHITECT FOUND THE SAME DEFINITION-OF-READY DEFECT IN ITS OWN FRONTMATTER WHILE VERIFYING SOMEONE ELSE'S REPORT OF IT | **open** |
 | **T-09-4** | MAJOR | 3 *(+0)* | test-engineer | AC-12 PASSES AT RED AND COULD NOT BE MADE TO FAIL HONESTLY — the coverage property does not actually cover it, and the test-engineer said so rather than forcing it | accepted |
+| **I-09-2** | MAJOR | 4 *(+1)* | implementer | THE SHARED_SEED FIXTURE ASSUMED A TECHNICIAN ORDERING THAT DOES NOT TRANSFER ACROSS NAMESPACES | accepted |
+| **I-09-3** | MAJOR | 4 *(+1)* | implementer | A PRE-EXISTING CONTRACT CASE PINNED THE EXACT 400 THAT AC-6b'S OWN TEXT SAYS IT SUPERSEDES | accepted |
+| **I-09-4** | MINOR | 4 *(+0)* | implementer | THE ABSORBED-CONFLICT COUNTER SEMANTICS ARE A QUESTION THE IMPLEMENTER ASKED RATHER THAN A DEFECT IT CLAIMED | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2356,6 +2359,24 @@ rather than narrated.*
 - *scenario:* THE ARCHITECT RULED AT STEP 2 THAT THE THREE-TEST-FILES COUNT BECOMES A COVERAGE PROPERTY: EVERY ONE OF THE SEVENTEEN CRITERIA AND BOTH CONTROLS FAILS IN THE ONE OBSERVED RED RUN, on the ground that one run failing everything proves nothing was already passing — the reasoning that withdrew AC-7 at slice 08. AC-12 BREAKS THAT PROPERTY. It asserts the availability query's p95 under 200 milliseconds, and MEASURED LOCALLY IT IS ABOUT 9 MILLISECONDS against its own fixture of 500 appointments, 5 bays and 20 technicians — ROUGHLY TWENTY-TWO TIMES UNDER BUDGET. The endpoint already shipped in slice 08, so the budget is met before the slice that asserts it begins, and UNLIKE AC-13 IT HAS NO SECOND CLAUSE TO FAIL ON: AC-13 is still red overall through its INSERT-count half. THE TEST-ENGINEER REFUSED THE TWO AVAILABLE WAYS TO MANUFACTURE A RED — lowering the threshold, or adding unrelated assertions — ON THE GROUND THAT EITHER WOULD MISREPRESENT THE ACCEPTANCE CRITERION, and reported the gap instead. THAT IS THE CORRECT CALL AND IT LEAVES A REAL HOLE: section 2.4 says a test that has never failed is not evidence, and AC-12's test has never failed. WHAT IS STILL TRUE: the OTHER sixteen criteria and both architecture controls did fail in the observed run, and red-proof confirmed six files red with NO UNIT TEST FAILING, which is the discrimination that matters. THE QUESTION FOR THE ARCHITECT IS WHETHER A BUDGET ALREADY MET IS EVIDENCE OF ANYTHING, or whether AC-12 needs a different shape — a regression floor rather than a ceiling, or an explicit statement that it is a guard against future work rather than a criterion this slice earns.
 - *file:* `tests/performance/availability-budget.test.ts`
 - *accepted* by architect — AGREE THE FINDING ENTIRE, OUTCOME (a), AND THE FALSE CLAIM WAS THE ARCHITECT'S OWN. Its T-09-2 ruling said EVERY criterion fails in the red run, and THAT UNIVERSAL QUANTIFIER IS WHAT AC-12 BREAKS — the criterion asserts a budget on an endpoint merged at slice 08 and met on arrival. IS A BUDGET ALREADY MET EVIDENCE? OF TWO THINGS, AND ONLY ONE OF THEM IS SECTION 2.4's. It is NOT evidence that slice 09 built anything and nothing may claim that. It IS evidence of the MEASUREMENT: a real p95 over 100 samples, a stated fixture, the machine class printed, and every sample asserting 200 — so it FAILS TODAY on an absent, broken or erroring endpoint and on a twenty-two-times regression. A PASSING TEST WITH A LIVE ORACLE IS NOT THE VACUOUS TEST SECTION 2.4 AIMS AT. WHAT AC-12 BECOMES: A STANDING GUARD RATHER THAN A CRITERION THIS SLICE EARNS — RECLASSIFIED, NOT RESHAPED. Threshold and fixture untouched; section 11 records THE HEADROOM as the regression baseline, THE CEILING BEING ONLY THE ALARM. ALL THREE ALTERNATIVES REFUSED WITH REASONS: lowering the threshold and inflating the fixture ARE THE SAME ACT, because section 10.2 names the fixture INSIDE the scenario so the two are operands of one ratio, honest only as a DIFFERENT scenario which section 1.2's ranking and the Out of scope section bar; and a regression floor at the measured figure WOULD FAIL ORDINARY REFACTORS on the goal section 1.2 ranks LAST, on A-09-2's own admission that the class is only assumed stable. WITHDRAWAL REFUSED TOO, AND THE DISTINCTION FROM SLICE 08's AC-7 IS EXACT: AC-7's guarantee STAYED ASSERTED after it went, because ambiguity-containment holds the permitted-file list by exact equality on every commit, so a DUPLICATE was dropped. NOTHING ELSE ASSERTS AC-12 — dropping it returns goal 5 to A GOAL WITH NO NUMBER, the state QS-14 was minted to end. THE COVERAGE PROPERTY DOES NOT STAND AS STATED AND IS REPLACED AND BOUNDED: every criterion and control whose subject THIS SLICE INTRODUCES failed in the one observed red run, sixteen of seventeen plus both controls, and nothing outside that set failed. THE EXCLUSION IS CLOSED RATHER THAN OPEN — a criterion may sit outside the red set ONLY where it asserts a property of already-merged code AND ONLY WHERE IT IS NAMED, and exactly one does. WHY NOT (c), SINCE SECTION 2.4 WAS NAMEABLE: section 2.4 is breached BY A CLAIM AND NOT BY THIS TEST — the false sentence was the architect's and the test-engineer's work is correct, safe and shippable byte for byte as committed. (c) AND (a) HERE PRODUCE THE IDENTICAL DIFF; the only difference is a counter that measures slicing pressure, and the gate is shown this as an AC ruling.
+
+**I-09-2** — THE SHARED_SEED FIXTURE ASSUMED A TECHNICIAN ORDERING THAT DOES NOT TRANSFER ACROSS NAMESPACES
+
+- *scenario:* RAISED BY THE IMPLEMENTER AS A DCR RATHER THAN EDITED AROUND, WHICH IS SECTION 5's WHOLE POINT — the implementer may not touch tests/integration and did not. The telemetry test's SHARED_SEED equals 7 fixture assumed a technician ordering that holds in one namespace and not another, because ORDER BY id IS A PER-NAMESPACE COIN-FLIP over generated uuids. The test would have failed for a reason that had nothing to do with the criterion it asserts. Ruled (a) clarification by the architect and FIXED BY THE TEST-ENGINEER AT 5d8a513, the owner of the file.
+- *file:* `tests/integration/telemetry-booking.test.ts`
+- *accepted* by architect — (a) CLARIFICATION. The fixture assumed an ordering that ORDER BY id does not guarantee across namespaces. The design was right and the fixture was wrong; the test-engineer, who owns the file, fixed it at 5d8a513. NO LOOPBACK.
+
+**I-09-3** — A PRE-EXISTING CONTRACT CASE PINNED THE EXACT 400 THAT AC-6b'S OWN TEXT SAYS IT SUPERSEDES
+
+- *scenario:* THE SECOND DCR, AND IT IS THE INTERESTING ONE: a case written in an earlier slice asserted the very response AC-6b was written to change, so the new criterion and the old assertion were in direct contradiction AND THE IMPLEMENTER COULD NOT SATISFY BOTH. It raised rather than editing a test it does not own — the escalation section 5 describes as usually meaning the acceptance criteria were ambiguous. Ruled (a) and THE TEST-ENGINEER SPLIT THE CASE at 5d8a513, so the taxonomy keeps its old guarantee where it still holds and AC-6b owns the arm it supersedes.
+- *file:* `tests/contract/error-taxonomy.test.ts`
+- *accepted* by architect — (a) CLARIFICATION. A contract case from an earlier slice pinned the exact 400 AC-6b supersedes, so the criterion and the assertion contradicted each other. The test-engineer SPLIT the case at 5d8a513 rather than deleting it — the taxonomy keeps its guarantee where it still holds, and AC-6b owns only the arm it supersedes. NO LOOPBACK.
+
+**I-09-4** — THE ABSORBED-CONFLICT COUNTER SEMANTICS ARE A QUESTION THE IMPLEMENTER ASKED RATHER THAN A DEFECT IT CLAIMED
+
+- *scenario:* RAISED EXPLICITLY AS A QUESTION AND NOT AS A DEFECT CLAIM, which is worth recording because the distinction is one this project has had to relearn. After F-06-1's extraction the attempt loop can absorb a conflict and retry, so booking_conflicts_total can count EITHER one per exclusion violation OR one per contended request, and the two diverge exactly when a retry succeeds. Ruled (b) DEFERRED IMPROVEMENT: the work merges as-is and ADR-0035 records the alternative with status proposed.
+- *file:* `src/application/attemptLoop.ts`
+- *deferred* by architect — (b) DEFERRED IMPROVEMENT. The counter's absorbed-conflict semantics merge AS-IS and the alternative is recorded in ADR-0035 with status proposed. SECTION 6(b) WANTS A BACKLOG SLICE AND THERE IS NO LATER SLICE TO CUT — slice 09 is the last. That is A-08-3's shape a second time and the gate is the honest destination: the human decides whether a proposed ADR with no slice behind it is an acceptable close-out state, or whether the counter's semantics are settled before merge.
 
 </details>
 
