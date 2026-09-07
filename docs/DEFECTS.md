@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **341** |
-| Severity | 13 blocking · 168 major · 160 minor |
+| Findings recorded | **342** |
+| Severity | 13 blocking · 169 major · 160 minor |
 | Verdicts | 20 narrowed · 124 accepted · 3 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 72 · architect 71 · orchestrator 67 · reviewer 66 · implementer 51 · scribe 10 · human 4 |
-| Awaiting a ruling | **165** |
-| Mean escape distance | 1.57 step(s) |
+| Raised by | test-engineer 73 · architect 71 · orchestrator 67 · reviewer 66 · implementer 51 · scribe 10 · human 4 |
+| Awaiting a ruling | **166** |
+| Mean escape distance | 1.56 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2298,6 +2298,7 @@ rather than narrated.*
 | **T-09-2** | MAJOR | 2 *(+1)* | test-engineer | THE RED-COMMIT FILE SET IS UNDERCOUNTED AND QS-10 AND QS-12 ARE UNLINKED — the design commits two architecture controls it never names | accepted |
 | **T-09-3** | BLOCKING | 2 *(+1)* | test-engineer | QS-14's BUDGET CANNOT FAIL HONESTLY ON CI — the performance suite can run concurrently with the 20-racer concurrency suite against the one shared database | accepted |
 | **A-09-3** | MINOR | 2 *(+1)* | architect | THE ARCHITECT FOUND THE SAME DEFINITION-OF-READY DEFECT IN ITS OWN FRONTMATTER WHILE VERIFYING SOMEONE ELSE'S REPORT OF IT | **open** |
+| **T-09-4** | MAJOR | 3 *(+0)* | test-engineer | AC-12 PASSES AT RED AND COULD NOT BE MADE TO FAIL HONESTLY — the coverage property does not actually cover it, and the test-engineer said so rather than forcing it | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2349,6 +2350,11 @@ rather than narrated.*
 
 - *scenario:* T-09-2 SAID THE SLICE'S quality_scenarios OMITTED QS-10 AND QS-12 FOR WORK THE DESIGN ITSELF COMMITS. VERIFYING THAT, THE ARCHITECT FOUND THE IDENTICAL CLASS ONE LEVEL OVER AND IN ITS OWN WORK: decision 1's new dependency-cruiser rule lives in the ruleset table at arc42 SECTION 5.3, and the slice's arc42 declaration DID NOT NAME SECTION 5.3 — an undeclared arc42 scope, which slice:check's arc42-edits-match-the-declaration clause would have caught only AFTER the edit was made. Added in the same pass. RECORDED BECAUSE OF WHO FOUND IT AND HOW: an objection about an undeclared scope was verified by a role that then discovered its own undeclared scope, which is the argument for section 6's agree-or-object round existing at all — the check was not the tool, it was a second reader with a reason to look.
 - *file:* `docs/slices/09-observability.md`
+
+**T-09-4** — AC-12 PASSES AT RED AND COULD NOT BE MADE TO FAIL HONESTLY — the coverage property does not actually cover it, and the test-engineer said so rather than forcing it
+
+- *scenario:* THE ARCHITECT RULED AT STEP 2 THAT THE THREE-TEST-FILES COUNT BECOMES A COVERAGE PROPERTY: EVERY ONE OF THE SEVENTEEN CRITERIA AND BOTH CONTROLS FAILS IN THE ONE OBSERVED RED RUN, on the ground that one run failing everything proves nothing was already passing — the reasoning that withdrew AC-7 at slice 08. AC-12 BREAKS THAT PROPERTY. It asserts the availability query's p95 under 200 milliseconds, and MEASURED LOCALLY IT IS ABOUT 9 MILLISECONDS against its own fixture of 500 appointments, 5 bays and 20 technicians — ROUGHLY TWENTY-TWO TIMES UNDER BUDGET. The endpoint already shipped in slice 08, so the budget is met before the slice that asserts it begins, and UNLIKE AC-13 IT HAS NO SECOND CLAUSE TO FAIL ON: AC-13 is still red overall through its INSERT-count half. THE TEST-ENGINEER REFUSED THE TWO AVAILABLE WAYS TO MANUFACTURE A RED — lowering the threshold, or adding unrelated assertions — ON THE GROUND THAT EITHER WOULD MISREPRESENT THE ACCEPTANCE CRITERION, and reported the gap instead. THAT IS THE CORRECT CALL AND IT LEAVES A REAL HOLE: section 2.4 says a test that has never failed is not evidence, and AC-12's test has never failed. WHAT IS STILL TRUE: the OTHER sixteen criteria and both architecture controls did fail in the observed run, and red-proof confirmed six files red with NO UNIT TEST FAILING, which is the discrimination that matters. THE QUESTION FOR THE ARCHITECT IS WHETHER A BUDGET ALREADY MET IS EVIDENCE OF ANYTHING, or whether AC-12 needs a different shape — a regression floor rather than a ceiling, or an explicit statement that it is a guard against future work rather than a criterion this slice earns.
+- *file:* `tests/performance/availability-budget.test.ts`
 
 </details>
 

@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `544bc75 docs(09): step 2 — four objections, four AGREEs, one remedy changed` |
+| Last commit | `46729f3 test(09): telemetry, the OpenAPI contract, the harness and the QS-14 budget — seventeen criteria, two architecture controls (red)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 199 |
+| Agent runs recorded | 200 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -344,7 +344,8 @@
 | 2026-09-07 17:32 | implementer | 7m59 | 122 / 13,921 / 4,000,936 | `derived` |
 | 2026-09-07 17:33 | test-engineer | 8m59 | 106 / 10,804 / 3,731,744 | `derived` |
 | 2026-09-07 17:43 | architect | 8m32 | 96 / 891 / 3,444,062 | `derived` |
-| | **total** | **7157m22** | **47,132 / 3,343,597 / 3,823,004,880** | |
+| 2026-09-07 19:15 | test-engineer | 58m34 | 744 / 57,809 / 111,091,312 | `derived` |
+| | **total** | **7215m56** | **47,876 / 3,401,406 / 3,934,096,192** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
