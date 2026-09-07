@@ -24,7 +24,7 @@ ai-input: >
 
 ## Context and problem statement
 
-A service advisor books a car in for 03:00 on a Sunday and the system confirms it: the dealership is
+A user books a car in for 03:00 on a Sunday and the system confirms it: the dealership is
 shut, nobody is there, and *available* has so far meant only *not already booked*.
 
 Making it mean *within a working window* too is the largest scope lever in the brief. It adds a

@@ -26,7 +26,7 @@ ai-input: >
 
 ## Context and problem statement
 
-An advisor reschedules a car into a busy afternoon and gets a `500`: an internal fault, not *"that
+A user reschedules a car into a busy afternoon and gets a `500`: an internal fault, not *"that
 slot is taken"*. That is 11.7 % of contended moves.
 
 The advisory locks were designed for an **insert**, in flight against one pair. A move is not:
