@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CONNECTION_TIMEOUT_MS,
-  POOL_MAX,
   closeDb,
   createDb,
   createPool,
@@ -24,8 +23,16 @@ import { pingDatabase } from '../../../src/persistence/health.js';
  *
  * The URL below is well-formed and certain not to answer: port 1 is reserved. Nothing in
  * this file talks to a database, which is why it lives in the `nodb` Vitest project.
+ *
+ * `poolMax` is a plain field of the fixture, not a default `createPool` supplies (`R-09-10`):
+ * `DbConfig.poolMax` is REQUIRED precisely so no second default can drift from `config.ts`'s
+ * `DEFAULT_DB_POOL_MAX`, so every fixture here states the value under test explicitly.
  */
-const UNREACHABLE = { databaseUrl: 'postgresql://keyloop:keyloop@127.0.0.1:1/keyloop' };
+const POOL_MAX = 10;
+const UNREACHABLE = {
+  databaseUrl: 'postgresql://keyloop:keyloop@127.0.0.1:1/keyloop',
+  poolMax: POOL_MAX,
+};
 
 const pools: Array<{ end(): Promise<void>; ended: boolean }> = [];
 function track<T extends { end(): Promise<void>; ended: boolean }>(pool: T): T {
@@ -79,8 +86,16 @@ describe('createPool', () => {
     // named ceiling rather than a rediscovery of `pg`'s default.
     const pool = track(createPool(UNREACHABLE));
 
-    expect(POOL_MAX).toBe(10);
     expect(pool.options.max).toBe(POOL_MAX);
+  });
+
+  it('passes `poolMax` THROUGH rather than reading a constant of its own (R-09-10)', () => {
+    // A ceiling of 3 is nothing `pg` or this file would pick by coincidence — the only way
+    // `pool.options.max` can be 3 is that `createPool` read it off `DbConfig` rather than off a
+    // constant it no longer has, which is `DB_POOL_MAX`'s whole point: `config.ts` is the one
+    // place the ceiling is decided, and this file just carries the number through.
+    const pool = track(createPool({ ...UNREACHABLE, poolMax: 3 }));
+    expect(pool.options.max).toBe(3);
   });
 
   it('swallows an idle-client error instead of letting it terminate the process', () => {

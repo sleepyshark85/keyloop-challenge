@@ -41,16 +41,23 @@ export type Db = Kysely<Database>;
 export const CONNECTION_TIMEOUT_MS = 1_000;
 
 /**
- * `R-07-12`, `D-07-1`'s in-half. `createPool` used to pass no `max` at all, so the ceiling was
- * `pg`'s own default of 10 — matching it TODAY only by coincidence, and a coincidence a later
- * change to `pg`'s default would silently move. Naming it here makes the ceiling one value this
- * file owns rather than one `pg` happens to pick; `D-07-1`'s other half — what a saturated pool
- * *answers* — is out of scope (a `503` would be a new taxonomy row, ADR-0024, and QS-11 requires
- * every row reached end to end) and stays in arc42 §11.
+ * `R-07-12`, `D-07-1`'s in-half, `DB_POOL_MAX` (`R-09-10`, `docs/slices/09-design.md` decision 5
+ * and step-5 finding 10). `createPool` used to pass no `max` at all, so the ceiling was `pg`'s
+ * own default of 10 — matching it TODAY only by coincidence, and a coincidence a later change to
+ * `pg`'s default would silently move. Naming it made the ceiling one value this file owned
+ * rather than one `pg` happened to pick; `DB_POOL_MAX` is what makes it the SAME one value
+ * `src/platform/config.ts` reads and an operator can set, rather than a second constant that
+ * could drift from it. `D-07-1`'s other half — what a saturated pool *answers* — is out of scope
+ * (a `503` would be a new taxonomy row, ADR-0024, and QS-11 requires every row reached end to
+ * end) and stays in arc42 §11.
+ *
+ * `poolMax` is REQUIRED on `DbConfig` rather than defaulted here, deliberately: a second default
+ * beside `config.ts`'s is a second place the number 10 could drift from the first, which is
+ * exactly the coincidence this constant was named to stop repeating. `config.ts` — the one module
+ * arc42 §7.3 lets read an environment variable — owns the default; a caller with no `Config` to
+ * hand (a unit test, say) states its own value rather than falling back to an unstated one.
  */
-export const POOL_MAX = 10;
-
-export type DbConfig = { readonly databaseUrl: string };
+export type DbConfig = { readonly databaseUrl: string; readonly poolMax: number };
 
 export interface CreateDbOptions {
   /** Where an idle-client error is reported. Absent in unit tests; present in `main.ts`. */
@@ -67,7 +74,7 @@ export function createPool(config: DbConfig, logger?: Logger): pg.Pool {
   const pool = new Pool({
     connectionString: config.databaseUrl,
     connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
-    max: POOL_MAX,
+    max: config.poolMax,
   });
 
   pool.on('error', (error: Error) => {
