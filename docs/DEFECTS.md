@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **269** |
-| Severity | 12 blocking · 141 major · 116 minor |
+| Findings recorded | **272** |
+| Severity | 12 blocking · 143 major · 117 minor |
 | Verdicts | 18 narrowed · 93 accepted · 3 escalated · 23 deferred · 1 rejected |
-| Raised by | test-engineer 60 · reviewer 60 · architect 49 · orchestrator 49 · implementer 44 · scribe 5 · human 2 |
-| Awaiting a ruling | **131** |
-| Mean escape distance | 1.72 step(s) |
+| Raised by | test-engineer 62 · reviewer 60 · orchestrator 50 · architect 49 · implementer 44 · scribe 5 · human 2 |
+| Awaiting a ruling | **134** |
+| Mean escape distance | 1.70 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -1723,6 +1723,9 @@ rather than narrated.*
 | **R-07-11** | MINOR | 5 *(+2)* | reviewer | service.logRecords() is read with no drain wait, unlike no-spurious-refusal awaitLogRecords, so the final trials lines may not be in the buffer yet | **open** |
 | **O-52** | MINOR | 5 *(+0)* | orchestrator | A commit message on the pushed branch lost a word to shell interpolation, and the correction is appended rather than amended | **open** |
 | **O-53** | MAJOR | 5 *(+0)* | orchestrator | D-07-1 was routed to SLICE 11, a tombstone Gate D folded into 09 — the THIRD routing to a folded slice, and the second by the same role | **open** |
+| **T-07-7** | MAJOR | 3 *(+-2)* | test-engineer | The architect R-07-4 prediction is CONFIRMED BY MEASUREMENT WITH NON-OVERLAPPING INTERVALS — bounding in-flight requests to the pool made the mutant control 2 to 4 times stronger | **open** |
+| **T-07-8** | MINOR | 3 *(+-2)* | test-engineer | AC-5 pg_locks witness is deterministic in practice as well as in principle, verified five ways | **open** |
+| **O-54** | MAJOR | 3 *(+3)* | orchestrator | Section 7 EXACTLY ONE RED COMMIT PER SLICE does not contemplate a loopback, and slice 07 now has two | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -1861,6 +1864,21 @@ rather than narrated.*
 
 - *scenario:* CAUGHT BY THE WRITE-PATH GUARD BUILT FOR O-42, which is the third time it has had this job and the first time it was already in place when the mistake was made. docs/slices/11-performance-budget.md carries folded_into 09, folded_at 2026-09-04, folded_by gate-D, and slice 09 declares absorbs 10 and 11. THE PRIOR TWO WERE OQ-05-2 TO SLICE 10 AND A-06-2 TO SLICE 10, the latter also the architect and also caught by this guard. THE REASONING IS NOT IN DISPUTE AND NEVER HAS BEEN in any of the three: what a saturated pool should answer, whether max becomes prefixed config, and the CONNECTION_TIMEOUT_MS double duty are genuinely performance-budget work. Only the label is stale. D-07-1 IS THEREFORE LOGGED WITH NO deferred_to, exactly as A-06-2 was, because a destination the architect did not name is not a destination and the orchestrator does not silently correct an architect ruling. THE PATTERN IS NOW THE FINDING RATHER THAN THE INSTANCE: three occurrences, one guard that catches them at the write path every time, and a folded slice that is still being reached for by its old number five days after Gate D folded it. For the gate: whether tombstone files should be RENAMED or carry a louder marker, since the evidence is that reading folded_into is not what a role does when it reaches for a slice number from memory.
 - *file:* `docs/adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md`
+
+**T-07-7** — The architect R-07-4 prediction is CONFIRMED BY MEASUREMENT WITH NON-OVERLAPPING INTERVALS — bounding in-flight requests to the pool made the mutant control 2 to 4 times stronger
+
+- *scenario:* THE ARCHITECT ASKED TO BE CONTRADICTED AND WAS NOT. Its reading was that 40 racers against a 10-client pool were SERIALISING the simultaneity AC-4 measures — a pair two movers queued apart never race — rather than the extra-round-trip explanation the file header had given. RACE_COUNT dropped 20 to 5 so movers.length of 10 never exceeds pg unconfigured default of 10, TRIAL_COUNT rose to 100 to hold 1000 total attempts. THE PRE-ADR-0030 BUILD RE-MEASURED AT THE BOUNDED SHAPE VIA A THROWAWAY GIT WORKTREE, three runs of 1000: 20, 23 and 13 deadlocks — 56 of 3000, about 1.87 percent, 95 percent CI 1.38 to 2.35 — AGAINST THE UNBOUNDED 41 of 7800, about 0.5 percent, CI 0.27 to 0.80. THE INTERVALS DO NOT OVERLAP. AND A POSITIVE CONTROL WAS RUN: the same bounded shape against the current ADR-0030-fixed build measured 0 of 1000, so the harness DISCRIMINATES rather than always firing. The test-engineer states it found no case for its own extra-round-trip explanation and that queue-serialisation is the better account. AC-4 itself stayed green throughout because ADR-0030 already ships, so this is a STRONGER CONTROL rather than a new failure.
+- *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
+
+**T-07-8** — AC-5 pg_locks witness is deterministic in practice as well as in principle, verified five ways
+
+- *scenario:* The architect required a DETERMINISTIC witness rather than a four-mover race, on the ground that A PROBABILISTIC WITNESS FOR A RULE IS THE THING ADR-0030 EXISTS TO REPLACE. Verified: three consecutive local runs, once inside the full tests/concurrency suite, once inside the full db project — FIVE RUNS, IDENTICAL FAILURE EVERY TIME, same message and same P1-held and P2-absent lock set. It is choreographed with two ORDINARY PostgreSQL locks — a SELECT FOR UPDATE holder that relocates the row while holding it, and an uncommitted blocker occupying attempt-1 target — never a timing race, WITH EXPLICIT PARK-PROBES THAT FAIL THE ARRANGE STEP LOUDLY IF THE INTENDED INTERLEAVING IS EVER MISSED. The mechanism was validated with a throwaway script BEFORE the committed test was written, confirming the two park points and the exact lock set independently.
+- *file:* `tests/concurrency/refused-move-leaves-original.test.ts`
+
+**O-54** — Section 7 EXACTLY ONE RED COMMIT PER SLICE does not contemplate a loopback, and slice 07 now has two
+
+- *scenario:* RAISED BY THE ORCHESTRATOR AND ANSWERED BY THE ROLE SECTION 7 NAMES AS THE AUTHOR OF THE RED, so both readings are in the record. The declared loopback reopened steps 1 to 4 over a DESIGN defect — R-07-1, ruled against the design rather than the build — so new criteria AC-5 and an amended AC-4 needed a red of their own. The test-engineer view, which the orchestrator shares: the two candidates were to AMEND THE FIRST RED IN PLACE, losing the record that AC-4 original shape was itself measured and superseded for a reasoned cause, or A SECOND RED CARRYING ITS OWN REASONING AND ITS OWN CI-OBSERVED FAILURE at the cost of the rule letter. Its words: I would rather have the git history show WHY the criteria changed than have one commit silently rewritten to look like it was always right — that history is exactly what ADR-0030 and ADR-0031 already do for the design side, AND STEP 3 EVIDENCE DESERVES THE SAME STANDARD. PROPOSED AMENDMENT: exactly one red commit PER DESIGN rather than per slice. Routed to the retro because the architect cannot amend CLAUDE.md by ruling — A-06-6 ground — and because it is a constitution question rather than a slice one.
+- *file:* `CLAUDE.md`
 
 </details>
 

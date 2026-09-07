@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `1a4164a docs(07): the architect declares a loopback against its own design — R-07-1` |
+| Last commit | `b555317 test(07): AC-5's pg_locks witness, and AC-4 re-aimed to the pool's own ceiling (red)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 145 |
+| Agent runs recorded | 148 |
 | ADRs accepted | 26 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -292,7 +292,10 @@
 | 2026-09-06 19:15 | reviewer | 36m53 | 240 / 7,900 / 13,792,485 | `derived` |
 | 2026-09-06 19:28 | test-engineer | 9m44 | 170 / 22,763 / 7,156,037 | `derived` |
 | 2026-09-06 19:33 | architect | 14m58 | 148 / 19,719 / 8,107,627 | `derived` |
-| | **total** | **5784m15** | **36,352 / 2,730,517 / 3,015,359,821** | |
+| 2026-09-07 00:19 | test-engineer | 28m47 | 356 / 45,475 / 30,873,068 | `derived` |
+| 2026-09-07 00:20 | test-engineer | 30m06 | 376 / 46,124 / 33,405,201 | `derived` |
+| 2026-09-07 00:21 | test-engineer | 30m32 | 378 / 46,125 / 33,664,141 | `derived` |
+| | **total** | **5873m40** | **37,462 / 2,868,241 / 3,113,302,231** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
