@@ -97,11 +97,11 @@ is a goal nobody can fail.
 
 - **F-06-1 — two attempt loops, one design.** `bookAppointment` and `rescheduleAppointment` each
   carry ADR-0004's retry loop — same pruning, same cap, one shared `booking.conflict` line but **two
-  deadlock names, by ADR-0029** — in two files. Slice 06 duplicated it rather than refactor the
+  deadlock names** — in two files. Slice 06 duplicated it rather than refactor the
   most-measured path inside its largest slice. **The destination is here because this slice must instrument both loops anyway**
   (`appointment.insert` / `appointment.update` spans, `booking_attempts`, §8.4), so it opens both
   files regardless: *cheaper*, and *stronger*, because an extracted loop is instrumented once. Note
-  ADR-0027 — the loops start on different first attempts, so the extraction takes a parameter rather
+  the loops start on different first attempts, so the extraction takes a parameter rather
   than being a lift. Re-measurable on arrival (D-05-3).
 - **OQ-05-2** — deferred here at slice 05; written up as AC-6b above.
 - **A-06-2 — nothing asserts that `deps.newId()` is the only place an appointment id is minted.**
@@ -111,11 +111,11 @@ is a goal nobody can fail.
   asserts over *every operation* that none accepts a caller-supplied id, rather than over the files
   someone grepped. A `dependency-cruiser` rule is file-granular and cannot see it; *"the reviewer
   looked"* is not executable.
-- **T-06-5 / [ADR-0028](../adr/0028-the-lock-carries-the-transaction-it-was-taken-on.md) — the lock
-  does not prove the write shares its transaction.** ADR-0026 named the hole; the test-engineer
+- **T-06-5 — the lock does not prove the write shares its transaction.**
+  [Slice 06's design](06-design.md) named the hole; the test-engineer
   measured it and returned a **negative result** — no black-box test can observe it, because the
   exclusion constraint backstops correctness either way. Types are the only control:
-  ADR-0028 (`proposed`) has `ResourceLock` carry the `Db` it was taken on. **Here for F-06-1's
+  The declined remedy has `ResourceLock` carry the `Db` it was taken on. **Here for F-06-1's
   reason** — the signature then changes once over an extracted loop instead of twice. Accepting it
   is a decision, not a formality: slice 06 declined it as outcome (b) because nothing fails
   without it.

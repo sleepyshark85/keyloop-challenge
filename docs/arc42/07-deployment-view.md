@@ -109,8 +109,7 @@ db     everything that talks to PostgreSQL, plus          globalSetup: tests/set
 `npm run test:nodb` is the Docker-less command. **`tests/property/` splits by database need**: a
 property test that talks to PostgreSQL is named `*.db.test.ts`, everything else runs in `nodb`, so
 three pure functions are not exercised behind a container and a Docker hiccup cannot turn QS-9's red
-evidence into a `globalSetup` crash rather than an assertion failure (ADR-0013; §8.5 states all three
-clauses).
+evidence into a `globalSetup` crash rather than an assertion failure (§8.5 states all three clauses).
 
 **`npm test` is not `vitest run`, and the difference is a NON-NEGOTIABLE.** It is
 [`tools/ci/run-tests.mjs`](../../tools/ci/run-tests.mjs), which runs the two projects as **separate**
@@ -142,8 +141,8 @@ ran.
 Environment variables only, validated at startup — a missing or malformed value fails the process
 rather than surfacing as a request error at 03:00. **`src/platform/config.ts` reads each of them once
 and is the only reader — except `OTEL_EXPORTER_OTLP_ENDPOINT`, which the OpenTelemetry SDK
-auto-configures and this application never reads** (A-04-10, and ADR-0022's proposed set-equality
-guard must exempt it).
+auto-configures and this application never reads** (A-04-10; the proposed set-equality guard must
+exempt it).
 
 | Variable | Purpose |
 |---|---|
@@ -151,10 +150,10 @@ guard must exempt it).
 | `PORT` | HTTP listener |
 | `LOG_LEVEL` | `pino` level |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector; unset disables export without disabling instrumentation |
-| `BOOKING_ATTEMPT_CAP` | ADR-0009's cap; default 16 |
-| `BOOKING_SEED` | ADR-0021's ordering seed; unset in production. Set, it warns at `warn` — visible at the default `LOG_LEVEL` |
+| `BOOKING_ATTEMPT_CAP` | ADR-0009's cap, default 16 |
+| `BOOKING_SEED` | ADR-0009's ordering seed, overridable so AC-5 is re-runnable; unset in production. Set, it warns — visible at the default `LOG_LEVEL` |
 
-**This table is the contract; `BOOKING_` marks what this application invented** (ADR-0022). There are
+**This table is the contract; `BOOKING_` marks what this application invented.** There are
 no secrets: nothing to authenticate to (ADR-0002, §11.3).
 
 ## 7.4 The pipeline

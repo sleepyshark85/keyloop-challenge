@@ -56,8 +56,8 @@ every test in slice 06.
   only resource ids cross into JavaScript — pulling `objid` out compares the catalogue's unsigned
   `oid` against `hashtext`'s signed `int4`, the same bits read two ways *(corrected at step 7,
   `R-07-13`)* — not by racing four movers into the stale interleaving: a probabilistic witness for a rule is the thing ADR-0030
-  exists to replace, and ADR-0031's claim is about *where a value is read*, which `pg_locks` reads
-  directly. *(QS-4; [ADR-0031](../adr/0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md)'s control)*
+  exists to replace, and the claim is about *where a value is read*, which `pg_locks` reads
+  directly. *(QS-4; the in-transaction re-read's control — [design §2](07-design.md))*
   <br>**Mutant control:** restore the pre-loop read and relocate the row between it and the attempt
   — the transaction then holds the *old* pair's keys, which the same assertion reads.
 

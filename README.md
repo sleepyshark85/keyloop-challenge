@@ -46,11 +46,11 @@ curl -i localhost:3000/health
 
 `DATABASE_URL` and `PORT` are required; `LOG_LEVEL` is optional (`src/platform/config.ts`). Config
 fails fast and names the variable; connectivity is probed only by `GET /health`, so the service
-still starts against a dead database and answers `503` (ADR-0011).
+still starts against a dead database and answers `503`.
 
 | Route | Purpose |
 |---|---|
-| `GET /health` | operational probe, outside the RFC 9457 taxonomy (ADR-0011) |
+| `GET /health` | operational probe, outside the RFC 9457 taxonomy |
 | `POST /appointments` | book — `201`, or a problem document (`409` conflict, `422` unknown reference, `400` invalid request) |
 | `GET /appointments/:id` | read back — `200` or `404` |
 

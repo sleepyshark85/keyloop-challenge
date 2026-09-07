@@ -79,7 +79,7 @@ it reports free is exactly what the constraint accepts.
   `src/persistence/appointmentRepository.ts`, and
   `tests/architecture/ambiguity-containment.test.ts:507-524` already asserts that against the **real
   `src/` tree by exact-file equality, in CI, on every commit** — `candidateRepository.ts` is absent
-  from `PERMITTED_FILE`. **ADR-0032's Option D is the only considered option that leaves that list
+  from `PERMITTED_FILE`. **Composing two reads in the use case is the only considered option that leaves that list
   unchanged**, so slice 08 need only avoid breaking a guarantee that already holds. AC-7 was minted
   at step 1 to assert this and **withdrawn at step 2**: a criterion satisfied before the slice opens
   cannot fail it, and a criterion that cannot fail is not evidence — §2.4's own argument.

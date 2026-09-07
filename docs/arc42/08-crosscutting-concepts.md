@@ -292,8 +292,8 @@ is not: on 25 October a dealership open 00:00–06:00 local is open for **seven*
 rejected as `spans-local-days` — refusing a job that finishes at closing time at a dealership open
 until 00:00, and leaving the time parser's `'24:00:00'` arm, which exists to describe exactly that
 window, unreachable.
-[ADR-0015](../adr/0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md) settles it and
-**shipped in slice 02** (AC-17–19): an end rendering `00:00:00` on the local date immediately after
+That **shipped in slice 02** (AC-17–19);
+[slice 13's tombstone](../slices/13-interval-ending-at-local-midnight.md) argues it: an end rendering `00:00:00` on the local date immediately after
 the start's normalises to `secondsOfDay = 86400` before step 4's comparison, while a genuine crossing
 (23:00 to 01:00) stays rejected.
 
@@ -362,14 +362,13 @@ and every test implicitly asserts A-9's scoping.
 ### How an outside-in test reaches a module with no boundary
 
 **`src/domain` has no boundary to reach it through**: QS-9 is a property over three pure functions with
-no HTTP route and no SQL.
-[ADR-0013](../adr/0013-outside-in-tests-exercise-the-built-artifact.md) resolves that in three clauses,
-all in force:
+no HTTP route and no SQL. Three clauses resolve it, all in force
+([slice 01's design](../slices/01-design.md) has the alternatives):
 
 1. **An outside-in test reaches a pure module through the built artifact.** It loads `dist/domain/*.js`
    — the output of `npm run build`, which `pretest` guarantees is current — never `src/`. The
-   dependency rule stands unwidened, and the test exercises the thing that ships rather than the thing
-   that compiles. It costs a dynamic `import()` and an `await` per test file.
+   dependency rule stands unwidened, and the test exercises what ships rather than what compiles. It
+   costs a dynamic `import()` and an `await` per file.
 2. **`tests/property/` splits by whether the property needs a database.** A property test that talks to
    PostgreSQL is named `*.db.test.ts` and runs in the `db` project behind
    `globalSetup: tests/setup/postgres.ts`; everything else runs in `nodb` with no container, so a

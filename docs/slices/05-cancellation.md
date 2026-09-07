@@ -97,6 +97,6 @@ Beyond `CLAUDE.md` §10:
   prediction of `src/domain/appointment.ts` and gains `cancelAppointment.ts`, `CancelOutcome` and the
   no-lock `cancelAppointmentById`; §8.6's `400` row and its residual paragraph say what the code does
   today; §10 corrects QS-7's false reason and QS-11's direction; §11 gains F-05-1, D-05-1 and D-05-3,
-  narrows F-02-9 to ADR-0023's *iff*, and updates R-10 and R-12. **§6.1 was added to the declaration
+  narrows F-02-9 to an *iff* on the constraints' scope, and updates R-10 and R-12. **§6.1 was added to the declaration
   at step 7**, R-02-2 having been built here — the four-cell control it claimed as measured from slice
   02 was only argued until this slice ran it.

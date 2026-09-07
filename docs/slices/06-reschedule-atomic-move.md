@@ -33,8 +33,8 @@ without being obvious.
   <br>The bay-and-technician clause was added at step 2 under I-06-2 and it is what makes AC-1 pin
   QS-6 at all: the self-overlap semantics are only exercised if the new version lands in the *same*
   bay with the *same* technician, so under a shuffle-from-first candidate order `[09:00,10:00) →
-  [09:15,10:15)` could be satisfied by allocating bay 2 and **AC-1 could not fail**. ADR-0027 fixes
-  the order; this clause makes the criterion able to observe it.
+  [09:15,10:15)` could be satisfied by allocating bay 2 and **AC-1 could not fail**. Attempting the
+  incumbent pair first fixes the order; this clause makes the criterion able to observe it.
 - **AC-2** — Given A is moved, when the database is inspected, then exactly one statement modified it
   **in the course of that move**: a single `UPDATE`. A `DELETE`-then-`INSERT`, or a cancel-then-book,
   fails this criterion. The window is the request, not the row's lifetime: the fixture's own arrange
@@ -64,13 +64,12 @@ Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
   distinguish its own case is not one. ADR-0019's criterion is met and re-measurable on arrival.
 - **F-05-1 — `lockResources` returns a branded `ResourceLock` that `insertAppointment` takes as a
   parameter** (slice 05 §6, deferred under ADR-0019). Type-only, erased, one minting cast, the
-  ADR-0016 shape: *"forgot the lock"* becomes a compile error and *"correctly exempt"* (ADR-0023's
-  cancel path) becomes a signature that does not ask for one. Slice 06 is the destination **because it
+  ADR-0016 shape: *"forgot the lock"* becomes a compile error and *"correctly exempt"* (the cancel
+  path) becomes a signature that does not ask for one. Slice 06 is the destination **because it
   writes `rescheduleAppointment`, a newly written locking path** — the first moment the mistake is live
-  rather than historical. *As built ADR-0026 took Option C: the lock carries its keys, so that residue is
-  closed between lock and write. What is left: the lock does not prove the write shares its
-  transaction (ADR-0028, deferred), and a `ResourceLock` can be written by hand with no cast (§11
-  D-06-2). **`F-02-9`'s slice-06 half is discharged by the required parameter**, not by the minting
+  rather than historical. *As built the lock carries its keys, so that residue is closed
+  between lock and write. What is left: the lock does not prove the write shares its transaction
+  (declined, deferred to slice 09), and a `ResourceLock` can be written by hand with no cast (§11 D-06-2). **`F-02-9`'s slice-06 half is discharged by the required parameter**, not by the minting
   site being unique.*
 - **ADR-0024 — `setNotFoundHandler`, the `404 /problems/route-not-found` row, and the hostile-request
   corpus.** *Both merged: `GET /nope` now answers `404 /problems/route-not-found`; the
