@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **320** |
-| Severity | 12 blocking · 162 major · 146 minor |
-| Verdicts | 20 narrowed · 118 accepted · 4 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 68 · reviewer 66 · architect 62 · orchestrator 62 · implementer 50 · scribe 10 · human 2 |
-| Awaiting a ruling | **149** |
-| Mean escape distance | 1.66 step(s) |
+| Findings recorded | **322** |
+| Severity | 12 blocking · 162 major · 148 minor |
+| Verdicts | 20 narrowed · 119 accepted · 4 escalated · 27 deferred · 2 rejected |
+| Raised by | test-engineer 68 · reviewer 66 · architect 63 · orchestrator 63 · implementer 50 · scribe 10 · human 2 |
+| Awaiting a ruling | **150** |
+| Mean escape distance | 1.65 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2003,7 +2003,7 @@ rather than narrated.*
 | **A-08-2** | MINOR | 1 *(+0)* | architect | Quiescent in QS-8 is a claim about the TEST PROCESS, not a database setting | accepted |
 | **A-08-3** | MAJOR | 1 *(+0)* | architect | status-not-cancelled and status-equals-confirmed are EXTENSIONALLY EQUAL over a two-value enum, so the denylist argument is guarded by nothing that runs | deferred |
 | **OQ-08-1** | MINOR | 1 *(+0)* | architect | The response returns two id lists — whether the booking screen needs names or capacities is unsettled | accepted |
-| **R-08-5** | MAJOR | 5 *(+1)* | architect | Section 10 is NOT satisfied on routes/availability.ts, and the orchestrator classification of its survivors is rejected | **open** |
+| **R-08-5** | MAJOR | 5 *(+1)* | architect | Section 10 is NOT satisfied on routes/availability.ts, and the orchestrator classification of its survivors is rejected | accepted |
 | **I-08-6** | MAJOR | 5 *(+0)* | implementer | The R-08-5 remedy as specified reaches SIX of the twelve named survivors, not twelve — verified by hand-mutation rather than claimed | narrowed |
 | **T-08-7** | MAJOR | 5 *(+0)* | test-engineer | The R-08-1 remedy KILLS THE MUTANT ONLY ABOUT THREE TIMES IN FOUR — 8 of 35 trials survived at numRuns=30 — so as specified it is not a gate | accepted |
 | **O-60** | MINOR | 5 *(+0)* | orchestrator | The orchestrator dispatched BY POINTER and the prompt capture recorded the pointer instead of the prompt | **open** |
@@ -2011,6 +2011,8 @@ rather than narrated.*
 | **O-62** | MAJOR | 5 *(+0)* | orchestrator | Stryker returned 71.43 on routes/availability.ts, NOT the ruled 76.19, so SECTION 10 IS NOT SATISFIED — and the shortfall is exactly two mutants the ruling did not count | accepted |
 | **O-63** | MINOR | 5 *(+0)* | orchestrator | TWO COMMITS ON THIS BRANCH WERE RED IN CI, one of them an implementer commit, and the architect had stated the opposite | **open** |
 | **O-64** | MAJOR | 5 *(+0)* | orchestrator | slice:check APPLIED SECTION 10's THRESHOLD TO AN AGGREGATE and would have reported PASS on a slice the architect ruled fails it | **open** |
+| **O-65** | MINOR | 5 *(+0)* | architect | The orchestrator's git add -A SWEPT THE ARCHITECT'S UNCOMMITTED RULING into a tooling commit, and the path guard cannot see that direction of the mistake | **open** |
+| **O-66** | MINOR | 5 *(+0)* | orchestrator | The light-gate row asserted AUTO-APPROVED, DoD GREEN without ever checking the Definition of Done | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2171,6 +2173,7 @@ rather than narrated.*
 
 - *scenario:* MINTED BY THE ARCHITECT WHEN IT RULED THE MUTATION QUESTION AND NEVER RAISED AS A FINDING — recovered by the O-39 check on its first run, which is the defect that check exists for, found in the slice that built it. THE SUBSTANCE: the orchestrator reported 48.94 and argued all 24 survivors fell in classes already ruled inert on routes/appointments.ts, citing I-06-5. THE CITATION INVERTS THE PRECEDENT: I-06-5 removed ONLY what is unkillable BY CONSTRUCTION and left the rest as a STATED GAP. Twelve of the twenty-four are OBSERVABLE TODAY AND ASSERTED BY NOTHING in this repository, four of them RFC 9457 title strings that routes/appointments.ts has also carried unasserted since slice 02. Adjusted score 25 of 47 equals 53.19 on I-06-5 own rule. Remedy is route unit assertions on the whole problem document, ruled (b), home here.
 - *file:* `src/http/routes/availability.ts`
+- *accepted* by architect — UPHELD WHOLE, THE OFFERED REMEDY REJECTED, RULED (d). BOTH HALVES OF THE REVIEWER'S FINDING ARE TRUE: section 10's per-file threshold is not met on routes/availability.ts, AND the classification offered beside it merged FOUR DISTINCT CLASSES into one — 2 unkillable by construction, 3 killed outside-in and invisible to a tests/unit config, 7 waiting on slice 09's OpenAPI document, and 12 OBSERVABLE TODAY AND ASSERTED BY NOTHING. THE FINDING AND THE REMEDY WERE JUDGED SEPARATELY, per section 6: removing all 24 from the denominator INVERTS I-06-5's precedent, which removes only what is unkillable BY CONSTRUCTION, and widening Stryker's include kills NONE of the twelve. Rejected. WHY (d) AND NOT THE OTHERS, EACH TESTED RATHER THAN ASSERTED: (c) IS UNAVAILABLE UNDER SECTION 6'S OWN TEST because the architect can name no acceptance criterion, no QS and no section 2 standing invariant that fails — the endpoint's behaviour is asserted; (b) IS AVAILABLE AND WRONG because its correct half was ALREADY ACTED ON, the reachable assertions built at 37cf8f6 and the residue booked as section 11 D-08-1 and D-08-2, and A STATED THRESHOLD MISSED ON A MERGING FILE IS NOT AN IMPROVEMENT DEFERRED. So (d): merging at 71.43 against 0.75 IS A TRADE-OFF AND TRADE-OFFS ARE THE GATE'S. That is also why gate light is revoked here CORRECTLY rather than by accident. I-08-6 and O-62 are this finding's downstream halves, ruled (d) on the same ground. Loopbacks stay at 0.
 
 **I-08-6** — The R-08-5 remedy as specified reaches SIX of the twelve named survivors, not twelve — verified by hand-mutation rather than claimed
 
@@ -2208,6 +2211,16 @@ rather than narrated.*
 **O-64** — slice:check APPLIED SECTION 10's THRESHOLD TO AN AGGREGATE and would have reported PASS on a slice the architect ruled fails it
 
 - *scenario:* SECTION 10's CLAUSE IS MUTATION SCORE ABOVE THRESHOLD ON CHANGED FILES, PLURAL, and the check compared ONE NUMBER to 0.75. Over slice 08's five changed files that number is 85.71 while src/http/routes/availability.ts sits at 71.43 — a file the architect ruled fails section 10 across THREE SEPARATE RULINGS, refused to lift by suppression, and booked into arc42 section 11 as D-08-1. THE GATE SAID PASS AT 0.8271. It is the THIRD time this one criterion has read a number that answered a different question: O-6 let a mutation record satisfy TESTS GREEN, then a vacuous score let a SQL-only slice clear the clause on the previous slice's measurement, and now an aggregate hides a member. THE PER-FILE TRUTH WAS NEVER MISSING — it was in the note field of a hand-written record, in prose, in capitals, saying BELOW THE 0.75 THRESHOLD ON THE PER-FILE READING, where no check could reach it. THE HONESTY SAT IN A FIELD THE GATE NEVER OPENED, which is the identical sentence the vacuous-score fix was written under. THE ROOT CAUSE IS THAT NO COLLECTOR EXISTED: the numbers were typed by the orchestrator, so write.mjs correctly refused them the derived tier, and adding a per-file FIELD without a collector would only have moved hand-entered figures somewhere the gate trusts more. A SECOND, SEPARATE ORCHESTRATOR FAILURE MADE IT WORSE: the record slice:check was reading was the PRE-REMEDIATION run, 48.94 with 24 survivors, because after running stryker and raising O-62 the orchestrator never logged the new measurement at all. The gate was reading a superseded number through a broken reading.
+- *file:* `tools/slice/check.mjs`
+
+**O-65** — The orchestrator's git add -A SWEPT THE ARCHITECT'S UNCOMMITTED RULING into a tooling commit, and the path guard cannot see that direction of the mistake
+
+- *scenario:* THE ARCHITECT RAISED THIS AGAINST THE ORCHESTRATOR AND IT IS CORRECT. The architect finished its R-08-5 ruling in docs/slices/08-design.md and ran git commit --only on that pathspec, as its brief required, and got NOTHING TO COMMIT, WORKING TREE CLEAN — because the orchestrator had already run git add -A tools docs package.json and swept the file into 73ce198, a commit whose subject is feat(08) section 10 is per changed file, O-64. NO CONTENT WAS LOST and the ruling is in HEAD and pushed, BUT IT IS ATTRIBUTED TO A TOOLING COMMIT BY ANOTHER ROLE, and section 9's whole claim is that the record says who reasoned what. THIS IS THE SLICE-00 SHAPE RUNNING THE OTHER WAY: PATHSPEC-PINNING PROTECTS THE PINNER, NOT THE PINNED-AROUND. Every agent brief in this project tells the agent to commit its own paths, which stops an agent stealing someone else's work; nothing stops a broad add from stealing the agent's, and guard-paths.mjs cannot see a git add -A because by the time it runs the paths are already staged together. HISTORY WAS NOT REWRITTEN TO RE-ATTRIBUTE IT — the architect declined on the ground O-36 settled, that rewriting the record of an artifact under assessment is the worse repair, and the orchestrator agrees. Recorded for the retro. SECOND FACT WORTH KEEPING: budget.mjs drops a slice design's ceiling from 3000 to 1200 words THE MOMENT its slice file reads status done, with no baseline to shelter it, so docs:budget:check would have failed ON THE BOARD MOVE rather than on any edit. The architect trimmed 1361 to exactly 1200 in the same pass. A ceiling that changes on a state transition is a check that fires at a moment no one is editing.
+- *file:* `tools/lib/guard-paths.mjs`
+
+**O-66** — The light-gate row asserted AUTO-APPROVED, DoD GREEN without ever checking the Definition of Done
+
+- *scenario:* FOUND WHILE FIXING O-64 AND VISIBLE ONLY BECAUSE THAT FIX MADE TWO ROWS GO RED. The light-gate row printed light gate: auto-approved, DoD GREEN AND NO OPEN MAJOR/BLOCKING while tests green and mutation score were BOTH FAILING TWO LINES ABOVE IT. Its predicate reads open MAJOR and BLOCKING findings ONLY; the phrase DoD green was never computed. THE ARRANGEMENT WAS NEVER UNSAFE: the surrounding docblock states deliberately that a light gate cannot carry a slice over a red suite, a stale CI run or an unreconciled arc42, because the tool reports all checks pass only when every Done row passes. So the slice could not have auto-merged. WHAT WAS WRONG IS THE SENTENCE A HUMAN SKIMS, and this project has now caught that identical shape four times in one slice — the mutation criterion reading an aggregate as if it were per-file, arc42 section 6.5 specifying a function that never existed, the Stryker directive comment claiming a reach it did not have, and the busyResources docblock under F-08-4. A GATE THAT STATES A FACT IT DID NOT CHECK IS THE FAILURE IT EXISTS TO PREVENT.
 - *file:* `tools/slice/check.mjs`
 
 </details>

@@ -344,6 +344,17 @@ const raised = (over) => ({ ts: '2026-01-01T02:00:00Z', slice: '77', event: 'fin
     row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'approved').startsWith('PASS'),
     row(run([ciRun(), raised({}), ruled], { slice: LIGHT }), 'approved'));
 
+  // O-66. The row used to assert "DoD green" without checking, and printed it at slice 08
+  // while §10 was failing two rows above. The verdict is deliberately unchanged — the
+  // safety lives in the summary — so what is asserted here is that the row STOPS CLAIMING
+  // a fact it did not check, and says which rows are red when they are.
+  {
+    const line = row(run([ciRun()], { slice: LIGHT }), 'approved');
+    ok('the light gate never claims "DoD green"', !/DoD green/.test(line), line);
+    ok('...and names the red rows when the Definition of Done is not green',
+      !line.includes('auto-approved') && /NOT green \(/.test(line), line);
+  }
+
   ok('a MINOR never revokes it',
     row(run([ciRun(), raised({ severity: 'MINOR', ref: 'R-77-2' })], { slice: LIGHT }), 'approved').startsWith('PASS'));
 

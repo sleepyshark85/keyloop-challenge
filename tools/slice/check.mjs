@@ -575,6 +575,19 @@ if (!onlyReady) {
   // an orchestrator decision is precisely the misreport this check exists to prevent, one
   // level up — so the label names the actor, and a delegated gate is visibly not a human
   // one at a glance rather than eleven words into the rationale.
+  // O-66. This row said "auto-approved — DoD green" WITHOUT EVER CHECKING DoD. At slice 08
+  // it printed exactly that while §10 was failing at 71.43 and the CI record was stale —
+  // the two rows directly above it.
+  //
+  // THE VERDICT IS LEFT ALONE AND ONLY THE CLAIM IS FIXED. Coupling PASS to the other rows
+  // was tried and reverted: the docblock above states the safety deliberately lives in the
+  // summary — "a light gate cannot carry a slice over a red suite, a stale CI run or an
+  // unreconciled arc42" — and three tests assert the revocation rule in isolation from
+  // unrelated red rows. Overriding a documented decision to fix its wording would be the
+  // adjudicate-and-edit-in-one-pass move §6 forbids. So the row now REPORTS what it sees:
+  // no open MAJOR, and whether DoD is actually green. Whether the verdict itself should be
+  // coupled is the architect's call, recorded as O-66.
+  const doneRedRows = results.filter((r) => r.phase === 'done' && r.verdict === FAIL);
   const gateActor = gateE?.actor ?? (light ? 'light gate' : null);
   const approvedBy = gateActor === 'human' ? 'human approved'
     : gateActor === 'light gate' ? 'gate approved (light)'
@@ -586,8 +599,12 @@ if (!onlyReady) {
       : FAIL,
     gateE ? `${gateE.decision} — ${gateE.rationale}`
       : light && !openSerious.length
-        ? 'light gate (human ruling 2026-09-05): auto-approved — DoD green and no open MAJOR/BLOCKING'
-      : light
+        ? 'light gate (human ruling 2026-09-05): no open MAJOR/BLOCKING'
+          + (doneRedRows.length
+            ? ` — but the Definition of Done is NOT green (${doneRedRows.map((r) => r.name).join(', ')}), `
+              + 'so this slice does not auto-approve'
+            : ' and every other Done check passes — auto-approved')
+      : light && openSerious.length
         ? `light gate REVOKED — ${openSerious.length} open MAJOR/BLOCKING finding(s): `
           + `${openSerious.map((e) => e.ref).join(', ')}. This slice needs a human.`
       : 'no Gate E gate.decided event');

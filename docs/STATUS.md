@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `e1b75dc docs(08): step 7 — arc42 had specified a function that never existed` |
+| Last commit | `73ce198 feat(08): §10 is per changed file, and the gate could not see it — O-64` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process |
-| Agent runs recorded | 185 |
+| Agent runs recorded | 186 |
 | ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -342,7 +342,8 @@
 | 2026-09-07 08:46 | architect | 5m50 | 98 / 1,232 / 2,560,671 | `derived` |
 | 2026-09-07 08:49 | implementer | 2m12 | 52 / 771 / 861,276 | `derived` |
 | 2026-09-07 09:13 | architect | 23m21 | 260 / 25,445 / 17,081,978 | `derived` |
-| | **total** | **6698m17** | **42,974 / 3,131,588 / 3,384,870,795** | |
+| 2026-09-07 09:23 | architect | 32m54 | 354 / 25,785 / 28,688,216 | `derived` |
+| | **total** | **6731m11** | **43,328 / 3,157,373 / 3,413,559,011** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
