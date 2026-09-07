@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `46729f3 test(09): telemetry, the OpenAPI contract, the harness and the QS-14 budget — seventeen criteria, two architecture controls (red)` |
+| Last commit | `bea888d docs(09): T-09-4 — AC-12 becomes a guard, and the coverage property is bounded` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 200 |
+| Agent runs recorded | 201 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -345,7 +345,8 @@
 | 2026-09-07 17:33 | test-engineer | 8m59 | 106 / 10,804 / 3,731,744 | `derived` |
 | 2026-09-07 17:43 | architect | 8m32 | 96 / 891 / 3,444,062 | `derived` |
 | 2026-09-07 19:15 | test-engineer | 58m34 | 744 / 57,809 / 111,091,312 | `derived` |
-| | **total** | **7215m56** | **47,876 / 3,401,406 / 3,934,096,192** | |
+| 2026-09-07 19:24 | architect | 6m15 | 84 / 10,536 / 2,596,387 | `derived` |
+| | **total** | **7222m11** | **47,960 / 3,411,942 / 3,936,692,579** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
