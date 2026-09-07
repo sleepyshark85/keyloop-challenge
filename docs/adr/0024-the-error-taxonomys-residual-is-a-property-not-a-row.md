@@ -21,20 +21,20 @@ ai-input: >
 ## Context and problem statement
 
 Ask this service for a URL that does not exist and it answers a bare `404` with **no `type` member
-at all** — sharing a status with "appointment not found" and carrying nothing to tell the two apart.
-Post to it with `content-type: application/xml` and it answers `500 /problems/internal`: an internal
+at all**, sharing a status with "appointment not found" and carrying nothing to tell them apart. Post
+to it with `content-type: application/xml` and it answers `500 /problems/internal`: an internal
 fault, for a header the client can see and can fix.
 
-Both are conformant, and that is the problem. The error taxonomy opens *"Errors are RFC 9457
-`application/problem+json`, with a stable `type` per failure"*, and the quality scenario indexing it
-promises *"every failure has one status and one problem type."* But the table's last row is
+Both are conformant, and that is the problem. The taxonomy opens *"Errors are RFC 9457
+`application/problem+json`, with a stable `type` per failure"*, and the scenario indexing it promises
+*"every failure has one status and one problem type."* But the table's last row is
 `500 | /problems/internal | Reference data the client cannot see or correct, **and anything else**`.
 
 That row is two things at once: a described failure class with four named reference-data faults and a
 `40P01`, and an unrestricted catch-all. The catch-all makes the totality claim unfalsifiable. The
 acceptance criterion sweeps ∀rows ∃input; the property actually at risk is **∀responses ∃row**, and
-no reachability sweep can falsify a catch-all's *fitness* — which is why the test-engineer's
-objection, as written, can never block.
+no reachability sweep can falsify a catch-all's *fitness* — which is why the objection, as written,
+can never block.
 
 Both escapes were measured against the real server:
 
@@ -58,7 +58,7 @@ Both escapes were measured against the real server:
 Chosen option: **B**, in four parts.
 
 1. **The `500` row is a described class.** *"and anything else"* is struck. It covers the four
-   reference-data faults and `40P01`, which is what the quality scenario already reaches end-to-end.
+   reference-data faults and `40P01`, which the quality scenario already reaches end-to-end.
 2. **The residual is an invariant stated beneath the table, not a member of it:** *every response
    this service emits with status ≥ 400 is `application/problem+json` and carries a `type` from the
    closed set.* An input that reaches the fallback handler renders as `/problems/internal`. A
@@ -73,23 +73,23 @@ Chosen option: **B**, in four parts.
    test-engineer's.
 
 **It lands at slice 06 step 1, not here** — and the decisive reason is not cost. `setNotFoundHandler`
-**breaks an assertion this slice committed red.** The cancellation acceptance test closes its own
-vacuous-green trap at line 247 by discriminating on the media type *and* the `type` member, precisely
-because Fastify's default `404` carries neither; its comment quotes that body verbatim. Register the
+**breaks an assertion this slice committed red.** `cancel-appointment.test.ts:247` closes its own
+vacuous-green trap by discriminating on the media type *and* the `type` member, precisely because
+Fastify's default `404` carries neither; its comment quotes that body verbatim. Register the
 handler and the media-type half stops discriminating — only `route-not-found` ≠
 `appointment-not-found` still does. Doing that at step 5, with no test-engineer round left, would
 silently degrade an acceptance test by fixing a defect. Slice 06 has that round, already declares the
-taxonomy, and grows it anyway. That satisfies the rule that a control is deferred only to a slice
-making it cheaper or stronger — and, this being the finding that showed an ADR must never be the only
-place a destination is recorded, the deferral is written into slice 06's own file as well as here.
+taxonomy, and grows it anyway. That satisfies the deferral criterion — and, this being the finding
+that showed an ADR must never be a destination's only record, it is written into slice 06's own file
+as well as here.
 
 ## Consequences
 
 **Good**
 
-- The objection becomes blockable. The sweep it named certifies absence and therefore cannot; the
-  corpus can only find defects, and found two in one twenty-line run.
-- The taxonomy's opening sentence becomes something a test asserts rather than something the table
+- The objection becomes blockable. The sweep it named certifies absence and so cannot; the corpus
+  can only find defects, and found two in one twenty-line run.
+- The taxonomy's opening sentence becomes something a test asserts, not something the table
   assumes.
 
 **Bad, or deferred**
@@ -101,10 +101,9 @@ place a destination is recorded, the deferral is written into slice 06's own fil
   briefly the only place it exists. Deliberate: a taxonomy row with no handler behind it is the
   inversion this ADR is about.
 - The corpus is still a list somebody wrote. What changed is its direction, not its completeness.
-- **The cancellation test's vacuity guard must be re-derived when the handler lands**, per the
-  Decision. The gap this record closes is not unknown to `tests/` — it is *load-bearing* there, as a
+- **That vacuity guard must be re-derived when the handler lands**, per the Decision. The gap this record closes is not unknown to `tests/` — it is *load-bearing* there, as a
   discriminator. That is the sharpest form of the finding: a defect a test depends on.
-- `src/http/problem.ts` renders every row and sits at **exactly the 0.75 mutation threshold**, three
+- `src/http/problem.ts` renders every row and sits at **exactly the 0.75 threshold**, three
   survivors. Slice 06 changes it twice — this row and `appointment-not-confirmed` — so one new
   survivor fails its Definition of Done. Named in slice 06's inherited scope as a warning rather than
   left as a surprise.
