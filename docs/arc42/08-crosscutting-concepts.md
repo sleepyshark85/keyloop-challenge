@@ -480,7 +480,8 @@ TC-4 fixes REST; A-7 keeps reference data out of the API. Five operations.
 `PATCH` for a move because ADR-0003's mechanism *is* "modify this resource in place" — the verb and the
 `UPDATE` say the same thing. Cancellation is a sub-resource rather than `DELETE` because the appointment
 remains readable at its URL afterwards with `status: cancelled`, which `DELETE` would misdescribe. The
-availability response carries an explicit advisory flag and says so in its OpenAPI description (§6.5).
+availability response carries an explicit advisory flag, and it answers **only about the interval
+queried** (§6.5).
 
 ### Status codes
 

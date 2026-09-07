@@ -77,10 +77,9 @@ check to have a window after.
 
 **Why the lock is there, and why it is not part of that.** Without it, simultaneous inserters do not
 queue: `check_exclusion_constraint` inserts the index tuple and *then* scans, so each waits on the
-others' in-progress tuples and they cycle. Measured, 20 racers over 20 trials:
-**285 of 400 losers returned `40P01`, 95 returned `23P01`, and exactly one row survived every
-trial.** The invariant was never in question; the *status* was, a deadlock carrying no constraint
-and so no verdict to render as `409`. ADR-0018 holds the measurements and the rejected alternatives.
+others' in-progress tuples and they cycle. The invariant was never in question; the *status* was —
+a deadlock carries no constraint, so no verdict to render as `409`. ADR-0018 holds the measurement
+and the rejected alternatives.
 One `pg_advisory_xact_lock` per bay and per technician now precedes each attempt, so at most one
 inserter is in flight against a given resource, every loser conflicts with a **committed** row, and
 the reported constraint is therefore deterministic. **The serialisation point moved but did not
@@ -90,10 +89,8 @@ a move adds.
 **The lock decides nothing, and from slice 05 that is measured both ways.** Drop the lock, keep the
 constraints: still exactly one row, with 108 deadlocks. Drop the constraints and **hold** the locks:
 twenty overlapping rows land one at a time, zero refusals, at most **1** racer inside the `INSERT`
-against the unlocked phase's **20**. §11 D-02-1 carries why the
-fourth cell matters. Perfect mutual exclusion
-over exactly the contended bay prevents not one overlap. *The lock buys liveness; only the constraint
-makes overlap unrepresentable.* All four cells run in
+against the unlocked phase's **20**. §11 D-02-1 carries why the fourth cell matters. *The lock buys
+liveness; only the constraint makes overlap unrepresentable.* All four cells run in
 `tests/integration/exclusion-constraint-adjudicates.test.ts`.
 
 **Where `23P01` is caught and mapped**, one place per stage:
@@ -213,8 +210,7 @@ so a move both waits and is waited on. It therefore locks the **union** of both 
 it leaves re-read inside the attempt's own transaction under the row's lock (ADR-0031): row lock,
 advisory locks, write. Two mechanisms keep that acyclic — `(class, hashtext(key))` total-orders the
 advisory waits, and a complete lock set covers every tuple wait — and no waiter for an appointment
-row lock holds anything while it waits. Measured: 11.7 % of contended moves deadlocked
-before ADR-0030, 0 / 1000 after.
+row lock holds anything while it waits; §11 F-02-9 carries the measurement.
 
 **`0 rows` means one thing — not `confirmed`.** Existence was
 settled by the read above, so there is no follow-up read and §6.6 shows two deciders where it once
@@ -245,22 +241,28 @@ What QS-7 uniquely pins, and why its stated reason was wrong twice, is in §10 �
 
 ## 6.5 Availability query — advisory by contract
 
-`GET /availability?dealershipId&serviceTypeId&from&to` runs `candidateRepository.freeResources` over
-a window and returns free bays and qualified free technicians. It takes no lock, reserves nothing, and
-may be stale before the response is serialised — which the body and the OpenAPI description both say,
-staleness being a property of the domain interface rather than an implementation detail (§8.6).
+`GET /availability?dealershipId&serviceTypeId&from&to` is **two reads composed in
+`src/application/queryAvailability.ts`**: `candidateResources` (reference data) minus
+`appointmentRepository.busyResources` (the window). *This section specified a
+`candidateRepository.freeResources` that never existed, from phase 2 until slice 08, while
+`ambiguity-containment.test.ts` planted exactly that call as a violation — the control was right and
+arc42 wrong (F-08-1, ADR-0032). `candidateRepository.ts` still cannot see `appointment`.*
+
+It takes no lock, reserves nothing, and may be stale before the response is serialised — staleness
+is a property of the domain interface, not an implementation detail (§8.6). It is also about
+**exactly the window queried**: QS-8's probe inserts `[from, to)` itself, so a client querying a day
+to book an hour inside it is outside the guarantee.
 
 The overlap predicate is the same expression the exclusion constraint uses:
 
 ```sql
-tstzrange(a.starts_at, a.ends_at) && tstzrange($from, $to)   AND a.status <> 'cancelled'
+tstzrange(starts_at, ends_at) && tstzrange($from, $to)   AND status <> 'cancelled'
+  AND dealership_id = $1      -- redundant by the composite FKs; it scopes the index, not the answer
 ```
 
-Two expressions, two files, and nothing structural holding them equal (§11 R-5; §4.2 says why a
-shared `IMMUTABLE` function is a trap rather than a fix). QS-8 is what holds them together.
-
-The partial GiST indexes the exclusion constraints create serve this query's range predicate: the
-mechanism that costs write throughput (§11.2) pays for the read path.
+Two expressions in two files, nothing structural holding them equal (§11 R-5; §4.2 says why a
+shared `IMMUTABLE` function is a trap). QS-8 is what holds them together, and the
+partial GiST indexes serve this query's range predicate (§8.2 mechanism 6).
 
 ## 6.6 Where each failure is decided
 
