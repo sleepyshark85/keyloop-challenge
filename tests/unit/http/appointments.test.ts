@@ -651,6 +651,12 @@ describe('setNotFoundHandler — ADR-0024, the second handler §8.6\'s totality 
     expect(response.json().status).toBe(404);
   });
 
+  it('carries its title and detail, not just its type and status — and detail names the METHOD and URL', async () => {
+    const response = await serverAnswering({}).inject({ method: 'GET', url: '/nope-such-route-exists' });
+    expect(response.json().title).toBe('No such route');
+    expect(response.json().detail).toBe('no route matches GET /nope-such-route-exists');
+  });
+
   it('a real resource prefix with no matching sub-route is ALSO route-not-found, not a domain 404', async () => {
     // The control ADR-0024's warning names: this must not collide with `appointment-not-found`.
     const response = await serverAnswering({}).inject({

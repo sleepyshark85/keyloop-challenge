@@ -279,8 +279,14 @@ describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachabl
     readonly description?: string;
     readonly responses?: Record<string, { readonly content?: Record<string, { readonly schema?: { readonly description?: string } }> }>;
   }
+  interface OpenApiInfo {
+    readonly title?: string;
+    readonly description?: string;
+    readonly version?: string;
+  }
   interface OpenApiDoc {
     readonly openapi?: string;
+    readonly info?: OpenApiInfo;
     readonly paths?: Record<string, Record<string, OpenApiOperation>>;
   }
 
@@ -309,5 +315,32 @@ describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachabl
     // AvailabilityBody's own first and last literal pieces survive Stryker unkilled).
     expect(responseSchema?.description).toContain('bays and technicians free over the queried interval');
     expect(responseSchema?.description).toContain('adjudicated, database-verified booking');
+  });
+
+  /**
+   * `docs/slices/09-design.md` step 5 finding 3 — `server.ts`'s `OPENAPI_INFO`/`openapi` string
+   * literals, read byte for byte via the SAME `buildOpenApiDocument()` call this describe block
+   * already makes, rather than a second path into `server.ts`. `R-09-3`: "seven `OPENAPI_INFO`/
+   * `openapi` literals byte for byte outside Stryker's scope … asserting `doc.info`/`doc.openapi`
+   * here gives 57/72".
+   */
+  it("ADR-0005's OPENAPI_INFO reaches the emitted document — title, description and version", async () => {
+    const doc = (await buildOpenApiDocument()) as OpenApiDoc;
+
+    expect(doc.info?.title).toBe('Keyloop Unified Service Scheduler');
+    expect(doc.info?.description).toContain(
+      'Service-appointment scheduling for automotive dealerships',
+    );
+    expect(doc.info?.description).toContain('No authentication (ADR-0002)');
+    expect(doc.info?.description).toContain('a candidate list is advisory only');
+    expect(doc.info?.description).toContain(
+      'every write is adjudicated by PostgreSQL (CLAUDE.md §2.1)',
+    );
+    expect(doc.info?.version).toBe('1.0.0');
+  });
+
+  it('the document declares OpenAPI 3.1.0 — the version `buildServer` registers `@fastify/swagger` with', async () => {
+    const doc = (await buildOpenApiDocument()) as OpenApiDoc;
+    expect(doc.openapi).toBe('3.1.0');
   });
 });

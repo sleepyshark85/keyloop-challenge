@@ -107,17 +107,17 @@ function isValidationError(error: FastifyError): boolean {
 }
 
 /**
- * AC-5 — the two Fastify content-type-parser errors, NAMED, because §8.6 has a row for them and
- * it was not the one they were reaching.
+ * AC-5 — Fastify's content-type-parser error, NAMED, because §8.6 has a row for it and it was
+ * not the one it was reaching.
  *
  * Measured three times independently on the pinned `fastify@5.12.1`: a `POST` carrying
- * `content-type: application/json` with no body raises `FST_ERR_CTP_EMPTY_JSON_BODY`, and with an
- * unparseable body `FST_ERR_CTP_INVALID_JSON_BODY`. Both carry `statusCode: 400`; NEITHER sets
- * `validation`. So both missed the arm above and fell to the catch-all — `500 /problems/internal`,
- * live on the already-merged booking route. §8.6 justifies its `500` row with *"a 4xx would tell
- * the caller to correct something they did not send and cannot see"*, and here the client
- * sent exactly that, can see it, and can correct it. The row was inverted, not missing: this maps
- * to the `/problems/malformed-request` that already exists, and the taxonomy gains nothing.
+ * `content-type: application/json` with an unparseable body raises `FST_ERR_CTP_INVALID_JSON_BODY`,
+ * `statusCode: 400`, with `validation` unset — so it missed the arm above and fell to the
+ * catch-all, `500 /problems/internal`, live on the already-merged booking route. §8.6 justifies
+ * its `500` row with *"a 4xx would tell the caller to correct something they did not send and
+ * cannot see"*, and here the client sent exactly that, can see it, and can correct it. The row
+ * was inverted, not missing: this maps to the `/problems/malformed-request` that already exists,
+ * and the taxonomy gains nothing.
  *
  * BY CODE, NEVER BY `statusCode < 500`. The comment above this one records a broader disjunction
  * being deleted after mutation because no input reached its second arm; widening this one would
@@ -126,21 +126,18 @@ function isValidationError(error: FastifyError): boolean {
  * meet it is the tail wagging the dog.
  *
  * The parser runs BEFORE the router, measured: a malformed body addressed to a path that is not
- * registered raises this too. So this arm is not per-route and cannot be, which is also why
- * `POST /appointments/{id}/cancellation` — a route that reads no body — is answered by it.
+ * registered raises this too. So this arm is not per-route and cannot be.
  *
- * OQ-05-2, deferred to slice 10 and pinned at `400` meanwhile: a correct client that sets
- * `application/json` reflexively on a bodyless request is now told to fix something the endpoint
- * never reads. The alternative is a content-type parser mapping an empty body to `undefined`,
- * which lands with the cURL harness that is the real client emitting the header.
+ * `FST_ERR_CTP_EMPTY_JSON_BODY` NAMED NO LONGER, having named it once (`R-09-14`). It was the
+ * pair's other half until AC-6b's content-type parser above started mapping a zero-length body to
+ * `undefined` before Fastify's own default parser ever runs — the case this arm existed to catch
+ * cannot occur any more, on ANY route, and a set with that code in it was unreachable rather than
+ * a belt to the braces. Removed rather than kept for a mutant to survive against: an unkillable
+ * arm is not a safety margin, the same finding `isValidationError`'s own docblock already made
+ * about its own second arm.
  */
-const MALFORMED_BODY_CODES: ReadonlySet<string> = new Set([
-  'FST_ERR_CTP_EMPTY_JSON_BODY',
-  'FST_ERR_CTP_INVALID_JSON_BODY',
-]);
-
 function isMalformedBody(error: FastifyError): boolean {
-  return MALFORMED_BODY_CODES.has(error.code);
+  return error.code === 'FST_ERR_CTP_INVALID_JSON_BODY';
 }
 
 /** ADR-0005 — one title, one description, shared between the live server and the emitted document. */
