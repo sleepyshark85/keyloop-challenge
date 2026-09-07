@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CONNECTION_TIMEOUT_MS,
+  POOL_MAX,
   closeDb,
   createDb,
   createPool,
@@ -69,6 +70,17 @@ describe('createPool', () => {
 
     expect(CONNECTION_TIMEOUT_MS).toBe(1_000);
     expect(pool.options.connectionTimeoutMillis).toBe(CONNECTION_TIMEOUT_MS);
+  });
+
+  it('names the pool ceiling explicitly rather than relying on pg\'s default (R-07-12)', () => {
+    // `pg`'s own default happens to be 10 too — the whole point of `R-07-12` is that
+    // matching it by omission is a coincidence a future `pg` upgrade could silently move.
+    // Asserting the CONFIGURED value, not merely the observed one, is what makes this a
+    // named ceiling rather than a rediscovery of `pg`'s default.
+    const pool = track(createPool(UNREACHABLE));
+
+    expect(POOL_MAX).toBe(10);
+    expect(pool.options.max).toBe(POOL_MAX);
   });
 
   it('swallows an idle-client error instead of letting it terminate the process', () => {

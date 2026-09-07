@@ -40,6 +40,16 @@ export type Db = Kysely<Database>;
  */
 export const CONNECTION_TIMEOUT_MS = 1_000;
 
+/**
+ * `R-07-12`, `D-07-1`'s in-half. `createPool` used to pass no `max` at all, so the ceiling was
+ * `pg`'s own default of 10 — matching it TODAY only by coincidence, and a coincidence a later
+ * change to `pg`'s default would silently move. Naming it here makes the ceiling one value this
+ * file owns rather than one `pg` happens to pick; `D-07-1`'s other half — what a saturated pool
+ * *answers* — is out of scope (a `503` would be a new taxonomy row, ADR-0024, and QS-11 requires
+ * every row reached end to end) and stays in arc42 §11.
+ */
+export const POOL_MAX = 10;
+
 export type DbConfig = { readonly databaseUrl: string };
 
 export interface CreateDbOptions {
@@ -57,6 +67,7 @@ export function createPool(config: DbConfig, logger?: Logger): pg.Pool {
   const pool = new Pool({
     connectionString: config.databaseUrl,
     connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
+    max: POOL_MAX,
   });
 
   pool.on('error', (error: Error) => {

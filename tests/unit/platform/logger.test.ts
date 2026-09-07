@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { context, trace } from '@opentelemetry/api';
+import type { Span } from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { createLogger } from '../../../src/platform/logger.js';
 import { LOG_LEVELS } from '../../../src/platform/config.js';
 
@@ -52,5 +55,62 @@ describe('createLogger', () => {
     // default is `info`, so only a NON-info level can tell the two apart.
     expect(createLogger({ logLevel: 'trace' }).level).not.toBe('info');
     expect(createLogger({ logLevel: 'fatal' }).level).not.toBe('info');
+  });
+});
+
+/**
+ * AC-6 / arc42 §8.4 — "each carrying `trace_id` and `span_id` from the active context". A fake
+ * `Span` is enough: the mixin only ever calls `.spanContext()`, and `context.with` is what makes
+ * it "active" without a real `NodeTracerProvider` — the same mechanism `AsyncLocalStorageContext
+ * Manager` uses in production, just without the SDK this file must not import
+ * (`otel-sdk-only-in-platform`, decision 1).
+ */
+describe('createLogger — trace_id/span_id from the active OTel context', () => {
+  // `@opentelemetry/api`'s default context manager is a no-op: `context.with(ctx, fn)` runs
+  // `fn` without actually making `ctx` "active", so `context.active()` would always report the
+  // root context and this describe block would pass vacuously. Registering the SAME context
+  // manager `src/platform/telemetry.ts` registers in production (decision 1's "note the Node
+  // SDK's AsyncLocalStorageContextManager must be registered") is what makes `context.with`
+  // load-bearing here — a test file, not `src/`, so `otel-sdk-only-in-platform` does not apply.
+  beforeAll(() => {
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+  });
+  afterAll(() => {
+    context.disable();
+  });
+
+  function fakeSpan(traceId: string, spanId: string): Span {
+    return { spanContext: () => ({ traceId, spanId, traceFlags: 1 }) } as unknown as Span;
+  }
+
+  function logOneLine(): { logger: ReturnType<typeof createLogger>; lines: string[] } {
+    const lines: string[] = [];
+    const logger = createLogger({ logLevel: 'info' }, { write: (line: string): void => void lines.push(line) });
+    return { logger, lines };
+  }
+
+  it('adds trace_id/span_id when a span is active', () => {
+    const span = fakeSpan('0af7651916cd43dd8448eb211c80319c', 'b7ad6b7169203331');
+    const { logger, lines } = logOneLine();
+
+    context.with(trace.setSpan(context.active(), span), () => {
+      logger.info('inside the span');
+    });
+
+    expect(lines).toHaveLength(1);
+    const record = JSON.parse(lines[0] as string) as Record<string, unknown>;
+    expect(record['trace_id']).toBe('0af7651916cd43dd8448eb211c80319c');
+    expect(record['span_id']).toBe('b7ad6b7169203331');
+  });
+
+  it('omits both fields when no span is active', () => {
+    const { logger, lines } = logOneLine();
+
+    logger.info('outside any span');
+
+    expect(lines).toHaveLength(1);
+    const record = JSON.parse(lines[0] as string) as Record<string, unknown>;
+    expect(record['trace_id']).toBeUndefined();
+    expect(record['span_id']).toBeUndefined();
   });
 });
