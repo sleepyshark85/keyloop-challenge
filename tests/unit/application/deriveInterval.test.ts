@@ -110,7 +110,7 @@ describe('deriveInterval — PRECEDENCE (the order Stryker cannot mutate)', () =
 describe('deriveInterval — the client\'s fault and the system\'s fault are different outcomes', () => {
   it('an unresolvable zone is reference-data-invalid, not outside-opening-hours', () => {
     // OQ-02-2, closed: broken reference data is the SYSTEM's fault and renders as
-    // `500 /problems/internal`. A 4xx would tell a service advisor to correct a `time_zone`
+    // `500 /problems/internal`. A 4xx would tell the caller to correct a `time_zone`
     // column they did not send and cannot see. This is also AC-12's route to the `500` row.
     const derivation = deriveInterval(TEN_AM_LOCAL, { durationMinutes: 60 }, dealership(
       weekOpen('09:00:00', '17:00:00'),

@@ -163,8 +163,8 @@ describe('classifyOwnership — ADR-0017', () => {
 
   it('reports unknown-customer when NEITHER exists — the customer is named first', async () => {
     // Both are unresolvable and only one `reference` can be reported. Naming the customer is the
-    // outer-to-inner order: a vehicle is identified relative to its owner, so telling a service
-    // advisor the vehicle is unknown when the customer is too would send them to the wrong record.
+    // outer-to-inner order: a vehicle is identified relative to its owner, so telling the caller
+    // the vehicle is unknown when the customer is too would send them to the wrong record.
     const { db } = scriptedDb([{ rows: [{ customer_exists: false, vehicle_exists: false }] }]);
     expect(await classifyOwnership(db, CUSTOMER, VEHICLE)).toBe('unknown-customer');
   });
