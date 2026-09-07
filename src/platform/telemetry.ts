@@ -19,12 +19,22 @@
  * read "the current span" via `trace.getSpan(context.active())` from inside a handler several
  * `await`s downstream of where the span was started, with no context object threaded by hand.
  *
- * ── ONE TRACER, ONE METER, NAMED ONCE ──────────────────────────────────────────────────────────
+ * ── ONE TRACER, LAZY METER INSTRUMENTS — MEASURED, NOT ASSUMED ─────────────────────────────────
  *
- * `tracer` and the six instruments below are created against the GLOBAL providers `NodeSDK#start()`
- * registers, so importing them before `startTelemetry()` runs still works — `@opentelemetry/api`'s
- * proxy objects forward to whatever provider is registered by the time a span or a measurement is
- * actually taken, never by the time the module is imported.
+ * `src/main.ts` imports this module TRANSITIVELY (via `bookAppointment.js` -> `attemptLoop.js`)
+ * at the top of the file, ahead of its own `startTelemetry()` call — ESM hoists every static
+ * import above a module's own top-level statements, so this module evaluates before `NodeSDK` has
+ * started no matter where `import { startTelemetry }` appears in `main.ts`'s source.
+ *
+ * Measured on the pinned `@opentelemetry/api@1.9.1`/`sdk-metrics@2.11.0`: `trace.getTracer(...)`
+ * called at THIS eval time still exports correctly once `NodeSDK#start()` runs later —
+ * `ProxyTracer` defers to the registered delegate per call, not once at construction. `metrics
+ * .getMeter(...)` does NOT: a `Meter` obtained before a real `MeterProvider` is registered stays a
+ * no-op forever, and every instrument created from it — `meter.createCounter(...)` — inherits
+ * that, silently. A probe confirmed the exact boundary: `getMeter()` and `createCounter()` both
+ * called only after `sdk.start()` exports; either one called before it does not, regardless of
+ * when `.add()` is called. `lazyMeter`/`lazyCounter`/`lazyHistogram` below defer BOTH calls to the
+ * first actual measurement, which happens per request — always after `startTelemetry()` has run.
  */
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
@@ -32,40 +42,68 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { metrics, trace } from '@opentelemetry/api';
-import type { Counter, Histogram } from '@opentelemetry/api';
+import type { Counter, Histogram, Meter, MetricOptions } from '@opentelemetry/api';
 
 const INSTRUMENTATION_NAME = 'keyloop-service-scheduler';
 
 /** §8.4's spans: created wherever the work happens (decision 1), always through this tracer. */
 export const tracer = trace.getTracer(INSTRUMENTATION_NAME);
 
-const meter = metrics.getMeter(INSTRUMENTATION_NAME);
+/** `getMeter()` itself, deferred — see the file docblock's measurement. Called at most once. */
+let cachedMeter: Meter | undefined;
+function meter(): Meter {
+  cachedMeter ??= metrics.getMeter(INSTRUMENTATION_NAME);
+  return cachedMeter;
+}
+
+/**
+ * A `Counter`/`Histogram` handle whose UNDERLYING instrument is not created until the first
+ * `.add()`/`.record()` — which is always at request-handling time, after `startTelemetry()` has
+ * registered the real `MeterProvider` (see the file docblock).
+ */
+function lazyCounter(name: string, options: MetricOptions): Counter {
+  let real: Counter | undefined;
+  return {
+    add: (value, attributes, context): void => {
+      real ??= meter().createCounter(name, options);
+      real.add(value, attributes, context);
+    },
+  };
+}
+
+function lazyHistogram(name: string, options: MetricOptions): Histogram {
+  let real: Histogram | undefined;
+  return {
+    record: (value, attributes, context): void => {
+      real ??= meter().createHistogram(name, options);
+      real.record(value, attributes, context);
+    },
+  };
+}
 
 /**
  * arc42 §8.4's metrics table, verbatim. `booking_conflicts_total` is the one this slice's ACs
  * read; the other five complete the table `docs/slices/09-observability.md` puts in scope, even
  * though no acceptance criterion reads them back off a collector.
  */
-export const bookingConflictsTotal: Counter = meter.createCounter('booking_conflicts_total', {
+export const bookingConflictsTotal: Counter = lazyCounter('booking_conflicts_total', {
   description:
     'Bookings and reschedules that met a database-adjudicated conflict (SQLSTATE 23P01), by ' +
     'which resource conflicted and how the attempt loop resolved it.',
 });
-export const appointmentsBookedTotal: Counter = meter.createCounter('appointments_booked_total', {
+export const appointmentsBookedTotal: Counter = lazyCounter('appointments_booked_total', {
   description: 'Appointments confirmed, by dealership.',
 });
-export const appointmentsRescheduledTotal: Counter = meter.createCounter(
-  'appointments_rescheduled_total',
-  { description: "ADR-0003's second act: moves, by outcome." },
-);
-export const appointmentsCancelledTotal: Counter = meter.createCounter(
-  'appointments_cancelled_total',
-  { description: 'Cancellations.' },
-);
-export const bookingAttempts: Histogram = meter.createHistogram('booking_attempts', {
+export const appointmentsRescheduledTotal: Counter = lazyCounter('appointments_rescheduled_total', {
+  description: "ADR-0003's second act: moves, by outcome.",
+});
+export const appointmentsCancelledTotal: Counter = lazyCounter('appointments_cancelled_total', {
+  description: 'Cancellations.',
+});
+export const bookingAttempts: Histogram = lazyHistogram('booking_attempts', {
   description: "Attempts per booking or reschedule request — ADR-0009's ordering policy, working or not.",
 });
-export const availabilityQueryDurationSeconds: Histogram = meter.createHistogram(
+export const availabilityQueryDurationSeconds: Histogram = lazyHistogram(
   'availability_query_duration_seconds',
   { description: "Goal 5's budget (QS-14), measured in production as well as in the suite.", unit: 's' },
 );
@@ -78,7 +116,9 @@ export function startTelemetry(): NodeSDK {
   const sdk = new NodeSDK({
     contextManager: new AsyncLocalStorageContextManager(),
     traceExporter: new OTLPTraceExporter(),
-    metricReader: new PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter() }),
+    // Plural, not the deprecated singular `metricReader` — the SAME instance either way, but the
+    // singular form logs a deprecation warning on every start.
+    metricReaders: [new PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter() })],
     instrumentations: [],
   });
   sdk.start();

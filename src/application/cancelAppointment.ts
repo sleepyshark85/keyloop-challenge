@@ -22,6 +22,7 @@ import { toAppointmentView } from './bookAppointment.js';
 import type { AppointmentView } from './bookAppointment.js';
 import { cancelAppointmentById } from '../persistence/appointmentRepository.js';
 import type { Db } from '../persistence/db.js';
+import { appointmentsCancelledTotal } from '../platform/telemetry.js';
 
 export type CancelOutcome =
   | { readonly kind: 'cancelled'; readonly appointment: AppointmentView }
@@ -30,7 +31,10 @@ export type CancelOutcome =
 export async function cancelAppointment(db: Db, id: string): Promise<CancelOutcome> {
   const row = await cancelAppointmentById(db, id);
 
-  return row === null
-    ? { kind: 'not-found' }
-    : { kind: 'cancelled', appointment: toAppointmentView(row) };
+  if (row === null) return { kind: 'not-found' };
+
+  // arc42 §8.4's metrics table. `not-found` counts nothing — a replay of an id that never
+  // existed is not a cancellation.
+  appointmentsCancelledTotal.add(1);
+  return { kind: 'cancelled', appointment: toAppointmentView(row) };
 }

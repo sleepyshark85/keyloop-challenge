@@ -304,5 +304,10 @@ describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachabl
     expect(responseSchema?.description).toContain('Advisory only');
     expect(responseSchema?.description).toContain('not a reservation');
     expect(responseSchema?.description).toContain('true only of the interval queried');
+    // The two remaining concatenated literals in this same description — asserted so a
+    // mutation to either is not free of the score's reach either (measured: without these,
+    // AvailabilityBody's own first and last literal pieces survive Stryker unkilled).
+    expect(responseSchema?.description).toContain('bays and technicians free over the queried interval');
+    expect(responseSchema?.description).toContain('adjudicated, database-verified booking');
   });
 });

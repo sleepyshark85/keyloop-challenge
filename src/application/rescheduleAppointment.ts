@@ -63,6 +63,7 @@ import type { AppointmentRow, Move, ResourcePair } from '../persistence/appointm
 import { candidateResources } from '../persistence/candidateRepository.js';
 import { findDealership, findServiceType } from '../persistence/referenceRepository.js';
 import type { ContendedResource } from '../persistence/pgError.js';
+import { appointmentsRescheduledTotal } from '../platform/telemetry.js';
 
 export interface RescheduleCommand {
   readonly id: string;
@@ -232,12 +233,15 @@ export async function rescheduleAppointment(
 
   switch (loopOutcome.kind) {
     case 'success':
+      // arc42 §8.4's metrics table — ADR-0003's second act.
+      appointmentsRescheduledTotal.add(1, { outcome: 'moved' });
       return { kind: 'moved', appointment: toAppointmentView(loopOutcome.row) };
     case 'not-confirmed':
       return { kind: 'not-confirmed' };
     case 'aborted':
       return loopOutcome.value;
     case 'no-capacity':
+      appointmentsRescheduledTotal.add(1, { outcome: 'refused' });
       return {
         kind: 'no-capacity',
         resource: loopOutcome.resource,

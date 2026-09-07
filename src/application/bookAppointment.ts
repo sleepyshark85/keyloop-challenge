@@ -67,6 +67,7 @@ import {
 import { VEHICLE_OWNERSHIP_CONSTRAINT } from '../persistence/pgError.js';
 import type { ContendedResource } from '../persistence/pgError.js';
 import type { OpeningHoursVerdict } from '../domain/openingHours.js';
+import { appointmentsBookedTotal } from '../platform/telemetry.js';
 
 /**
  * The ONE shape the `201` and the `200` both return, defined here because two roles guessed at it
@@ -346,6 +347,8 @@ export async function bookAppointment(
 
   switch (loopOutcome.kind) {
     case 'success':
+      // arc42 §8.4's metrics table.
+      appointmentsBookedTotal.add(1, { dealership: command.dealershipId });
       return { kind: 'confirmed', appointment: toAppointmentView(loopOutcome.row) };
     case 'aborted':
       return loopOutcome.value;
