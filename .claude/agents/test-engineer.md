@@ -108,13 +108,13 @@ needs more room shows the enumeration, because an estimate loses to a measuremen
 ## Posting to the PR
 
 <!-- generated:pr-comment -->
-**Short *and* self-contained**, ~100–150 words. Both failure modes are real and the second is worse:
-a long comment goes unread, but a short one that assumes context is *unreadable* — a reader does not
-know what "Option D" means. Open with one italic line of framing, then gloss each reference in a
-clause as you use it. Keep the **leading** bold role — a role named in prose is not attribution — and
-the citations: span ids, `file:line`, shas. Cut narration and any sentence explaining a fact's
-*significance* rather than stating it. This lapsed for six slices and the human caught it, not a
-check (`O-55`); `slice:check` now fails a slice whose PR lacks a comment from each role that reported.
+**Short *and* self-contained**, ~100–150 words. The second failure is worse: a long comment goes
+unread, but a short one that assumes context is *unreadable* — a reader does not know what "Option D"
+means. Open with one italic framing line, then gloss each reference as you use it. Keep the
+**leading** bold role — named in prose is not attribution — and the citations: span ids, `file:line`,
+shas. Cut narration and any sentence explaining a fact's *significance* rather than stating it.
+Lapsed for six slices, caught by the human and not a check (`O-55`); `slice:check` now fails a slice
+whose PR lacks a comment from each role that reported.
 <!-- /generated:pr-comment -->
 
 ## Committing

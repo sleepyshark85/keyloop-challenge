@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `30fbd44 docs(08): four AC amendments, and the backfill's five findings` |
+| Last commit | `aedb46d feat(08): the PR-comment rule reaches every role by generation, not by briefing` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E |
 | Agent runs recorded | 172 |
 | ADRs accepted | 27 |
