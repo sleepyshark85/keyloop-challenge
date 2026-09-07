@@ -93,72 +93,76 @@ import type { Scenario } from '../support/booking.js';
  * whether that inevitable refusal is reported as a database VERDICT (`23P01`/`409`) or as an
  * unresolved deadlock surfacing as `40P01`/`500` — which is exactly AC-4's claim.
  *
- * `P = 20` independent pairs (distinct dealerships, so no pair's resources can interact with
- * another's), released together from ONE barrier, over `TRIAL_COUNT` trials — at least the
- * AC's floor of 25, matching ADR-0030's own measurement scale (20 x 25 x 2 = 1000) so this
- * file's counts are comparable in KIND to the 117/1000 the architect measured (see the
- * false-pass analysis below for why the RATE is not the same, and why `TRIAL_COUNT` is set
- * higher). Each dealership is seeded ONCE and reused across every trial; each trial's four
- * rows sit at an interval offset by
- * `trial * 1440` minutes (whole days) so no trial's rows can ever collide with another's on
+ * `RACE_COUNT` independent pairs (distinct dealerships, so no pair's resources can interact
+ * with another's), released together from ONE barrier **whose batch size never exceeds the
+ * service's connection pool** (R-07-4, below), over `TRIAL_COUNT` trials. Each dealership is
+ * seeded ONCE and reused across every trial; each trial's four rows sit at an interval offset
+ * by `trial * 1440` minutes (whole days) so no trial's rows can ever collide with another's on
  * the same bay, and so every trial lands at the SAME local wall-clock time on a different
  * calendar day — never spanning local midnight, which is refused independently of the
  * opening-hours window itself (slice 13). Opening hours are additionally set to the whole
  * day (`00:00:00`-`24:00:00`) so the window itself can never be the reason a target is
  * refused — this file is about contention, not GC-1.
  *
- * ── THE FALSE-PASS ARITHMETIC THIS FILE'S "NEVER 40P01" ASSERTION RESTS ON ──────────────
+ * ── R-07-4: THE IN-FLIGHT BOUND, AND WHY IT IS NOT A FLAKE DODGE ────────────────────────
+ *
+ * At the red commit this file released `RACE_COUNT = 20` pairs — 40 movers — from ONE barrier
+ * per trial, against a service whose `createPool` sets no `max` and so runs at pg's
+ * unconfigured default of 10 (D-07-1). The reviewer named two effects of that, and the second
+ * is the one that matters: 40-in-flight-against-10 **manufactures a codeless `500`** the
+ * assertion below then blamed on a deadlock without having measured one, **and** it
+ * **serialises the very simultaneity this criterion is about** — the pool can queue a pair's
+ * two movers apart, so they never actually race the exclusion check at the same instant. The
+ * slice file's own amended text: *"bounding concurrency should make the mutant control
+ * stronger"*, and the architect asked to be contradicted if the re-measurement did not bear
+ * that out.
+ *
+ * **The fix is `RACE_COUNT = 5`, not a new synchronisation primitive.** `movers.length` per
+ * trial is `RACE_COUNT * 2 = 10`, exactly pg's unconfigured pool ceiling, so the EXISTING
+ * `releaseFromBarrier` — already a true release-together barrier, never a queue — never has
+ * more than 10 requests in flight at once. `TRIAL_COUNT` rises to 100 to hold total attempt
+ * volume at `5 * 100 * 2 = 1000`: the AC's own floor, and ADR-0030's own measurement scale
+ * (20 pairs x 25 trials x 2 = 1000).
+ *
+ * ── THE RE-MEASUREMENT (R-07-4's own discipline: measure, don't assume) ─────────────────
  *
  * The architect's own measurement — 117 `40P01` per 1000 contended attempts, 11.7% — is on a
- * DIFFERENT fixture (`docs/adr/0030-...md`'s own, not this one), and it does not transfer
- * uncritically: this fixture forces every attempt 1 to fail first, which costs an extra
- * round trip before the two movers' contended attempt 2 statements are in flight together,
- * and that changes how often their timing actually aligns into a cycle. MEASURED on this
- * file's own fixture against the unfixed build, six throwaway runs: three at RACE_COUNT x 25
- * trials (1000 attempts each — 6, 5, 5 `40P01`) and three at RACE_COUNT x 40 trials (1600
- * attempts each — 13, 4, 8). 41 `40P01` in 7800 attempts total, roughly 0.5% — an order of
- * magnitude below the architect's own number and worth recording rather than assuming.
+ * different fixture (`docs/adr/0030-...md`'s own). The RED-COMMIT shape of THIS fixture (40
+ * in flight against a 10-client pool, `RACE_COUNT = 20`, unbounded barrier) measured 41
+ * `40P01` in 7800 attempts across six throwaway runs — a point estimate of **0.5%**, 95% CI
+ * roughly 0.27%-0.80%.
  *
- * R-07-6: 0.5% IS A POINT ESTIMATE OF AN UNKNOWN RATE `p`, NOT `p` ITSELF, and `p` is
- * machine-dependent — unmeasured on whatever machine actually runs this file in CI — so the
- * false-pass arithmetic below must carry that uncertainty rather than treat 41/7800 as exact.
- * A 95% binomial confidence interval on 41/7800 is roughly 0.27%-0.80%, not a single number.
+ * Re-measured at THIS shape (`RACE_COUNT = 5`, `TRIAL_COUNT = 100`, a 10-wide barrier per
+ * trial, never exceeding the pool) against the SAME unfixed build (`783f323`, ADR-0030 not
+ * yet applied — a throwaway worktree, three runs of 1000 attempts each): **20, 23, 13
+ * `40P01`** — 56 in 3000 attempts, a point estimate of **1.87%**, 95% CI roughly
+ * **1.38%-2.35%**. That interval sits entirely above the unbounded shape's 0.27%-0.80% —
+ * **the rate rose, roughly 2x-4x, and the two intervals do not overlap.** This CONFIRMS the
+ * architect's reading: queue-serialisation, not the extra-round-trip explanation the
+ * red-commit header gave, is why the unbounded shape under-measured. Bounding concurrency to
+ * the pool did not merely avoid the codeless `500` — it let more of the true contention
+ * happen, which is what a mutant control is for. (As a positive control on the measurement
+ * method itself: the SAME bounded shape against the FIXED build — current `HEAD`, ADR-0030
+ * applied — measured 0/1000, confirming the harness discriminates rather than always firing.)
  *
- * Modelled as independent Bernoulli draws at each bound (a simplification — the two attempts
- * of one pair are not independent of each other, but the pairs are): at the POINT ESTIMATE
- * (0.5%), a single run of RACE_COUNT x 25 trials (1000 attempts) observes ZERO deadlocks by
- * chance alone with probability (1 - 0.005)^1000, on the order of 0.67% — small, but not the
- * negligible figure the architect's own 11.7% would suggest. `TRIAL_COUNT` is therefore set
- * to 40, not 25 (the AC's floor is "≥ 25"): at 1000 -> 1600 attempts, the same point-estimate
- * arithmetic gives (1 - 0.005)^1600, on the order of 0.034%.
- *
- * THAT 0.034% IS ALSO A POINT ESTIMATE, and reporting it alone overstates confidence. At the
- * LOWER bound of the interval (0.27%) — the bound that matters, since a lower `p` is what
- * makes a silent false pass MORE likely, not less — `(1 - 0.0027)^1600` is on the order of
- * 1.3%: 38x worse than the 0.034% headline, and worse than the 0.67% the raise from 25 to 40
- * trials was made to fix in the first place. The raise is still the right call: at that same
- * lower bound, 25 trials gives `(1 - 0.0027)^1000` on the order of 6.7%, so going to 40 trials
- * still cuts the worst-case false-pass risk roughly 5x even though it falls well short of the
- * 0.034% the point estimate implied. State the interval, not the point. It is still not
- * zero, and a single green run is still not proof on its own; it is the same standard
- * `no-spurious-refusal.test.ts` applies to its own absence assertions (T-04-4): a positive
- * witness (attempt >= 2 for both movers of a pair, forced by construction here rather than
- * merely likely) must be on the record before the absence of `40P01` is trusted as evidence
- * about ADR-0030 rather than about a race that never bit.
+ * At the new point estimate the false-pass arithmetic is no longer the file's binding
+ * concern: `(1 - 0.0138)^1000` (the interval's LOWER bound, which is what matters for a
+ * silent false pass) is on the order of `1e-6` — several orders below the old shape's worst
+ * case. `TRIAL_COUNT = 100` is kept at the AC's own floor of 1000 total attempts rather than
+ * raised further, because the margin no longer needs it; a single green run is still not
+ * proof on its own, so the positive witnesses below (attempt >= 2, forced by construction)
+ * remain load-bearing exactly as `no-spurious-refusal.test.ts`'s own standard (T-04-4) requires.
  */
 
-const RACE_COUNT = 20;
+const RACE_COUNT = 5;
+/** pg's unconfigured pool default (D-07-1) — `RACE_COUNT * 2` must never exceed this. */
+const POOL_MAX = 10;
 /**
- * ADR-0030's own measurement used 25 trials (20 x 25 x 2 = 1000). Empirically, THIS fixture's
- * observed deadlock rate under the built (target-only) lock is lower than the 11.7% the
- * architect measured on their own fixture — a point estimate of 0.5% per attempt over six
- * throwaway runs (41 `40P01` in 7800 attempts; 95% CI roughly 0.27%-0.80%, see the false-pass
- * analysis below). 40 trials is kept as the floor here rather than 25 for exactly the reason
- * stated there: it is still >= the AC's "≥ 25", and it materially reduces the false-pass
- * probability at both the point estimate and the interval's lower bound, even though it does
- * not reach the headline point-estimate figure once that uncertainty is carried through.
+ * `RACE_COUNT * TRIAL_COUNT * 2 = 1000` — the AC's own floor, and ADR-0030's own measurement
+ * scale (20 x 25 x 2). See the R-07-4 re-measurement above for why this shape's false-pass
+ * risk is lower than the red-commit shape's despite fewer pairs.
  */
-const TRIAL_COUNT = 40;
+const TRIAL_COUNT = 100;
 
 interface RowSnapshot {
   readonly columns: unknown;
@@ -560,6 +564,16 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
             movers.map((m) => m.id),
           );
 
+          // R-07-4: `movers.length` is `RACE_COUNT * 2` and must never exceed `POOL_MAX` —
+          // this barrier releases its whole batch AT ONCE (never a queue), so exceeding the
+          // pool here is exactly the shape that manufactures a codeless `500` and serialises
+          // the simultaneity this criterion measures. An arrangement failure, not a race.
+          expect(
+            movers.length,
+            `ARRANGE — ${String(movers.length)} movers would be released at once against a ` +
+              `pool of at most ${String(POOL_MAX)}; RACE_COUNT must shrink.`,
+          ).toBeLessThanOrEqual(POOL_MAX);
+
           const answers = await releaseFromBarrier(movers.length, async (index) => {
             const mover = movers[index] as TrialMover;
             return {
@@ -630,6 +644,14 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
         );
         const conflicts = conflictRecords(allRecords);
         const loop = describeLoopLines(allRecords);
+        // Computed HERE, ahead of `badAnswers` below, so THAT assertion can report the
+        // MEASURED cause of a `500` rather than assume one (R-07-4): ADR-0029's per-path
+        // naming means a deadlock on the reschedule path carries no SQLSTATE text on stdout,
+        // only this event — so "a 500 happened" and "a 40P01 happened" are two different
+        // measurements, and one is not evidence for the other without being read off it.
+        const deadlocks = allRecords.filter(
+          (r) => r['event'] === 'reschedule.deadlock' || r['msg'] === 'reschedule.deadlock',
+        );
 
         // ── THE POSITIVE WITNESS, FIRST (T-07-2 / T-04-4's principle). Every race is BUILT
         // to force both movers past attempt 1 (see the file header): attempt 1 always fails
@@ -694,14 +716,26 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
 
         // ── THE CORE CLAIM. Every attempt receives a database verdict: 200 or 409, never a
         // 500 — which is what an unresolved 40P01 looks like at the edge (arc42 §8.6,
-        // ADR-0029). This is the assertion the false-pass arithmetic in the file header is
-        // about, and it is expected to FAIL at this red commit: ADR-0030 is not built, and
-        // the architect measured the unfixed shape at 117 40P01 per 1000 contended attempts.
+        // ADR-0029). This is the assertion the R-07-4 re-measurement above is about, and it
+        // is expected to FAIL at this red commit: ADR-0030 is not built, and the
+        // re-measurement at THIS shape found 20/23/13 per 1000 against the unfixed build.
+        //
+        // R-07-4: the message reports `deadlocks.length` — WHAT WAS MEASURED — rather than
+        // naming a cause it did not check. A `500` with zero `reschedule.deadlock` lines is
+        // not this criterion's failure mode (D-07-1's pool-saturation fault is out of slice,
+        // and the movers.length guard above keeps this fixture under the pool ceiling), and
+        // the message says so rather than assuming every `500` is a 40P01.
         expect(
           badAnswers,
           `AC-4 — every attempt must be answered 200 or 409, never anything else (500 above ` +
             `all: an unresolved 40P01 surfacing at the edge). ${String(badAnswers.length)} of ` +
-            `${String(RACE_COUNT * TRIAL_COUNT * 2)} attempts violated this.\n` +
+            `${String(RACE_COUNT * TRIAL_COUNT * 2)} attempts violated this; ` +
+            `${String(deadlocks.length)} reschedule.deadlock event(s) were logged` +
+            (badAnswers.length > 0 && deadlocks.length === 0
+              ? ' — NONE, so this run\'s 500s are NOT explained by a measured 40P01 and the ' +
+                'cause is something else (see stdout below).'
+              : '.') +
+            `\n` +
             badAnswers.slice(0, 10).join('\n') +
             (badAnswers.length > 10 ? `\n  … and ${String(badAnswers.length - 10)} more` : ''),
         ).toEqual([]);
@@ -713,10 +747,8 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
         // means a deadlock on the reschedule path never carries the literal string "40P01"
         // anywhere in this service's structured output — it is reported as the event
         // `reschedule.deadlock`, with no SQLSTATE text alongside it — so the claim is read
-        // off THAT event, not off a raw substring search that would pass vacuously here.
-        const deadlocks = allRecords.filter(
-          (r) => r['event'] === 'reschedule.deadlock' || r['msg'] === 'reschedule.deadlock',
-        );
+        // off THAT event (computed above, ahead of `badAnswers`), not off a raw substring
+        // search that would pass vacuously here.
         expect(
           deadlocks.length,
           `AC-4 — a reschedule.deadlock event was logged (ADR-0029's per-path deadlock name, ` +
@@ -784,5 +816,294 @@ describe('slice 07 — AC-4: racing moves on different incumbent pairs never dea
       });
     },
     300_000,
+  );
+});
+
+// ──────────────────────────────────────── AC-5: the lock set is derived from state the ──
+// ──────────────────────────────────────── transaction itself observed (ADR-0031) ────────
+
+/**
+ * Slice 07 — AC-5, added at step 5 (`R-07-1`, the loopback): a move's advisory lock set must
+ * reflect the pair the row *currently* occupies, never a pair read before the transaction
+ * opened. `docs/slices/07-reschedule-under-contention.md` AC-5 · `docs/slices/07-design.md`
+ * §11 `R-07-1` · ADR-0027, ADR-0030, ADR-0031 · arc42 §5.2, §6.3.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * WHY THIS IS DETERMINISTIC, NOT A RACE — the architect's own instruction.
+ *
+ * A probabilistic witness for this rule is the thing ADR-0030 (and now ADR-0031) exists to
+ * replace: racing four movers into the exact stale interleaving would be exactly that. This
+ * file instead CHOREOGRAPHS the interleaving with two ordinary PostgreSQL locks, so the
+ * sequence below happens on every run or the ARRANGE step fails loudly rather than the
+ * assertion passing vacuously:
+ *
+ *   1. `holder` takes A's OWN ROW LOCK (`SELECT … FOR UPDATE`) before the mover is even
+ *      issued. A move's PLAIN pre-loop existence read is NEVER blocked by a row lock — MVCC
+ *      serves it the last COMMITTED version regardless — so the mover reads A at P1 exactly
+ *      as ADR-0027 intends, then blocks the instant it needs A's row for itself: at its own
+ *      fresh `FOR UPDATE` read under ADR-0031 (blocks BEFORE `lockResources`), or at the
+ *      guarded `UPDATE`'s implicit row lock under the pre-loop-read build (blocks AFTER
+ *      `lockResources`, since advisory locks depend on no table state). Either way the
+ *      mover is now genuinely parked on `holder`, confirmed by a bounded probe that it has
+ *      NOT answered (`within`, below) rather than inferred from a sleep.
+ *   2. `holder`, STILL the session holding A's row lock, relocates A itself — from P1 to P2
+ *      — and commits. This is the moment ADR-0031's text names: *"relocate the row between
+ *      [the pre-loop read] and the attempt."* Only the lock's own holder may write the row
+ *      while it is held, which is exactly what makes the ordering deterministic rather than
+ *      raced: the mover cannot observe P2 one instant sooner or later than this commit.
+ *   3. `blocker` already holds an UNCOMMITTED row at P1 — attempt 1's TARGET, which ADR-0027
+ *      pins to "the pair the row already holds" regardless of which build is running and
+ *      regardless of the relocation in step 2. Once `holder` releases A, the mover reaches
+ *      its own `UPDATE`'s exclusion check against P1 and waits on `blocker`'s uncommitted
+ *      row — a second, confirmed park, this time strictly AFTER `lockResources` on EVERY
+ *      build (advisory locks never depend on `blocker`'s row). THIS is "in flight between
+ *      `lockResources` and its `UPDATE`," and it is where `pg_locks` is read.
+ *   4. `pg_locks` is read for exactly four `(classid, objid)` pairs — P1's bay and
+ *      technician, P2's bay and technician — computed via the SAME `hashtext` the service
+ *      itself uses (`docs/slices/07-design.md` §3), never inferred from a backend pid: since
+ *      nothing else in this run takes an advisory lock on these four specific keys, whatever
+ *      rows appear are the mover's, full stop.
+ *   5. `blocker` releases and the mover is awaited to completion (the release witness —
+ *      `cancellation-takes-no-lock.test.ts`'s own three-step shape), so a hung promise is a
+ *      test failure rather than a leaked timer.
+ *
+ * MEASURED against the current build (a throwaway run, this exact construction, `postgres:16`,
+ * ADR-0030 applied and ADR-0031 not): the mover parks exactly as predicted at both steps 1
+ * and 3, and `pg_locks` shows ONLY P1's two keys — P2's are absent. That is this file's RED:
+ * the transaction that is, at that moment, "in flight between `lockResources` and its
+ * `UPDATE`" against the row's ACTUAL current pair (P2) holds no lock on it at all.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * WHY ATTEMPT 1, NOT A FORCED RETRY.
+ *
+ * ADR-0031's own text: *"Attempt 1's take stays existing's pair (ADR-0027, unchanged) …
+ * Where the row did move underneath, attempt 1 locks four keys instead of two."* Attempt 1
+ * already exercises the discriminating case once the row is relocated between the pre-loop
+ * read and the attempt — no candidate shuffle, no second mover, no seed is needed to reach
+ * it, which is exactly why a mutant control built from real locks rather than four racing
+ * movers is possible at all.
+ */
+
+const ADVISORY_BAY_CLASS = 1;
+const ADVISORY_TECHNICIAN_CLASS = 2;
+
+const AC5_TIMED_OUT = Symbol('AC-5: still in flight');
+
+/** `work`, or `AC5_TIMED_OUT` if it has not settled within `ms`. Never rejects, never hangs. */
+async function ac5Within<T>(ms: number, work: Promise<T>): Promise<T | typeof AC5_TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expiry = new Promise<typeof AC5_TIMED_OUT>((resolveExpiry) => {
+    timer = setTimeout(() => resolveExpiry(AC5_TIMED_OUT), ms);
+  });
+  try {
+    return await Promise.race([work, expiry]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/** How long the mover gets to reach each park point before ARRANGE is declared failed. */
+const AC5_PARK_PROBE_MS = 2_000;
+/** How long the mover gets to resolve once every lock it was waiting on is released. */
+const AC5_RELEASE_DEADLINE_MS = 20_000;
+
+describe('slice 07 — AC-5: the lock set is derived from state the transaction itself observed (ADR-0031)', () => {
+  let client: Client;
+
+  beforeAll(async () => {
+    client = new Client({ connectionString: inject('databaseUrl') });
+    await client.connect();
+  });
+
+  afterAll(async () => {
+    await client?.end();
+  });
+
+  it(
+    'AC-5 — a move relocated between the pre-loop read and the attempt holds advisory locks on the pair the row NOW occupies, not the pair it was read at',
+    async () => {
+      const scenario = await seedScenario(client, 'ac5-lock-set-reflects-current-pair', {
+        bays: 2,
+        technicians: 2,
+        customers: 1,
+        hours: { opensAt: '00:00:00', closesAt: '24:00:00' },
+      });
+      const where = `\n${describeScenario(scenario)}`;
+      const [p1Bay, p2Bay] = scenario.bayIds as readonly [string, string];
+      const [p1Tech, p2Tech] = scenario.technicianIds as readonly [string, string];
+
+      // A confirmed at P1 = (p1Bay, p1Tech) @ I.
+      const aId = await occupy(client, scenario, {
+        label: 'a',
+        bayId: p1Bay,
+        technicianId: p1Tech,
+        startsAt: at(0),
+        endsAt: at(60),
+      });
+      // Attempt 1's TARGET (ADR-0027: "the pair the row already holds") is P1 at the NEW
+      // interval J, regardless of build and regardless of the relocation below.
+      const targetStart = at(1440);
+      const targetEnd = at(1500);
+
+      const holder = new Client({ connectionString: inject('databaseUrl') });
+      const blocker = new Client({ connectionString: inject('databaseUrl') });
+      await holder.connect();
+      await blocker.connect();
+
+      await withService(async (service) => {
+        try {
+          // ── STEP 3's SETUP (done first; independent of steps 1-2's timing). `blocker`
+          // occupies P1 @ J, UNCOMMITTED, so the mover's own UPDATE — whichever build,
+          // since ADR-0027's TAKE for attempt 1 is unaffected by ADR-0031 — waits on it.
+          await blocker.query('begin');
+          await blocker.query(
+            `insert into appointment
+               (id, dealership_id, customer_id, vehicle_id, service_type_id, technician_id,
+                bay_id, starts_at, ends_at)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+            [
+              uuidFor(scenario.namespace, 'blocker'),
+              scenario.dealershipId,
+              scenario.customers[0]?.customerId,
+              scenario.customers[0]?.vehicleId,
+              scenario.serviceTypeId,
+              p1Tech,
+              p1Bay,
+              targetStart.toISOString(),
+              targetEnd.toISOString(),
+            ],
+          );
+
+          // ── STEP 1. `holder` takes A's own row lock BEFORE the mover is issued.
+          await holder.query('begin');
+          const held = await holder.query('select id from appointment where id = $1 for update', [
+            aId,
+          ]);
+          expect(held.rowCount, `ARRANGE — holder did not lock A's row.${where}`).toBe(1);
+
+          // ── ISSUE THE MOVER. Its own plain pre-loop read of A is unaffected by `holder`'s
+          // row lock (MVCC), so it reads P1 — exactly the value ADR-0031's text calls stale.
+          let settled: import('../support/booking.js').HttpAnswer | undefined;
+          const moverPromise = postReschedule(service, aId, targetStart.toISOString()).then(
+            (answer) => {
+              settled = answer;
+              return answer;
+            },
+          );
+
+          const firstProbe = await ac5Within(AC5_PARK_PROBE_MS, moverPromise);
+          expect(
+            firstProbe === AC5_TIMED_OUT ? 'still in flight' : 'answered',
+            `ARRANGE — the mover answered before \`holder\`'s row lock on A was ever released ` +
+              `(${firstProbe === AC5_TIMED_OUT ? '' : describeAnswer(settled as never)}). It ` +
+              `must park on \`holder\` — either at its own fresh row read (ADR-0031) or at its ` +
+              `guarded UPDATE's implicit row lock (the pre-loop-read build) — before this file's ` +
+              `choreography means anything.${where}`,
+          ).toBe('still in flight');
+
+          // ── STEP 2. RELOCATE A, from the session that HOLDS its row lock, then commit —
+          // the moment ADR-0031's own text names: "relocate the row between [the pre-loop
+          // read] and the attempt."
+          await holder.query('update appointment set bay_id = $1, technician_id = $2 where id = $3', [
+            p2Bay,
+            p2Tech,
+            aId,
+          ]);
+          await holder.query('commit');
+
+          // ── STEP 3. The mover is now unblocked from `holder` and must park a SECOND time,
+          // on `blocker` — either immediately (the pre-loop-read build, which already ran
+          // `lockResources` before parking on `holder`) or after its own fresh read and
+          // `lockResources` call (ADR-0031). THIS is "in flight between lockResources and
+          // its UPDATE" on every build, which is where pg_locks is read next.
+          const secondProbe = await ac5Within(AC5_PARK_PROBE_MS, moverPromise);
+          expect(
+            secondProbe === AC5_TIMED_OUT ? 'still in flight' : 'answered',
+            `ARRANGE — the mover answered before \`blocker\`'s uncommitted row at P1 was ever ` +
+              `released (${secondProbe === AC5_TIMED_OUT ? '' : describeAnswer(settled as never)}). ` +
+              `Attempt 1's target is P1 (ADR-0027) on every build, so it must wait on \`blocker\` ` +
+              `here — without this park the pg_locks read below could land before lockResources ` +
+              `ever ran.${where}`,
+          ).toBe('still in flight');
+
+          // ── STEP 4. THE ASSERTION. Read pg_locks for exactly the four keys this scenario
+          // can produce, via the SAME hashtext the service itself uses (design §3).
+          const hash = async (value: string): Promise<number> => {
+            const { rows } = await client.query<{ h: number }>('select hashtext($1::text) as h', [
+              value,
+            ]);
+            return Number(rows[0]?.h);
+          };
+          const p1BayHash = await hash(p1Bay);
+          const p1TechHash = await hash(p1Tech);
+          const p2BayHash = await hash(p2Bay);
+          const p2TechHash = await hash(p2Tech);
+
+          const { rows: locks } = await client.query<{
+            classid: string;
+            objid: string;
+            granted: boolean;
+          }>(
+            `select classid, objid, granted
+               from pg_locks
+              where locktype = 'advisory' and granted = true
+                and classid in ($1, $2)
+                and objid in ($3, $4, $5, $6)`,
+            [ADVISORY_BAY_CLASS, ADVISORY_TECHNICIAN_CLASS, p1BayHash, p1TechHash, p2BayHash, p2TechHash],
+          );
+          const holds = (classid: number, objid: number): boolean =>
+            locks.some((l) => Number(l.classid) === classid && Number(l.objid) === objid);
+
+          const locksWhere =
+            `\n  P1 bay=${p1Bay} (hash ${String(p1BayHash)}) tech=${p1Tech} (hash ${String(p1TechHash)})` +
+            `\n  P2 bay=${p2Bay} (hash ${String(p2BayHash)}) tech=${p2Tech} (hash ${String(p2TechHash)})` +
+            `\n  granted advisory locks on these keys: ${JSON.stringify(locks)}${where}`;
+
+          // ── THE POSITIVE WITNESS, FIRST (T-07-2 / T-04-4's principle): the harness itself
+          // reached the intended state. P1's keys are held on EVERY build — the pre-loop-read
+          // build takes them because take=leave=P1 there; ADR-0031 takes them too, because
+          // ADR-0027's TAKE for attempt 1 is unaffected by the fix. Their absence means the
+          // mover never reached lockResources at all (a fixture defect), not evidence about
+          // ADR-0031.
+          expect(
+            holds(ADVISORY_BAY_CLASS, p1BayHash) && holds(ADVISORY_TECHNICIAN_CLASS, p1TechHash),
+            `the positive witness is missing: the mover holds no advisory lock on P1 at all, ` +
+              `on EITHER build — the fixture never reached lockResources.${locksWhere}`,
+          ).toBe(true);
+
+          // ── THE CLAIM ITSELF. P2 is the pair A ACTUALLY occupies right now (step 2's
+          // commit). A transaction whose lock set is "derived from state the transaction
+          // itself observed" (AC-5's own words) must hold P2's keys too — ADR-0031's fix
+          // takes FOUR keys at attempt 1 exactly when the row moved underneath (its own
+          // Decision section). The pre-loop-read build never re-reads, so it never acquires
+          // them: this is expected to FAIL at this commit.
+          expect(
+            holds(ADVISORY_BAY_CLASS, p2BayHash) && holds(ADVISORY_TECHNICIAN_CLASS, p2TechHash),
+            `AC-5 — the transaction must hold advisory locks on P2 (${p2Bay} / ${p2Tech}), the ` +
+              `pair A's row CURRENTLY occupies (relocated at step 2, under A's own row lock, ` +
+              `before the mover's lockResources call could have run against it). It does not: ` +
+              `the lock set reflects the STALE pair read before this attempt's transaction ` +
+              `opened, not the row's current state — ADR-0031's own subject.${locksWhere}`,
+          ).toBe(true);
+
+          // ── STEP 5. RELEASE WITNESS. Without it "in flight" is inferred from a timeout
+          // that never resolves, and a mover broken for an unrelated reason reads the same.
+          await blocker.query('rollback');
+          const finalAnswer = await ac5Within(AC5_RELEASE_DEADLINE_MS, moverPromise);
+          expect(
+            finalAnswer === AC5_TIMED_OUT ? 'never completed' : 'completed',
+            `RELEASE WITNESS — the mover did not complete within ` +
+              `${String(AC5_RELEASE_DEADLINE_MS)} ms of \`blocker\`'s row being released, so the ` +
+              `park above measured a broken request rather than a blocked one.${where}`,
+          ).toBe('completed');
+        } finally {
+          await holder.query('rollback').catch(() => undefined);
+          await blocker.query('rollback').catch(() => undefined);
+          await holder.end();
+          await blocker.end();
+        }
+      });
+    },
+    60_000,
   );
 });
