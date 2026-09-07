@@ -67,7 +67,7 @@ conclusion, before one. **Those two are the same string, and nothing distinguish
 | **A** | Do nothing structural; rely on the source scan and review | It is the weakest available mechanism for a NON-NEGOTIABLE rule. Not rejected as an *alternative*: C is what makes A a backstop rather than the whole defence, and this ADR keeps both |
 | **B** | A `dependency-cruiser` rule | `dependency-cruiser` reasons about module *edges*, and the use case is already permitted to import the repository, the port having been removed on purpose. There is no forbidden import to forbid, and the nearest expressible rule would forbid the correct design too |
 | **C** | **Brand the contended resource**, minted only by the SQLSTATE classifier | **Chosen** |
-| **D** | Carry the whole classifier verdict into the `no-capacity` outcome | Strictly more evidence, but it puts a persistence-shaped value into the HTTP layer's `switch` — the leakage the SQL-confinement rule exists to prevent — and fabricating a plausible error object is barely harder than writing a cast. **Partially adopted**: the constraint name is carried on the classifier's verdict, because the acceptance criteria assert on it; not into the booking outcome |
+| **D** | Carry the whole `PgOutcome` conflict object into the `no-capacity` outcome | Strictly more evidence, but it puts a persistence-shaped value into the HTTP layer's `switch` — the leakage the SQL-confinement rule exists to prevent — and fabricating a plausible error object is barely harder than writing a cast. **Partially adopted**: the constraint name is carried on `PgOutcome`, because the acceptance criteria assert on it; not into `BookOutcome` |
 | **E** | Assert at runtime that a `409` followed a `23P01`, through the observability slice's span or metric | The only option that catches the defect behaviourally, and it cannot exist until that slice — a guard arriving seven slices after the code it guards. It also asserts on telemetry, so deleting a span deletes the guard. **Deferred, not rejected**: once the conflict counter distinguishes absorbed from refused, a refusal with no counted conflict is exactly this check, and it belongs there as a second line of defence |
 
 ## Decision
@@ -75,12 +75,12 @@ conclusion, before one. **Those two are the same string, and nothing distinguish
 Chosen option: **C — `ContendedResource` is a branded type minted only inside
 `src/persistence/pgError.ts`, and `BookOutcome`'s `no-capacity` variant carries it.**
 
-The brand is a `'bay' | 'technician'` union no other module can construct. The sentence to carry
-away: **you cannot
-refuse a booking for capacity reasons without holding a value PostgreSQL produced.** The refusal is
-not *justified* by a database verdict in a comment; it is *constructed from* one, and the compiler
-checks it. It is the pattern the domain already uses: `Instant` and `DurationMinutes` are branded with one
-constructor each, so possession of the type is evidence about the value.
+The brand is a `'bay' | 'technician'` union no other module can construct: it is minted on the
+`PgOutcome` the SQLSTATE classifier returns, and nowhere else. The sentence to carry away: **you
+cannot refuse a booking for capacity reasons without holding a value PostgreSQL produced.** The
+refusal is not *justified* by a database verdict in a comment; it is *constructed from* one, and the
+compiler checks it. It is the pattern the domain already uses: `Instant` and `DurationMinutes` are
+branded with one constructor each, so possession of the type is evidence about the value.
 
 ### What was measured, and the claim narrowed to fit it
 
@@ -88,7 +88,7 @@ constructor each, so possession of the type is evidence about the value.
 
 | Tree | Result |
 |---|---|
-| `pgError.ts` + a use case refusing from a classifier verdict | **exit 0** |
+| `pgError.ts` + a use case refusing from a `PgOutcome` | **exit 0** |
 | the same, plus a planted `if (!free) return { kind: 'no-capacity', resource: 'bay', attempts: 0 }` | **exit 2** — `TS2322: Type '"bay"' is not assignable to type 'ContendedResource'` |
 | the same planted mutant written `resource: 'bay' as ContendedResource` | **exit 0** — the escape hatch |
 
