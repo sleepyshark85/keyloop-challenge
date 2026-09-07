@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `da68d67 feat(07): ADR-0031 — a move reads the pair it leaves inside its own transaction` |
+| Last commit | `2bca770 test(07): AC-5's lock-set comparison moves into SQL; A-07-4 retired` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 150 |
+| Agent runs recorded | 151 |
 | ADRs accepted | 26 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -297,7 +297,8 @@
 | 2026-09-07 00:21 | test-engineer | 30m32 | 378 / 46,125 / 33,664,141 | `derived` |
 | 2026-09-07 00:39 | implementer | 18m33 | 418 / 15,847 / 31,956,516 | `derived` |
 | 2026-09-07 00:40 | architect | 322m44 | 152 / 19,731 / 8,107,627 | `derived` |
-| | **total** | **6214m56** | **38,032 / 2,903,819 / 3,153,366,374** | |
+| 2026-09-07 00:53 | test-engineer | 11m23 | 236 / 8,730 / 9,868,582 | `derived` |
+| | **total** | **6226m19** | **38,268 / 2,912,549 / 3,163,234,956** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
