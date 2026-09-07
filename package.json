@@ -46,6 +46,7 @@
     "slice:close": "node tools/slice/close.mjs"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "13.0.0",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@testcontainers/postgresql": "12.1.0",

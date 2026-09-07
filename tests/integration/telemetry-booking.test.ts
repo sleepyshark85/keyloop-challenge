@@ -1,0 +1,432 @@
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { Client } from 'pg';
+import { startService } from '../support/service.js';
+import type { StartedService } from '../support/service.js';
+import { startOtelCollector } from '../support/otelCollector.js';
+import type { CollectedSpan, OtelCollector } from '../support/otelCollector.js';
+import { vinFor } from '../support/ids.js';
+import {
+  at,
+  blockPairs,
+  bookingBody,
+  describeAnswer,
+  describeScenario,
+  member,
+  occupy,
+  postBooking,
+  postCancellation,
+  postReschedule,
+  seedScenario,
+} from '../support/booking.js';
+import type { HttpAnswer, Scenario } from '../support/booking.js';
+
+/**
+ * Slice 09 — QS-13, AC-1 through AC-6, over the running service's emitted telemetry.
+ *
+ * `docs/slices/09-observability.md` · `docs/slices/09-design.md` §8.4, decisions 1-3 ·
+ * arc42 §8.4, §8.5.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * WHY THIS FILE IS `tests/integration/` AND NOT `tests/acceptance/`.
+ *
+ * The design's own step-2 ruling places it here (the five files decision 1-2 commit), and
+ * `CLAUDE.md` §5 makes `tests/integration/` shared with DB-invariant assertions the
+ * test-engineer's. This file asserts a PROCESS invariant rather than a database one — the
+ * span ordering and the counter's single increment site are properties of the running
+ * artifact, not of a row — but it sits beside the other process-level integration tests
+ * (`reschedule-is-one-statement.test.ts`) for the same reason: it needs the real compiled
+ * service and real PostgreSQL together, never a stub of either (`CLAUDE.md` §2.2).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * "AN IN-MEMORY OTEL EXPORTER" (AC-1's Given), AND WHAT THAT CAN MEAN FROM OUTSIDE THE PROCESS.
+ *
+ * The service under test is a SEPARATE, spawned process (`tests/support/service.ts`'s
+ * standing convention — never import `src/` to run the server in-process, C1/black-box).
+ * Spans and metric points created inside that process cannot be read by literally sharing
+ * memory with this test. What CAN be in-memory is the RECEIVER: `otelCollector.ts` is a
+ * throwaway OTLP/HTTP endpoint this test owns, standing in for the `grafana/otel-lgtm` stack
+ * `docker-compose.yml` names for the demo — it holds what it received in a plain array,
+ * never on disk, and it is thrown away with the process at the end of each `it`.
+ *
+ * The wire contract this rests on — bare `OTEL_EXPORTER_OTLP_ENDPOINT`, JSON body, the
+ * `/v1/traces` and `/v1/metrics` suffixes appended by the exporter — is measured against
+ * `@opentelemetry/exporter-trace-otlp-http` / `-metrics-otlp-http` `0.222.0` and documented
+ * in `otelCollector.ts`'s own header, per that file's own "verify before relying on it"
+ * standard (`tests/setup/postgres.ts`'s precedent). **If the implementation exports over
+ * gRPC, over `http/protobuf`, or reads a different endpoint variable, every case below fails
+ * with zero requests received** (`collector.describe()` renders that plainly) rather than
+ * with a crash — a real, diagnosable red for a seam whose other side does not exist yet.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * WHY AC-1/AC-2/AC-3 SHARE ONE BOOKING RATHER THAN EACH REPEATING IT.
+ *
+ * All three read facts off the SAME trace and the SAME metric export — "the same run", in
+ * AC-3's own words. A `beforeAll` in that describe block runs the booking once; each `it`
+ * asserts a different fact against the telemetry it produced, so a failure in one is legible
+ * on its own criterion rather than smeared across a shared assertion.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * THE AC-1/AC-2/AC-3 FIXTURE, AND WHY IT NEEDS A FIXED `BOOKING_SEED`.
+ *
+ * "Retries once then succeeds, on `resource=bay`" needs the FIRST draw to be doomed and the
+ * SECOND to succeed — unlike `tests/acceptance/candidate-retry.test.ts`'s AC-3/AC-4 fixtures,
+ * which are permutation-safe because every remaining path has the SAME outcome. Here two
+ * outcomes are reachable from a two-candidate list (dealership: 2 bays, 2 technicians;
+ * `bayIds[0]` occupied by `technicianIds[1]` for the target window, `technicianIds[0]` free
+ * throughout), so ADR-0021's `BOOKING_SEED` is the actual subject, exactly the case its own
+ * design note ("used below only where it is the actual subject") anticipates.
+ *
+ * `BOOKING_SEED=7` is not read off any source: MEASURED against this repository's already
+ * merged, already shipped candidate-ordering implementation (slices 02/04, pre-dating this
+ * slice) by seeding this exact fixture shape against a throwaway container and a compiled
+ * `dist/main.js`, and observing the request, reset, and repeat across many seeds and two
+ * independently-derived namespaces (different UUIDs, same shuffle) until one produced
+ * `resource=bay` on attempt 1 and a `201` on attempt 2, reproducibly across five repeats. The
+ * shuffle is a pure function of (list lengths, seed) — ADR-0009 — so the seed transfers
+ * across namespaces; it would stop transferring only if candidate ordering itself changed,
+ * which is exactly the kind of regression a fixed seed is supposed to catch.
+ */
+
+const SHARED_SEED = 7;
+
+async function seedRetryOnceFixture(client: Client, namespace: string): Promise<Scenario> {
+  const scenario = await seedScenario(client, namespace, { bays: 2, technicians: 2 });
+  await occupy(client, scenario, {
+    label: 'blocker',
+    bayId: scenario.bayIds[0]!,
+    technicianId: scenario.technicianIds[1]!,
+    startsAt: at(0),
+    endsAt: at(60),
+  });
+  return scenario;
+}
+
+interface TelemetryRun {
+  readonly answer: HttpAnswer;
+  readonly service: StartedService;
+  readonly collector: OtelCollector;
+}
+
+/**
+ * Start a collector and a service pointed at it, run `action`, stop the SERVICE (which is
+ * what flushes a graceful `NodeSDK#shutdown()`, per `otelCollector.ts`'s header), then hand
+ * back the collector for assertions. The COLLECTOR is stopped by the caller, in a `finally`,
+ * once every assertion in the `it`/`describe` has read it.
+ */
+async function runWithTelemetry(
+  options: { readonly bookingSeed?: number },
+  action: (service: StartedService) => Promise<HttpAnswer>,
+): Promise<{ readonly failure?: string; readonly run?: TelemetryRun }> {
+  const collector = await startOtelCollector();
+  const attempt = await startService({
+    databaseUrl: inject('databaseUrl'),
+    logLevel: 'trace',
+    otelExporterEndpoint: collector.endpoint,
+    ...(options.bookingSeed === undefined ? {} : { bookingSeed: options.bookingSeed }),
+  });
+  if (attempt.service === undefined) {
+    await collector.stop();
+    return { failure: attempt.failure ?? 'the service did not start' };
+  }
+  const service = attempt.service;
+  const answer = await action(service);
+  // Flush: SIGTERM, and `main.ts` is described as "starts and shuts the SDK down".
+  await service.stop();
+  return { run: { answer, service, collector } };
+}
+
+describe('QS-13 / AC-1, AC-2, AC-3 — one retried-then-succeeded booking, read off its trace and its metric export', () => {
+  let client: Client;
+  let scenario: Scenario;
+  let run: TelemetryRun | undefined;
+  let startFailure: string | undefined;
+
+  beforeAll(async () => {
+    client = new Client({ connectionString: inject('databaseUrl') });
+    await client.connect();
+    scenario = await seedRetryOnceFixture(client, 'ac1-telemetry-retry-once');
+
+    const { failure, run: started } = await runWithTelemetry({ bookingSeed: SHARED_SEED }, async (service) =>
+      postBooking(service, bookingBody(scenario)),
+    );
+    startFailure = failure;
+    run = started;
+
+    if (run !== undefined) {
+      // AC-1/AC-2 need the insert spans; AC-3 needs the counter's export. Both are async
+      // relative to the HTTP response, so wait for the shape this fixture is KNOWN to
+      // produce (two `appointment.insert` spans) before any `it` reads the collector —
+      // otherwise a slow exporter reads as "the spans don't exist" instead of "not yet".
+      await run.collector.awaitSpans(
+        (spans) => spans.filter((s) => s.name === 'appointment.insert').length >= 2,
+      );
+      await run.collector.awaitMetricPoints((points) => points.some((p) => p.metric === 'booking_conflicts_total'));
+    }
+  });
+
+  afterAll(async () => {
+    await run?.collector.stop();
+    await client?.end();
+  });
+
+  function where(): string {
+    const fixture = describeScenario(scenario);
+    const answer = run === undefined ? '(service did not start)' : describeAnswer(run.answer);
+    const telemetry = run === undefined ? '(no collector)' : run.collector.describe();
+    return `\n${fixture}\n  HTTP answer: ${answer}\n${telemetry}`;
+  }
+
+  it('the service started and the booking succeeded (201) — the shared arrangement for AC-1/AC-2/AC-3', () => {
+    expect(startFailure ?? 'started', `ARRANGE failed.${where()}`).toBe('started');
+    expect(run?.answer.status, `ARRANGE — the seeded BOOKING_SEED=${String(SHARED_SEED)} fixture did not retry-then-succeed as measured.${where()}`).toBe(201);
+  });
+
+  it('AC-1 — an `availability.candidates` span ends before the first `appointment.insert` span begins', () => {
+    if (run === undefined) return;
+    const spans = run.collector.spans();
+    const candidates = spans.filter((s) => s.name === 'availability.candidates');
+    const inserts = [...spans.filter((s) => s.name === 'appointment.insert')].sort(
+      (a, b) => (a.startTimeUnixNano < b.startTimeUnixNano ? -1 : a.startTimeUnixNano > b.startTimeUnixNano ? 1 : 0),
+    );
+
+    expect(candidates.length, `expected an availability.candidates span.${where()}`).toBeGreaterThanOrEqual(1);
+    expect(inserts.length, `expected at least one appointment.insert span.${where()}`).toBeGreaterThanOrEqual(1);
+
+    const firstInsert = inserts[0];
+    const endsBeforeFirstInsert = candidates.some((c) => c.endTimeUnixNano <= (firstInsert?.startTimeUnixNano ?? 0n));
+    expect(
+      endsBeforeFirstInsert,
+      `expected an availability.candidates span to END before the first appointment.insert ` +
+        `span BEGINS — the window check-then-act would have raced in (§8.4).${where()}`,
+    ).toBe(true);
+  });
+
+  it('AC-2 — exactly two appointment.insert spans; the failed one carries db.sqlstate=23P01 and db.constraint', () => {
+    if (run === undefined) return;
+    const inserts = run.collector.spans().filter((s) => s.name === 'appointment.insert');
+    expect(inserts.map((s) => s.attributes), `expected exactly two appointment.insert spans.${where()}`).toHaveLength(2);
+
+    const failed = inserts.filter((s) => s.attributes['db.sqlstate'] !== undefined);
+    expect(failed.map((s) => s.attributes), `expected exactly one failed attempt span.${where()}`).toHaveLength(1);
+    expect(failed[0]?.attributes['db.sqlstate']).toBe('23P01');
+    expect(failed[0]?.attributes['db.constraint'], `db.constraint missing on the failed span.${where()}`).toBe(
+      'no_bay_overlap',
+    );
+  });
+
+  it('AC-3 — booking_conflicts_total{resource=bay,outcome=absorbed} increments by exactly 1, with no outcome=refused', () => {
+    if (run === undefined) return;
+    const points = run.collector.metricPoints().filter((p) => p.metric === 'booking_conflicts_total');
+    const absorbed = points.filter((p) => p.attributes['resource'] === 'bay' && p.attributes['outcome'] === 'absorbed');
+    const refused = points.filter((p) => p.attributes['outcome'] === 'refused');
+
+    expect(absorbed.length, `expected a booking_conflicts_total{resource=bay,outcome=absorbed} point.${where()}`).toBeGreaterThanOrEqual(1);
+    // Cumulative temporality may export the same point more than once across periodic
+    // exports; every exported value for THIS attribute set must read exactly 1, never more.
+    expect(absorbed.every((p) => p.value === 1), `every absorbed export must read exactly 1.${where()}`).toBe(true);
+    expect(refused, `no outcome=refused increment is expected in this run.${where()}`).toHaveLength(0);
+  });
+});
+
+describe('QS-13 / AC-4 — a booking refused after exhausting candidates', () => {
+  let client: Client;
+  let scenario: Scenario;
+  let run: TelemetryRun | undefined;
+  let startFailure: string | undefined;
+
+  beforeAll(async () => {
+    client = new Client({ connectionString: inject('databaseUrl') });
+    await client.connect();
+    // Both bays blocked (candidate-retry.test.ts's AC-3a/AC-4 shape): permutation-safe —
+    // every draw conflicts on `no_bay_overlap`, so no BOOKING_SEED is needed here.
+    scenario = await seedScenario(client, 'ac4-telemetry-exhausted', { bays: 2, technicians: 2 });
+    await blockPairs(client, scenario, 2, at(0), at(60));
+
+    const { failure, run: started } = await runWithTelemetry({}, async (service) =>
+      postBooking(service, bookingBody(scenario)),
+    );
+    startFailure = failure;
+    run = started;
+    if (run !== undefined) {
+      await run.collector.awaitMetricPoints((points) => points.some((p) => p.metric === 'booking_conflicts_total'));
+    }
+  });
+
+  afterAll(async () => {
+    await run?.collector.stop();
+    await client?.end();
+  });
+
+  function where(): string {
+    const fixture = describeScenario(scenario);
+    const answer = run === undefined ? '(service did not start)' : describeAnswer(run.answer);
+    const telemetry = run === undefined ? '(no collector)' : run.collector.describe();
+    return `\n${fixture}\n  HTTP answer: ${answer}\n${telemetry}`;
+  }
+
+  it('AC-4 — outcome=refused increments and outcome=absorbed does not', () => {
+    expect(startFailure ?? 'started', `ARRANGE failed.${where()}`).toBe('started');
+    expect(run?.answer.status, `ARRANGE — expected the fully-blocked fixture to be refused.${where()}`).toBe(409);
+    if (run === undefined) return;
+
+    const points = run.collector.metricPoints().filter((p) => p.metric === 'booking_conflicts_total');
+    const refused = points.filter((p) => p.attributes['resource'] === 'bay' && p.attributes['outcome'] === 'refused');
+    const absorbed = points.filter((p) => p.attributes['outcome'] === 'absorbed');
+
+    expect(refused.length, `expected a booking_conflicts_total{resource=bay,outcome=refused} point.${where()}`).toBeGreaterThanOrEqual(1);
+    expect(absorbed, `outcome=absorbed must not increment when every candidate is exhausted.${where()}`).toHaveLength(0);
+  });
+});
+
+describe('QS-13 / AC-5 — a 409 from moving a CANCELLED appointment does not touch booking_conflicts_total', () => {
+  let client: Client;
+  let scenario: Scenario;
+  let run: TelemetryRun | undefined;
+  let startFailure: string | undefined;
+  let bookAnswer: HttpAnswer | undefined;
+  let cancelAnswer: HttpAnswer | undefined;
+  let rescheduleAnswer: HttpAnswer | undefined;
+
+  beforeAll(async () => {
+    client = new Client({ connectionString: inject('databaseUrl') });
+    await client.connect();
+    scenario = await seedScenario(client, 'ac5-telemetry-not-confirmed', { bays: 1, technicians: 1 });
+
+    const { failure, run: started } = await runWithTelemetry({}, async (service) => {
+      bookAnswer = await postBooking(service, bookingBody(scenario));
+      const id = member(bookAnswer, 'id');
+      cancelAnswer = await postCancellation(service, String(id));
+      rescheduleAnswer = await postReschedule(service, String(id), new Date(at(120).getTime()).toISOString());
+      return rescheduleAnswer;
+    });
+    startFailure = failure;
+    run = started;
+    if (run !== undefined) {
+      // There is nothing to wait FOR here — the claim is absence — so this only waits long
+      // enough that an eventual, wrongly-fired increment would have arrived.
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
+  });
+
+  afterAll(async () => {
+    await run?.collector.stop();
+    await client?.end();
+  });
+
+  function where(): string {
+    const fixture = describeScenario(scenario);
+    return (
+      `\n${fixture}` +
+      `\n  book:       ${bookAnswer === undefined ? '(none)' : describeAnswer(bookAnswer)}` +
+      `\n  cancel:     ${cancelAnswer === undefined ? '(none)' : describeAnswer(cancelAnswer)}` +
+      `\n  reschedule: ${rescheduleAnswer === undefined ? '(none)' : describeAnswer(rescheduleAnswer)}` +
+      `\n${run === undefined ? '(no collector)' : run.collector.describe()}`
+    );
+  }
+
+  it('AC-5 — the arrangement: booked, cancelled, then a 409 appointment-not-confirmed on reschedule', () => {
+    expect(startFailure ?? 'started', `ARRANGE failed.${where()}`).toBe('started');
+    expect(bookAnswer?.status, `ARRANGE — booking failed.${where()}`).toBe(201);
+    expect(cancelAnswer?.status, `ARRANGE — cancellation failed.${where()}`).toBe(200);
+    expect(rescheduleAnswer?.status, `ARRANGE — expected 409 appointment-not-confirmed.${where()}`).toBe(409);
+    expect(member(rescheduleAnswer as HttpAnswer, 'type')).toBe('/problems/appointment-not-confirmed');
+  });
+
+  it('AC-5 — booking_conflicts_total did not increment: this is a state conflict, never a 23P01', () => {
+    if (run === undefined) return;
+    // GUARD FIRST: "zero points" is vacuous if telemetry never arrived at all — the same
+    // discipline `guardTheCruiseHappened` applies in tests/architecture/layering.test.ts.
+    // The booking half of this arrangement is a real, uncontended write, so at least one
+    // span (e.g. appointment.insert) must exist before the ABSENCE claim below means anything.
+    expect(
+      run.collector.spans().length,
+      `no telemetry arrived at all in this run — the claim below would be vacuously true ` +
+        `rather than evidence that a state conflict specifically is not counted.${where()}`,
+    ).toBeGreaterThan(0);
+
+    const points = run.collector.metricPoints().filter((p) => p.metric === 'booking_conflicts_total');
+    expect(
+      points,
+      `a 409 from an application-guarded UPDATE (zero rows, ADR-0025) is not contention — ` +
+        `§8.4 counts SQLSTATE 23P01 and nothing else.${where()}`,
+    ).toHaveLength(0);
+  });
+});
+
+describe('QS-13 / AC-6 — structured, trace-correlated logs carry no customer name, VIN or vehicle description', () => {
+  let client: Client;
+  let scenario: Scenario;
+  let run: TelemetryRun | undefined;
+  let startFailure: string | undefined;
+
+  const NAMESPACE = 'ac6-telemetry-log-pii';
+  // Mirrors seedScenario's OWN naming exactly (tests/support/booking.ts), so this test
+  // asserts against the actual seeded values without needing seedScenario to expose them.
+  const CUSTOMER_NAME = `${NAMESPACE} customer 000`;
+  const VEHICLE_DESCRIPTION = 'vehicle 000';
+  const VEHICLE_VIN = vinFor(NAMESPACE, 'vehicle/000');
+
+  beforeAll(async () => {
+    client = new Client({ connectionString: inject('databaseUrl') });
+    await client.connect();
+    scenario = await seedScenario(client, NAMESPACE, { bays: 1, technicians: 1 });
+
+    const { failure, run: started } = await runWithTelemetry({}, async (service) =>
+      postBooking(service, bookingBody(scenario)),
+    );
+    startFailure = failure;
+    run = started;
+    if (run !== undefined) {
+      await run.collector.awaitSpans((spans) => spans.some((s) => s.name === 'appointment.insert'));
+    }
+  });
+
+  afterAll(async () => {
+    await run?.collector.stop();
+    await client?.end();
+  });
+
+  function where(): string {
+    const fixture = describeScenario(scenario);
+    const output = run === undefined ? '(service did not start)' : run.service.output().stdout;
+    return `\n${fixture}\n  stdout:\n${output}`;
+  }
+
+  it('AC-6 — the request succeeded, so its logs exist to be examined', () => {
+    expect(startFailure ?? 'started', `ARRANGE failed.${where()}`).toBe('started');
+    expect(run?.answer.status, `ARRANGE — booking failed.${where()}`).toBe(201);
+  });
+
+  it('AC-6 — pino output carries trace_id/span_id matching an emitted span, correlating logs to the trace', () => {
+    if (run === undefined) return;
+    const records = run.service.logRecords();
+    const withTrace = records.filter(
+      (r) => typeof r['trace_id'] === 'string' && typeof r['span_id'] === 'string',
+    );
+    expect(withTrace.length, `expected at least one log line carrying trace_id/span_id.${where()}`).toBeGreaterThanOrEqual(1);
+
+    const HEX32 = /^[0-9a-f]{32}$/;
+    const HEX16 = /^[0-9a-f]{16}$/;
+    for (const record of withTrace) {
+      expect(HEX32.test(String(record['trace_id'])), `trace_id is not a 32-hex-char id: ${JSON.stringify(record)}${where()}`).toBe(true);
+      expect(HEX16.test(String(record['span_id'])), `span_id is not a 16-hex-char id: ${JSON.stringify(record)}${where()}`).toBe(true);
+    }
+
+    // Correlated, not merely present: the log's trace_id must name a REAL trace this
+    // request produced, not an unrelated or fabricated value.
+    const spanTraceIds = new Set<string>(run.collector.spans().map((s: CollectedSpan) => s.traceId));
+    const correlated = withTrace.some((r) => spanTraceIds.has(String(r['trace_id'])));
+    expect(
+      correlated,
+      `no log line's trace_id matched a trace_id the collector actually received.${where()}`,
+    ).toBe(true);
+  });
+
+  it('AC-6 — no log line names the customer, the VIN, or the vehicle description', () => {
+    if (run === undefined) return;
+    const stdout = run.service.output().stdout;
+    expect(stdout.includes(CUSTOMER_NAME), `the customer's name leaked into the logs.${where()}`).toBe(false);
+    expect(stdout.includes(VEHICLE_VIN), `the vehicle's VIN leaked into the logs.${where()}`).toBe(false);
+    expect(stdout.includes(VEHICLE_DESCRIPTION), `the vehicle's description leaked into the logs.${where()}`).toBe(false);
+  });
+});

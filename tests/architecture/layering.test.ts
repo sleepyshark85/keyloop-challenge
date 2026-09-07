@@ -602,3 +602,109 @@ describe('AC-3 — `npm run lint:arch` exits 0 against the real module tree', ()
     ).toBeGreaterThan(0);
   });
 });
+
+// ═══════════════════════════════════════════════════════ slice 09 — QS-10's fifth plant ══
+
+/**
+ * QS-10's fifth confinement — `docs/slices/09-design.md` decision 1: "A new forbidden rule
+ * arrives with its plant or it does not arrive." `otel-sdk-only-in-platform` is the rule;
+ * this is its plant, in its OWN fixture rather than folded into `VIOLATING_SOURCES` above —
+ * that fixture's "exactly one violation per planted file, and none besides" assertion is a
+ * closed inventory over the FOUR founding rules, and adding a fifth rule's plants there
+ * would make that assertion a claim about five rules while `AC-4`'s own text still names
+ * four. A second, self-contained fixture keeps both claims true without editing either.
+ *
+ * The rule does not exist in `.dependency-cruiser.js` yet (it is the architect's file,
+ * `CLAUDE.md` §2.3) — so every case below is RED for the same reason the founding rules were
+ * once: the control has no rule to fire, and "found 0" is what the assertion below reports
+ * rather than a crash.
+ *
+ * Four cases, matching design decision 1's own words: `@opentelemetry/api` is importable
+ * from `src/application` and `src/persistence`; the SDK is confined to `src/platform` PLUS
+ * `src/main.ts` (the composition root that starts and shuts it down).
+ */
+describe('slice 09 / QS-10 — otel-sdk-only-in-platform fires on the SDK outside platform/main, and not on @opentelemetry/api', () => {
+  const OTEL_SOURCES: Record<string, string> = {
+    'src/domain/thing.ts': 'export interface Thing { readonly id: string }\n',
+    // `cruise()` invokes `depcruise src tests`, so a `tests/` directory must exist even
+    // though this fixture plants no `outside-in-tests-do-not-import-src` case of its own —
+    // without it depcruise exits non-zero with "Can't open 'tests' for reading".
+    'tests/acceptance/placeholder.test.ts': 'export const placeholder = true;\n',
+    // legal: the SDK, confined to its two permitted homes.
+    'src/platform/telemetry.ts':
+      "import { NodeSDK } from '@opentelemetry/sdk-node';\nexport const sdk = new NodeSDK();\n",
+    'src/main.ts':
+      "import { NodeSDK } from '@opentelemetry/sdk-node';\nexport const bootSdk = (): NodeSDK => new NodeSDK();\n",
+    // legal: the API, importable outside platform (decision 1).
+    'src/application/ok-otel-api.ts':
+      "import { trace } from '@opentelemetry/api';\nexport const tracer = trace.getTracer('probe');\n",
+    // illegal: the SDK itself, reached from outside its two permitted homes.
+    'src/application/bad-otel-sdk.ts':
+      "import { NodeSDK } from '@opentelemetry/sdk-node';\nexport const leaked = new NodeSDK();\n",
+    'src/persistence/bad-otel-sdk.ts':
+      "import { NodeSDK } from '@opentelemetry/sdk-node';\nexport const leakedToo = new NodeSDK();\n",
+  };
+
+  function stubOtelPackages(root: string): void {
+    stubPackage(
+      root,
+      '@opentelemetry/api',
+      'export declare const trace: { getTracer(name: string): unknown };\n',
+    );
+    stubPackage(root, '@opentelemetry/sdk-node', 'export declare class NodeSDK { start(): void }\n');
+  }
+
+  let result: CruiseResult;
+  let planted: string[];
+
+  beforeAll(() => {
+    const root = newFixture('otel-confinement');
+    stubOtelPackages(root);
+    planted = plant(root, OTEL_SOURCES);
+    ({ result } = cruise(root));
+  });
+
+  it('cruised the fixture: no environment issues, and every planted file was analysed', () => {
+    guardTheCruiseHappened(result, planted);
+  });
+
+  it.each([
+    ['src/application/bad-otel-sdk.ts', 'node_modules/@opentelemetry/sdk-node'],
+    ['src/persistence/bad-otel-sdk.ts', 'node_modules/@opentelemetry/sdk-node'],
+  ])('reports otel-sdk-only-in-platform on %s -> %s', (from, to) => {
+    guardTheCruiseHappened(result, planted);
+    const matching = result.summary.violations.filter(
+      (violation) => violation.rule.name === 'otel-sdk-only-in-platform' && violation.from === from,
+    );
+    expect(
+      matching.map((v) => `${v.rule.name} ${v.from} -> ${v.to}`),
+      `expected otel-sdk-only-in-platform to fire on ${from}; all violations reported were ` +
+        JSON.stringify(result.summary.violations.map((v) => `${v.rule.name} ${v.from} -> ${v.to}`), null, 2),
+    ).toHaveLength(1);
+    expect(matching[0]?.to).toContain(to);
+  });
+
+  it.each(['src/platform/telemetry.ts', 'src/main.ts'])(
+    'does NOT fire on %s — the SDK\'s two permitted homes',
+    (from) => {
+      guardTheCruiseHappened(result, planted);
+      const matching = result.summary.violations.filter(
+        (violation) => violation.rule.name === 'otel-sdk-only-in-platform' && violation.from === from,
+      );
+      expect(matching, `${from} is a permitted home for the SDK and must not be flagged`).toEqual([]);
+    },
+  );
+
+  it('does NOT fire on src/application/ok-otel-api.ts — @opentelemetry/api is importable outside platform', () => {
+    guardTheCruiseHappened(result, planted);
+    const matching = result.summary.violations.filter(
+      (violation) =>
+        violation.rule.name === 'otel-sdk-only-in-platform' && violation.from === 'src/application/ok-otel-api.ts',
+    );
+    expect(
+      matching,
+      'decision 1: @opentelemetry/api is importable from src/application and src/persistence; ' +
+        'only the SDK, its exporters and its instruments are confined',
+    ).toEqual([]);
+  });
+});
