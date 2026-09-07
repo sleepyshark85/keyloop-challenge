@@ -233,13 +233,28 @@ produce the identical diff** — this one. The difference is a counter that meas
 and I decline to spend it on a sentence of my own. **No test changes; step 3 stands and step 4 is not
 interrupted.** The gate is shown this as an AC ruling.
 
+## Step 4 adjudication — three findings, and a gap of my own
+
+| # | Verdict | Rule | Why |
+|---|---|---|---|
+| `I-09-2` | **AGREE**; remedy **changed** — the fixture, not the seed | (a) | Below |
+| `I-09-3` | **AGREE**. `AC-6b` superseded this pin **by name**: *"rather than the 400 slice 05's AC-5 pins today"* — `error-taxonomy.test.ts:590` | (a) | An empty body is no longer malformed: it leaves `MALFORMED_BODIES`, pinned at `404 /problems/appointment-not-found` on a never-booked id. Unparseable stays `400` |
+| `I-09-4` | **DISAGREE** that it is settled; the gap is **mine** | (b) | §8.4 fixes the counter's trigger and never its arity, so *"label by the most recent conflict"* is correct as agreed. ADR-0035, `proposed` |
+
+**The seed transfers; the fixture never did.** Bays are read `ORDER BY name`, technicians `ORDER BY
+id`, so which technician the blocker sorts to is a per-namespace coin-flip. Seed 7 is right where it
+was measured, wrong in `ac1-telemetry-retry-once`, where the blocker is drawn at the head and pruning
+the bay leaves it there. **Delete `technicianIds[1]`'s qualification.** The blocker stops
+being a candidate, the technician list is `I-04-10`'s permutation-safe singleton, only the bay
+draw decides, and `SHARED_SEED = 7` holds: `bay -> 201` across five namespaces.
+
 ## Proposed arc42 edits, made at step 7
 
 §8.4 gains the one-increment-site rule and loses the sentence `A-04-15` says slice 04 made false.
 §5.3's ruleset table gains `otel-sdk-only-in-platform` and QS-10's row its fifth plant (`T-09-2`).
 §10.2's QS-11 loses *"the OpenAPI half is slice 09's and unasserted"*, and QS-14 gains the measurement
-protocol above, exclusivity included. §3.1 gains the harness as the stubbed client. §11 gains R-1's measured figure, AC-12's headroom beside it (`T-09-4`) and
-`D-07-1`'s stated reason. **§8, §10 and §11 are over budget: every addition names its deletion.**
+protocol above, exclusivity included. §3.1 gains the harness as the stubbed client. §11 gains R-1's figure, AC-12's headroom beside it (`T-09-4`) and
+`D-07-1`'s stated reason, and ADR-0035's under-count. **§8, §10 and §11 are over budget: every addition names its deletion.**
 
 ## Assumptions and open questions
 
