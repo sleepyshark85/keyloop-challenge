@@ -94,7 +94,7 @@ I-02-9 ruled the false comment the more dangerous half.
 
 Frontmatter `arc42:` gains **§7.3** and **§13**. Both moved on this branch; neither was declared.
 
-- **§7.3** — `9dfde0d`, the environment table and its contract sentence (T-04-5, ADR-0022). Mine.
+- **§7.3** — `9dfde0d`, the environment table and its contract sentence (T-04-5). Mine.
 - **§13** — `4d172cc`, scoped `chore(04)`, +139 lines, and `ee868c3`. Scribe-owned prose, but the
   declaration governs the **branch**, not the author, so §13 is declared rather than exempted —
   I-04-12's rule, that nobody silences a guard by writing a name into it.

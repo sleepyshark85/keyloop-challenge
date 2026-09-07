@@ -5,14 +5,14 @@ status: done
 depends_on: ["01"]
 absorbs: ["03", "12", "13"]
 arc42: ["§5.2", "§6.1", "§8.6", "§10.2"]
-adr: [1, 2, 4, 5, 6, 8, 14, 15]
+adr: [1, 2, 4, 5, 6, 8]
 quality_scenarios: [QS-1, QS-2, QS-11, QS-9, QS-12]
 loopbacks: 0
-deferred_from: ["R-01-1:0014", "R-01-4:0015"]
+deferred_from: ["R-01-1", "R-01-4"]
 ---
 
 > **Absorbs slice 03** (Gate D, 2026-09-04) and **slices 12 and 13** (the human's cost ruling,
-> 2026-09-05). AC-7–AC-12 are slice 03's criteria; AC-13–AC-19 apply ADR-0014 and ADR-0015, both
+> 2026-09-05). AC-7–AC-12 are slice 03's criteria; AC-13–AC-19 apply slices 12 and 13's remedies, both
 > ratified, so this slice implements agreed decisions rather than proposing them. Rationale for both
 > folds is in `docs/team-log/events.jsonl` (`s-02-ruling-fold-12-13`, Gate D).
 >
@@ -73,7 +73,7 @@ contended one from an unknown vehicle without parsing prose.
 - **AC-12** — Given every row of §8.6's table, when the contract test runs, then each is reachable and
   no two rows collide — the taxonomy is total and stable. *(QS-11)*
 
-### Absorbed from slice 12 — ADR-0014, an `Instant` is renderable by construction
+### Absorbed from slice 12 — an `Instant` is renderable by construction
 
 - **AC-13** — Given `epochMillis` with `Math.abs(epochMillis) > 8_640_000_000_000_000`, when
   `instant()` is called, then it returns `null`. *(QS-12)*
@@ -86,7 +86,7 @@ contended one from an unknown vehicle without parsing prose.
   `withinOpeningHours` is called, then it returns `malformed-interval` and does not throw. The
   existing verdict variant is reused; no new variant is introduced. *(QS-12)*
 
-### Absorbed from slice 13 — ADR-0015, an interval ending at local midnight
+### Absorbed from slice 13 — an interval ending at local midnight
 
 - **AC-17** — Given a dealership open 09:00–24:00 local and a 60-minute job starting 23:00 local, when
   `withinOpeningHours` is called, then the verdict is **within**, not `spans-local-days`. *(QS-9)*
@@ -110,7 +110,7 @@ contended one from an unknown vehicle without parsing prose.
   is the refusal, and the resource named is the list that emptied. Candidate *ordering* stays slice
   04's; this is the loop only.
 - The two ratified domain fixes: the epoch bound in `src/domain/interval.ts`'s `instant()` **and** in
-  `src/domain/openingHours.ts` step 1 (ADR-0014), and step 4's midnight normalisation (ADR-0015).
+  `src/domain/openingHours.ts` step 1, and step 4's midnight normalisation.
 
 ## Out of scope
 
@@ -125,11 +125,11 @@ contended one from an unknown vehicle without parsing prose.
   AC-6 ruling no domain module may import another, so it appears twice with no mechanism to share it.
   That is **D-01-2** cashing in, booked as debt in design §11 and arc42 §11 rather than resolved here;
   reversing the AC-6 ruling to avoid a duplicated constant is a scope change and the human's.
-- **Deleting the `'24:00:00'` parse arm.** Refused explicitly as ADR-0015's Option C, on the
+- **Deleting the `'24:00:00'` parse arm.** Refused explicitly at slice 13, on the
   `'24:00:00'::time` measurement. The dead branch was the *symptom*; the live defect is that a
   midnight-ending job is refused.
 - Opening hours that wrap past midnight into the next day (an 18:00–02:00 window). A genuinely
-  two-day window, addressed by neither ADR-0001 nor ADR-0015.
+  two-day window, addressed by neither ADR-0001 nor slice 13.
 
 ## Definition of done
 

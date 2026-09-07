@@ -127,7 +127,7 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
  │     candidateResources(dealership, serviceType) → bays[], technicians[]        ADVISORY
  │       reference data only; the availability filter arrives after slice 08 (D-04-1)
  ├─ 6. orderCandidates(bays, technicians, deps.seed())       domain/candidates.ts    (ADR-0009)
- │        seeded, pure, injected — never a global RNG; BOOKING_SEED overrides (ADR-0021)
+ │        seeded, pure, injected — never a global RNG; BOOKING_SEED overrides it
  │        null → THE ONLY empty-candidate branch, and it is REACHABLE:
  │             no bay .................................. → 500  ┐ two different failures,
  │             no qualified technician .................. → 422  ┘ and NEVER a fabricated
@@ -159,13 +159,12 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
         therefore admit the identical execution set, and `<=` is kept deliberately — under
         `<` a future PgOutcome variant retrying WITHOUT pruning would leave the loop
         quietly at the bound instead of meeting the throw. It THROWS rather than refusing:
-        nothing is minted there (ADR-0020 F, §8.6). Proof and exhaustive search over every
+        nothing is minted there (§8.6). Proof and exhaustive search over every
         adversarial path, (B,T) in 1..9^2 and 8 seeds — step 5.
 
         Both refusals are 409 /problems/no-capacity and both carry the resource this
-        arm's own classification minted — ADR-0020: the cap is tested INSIDE the 23P01
-        arm, never as the loop's bound, so no refusal exit can be reached without a
-        verdict. `exhausted` wins a tie. The bound being exact, "capped" is reachable
+        arm's own classification minted, the cap being tested INSIDE the 23P01 arm and
+        never as the loop's bound, so no refusal exit is reachable without a verdict. `exhausted` wins a tie. The bound being exact, "capped" is reachable
         only where |bays| + |technicians| >= 18 — and at §1.1 scale it is, which is
         D-04-1: a non-zero "capped" is expected today, not ADR-0009's intended signal.
 ```
@@ -185,7 +184,7 @@ Two details a reviewer should check any implementation against:
 `PATCH /appointments/{id}` with a new `startsAt`. Steps 1–6 are §6.2's, with the appointment's own
 dealership and service type read from the existing row — **and that read also decides `404`**, being
 one the move cannot be built without (ADR-0025). Step 7 replaces the `INSERT`, and **attempt 1 is the
-pair the row already holds** before ADR-0009's shuffle opens (ADR-0027):
+pair the row already holds** before ADR-0009's shuffle opens:
 
 ```sql
 UPDATE appointment
@@ -207,8 +206,8 @@ because none of them is obvious:
 
 **A move is in flight against two pairs, not one.** Its vacated index entry stays live until commit,
 so a move both waits and is waited on. It therefore locks the **union** of both (ADR-0030), the pair
-it leaves re-read inside the attempt's own transaction under the row's lock (ADR-0031): row lock,
-advisory locks, write. Two mechanisms keep that acyclic — `(class, hashtext(key))` total-orders the
+it leaves re-read inside the attempt's own transaction under the row's lock: row lock, advisory
+locks, write. Two mechanisms keep that acyclic — `(class, hashtext(key))` total-orders the
 advisory waits, and a complete lock set covers every tuple wait — and no waiter for an appointment
 row lock holds anything while it waits; §11 F-02-9 carries the measurement.
 
@@ -220,7 +219,7 @@ showed one (ADR-0025).
 
 `POST /appointments/{id}/cancellation` — one unconditional statement: no guard, no pre-read and
 **no advisory lock**, a cancelled row satisfying no constraint's `WHERE` and leaving nothing to
-serialise (ADR-0023).
+serialise.
 
 ```sql
 UPDATE appointment
@@ -246,7 +245,7 @@ What QS-7 uniquely pins, and why its stated reason was wrong twice, is in §10 �
 `appointmentRepository.busyResources` (the window). *This section specified a
 `candidateRepository.freeResources` that never existed, from phase 2 until slice 08, while
 `ambiguity-containment.test.ts` planted exactly that call as a violation — the control was right and
-arc42 wrong (F-08-1, ADR-0032). `candidateRepository.ts` still cannot see `appointment`.*
+arc42 wrong (F-08-1). `candidateRepository.ts` still cannot see `appointment`.*
 
 It takes no lock, reserves nothing, and may be stale before the response is serialised — staleness
 is a property of the domain interface, not an implementation detail (§8.6). It is also about

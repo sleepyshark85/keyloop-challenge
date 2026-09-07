@@ -7,7 +7,7 @@ arc42: ["§5.2", "§6.1", "§6.4", "§6.6", "§8.6", "§10", "§11"]
                      # §6.6 and §8.6 amended at step 2; §6.1 at step 7, R-02-2 having been
                      # built in this slice. §6.2, §6.3 and §6.5 took pointer-only edits to
                      # pay the ratchet for the additions — one home per fact, no fact lost.
-adr: [3, 23, 24]
+adr: [3, 24]
 quality_scenarios: [QS-7]
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
@@ -97,6 +97,6 @@ Beyond `CLAUDE.md` §10:
   prediction of `src/domain/appointment.ts` and gains `cancelAppointment.ts`, `CancelOutcome` and the
   no-lock `cancelAppointmentById`; §8.6's `400` row and its residual paragraph say what the code does
   today; §10 corrects QS-7's false reason and QS-11's direction; §11 gains F-05-1, D-05-1 and D-05-3,
-  narrows F-02-9 to ADR-0023's *iff*, and updates R-10 and R-12. **§6.1 was added to the declaration
+  narrows F-02-9 to an *iff* on the constraints' scope, and updates R-10 and R-12. **§6.1 was added to the declaration
   at step 7**, R-02-2 having been built here — the four-cell control it claimed as measured from slice
   02 was only argued until this slice ran it.

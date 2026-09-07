@@ -9,26 +9,27 @@
 > most-cited ADR in the log (44 references), and the whole concurrency claim rests on it.
 >
 > **What is different, and why:**
-> 1. A new **What changes in the application** section with the actual call shape. The original
->    never said what code results from the decision — the SQL is there, but not where it goes.
-> 2. The problem is stated in plain terms *before* any section number or criterion id.
-> 3. **Cross-references: 29 uses of 14 distinct ids, down to none.** `AC-3`, `AC-4`, `QS-1`, `QS-2`,
+> 1. **The problem is stated as a situation, before any id.** Twenty people try to book the same
+>    bay at the same second; one should get it and nineteen should be told it is full; most of them
+>    got a `500`. The original opened on `40P01` and `check_exclusion_constraint`. The mechanism is
+>    still there — it moved to the second paragraph, after the reader knows what went wrong.
+> 2. **Cross-references: 29 uses of 14 distinct ids, down to none.** `AC-3`, `AC-4`, `QS-1`, `QS-2`,
 >    `ADR-0016` (×3), `ADR-0004`, `T-02-9`, `A-04-1`, `§5.2`, `§6.1`, `§8.2`, `§8.6`, `§11` and
 >    `CLAUDE.md §2.1` are gone — each replaced by the *fact* it pointed at, in a clause. Zero is not
->    a target and the first sample kept two; it is just what was left once every pointer that had a
->    one-clause substitute was replaced by it.
-> 4. The measurement tables are kept **entire**. They are the evidence, and they are why this
->    record is worth having; length spent on them is not the length the reader was complaining about.
-> 5. Same options, same chosen option, same consequences.
+>    a target; it is what was left once every pointer with a one-clause substitute was replaced by
+>    it. "AC-3, AC-4, QS-1 and QS-2 are not [untouched]" became "the criteria for this endpoint
+>    require every loser to receive `409 /problems/no-capacity`".
+> 3. **Same options, same chosen option, same consequences.** All three measurement tables are kept
+>    entire. They are the evidence, and they are why this record is worth having.
+> 4. **1012 words against the original's 1228** — a sixth shorter, with the evidence untouched.
 >
-> **One thing the form has to handle, and does.** ADR-0030 later corrected this decision — a move
-> must also lock the pair it *leaves*. A rewrite must not backfill that: ADRs are immutable and the
-> history of how thinking changed is the point. So the correction is not mentioned here, exactly as
-> it is not mentioned in the original; a reader meets it through the `superseded_by` field and the
-> index. **The risk the new section adds is that "what changes in the application" ages** — it
-> describes code that a later ADR revised. That is the cost, and it is worth naming: the section
-> must be written as *what this decision changed when it was made*, not as a description of today's
-> code.
+> **What is NOT here, and why the human ruled it out.** A first draft of this sample added a "What
+> changes in the application" section with the before/after call shape. The human's ruling:
+> *"I don't want to go into implementation detail in the ADR."* That is the stronger position, and
+> the draft had already conceded half of it — ADR-0030 later revised this very code, so the section
+> would have described an application that no longer exists, in a record that may not be edited to
+> say so. **An ADR that carries implementation detail acquires a way to become false that a decision
+> record should not have.** Where the code went is the slice design's job.
 
 ---
 
@@ -53,38 +54,6 @@ classified as an unknown error, so it became a `500`.
 constraint adjudicated anything, and the error carries no `constraint` field. The system's branded
 "contended resource" type can only be built *from* that field, so the question "is `409` honest
 here?" was answered by the type system rather than by preference: no.
-
-## What changes in the application
-
-Before — one statement per candidate, and under contention most of them fail the wrong way:
-
-```
-POST /appointments
-  └─ for each candidate (bay, technician):
-       INSERT INTO appointment …     ← 40P01 for most racers ⇒ 500
-```
-
-After — each attempt is its own transaction, and takes two locks first:
-
-```
-POST /appointments
-  └─ for each candidate (bay, technician):
-       BEGIN
-         SELECT pg_advisory_xact_lock(c, k)              ← new, one statement, two locks
-           FROM unnest(ARRAY[1,2],
-                       ARRAY[hashtext($bay), hashtext($technician)]) AS t(c, k);
-         INSERT INTO appointment …                       ← unchanged
-       COMMIT
-     23P01 ⇒ this candidate is taken, try the next one
-     40P01 ⇒ 500: a write path skipped the locks
-```
-
-Class `1` is bays and class `2` is technicians, so the two key spaces are **disjoint by
-construction** and *bay-then-technician* is a total order no attempt can take in reverse. There is no
-sort to keep sorted. The locks are transaction-scoped, so an attempt drops them as it ends and never
-holds one while trying the next candidate.
-
-The insert itself does not change. Nothing is retried.
 
 ## Considered options
 

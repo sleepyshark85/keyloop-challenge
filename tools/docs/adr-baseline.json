@@ -135,81 +135,6 @@
   ],
   "decision": "Chosen option: Option A \u2014 GitHub Actions on GitHub-hosted ubuntu-latest runners, because"
  },
- "0011-health-is-an-operational-probe.md": {
-  "options": [
-   "Option A \u2014 an operational probe, outside the contract",
-   "Option A \u2014 an operational probe, outside the contract. Plain JSON body on both 200 and 503",
-   "Option B \u2014 a sixth operation, inside the contract",
-   "Option B \u2014 a sixth operation, inside the contract. 503 rendered as application/problem+jso",
-   "Option C \u2014 split /health (liveness) and /ready (readiness)",
-   "Option C \u2014 split: /health (liveness, no dependencies) and /ready (readiness, checks the",
-   "Option D \u2014 no endpoint; connectivity is observed from logs and metrics only.",
-   "Option D \u2014 no endpoint; observe connectivity from logs and metrics"
-  ],
-  "decision": "Chosen option: Option A \u2014 /health is an operational probe outside the API contract."
- },
- "0012-seed-fixtures-are-a-test-owned-loader.md": {
-  "options": [
-   "Option A \u2014 a fourth migration, 0004seed.sql",
-   "Option A \u2014 a fourth migration, 0004seed.sql. Reference rows arrive with the schema, applie",
-   "Option B \u2014 a loader module under src/persistence/seed/",
-   "Option B \u2014 a loader module under src/persistence/seed/, exported and called by the test",
-   "Option C \u2014 a .sql fixture under src/, executed by path",
-   "Option C \u2014 a checked-in .sql fixture under src/, executed by path from the test, the way",
-   "Option D \u2014 a loader in tests/support/seed.ts",
-   "Option D \u2014 a loader in tests/support/seed.ts, owned by the test-engineer, issuing raw SQL",
-   "Option E \u2014 Option D for the suite, plus a separate src/persistence/seed/ dataset and",
-   "Option E \u2014 Option D plus the demo dataset, both now"
-  ],
-  "decision": "Chosen option: Option D, with Option E's second half deferred \u2014 the suite's fixtures are a"
- },
- "0013-outside-in-tests-exercise-the-built-artifact.md": {
-  "options": [
-   "Option A \u2014 Widen outside-in-tests-do-not-import-src to allow tests/property/ \u2192 src/domain/",
-   "Option A \u2014 widen the ruleset",
-   "Option B \u2014 Computed dynamic import of src/domain/.ts, so tsc cannot resolve the specifier",
-   "Option B \u2014 computed dynamic import of src/",
-   "Option C \u2014 Load the built artifact dist/domain/.js through a computed dynamic import, guar",
-   "Option C \u2014 load the built artifact",
-   "Option D \u2014 Move the test to tests/unit/, the implementer's directory, and drop QS-9's",
-   "Option D \u2014 move it to tests/unit/",
-   "Option E \u2014 Defer QS-9 to an HTTP-level property at the slice that adds the booking route.",
-   "Option E \u2014 defer QS-9 to an HTTP-level property"
-  ],
-  "decision": "Chosen option: C \u2014 outside-in tests reach a pure module through the built artifact \u2014 together with"
- },
- "0014-an-instant-is-renderable-by-construction.md": {
-  "options": [
-   "Option A \u2014 bound in instant() only",
-   "Option A \u2014 bound it in instant() only.",
-   "Option B \u2014 bound in withinOpeningHours step 1 only",
-   "Option B \u2014 bound it in withinOpeningHours step 1 only.",
-   "Option C \u2014 both",
-   "Option C \u2014 bound it in instant() AND in withinOpeningHours step 1.",
-   "Option D \u2014 bound in the HTTP request parser only",
-   "Option D \u2014 bound it in the HTTP request parser only.",
-   "Option E \u2014 catch the RangeError and return malformed-interval",
-   "Option E \u2014 catch the RangeError inside withinOpeningHours and return malformed-interval.",
-   "Option F \u2014 do nothing; document the range as a precondition",
-   "Option F \u2014 do nothing; document the range as a precondition."
-  ],
-  "decision": "Chosen option: C \u2014 the bound is applied in both places, instant() primarily and"
- },
- "0015-an-interval-ending-at-local-midnight-does-not-span-two-days.md": {
-  "options": [
-   "Option A \u2014 normalise the endpoint: an end rendering as 00:00:00 on the local day immediate",
-   "Option A \u2014 normalise the exclusive endpoint to 86400 on the start's day",
-   "Option B \u2014 compare endsAtMillis - 1, the last instant actually occupied",
-   "Option B \u2014 compare the last instant of the interval (endsAtMillis - 1) instead of endsAt.",
-   "Option C \u2014 delete the '24:00:00' parser arm",
-   "Option C \u2014 delete the '24:00:00' parser arm and reject the value.",
-   "Option D \u2014 leave it; document spans-local-days as covering this",
-   "Option D \u2014 leave the behaviour; document spans-local-days as covering midnight-ending jobs",
-   "Option E \u2014 allow the date to differ whenever the end renders as 00:00:00, and skip the",
-   "Option E \u2014 skip the seconds comparison for an endpoint rendering 00:00:00"
-  ],
-  "decision": "Chosen option: A \u2014 an end rendering as 00:00:00 on the local day immediately following the start's"
- },
  "0016-a-capacity-refusal-requires-a-database-verdict.md": {
   "options": [
    "Option A \u2014 do nothing structural; rely on AC-5's source scan and reviewer attention.",
@@ -224,21 +149,6 @@
    "Option E \u2014 assert at runtime that a 409 was preceded by a 23P01, e.g. through the span or"
   ],
   "decision": "Chosen option: C \u2014 ContendedResource is a branded type minted only inside"
- },
- "0017-the-composite-ownership-fk-is-disambiguated-after-it-fires.md": {
-  "options": [
-   "Option A \u2014 validate ownership before the insert",
-   "Option A \u2014 validate ownership with a read before the insert; treat any 23503 as 500.",
-   "Option B \u2014 classify after the failure",
-   "Option B \u2014 classify with a read after the insert is refused, on",
-   "Option C \u2014 add singleton foreign keys on customerid and vehicleid",
-   "Option C \u2014 add singleton foreign keys on customerid and vehicleid so the three failures",
-   "Option D \u2014 collapse the rows; return unknown-reference for all three",
-   "Option D \u2014 collapse the two taxonomy rows: return /problems/unknown-reference for all thre",
-   "Option E \u2014 parse the DETAIL line of the PostgreSQL error.",
-   "Option E \u2014 parse the error's DETAIL line"
-  ],
-  "decision": "Chosen option: B \u2014 on 23503 naming appointmentvehicleownedbycustomer, and only then, run one"
  },
  "0018-lock-the-bay-and-the-technician-before-each-insert.md": {
   "options": [
@@ -262,45 +172,6 @@
   ],
   "decision": "Chosen option: B, and the criterion is the decision rather than the destination: a control is"
  },
- "0020-test-the-attempt-cap-inside-the-conflict-arm.md": {
-  "options": [
-   "Option A \u2014 The cap as the loop's bound \u2014 while (attempts < cap) \u2014 refusing after the loop ",
-   "Option B \u2014 A, carrying the last minted resource forward in a ContendedResource \\",
-   "Option C \u2014 B plus 'bay' as ContendedResource to discharge the null branch",
-   "Option D \u2014 A second BookOutcome variant for the capped exit, carrying no resource",
-   "Option E \u2014 Test the cap inside the conflict arm, immediately after pruning"
-  ],
-  "decision": "Chosen option: E \u2014 the cap is tested inside the conflict arm of the classification switch, beside"
- },
- "0021-the-booking-seed-is-overridable-by-environment.md": {
-  "options": [
-   "Option A \u2014 No seam. Accept probabilistic coverage",
-   "Option B \u2014 BOOKINGSEED in platform/config.ts, unset by default, plus one startup warn",
-   "Option C \u2014 B, but honoured only when NODEENV=test",
-   "Option D \u2014 Carry the seed on the request \u2014 a header or a body field",
-   "Option E \u2014 Derive the seed from deps.newId(), already injected"
-  ],
-  "decision": "Chosen option: B. loadConfig reads BOOKINGSEED into bookingSeed?: number. Unset \u2014 the"
- },
- "0022-application-configuration-is-prefixed-booking.md": {
-  "options": [
-   "Option A \u2014 ATTEMPTCAP \u2014 \u00a75.2's name; correct \u00a77.3",
-   "Option B \u2014 BOOKINGATTEMPTCAP \u2014 \u00a77.3's name; correct \u00a75.2 and \u00a76.2",
-   "Option C \u2014 Drop the prefix everywhere: ATTEMPTCAP and SEED"
-  ],
-  "decision": "Chosen option: B, and the rule behind it is the part worth keeping: BOOKING marks"
- },
- "0023-a-write-that-leaves-the-constraints-scope-takes-no-lock.md": {
-  "options": [
-   "Option A \u2014 Obey F-02-9 literally: pre-read, lock, update",
-   "Option A \u2014 pre-read, lock, update",
-   "Option B \u2014 Derive the lock keys from RETURNING",
-   "Option C \u2014 A third lock class on appointment.id, serialising cancels",
-   "Option C \u2014 a lock class on appointment.id",
-   "Option D \u2014 Narrow F-02-9 to an iff on the constraints' scope"
-  ],
-  "decision": "Chosen option: D."
- },
  "0024-the-error-taxonomys-residual-is-a-property-not-a-row.md": {
   "options": [
    "A \u2014 keep the catch-all, and close T-05-7 as misframed.",
@@ -319,67 +190,12 @@
    "Good, because a doomed request skips the opening-hours derivation",
    "Good, because one statement still does the writing",
    "Good, because one statement's output decides both, unambiguously",
-   "Option A \u2014 guarded UPDATE, plus a follow-up read on zero rows. \u00a76.3 as designed.",
+   "Option A \u2014 guarded UPDATE, plus a follow-up read on zero rows. §6.3 as designed.",
    "Option B \u2014 unguarded UPDATE, the status guard moved into the SET, slice 05's CASE",
    "Option C \u2014 the read decides existence; the guarded UPDATE decides legality. Chosen.",
    "Option D \u2014 Option C, and the read short-circuits on cancelled too."
   ],
   "decision": "Chosen option: C."
- },
- "0026-the-lock-is-a-value-the-write-takes-and-it-carries-its-keys.md": {
-  "options": [
-   "Bad, because both are file-granular, and the two functions this is about are in one file \u2014",
-   "Bad, because it leaves a residue slice 05 named and accepted: the token proves a lock was",
-   "Good, because \"forgot the lock\" becomes a compile error and \"correctly exempt\" becomes a",
-   "Good, because it needs no signature change",
-   "Option A \u2014 keep the docblock. Good, because it costs nothing. Bad, because the defect it",
-   "Option B \u2014 a branded ResourceLock token: lockResources returns it, the writes take it",
-   "Option C \u2014 Option B, and the lock carries the keys it took, the write reading bay and",
-   "Option D \u2014 an ambiguity-containment marker or a dependency-cruiser rule."
-  ],
-  "decision": "Chosen option: C."
- },
- "0027-a-move-attempts-the-pair-it-already-holds-before-it-shuffles.md": {
-  "options": [
-   "Option A \u2014 shuffle from the first attempt",
-   "Option A \u2014 shuffle from the first attempt, bookAppointment's order applied unchanged.",
-   "Option B \u2014 current pair first, then the shuffle",
-   "Option B \u2014 the current pair is attempt 1, then ADR-0009's seeded shuffle over the remainde",
-   "Option C \u2014 current pair only",
-   "Option C \u2014 the current pair only; refuse if it conflicts.",
-   "Option D \u2014 order by distance from the current pair",
-   "Option D \u2014 order by distance from the current pair \u2014 current, then same bay other technici"
-  ],
-  "decision": "Chosen option: B. Attempt 1 is the appointment's own (bayid, technicianid). On a 23P01"
- },
- "0028-the-lock-carries-the-transaction-it-was-taken-on.md": {
-  "options": [
-   "Option A \u2014 leave it as \u00a711 debt",
-   "Option A \u2014 leave it as \u00a711 debt, ADR-0026's position.",
-   "Option B \u2014 a runtime identity assertion",
-   "Option B \u2014 a runtime identity assertion in each write.",
-   "Option C \u2014 the lock carries its Db",
-   "Option C \u2014 the lock carries the Db it was taken on, and the write takes no Db of its own.",
-   "Option D \u2014 a dependency-cruiser rule or an ambiguity-containment marker.",
-   "Option D \u2014 a rule or a marker"
-  ],
-  "decision": "Chosen option: C, proposed and not applied."
- },
- "0029-a-deadlock-names-the-write-path-a-conflict-does-not.md": {
-  "options": [
-   "Bad, because it breaks I-02-6's observer. QS-1 and QS-2 read the constraint name off one",
-   "Bad, because it is a third design proposed at step 7 over merged, measured code, and the",
-   "Bad, because the payload carries bayId, technicianId and attempt and no path, so",
-   "Good, because it is a rule with no cases, and cases are what rot",
-   "Good, because it is also a rule with no cases",
-   "Good, because it keeps the taxonomy flat and is more extensible",
-   "Option A \u2014 every event name is shared with booking. One taxonomy, no exceptions.",
-   "Option B \u2014 every event name is per use case: reschedule.conflict, reschedule.refused.",
-   "Option C \u2014 shared where the event is the same event; distinct where the path is the findin",
-   "Option D is probably the better long-run shape and is not booked: proposing a third design",
-   "Option D \u2014 one booking.deadlock name plus a path field."
-  ],
-  "decision": "Chosen option: C. DEADLOCKEVENT is 'reschedule.deadlock' on the move path and"
  },
  "0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md": {
   "options": [
@@ -389,34 +205,5 @@
    "Option D \u2014 Lock the whole dealership for a move"
   ],
   "decision": "Chosen option: C. A write acquires a pgadvisoryxactlock for every resource it is in"
- },
- "0031-a-move-reads-the-pair-it-leaves-inside-its-own-transaction.md": {
-  "options": [
-   "Option A",
-   "Option A \u2014 Re-read the pair inside the transaction, under the row's own lock",
-   "Option B",
-   "Option B \u2014 Carry the expected pair in the UPDATE's WHERE",
-   "Option C",
-   "Option C \u2014 Book it; four concurrent moves on two rows is rare"
-  ],
-  "decision": ""
- },
- "0032-availability-is-two-reads-composed-in-the-use-case.md": {
-  "options": [
-   "A \u2014 one joined query in candidateRepository.ts (freeResources, as \u00a76.5 says).",
-   "B \u2014 a NOT EXISTS clause added to candidateResources itself, so one function serves both pa",
-   "C \u2014 a new availabilityRepository.ts naming the table.",
-   "D \u2014 busyResources in appointmentRepository.ts, subtracted in src/application/queryAvailabi"
-  ],
-  "decision": "Chosen option: D. appointmentRepository.busyResources(db, dealershipId, from, to) returns the"
- },
- "0033-the-advisory-read-orders-candidates-it-never-removes-them.md": {
-  "options": [
-   "A \u2014 filter, falling back to the unfiltered list when it empties.",
-   "B \u2014 filter, refusing when it empties.",
-   "C \u2014 order free-first; never remove.",
-   "D \u2014 raise the cap above the bound instead."
-  ],
-  "decision": "Chosen option: C. busyResources (ADR-0032) is read once on the booking path and its answer"
  }
 }

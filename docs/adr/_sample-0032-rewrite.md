@@ -5,13 +5,17 @@
 > unchanged and still accepted. Nothing here changes a decision — only how it is told.
 >
 > **What is different, and why:**
-> 1. A new **What changes in the application** section, with the actual call shape. The original never
->    said what code results from the decision.
-> 2. The problem is stated in plain terms *before* any section number.
-> 3. **Cross-references cut from ~14 to 2.** `§6.4`, `§5.2`, `§11 R-5`, `§8.2`, `QS-8`, `QS-12`,
+> 1. The problem is stated in plain terms *before* any section number.
+> 2. **Cross-references cut from ~14 to 2.** `§6.4`, `§5.2`, `§11 R-5`, `§8.2`, `QS-8`, `QS-12`,
 >    `QS-14`, `AC-1`, `AC-14`, `I-04-5`, `A-07-3` are gone — each replaced by the *fact* it pointed
 >    at, in a clause. A reference the reader must chase is a pointer; the fact is the record.
-> 4. Same option set, same chosen option, same consequences.
+> 3. Same option set, same chosen option, same consequences.
+>
+> **Updated after the human's ruling.** This sample originally opened with a "What changes in the
+> application" section carrying the call shape. The human ruled it out for every ADR — *"I don't
+> want to go into implementation detail in the ADR"* — and it is removed here so the two samples
+> show one form rather than two. What the decision constrains still belongs; the code it produced
+> belongs to the slice design.
 
 ---
 
@@ -34,25 +38,6 @@ the fact that this function **cannot** see appointments is what makes the system
 provable: there is no check-then-act on the booking path, because there is nowhere for a check to
 read from. Put the availability query in that file and the claim becomes a promise instead of a
 property.
-
-## What changes in the application
-
-Before: the endpoint does not exist.
-
-After:
-
-```
-GET /availability?dealershipId&serviceTypeId&from&to
-  →  queryAvailability                        ← new, src/application/
-       ├─ candidateResources(...)             ← unchanged: every bay × qualified technician
-       └─ busyResources(dealershipId,from,to) ← new, in appointmentRepository.ts
-     free = candidates − busy                 ← set difference, in the use case
-```
-
-`busyResources` returns the bay ids and technician ids occupied over `[from, to)`. It goes in
-`appointmentRepository.ts` because that file is already the one permitted to read the table.
-`candidateResources` is not touched, so the booking path still cannot see appointments. Two reads, one
-round trip each, no join across the boundary.
 
 ## Considered options
 
