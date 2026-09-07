@@ -84,6 +84,19 @@ export const EVENTS = {
   'gate.decided':     ['gate', 'decision', 'rationale'],
   'check.run':        ['checks'],
   'adr.recorded':     ['adr'],
+  // A RETIRED ADR'S FORWARDING ADDRESS — the human's 2026-09-07 ruling that only important
+  // decisions warrant an ADR, which retired seventeen of thirty-three.
+  //
+  // It exists because THE LOG CANNOT BE REWRITTEN. 155 citations of those seventeen are
+  // already appended, and O-36 settled that rewriting the record of an artifact under
+  // assessment is the worse repair. Deleting the files without this record would leave
+  // every one of those citations pointing at nothing — the decisions would survive in the
+  // slice designs while the log's own history stopped resolving.
+  //
+  // `now_lives_in` is required for the same reason ADR-0019 requires a deferral to name a
+  // destination: a retirement that cannot say where the decision went is not a retirement,
+  // it is a deletion.
+  'adr.retired':      ['adr', 'now_lives_in'],
   'arc42.updated':    ['sections'],
   'slice.done':       [],
 };

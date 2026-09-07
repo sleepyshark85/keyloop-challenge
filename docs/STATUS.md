@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `f826a8c docs(adr): every citation of the seventeen becomes the fact it pointed at` |
+| Last commit | `2da4ec6 docs(adr): §11's debt register regenerates without the five retired proposals` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 186 |
+| Agent runs recorded | 187 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -330,7 +330,8 @@
 | 2026-09-07 08:49 | implementer | 2m12 | 52 / 771 / 861,276 | `derived` |
 | 2026-09-07 09:13 | architect | 23m21 | 260 / 25,445 / 17,081,978 | `derived` |
 | 2026-09-07 09:23 | architect | 32m54 | 354 / 25,785 / 28,688,216 | `derived` |
-| | **total** | **6731m11** | **43,328 / 3,157,373 / 3,413,559,011** | |
+| 2026-09-07 11:33 | architect | 74m32 | 786 / 17,213 / 131,176,729 | `derived` |
+| | **total** | **6805m43** | **44,114 / 3,174,586 / 3,544,735,740** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

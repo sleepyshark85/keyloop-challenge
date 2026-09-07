@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **322** |
-| Severity | 12 blocking · 162 major · 148 minor |
+| Findings recorded | **323** |
+| Severity | 12 blocking · 163 major · 148 minor |
 | Verdicts | 20 narrowed · 119 accepted · 4 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 68 · reviewer 66 · architect 63 · orchestrator 63 · implementer 50 · scribe 10 · human 2 |
-| Awaiting a ruling | **150** |
-| Mean escape distance | 1.65 step(s) |
+| Raised by | test-engineer 68 · reviewer 66 · architect 64 · orchestrator 63 · implementer 50 · scribe 10 · human 2 |
+| Awaiting a ruling | **151** |
+| Mean escape distance | 1.64 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2013,6 +2013,7 @@ rather than narrated.*
 | **O-64** | MAJOR | 5 *(+0)* | orchestrator | slice:check APPLIED SECTION 10's THRESHOLD TO AN AGGREGATE and would have reported PASS on a slice the architect ruled fails it | **open** |
 | **O-65** | MINOR | 5 *(+0)* | architect | The orchestrator's git add -A SWEPT THE ARCHITECT'S UNCOMMITTED RULING into a tooling commit, and the path guard cannot see that direction of the mistake | **open** |
 | **O-66** | MINOR | 5 *(+0)* | orchestrator | The light-gate row asserted AUTO-APPROVED, DoD GREEN without ever checking the Definition of Done | **open** |
+| **A-R-1** | MAJOR | 6 *(+0)* | architect | ADR-0013 IS GENUINELY ARCHITECTURAL and the architect executed its retirement UNDER PROTEST | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2222,6 +2223,11 @@ rather than narrated.*
 
 - *scenario:* FOUND WHILE FIXING O-64 AND VISIBLE ONLY BECAUSE THAT FIX MADE TWO ROWS GO RED. The light-gate row printed light gate: auto-approved, DoD GREEN AND NO OPEN MAJOR/BLOCKING while tests green and mutation score were BOTH FAILING TWO LINES ABOVE IT. Its predicate reads open MAJOR and BLOCKING findings ONLY; the phrase DoD green was never computed. THE ARRANGEMENT WAS NEVER UNSAFE: the surrounding docblock states deliberately that a light gate cannot carry a slice over a red suite, a stale CI run or an unreconciled arc42, because the tool reports all checks pass only when every Done row passes. So the slice could not have auto-merged. WHAT WAS WRONG IS THE SENTENCE A HUMAN SKIMS, and this project has now caught that identical shape four times in one slice — the mutation criterion reading an aggregate as if it were per-file, arc42 section 6.5 specifying a function that never existed, the Stryker directive comment claiming a reach it did not have, and the busyResources docblock under F-08-4. A GATE THAT STATES A FACT IT DID NOT CHECK IS THE FAILURE IT EXISTS TO PREVENT.
 - *file:* `tools/slice/check.mjs`
+
+**A-R-1** — ADR-0013 IS GENUINELY ARCHITECTURAL and the architect executed its retirement UNDER PROTEST
+
+- *scenario:* THE ARCHITECT DID THE WORK AND SAID IT DISAGREED, WHICH IS WHAT SECTION 6 ASKS FOR. Its case, against the human's own stated bar that only IMPORTANT decisions warrant an ADR: ADR-0013 is marked contested true; it was HUMAN-RATIFIED AT GATE E after TWO MEASURED REVISIONS rather than ruled by an architect alone; and it constrains .dependency-cruiser.js, which CLAUDE.md section 2.3 makes NON-NEGOTIABLE tooling. It does not describe code shape — the thing the human's later ruling excluded from ADRs — it DEFINES WHAT OUTSIDE-IN MEANS OPERATIONALLY for every property test in the project, and its deciding evidence is a NEGATIVE RESULT, that widening the rule does not work, which is exactly the kind of finding that is expensive to rediscover and cheap to lose. NOTHING IS LOST OPERATIONALLY: arc42 section 8.5 already carries the clauses, so only the refused alternatives moved into slice 01's design. THE DISAGREEMENT IS ABOUT WHETHER THE RECORD SHOULD HAVE BEEN DEMOTED AT ALL, not about whether the system still behaves correctly. A SECOND CASE THE BRIEF MISSED ENTIRELY, raised by the architect unprompted: ADR-0023 IS ADR-0031-SHAPED. It does not stand alone — it NARROWS ONE SENTENCE of ADR-0018's Consequences, and ADR-0018 SURVIVES, IS IMMUTABLE, AND IS THE MOST-CITED ADR IN THE LOG. That sentence, every write path to appointment must take these two locks, IS WRONG ABOUT CANCELLATION, and ADR-0023 is the correction. ADR-0030 cites it four times. The architect handled it as the brief handled 0031, with 05-design section 2.1 opening by naming which sentence it narrows, but the brief had flagged only 0031 and the architect found the second one itself.
+- *file:* `docs/adr/0013-outside-in-tests-exercise-the-built-artifact.md`
 
 </details>
 
