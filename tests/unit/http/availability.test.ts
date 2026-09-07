@@ -163,6 +163,19 @@ describe('GET /availability — the querystring schema', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it("a to value with no explicit offset is 400 — from's twin pattern, not from's mutant (I-08-6)", async () => {
+    // `to`'s own `{ pattern: RFC3339_PATTERN }` (routes/availability.ts:57) is a distinct
+    // property from `from`'s (line 56); this is the case that removeAdditional/the fixed-shape
+    // literal cannot reach, and it is a different code path from the route's own to<=from guard
+    // above — a schema violation here answers via server.ts's catch-all (`detail: error.message`),
+    // never the route's fixed 'to must be strictly later than from'.
+    const app = serverAnswering((): never => {
+      throw new Error('a schema violation must never reach the handler');
+    });
+    const response = await get(app, { ...VALID_QUERY, to: '2026-09-08T10:00:00' });
+    expect(response.statusCode).toBe(400);
+  });
+
   it(
     "an unknown extra query parameter is STRIPPED, not rejected — Fastify's default ajv " +
       'removeAdditional: true, measured identically on the booking route (routes/appointments.ts)',
