@@ -27,7 +27,18 @@
  *
  * `CandidateSet` IS TWO LISTS OF IDS AND NOTHING ELSE. It has no field that could mean "free", no
  * timestamp and no freshness marker — there is nothing in the type for a later reader to trust.
+ *
+ * ── `availability.candidates`, arc42 §8.4 ──────────────────────────────────────────────────────
+ *
+ * The ONE call site every read of "which bays and technicians could this be" goes through —
+ * `bookAppointment`, `rescheduleAppointment` and `queryAvailability` all call this function and
+ * nothing else reads `service_bay`/`technician` for a candidate list — so instrumenting here
+ * gives AC-1's ordering claim (this span ends before the first `appointment.insert` begins) and
+ * AC-14's "reads the set once" claim (no nested per-candidate query spans) from one span, on
+ * every caller, for free. `@opentelemetry/api` only: decision 1 confines the SDK itself to
+ * `src/platform` and `src/main.ts`.
  */
+import { tracer } from '../platform/telemetry.js';
 import type { Db } from './db.js';
 
 export interface CandidateSet {
@@ -49,32 +60,42 @@ export async function candidateResources(
   dealershipId: string,
   serviceTypeId: string,
 ): Promise<CandidateSet> {
-  const bayRows = await db
-    .selectFrom('service_bay')
-    .select(['id'])
-    .where('dealership_id', '=', dealershipId)
-    .orderBy('name')
-    .execute();
+  return await tracer.startActiveSpan('availability.candidates', async (span) => {
+    try {
+      const bayRows = await db
+        .selectFrom('service_bay')
+        .select(['id'])
+        .where('dealership_id', '=', dealershipId)
+        .orderBy('name')
+        .execute();
 
-  // A-3 and Requirement 2's first half: the technician belongs to THIS dealership and is
-  // qualified for THIS service type. The join is what makes "qualified" a fact about the data
-  // rather than about the caller — and `appointment_technician_qualified` still adjudicates it at
-  // the insert, so a candidate list that got it wrong is refused rather than believed.
-  const technicianRows = await db
-    .selectFrom('technician')
-    .innerJoin(
-      'technician_qualification',
-      'technician_qualification.technician_id',
-      'technician.id',
-    )
-    .select(['technician.id as id'])
-    .where('technician.dealership_id', '=', dealershipId)
-    .where('technician_qualification.service_type_id', '=', serviceTypeId)
-    .orderBy('technician.id')
-    .execute();
+      // A-3 and Requirement 2's first half: the technician belongs to THIS dealership and is
+      // qualified for THIS service type. The join is what makes "qualified" a fact about the
+      // data rather than about the caller — and `appointment_technician_qualified` still
+      // adjudicates it at the insert, so a candidate list that got it wrong is refused rather
+      // than believed.
+      const technicianRows = await db
+        .selectFrom('technician')
+        .innerJoin(
+          'technician_qualification',
+          'technician_qualification.technician_id',
+          'technician.id',
+        )
+        .select(['technician.id as id'])
+        .where('technician.dealership_id', '=', dealershipId)
+        .where('technician_qualification.service_type_id', '=', serviceTypeId)
+        .orderBy('technician.id')
+        .execute();
 
-  return {
-    bays: bayRows.map((row) => row.id),
-    technicians: technicianRows.map((row) => row.id),
-  };
+      const result: CandidateSet = {
+        bays: bayRows.map((row) => row.id),
+        technicians: technicianRows.map((row) => row.id),
+      };
+      span.setAttribute('candidates.bays', result.bays.length);
+      span.setAttribute('candidates.technicians', result.technicians.length);
+      return result;
+    } finally {
+      span.end();
+    }
+  });
 }

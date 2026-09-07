@@ -20,9 +20,11 @@
  * "Consequences"), with Bound-2 pruning and the same attempt cap. The structural bound is
  * therefore Bound-2's plus one: the incumbent costs one attempt beyond the ordinary traversal.
  *
- * F-06-1, recorded rather than fixed: this loop and `bookAppointment`'s are two copies of one
- * design, not an extraction. Deferred to slice 09, which reopens both write paths to instrument
- * them anyway (docs/slices/06-design.md §1).
+ * F-06-1, discharged at slice 09: this loop and `bookAppointment`'s now share one implementation,
+ * `attemptLoop.ts`. Attempt 1 here is the `'incumbent'` `CandidateStrategy` — the row's own pair,
+ * no shuffle drawn for it — and every attempt from the first conflict onward is identical to
+ * booking's own loop, which is why it lives in one file rather than two (docs/slices/09-design.md
+ * decision 2).
  *
  * ── ADR-0025: EXISTENCE IS THE READ'S; LEGALITY IS THE STATEMENT'S ────────────────────────────
  *
@@ -43,11 +45,11 @@
  * answer is re-adjudicated atomically by the write's own `status = 'confirmed'` rather than
  * trusted.
  */
+import { runAttemptLoop } from './attemptLoop.js';
+import type { AttemptLoopOutcome } from './attemptLoop.js';
 import { deriveInterval } from './deriveInterval.js';
 import { toAppointmentView } from './bookAppointment.js';
 import type { AppointmentView } from './bookAppointment.js';
-import { nextCandidate, orderCandidates, prune } from '../domain/candidates.js';
-import type { CandidateOrder } from '../domain/candidates.js';
 import type { OpeningHoursVerdict } from '../domain/openingHours.js';
 import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
@@ -57,10 +59,9 @@ import {
   lockResources,
   rescheduleAppointmentById,
 } from '../persistence/appointmentRepository.js';
-import type { Move, ResourcePair } from '../persistence/appointmentRepository.js';
+import type { AppointmentRow, Move, ResourcePair } from '../persistence/appointmentRepository.js';
 import { candidateResources } from '../persistence/candidateRepository.js';
 import { findDealership, findServiceType } from '../persistence/referenceRepository.js';
-import { classify } from '../persistence/pgError.js';
 import type { ContendedResource } from '../persistence/pgError.js';
 
 export interface RescheduleCommand {
@@ -95,22 +96,23 @@ export interface RescheduleDeps {
   readonly logger: Logger;
 }
 
-const CONFLICT_EVENT = 'booking.conflict';
-const REFUSED_EVENT = 'booking.refused';
 /**
- * R-06-E: DISTINCT from `bookAppointment.ts`'s own `DEADLOCK_EVENT`, unlike `CONFLICT_EVENT`,
- * `REFUSED_EVENT` and `REFERENCE_DATA_EVENT` above, which are deliberately the SAME event
- * booking writes (I-02-6 — "one taxonomy of log lines, not two"). A deadlock is not one taxonomy
- * shared on purpose: under ADR-0030/ADR-0031 it means some write path did not lock every resource
- * it was in flight against — not that a path skipped its locks — and slice 09's
- * observability work counts deadlocks per path. Sharing `'booking.deadlock'` here would fold
- * every reschedule deadlock into booking's count silently — the two would still SUM correctly,
- * but nothing could tell them apart, and no test anywhere pinned the shared string (measured: a
- * repo-wide search finds no assertion on it outside `bookAppointment.test.ts`), so nothing
- * observable depends on undoing this before it compounds.
+ * R-06-E: DISTINCT from `bookAppointment.ts`'s own `DEADLOCK_EVENT`, unlike `attemptLoop.ts`'s
+ * shared `CONFLICT_EVENT`/`REFUSED_EVENT` and this file's own `REFERENCE_DATA_EVENT`, which are
+ * deliberately the SAME event booking writes (I-02-6 — "one taxonomy of log lines, not two"). A
+ * deadlock is not one taxonomy shared on purpose: under ADR-0030/ADR-0031 it means some write
+ * path did not lock every resource it was in flight against — not that a path skipped its locks
+ * — and slice 09's observability work counts deadlocks per path. Sharing `'booking.deadlock'`
+ * here would fold every reschedule deadlock into booking's count silently — the two would still
+ * SUM correctly, but nothing could tell them apart, and no test anywhere pinned the shared string
+ * (measured: a repo-wide search finds no assertion on it outside `bookAppointment.test.ts`), so
+ * nothing observable depends on undoing this before it compounds.
  */
 const DEADLOCK_EVENT = 'reschedule.deadlock';
 const REFERENCE_DATA_EVENT = 'booking.reference-data-invalid';
+/** AC-6 / arc42 §8.4's "one line per request" — the move, emitted inside the winning attempt's
+ * own span (F-06-1, `attemptLoop.ts`) so its `trace_id`/`span_id` correlate. */
+const MOVED_EVENT = 'reschedule.moved';
 
 export async function rescheduleAppointment(
   db: Db,
@@ -182,134 +184,67 @@ export async function rescheduleAppointment(
   const endsAt = new Date(derivation.occupancyEndsAt);
   const move: Move = { id: existing.id, startsAt, endsAt };
 
-  const refuse = (
-    exit: 'exhausted' | 'capped',
-    resource: ContendedResource,
-    attempts: number,
-  ): RescheduleOutcome => {
-    deps.logger.info({ event: REFUSED_EVENT, exit, resource, attempts, seed }, REFUSED_EVENT);
-    return { kind: 'no-capacity', resource, attempts, exit };
-  };
-
-  // ADR-0027 — the structural bound is Bound-2's plus one: attempt 1 is the incumbent pair,
-  // outside the shuffle; attempts 2.. traverse the full candidate lists exactly as booking's
-  // loop does, bounded at |bays| + |technicians|.
-  const structuralBound = 1 + candidates.bays.length + candidates.technicians.length;
-  let order: CandidateOrder | null = null;
-  let bayId = existing.bayId;
-  let technicianId = existing.technicianId;
-  let seed: number | null = null;
-
-  for (let attempts = 1; attempts <= structuralBound; attempts += 1) {
-    try {
-      const row = await db.transaction().execute(async (trx) => {
-        // ADR-0031 — the pair this row is IN FLIGHT AGAINST until this move commits, read
-        // INSIDE this attempt's own transaction under the row's own lock: never a value
-        // carried from the pre-loop existence read, which is stale the instant another
-        // request commits a move of the same row (R-07-1).
-        const leaves: ResourcePair = await lockAppointmentRow(trx, move.id);
-        const lock = await lockResources(trx, bayId, technicianId, leaves);
-        return await rescheduleAppointmentById(trx, move, lock);
-      });
-
+  // ADR-0027 / F-06-1 — `attemptLoop.ts`'s `'incumbent'` strategy: attempt 1 is the row's own
+  // pair, outside any shuffle; the seed is drawn only if that pair itself conflicts.
+  const loopOutcome: AttemptLoopOutcome<AppointmentRow, RescheduleOutcome> = await runAttemptLoop({
+    db,
+    logger: deps.logger,
+    attemptCap: deps.attemptCap,
+    candidates,
+    strategy: {
+      kind: 'incumbent',
+      bayId: existing.bayId,
+      technicianId: existing.technicianId,
+      drawSeed: deps.seed,
+    },
+    spanName: 'appointment.update',
+    deadlockEvent: DEADLOCK_EVENT,
+    successEvent: MOVED_EVENT,
+    runAttempt: async (trx, bayId, technicianId) => {
+      // ADR-0031 — the pair this row is IN FLIGHT AGAINST until this move commits, read INSIDE
+      // this attempt's own transaction under the row's own lock: never a value carried from the
+      // pre-loop existence read, which is stale the instant another request commits a move of
+      // the same row (R-07-1).
+      const leaves: ResourcePair = await lockAppointmentRow(trx, move.id);
+      const lock = await lockResources(trx, bayId, technicianId, leaves);
       // ADR-0025 decision 2/3 — zero rows here, at ANY attempt, means exactly one thing: the
       // row exists (the read above established that) and is not 'confirmed'. No follow-up read.
-      if (row === null) return { kind: 'not-confirmed' };
+      return await rescheduleAppointmentById(trx, move, lock);
+    },
+    onBadReference: async (constraint, bayId, technicianId) => {
+      // Should be UNREACHABLE (design §3): the row's references were already valid and a move
+      // sets none of them (dealership, customer, vehicle, service type are all out of scope). If
+      // this fires, the candidate query and the constraints disagree — the system's fault,
+      // exactly as booking's mirror arm.
+      deps.logger.error(
+        {
+          event: REFERENCE_DATA_EVENT,
+          constraint,
+          dealershipId: existing.dealershipId,
+          bayId,
+          technicianId,
+        },
+        'a reschedule candidate was refused by a composite foreign key',
+      );
+      return { kind: 'reference-data-invalid', detail: constraint };
+    },
+  });
 
-      return { kind: 'moved', appointment: toAppointmentView(row) };
-    } catch (error) {
-      const outcome = classify(error);
-
-      switch (outcome.kind) {
-        case 'conflict': {
-          // I-02-6's observer, reused verbatim (design §2.2): the SAME event, carrying the
-          // constraint name, the resource and the attempt.
-          deps.logger.info(
-            {
-              event: CONFLICT_EVENT,
-              constraint: outcome.constraint,
-              resource: outcome.resource,
-              attempt: attempts,
-              bayId,
-              technicianId,
-            },
-            CONFLICT_EVENT,
-          );
-
-          if (order === null) {
-            // Attempt 1 (the incumbent pair) just failed. Draw ADR-0009's seeded shuffle over
-            // ALL candidates for the remainder — the incumbent among them, which is the bounded
-            // extra cost ADR-0027 names rather than hides.
-            seed = deps.seed();
-            const initialOrder = orderCandidates(candidates.bays, candidates.technicians, seed);
-            if (initialOrder === null) return refuse('exhausted', outcome.resource, attempts);
-            order = initialOrder;
-          } else {
-            // EXHAUSTION FIRST, same tie-break as booking's loop (ADR-0020): a classification
-            // prunes only its own list, so the list that emptied is the one this `23P01` named.
-            const remaining = prune(
-              order,
-              outcome.resource,
-              outcome.resource === 'bay' ? bayId : technicianId,
-            );
-            if (remaining === null) return refuse('exhausted', outcome.resource, attempts);
-            order = remaining;
-          }
-
-          if (attempts >= deps.attemptCap) return refuse('capped', outcome.resource, attempts);
-
-          const next = nextCandidate(order);
-          bayId = next.bayId;
-          technicianId = next.technicianId;
-          continue;
-        }
-
-        case 'bad-reference': {
-          // Should be UNREACHABLE (design §3): the row's references were already valid and a
-          // move sets none of them (dealership, customer, vehicle, service type are all out of
-          // scope). If this fires, the candidate query and the constraints disagree — the
-          // system's fault, exactly as booking's mirror arm.
-          deps.logger.error(
-            {
-              event: REFERENCE_DATA_EVENT,
-              constraint: outcome.constraint,
-              dealershipId: existing.dealershipId,
-              bayId,
-              technicianId,
-            },
-            'a reschedule candidate was refused by a composite foreign key',
-          );
-          return { kind: 'reference-data-invalid', detail: outcome.constraint };
-        }
-
-        case 'no-verdict': {
-          // T-02-9 / ADR-0018, ADR-0030 and ADR-0031. NOT a write path skipping a lock — a
-          // move past attempt 1 is legitimately in flight against TWO pairs (the one it
-          // holds, the one it is trying to take), and `lockResources`' `leave` argument above
-          // locks both, read INSIDE this attempt's own transaction (`lockAppointmentRow`)
-          // rather than carried from before it opened. A `40P01` reaching here means a
-          // resource this move was in flight against went unlocked — which now also covers a
-          // regression to a lock set COMPUTED FROM STATE READ OUTSIDE THE TRANSACTION,
-          // ADR-0031's own failure mode — and under ADR-0030's rule is an internal fault
-          // either way. Not retried.
-          deps.logger.error(
-            { event: DEADLOCK_EVENT, bayId, technicianId, attempt: attempts },
-            DEADLOCK_EVENT,
-          );
-          return { kind: 'no-verdict' };
-        }
-
-        case 'other':
-          throw error;
-      }
-    }
+  switch (loopOutcome.kind) {
+    case 'success':
+      return { kind: 'moved', appointment: toAppointmentView(loopOutcome.row) };
+    case 'not-confirmed':
+      return { kind: 'not-confirmed' };
+    case 'aborted':
+      return loopOutcome.value;
+    case 'no-capacity':
+      return {
+        kind: 'no-capacity',
+        resource: loopOutcome.resource,
+        attempts: loopOutcome.attempts,
+        exit: loopOutcome.exit,
+      };
+    case 'no-verdict':
+      return { kind: 'no-verdict' };
   }
-
-  // UNREACHABLE — same argument as booking's, one attempt wider: attempt 1 always transitions
-  // into a CandidateOrder on its first conflict, and Bound-2's traversal from there empties a
-  // list by attempt `structuralBound`.
-  throw new Error(
-    `reschedule loop exceeded its structural bound of ${String(structuralBound)} attempts` +
-      (seed === null ? '' : ` (seed ${String(seed)})`),
-  );
 }

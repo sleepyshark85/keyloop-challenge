@@ -39,10 +39,18 @@
  * enclosing transaction. ADR-0018's locks are `pg_advisory_xact_lock`, so an attempt must have a
  * transaction to scope them to — and it must be exactly one attempt wide, or the two requirements
  * contradict. That is why `db.transaction()` appears inside the loop body and nowhere outside it.
+ *
+ * ── F-06-1: THE LOOP ITSELF IS `attemptLoop.ts`, SHARED WITH `rescheduleAppointment` ──────────
+ *
+ * This module keeps everything either side of the loop — reference data, the domain derivation,
+ * the empty-candidate pre-check no reschedule needs (attempt 1 always has a candidate: the
+ * incumbent pair) — and hands the loop its one write (`runAttempt`) and its one terminal
+ * callback (`onBadReference`, ADR-0017's ownership disambiguation).
  */
+import { runAttemptLoop } from './attemptLoop.js';
+import type { AttemptLoopOutcome } from './attemptLoop.js';
 import { deriveInterval } from './deriveInterval.js';
-import { nextCandidate, orderCandidates, prune } from '../domain/candidates.js';
-import type { CandidateOrder } from '../domain/candidates.js';
+import { orderCandidates } from '../domain/candidates.js';
 import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
 import {
@@ -56,7 +64,7 @@ import {
   findDealership,
   findServiceType,
 } from '../persistence/referenceRepository.js';
-import { classify, VEHICLE_OWNERSHIP_CONSTRAINT } from '../persistence/pgError.js';
+import { VEHICLE_OWNERSHIP_CONSTRAINT } from '../persistence/pgError.js';
 import type { ContendedResource } from '../persistence/pgError.js';
 import type { OpeningHoursVerdict } from '../domain/openingHours.js';
 
@@ -188,21 +196,11 @@ export interface BookDeps {
   readonly logger: Logger;
 }
 
-/** The `pino` line the concurrency suite reads. Renaming it is a behaviour change. */
-const CONFLICT_EVENT = 'booking.conflict';
-/**
- * The refusal line — one per refused booking, at BOTH exits.
- *
- * AC-4 requires the cap to be "visible in telemetry rather than silent", and an outside-in test
- * may read exactly three things: the response, the database and stdout (I-02-6). The response
- * carries no `exit` and no `attempts` by design, and a refusal writes no row — so this line is
- * where the two exits become distinguishable at all, until slice 09's
- * `booking_conflicts_total{outcome}`. The `seed` on it is what makes a reported failure
- * re-runnable through `BOOKING_SEED` (ADR-0021): a label that cannot be fed back in is not one.
- */
-const REFUSED_EVENT = 'booking.refused';
 const DEADLOCK_EVENT = 'booking.deadlock';
 const REFERENCE_DATA_EVENT = 'booking.reference-data-invalid';
+/** AC-6 / arc42 §8.4: "one line per request" — the confirmation, emitted inside the winning
+ * attempt's own span so its `trace_id`/`span_id` correlate (F-06-1, `attemptLoop.ts`). */
+const CONFIRMED_EVENT = 'booking.confirmed';
 
 export async function bookAppointment(
   db: Db,
@@ -281,175 +279,89 @@ export async function bookAppointment(
   const appointmentId = deps.newId();
   const startsAt = new Date(derivation.occupancyStartsAt);
   const endsAt = new Date(derivation.occupancyEndsAt);
-  let order: CandidateOrder = initialOrder;
 
-  /**
-   * BOTH REFUSAL EXITS, IN ONE PLACE. Only the `exit` differs, and both are called from inside
-   * the `23P01` arm holding a resource that classification minted (ADR-0016, ADR-0020).
-   */
-  const refuse = (
-    exit: 'exhausted' | 'capped',
-    resource: ContendedResource,
-    attempts: number,
-  ): BookOutcome => {
-    deps.logger.info({ event: REFUSED_EVENT, exit, resource, attempts, seed }, REFUSED_EVENT);
-    return { kind: 'no-capacity', resource, attempts, exit };
-  };
-
-  // 6. The loop. It varies ONLY the candidate: steps 1-4 ran once and nothing inside re-derives.
-  //
-  // A `CandidateOrder` is non-empty by construction and `prune` returns `null` rather than an
-  // empty one, so `nextCandidate` is total and there is no index assertion left on this path —
-  // the `as string` pair that stood here is gone with the tuple carrier (I-04-3).
-  //
-  // THE HEADER CARRIES BOUND-2'S STRUCTURAL BOUND, NOT THE CAP (ADR-0020 row F, I-04-2). Two
-  // encodings of one number drift, and these are two different numbers: `|bays| + |technicians|`
-  // is what pruning a whole resource per conflict guarantees, and the cap is a policy value that
-  // may be raised or lowered without touching liveness. The tail below is therefore unreachable —
-  // a list empties by attempt `|bays| + |technicians| - 1` and the arm has returned — and it
-  // THROWS rather than refusing, so that a future retried `PgOutcome` variant meets a loud fault
-  // instead of an unbounded loop.
-  const structuralBound = candidates.bays.length + candidates.technicians.length;
-  for (let attempts = 1; attempts <= structuralBound; attempts += 1) {
-    const { bayId, technicianId } = nextCandidate(order);
-
-    try {
-      const row = await db.transaction().execute(async (trx) => {
-        // ADR-0018. Two lock acquisitions that read no table and decide nothing, then ONE
-        // INSERT. AC-5's amended wording is exactly this transaction's contents. ADR-0026: the
-        // lock is a value the insert takes, carrying the pair it locked — there is no second
-        // copy of `bayId`/`technicianId` on `NewAppointment` for it to disagree with.
-        // ADR-0030: `leave: null` — a booking vacates nothing, so `lockResources` locks only
-        // the pair it takes.
-        const lock = await lockResources(trx, bayId, technicianId, null);
-        return await insertAppointment(
-          trx,
-          {
-            id: appointmentId,
-            dealershipId: command.dealershipId,
-            customerId: command.customerId,
-            vehicleId: command.vehicleId,
-            serviceTypeId: command.serviceTypeId,
-            startsAt,
-            endsAt,
-          },
-          lock,
-        );
-      });
-
-      return { kind: 'confirmed', appointment: toAppointmentView(row) };
-    } catch (error) {
-      const outcome = classify(error);
-
-      switch (outcome.kind) {
-        case 'conflict': {
-          // I-02-6's observer. One line per `23P01`, carrying the constraint name, the resource
-          // minted from it, and the attempt — the three facts AC-3 and AC-4 assert on and which
-          // are in neither the response nor the table.
-          deps.logger.info(
-            {
-              event: CONFLICT_EVENT,
-              constraint: outcome.constraint,
-              resource: outcome.resource,
-              attempt: attempts,
-              bayId,
-              technicianId,
-            },
-            CONFLICT_EVENT,
-          );
-
-          // PER RESOURCE VALUE, not per class and NOT PER PAIR (T-02-1, ADR-0009's Bound-2):
-          // drop THAT bay, or THAT technician, and leave the others. Emptying the whole list on
-          // one failure refuses while capacity plainly remains; pruning only the (bay,
-          // technician) pair leaves the conflicting resource in the list, meets it again behind
-          // the next partner, and turns the additive bound into a multiplicative one.
-          //
-          // `outcome.resource` is a `ContendedResource`, an intersection with the plain union
-          // `prune` takes — so it goes straight in with no cast at this call site.
-          const remaining = prune(
-            order,
-            outcome.resource,
-            outcome.resource === 'bay' ? bayId : technicianId,
-          );
-
-          // BOTH REFUSAL EXITS LIVE HERE, IN THE ARM — ADR-0020, and the order of these two
-          // lines is the tie-break.
-          //
-          // The loop `continue`s only on `conflict` and returns on every other classification
-          // and on success, so a refusal is reachable ONLY from a classification: the
-          // `ContendedResource` below is one this very `23P01` minted from `err.constraint`,
-          // never one chosen here. That is what lets ADR-0016's claim survive the cap with no
-          // exception, no nullable carrier and no cast.
-          //
-          // EXHAUSTION FIRST. A classification prunes only its own list, so the list that
-          // emptied is the one the last classification named — which is what makes `resource`
-          // the SCARCE resource rather than the abundant one (E-02-1). When an attempt both
-          // empties a list and reaches the cap, nothing was left untried and `exhausted` is the
-          // stronger true statement.
-          if (remaining === null) return refuse('exhausted', outcome.resource, attempts);
-          if (attempts >= deps.attemptCap) return refuse('capped', outcome.resource, attempts);
-
-          order = remaining;
-          continue;
-        }
-
-        case 'bad-reference': {
-          // NEVER RETRIED. A reference that does not resolve resolves no better on another bay.
-          if (outcome.constraint === VEHICLE_OWNERSHIP_CONSTRAINT) {
-            // ADR-0017: the three failures sharing this one constraint name are separated AFTER
-            // the insert was refused, never by a pre-flight check — which would make this arm
-            // unreachable, R-01-4's exact shape.
-            const verdict = await classifyOwnership(db, command.customerId, command.vehicleId);
-            if (verdict === 'not-owned') return { kind: 'vehicle-not-owned' };
-            return {
-              kind: 'unknown-reference',
-              reference: verdict === 'unknown-customer' ? 'customer' : 'vehicle',
-            };
-          }
-
-          // Any other composite FK — a technician not qualified, a bay in another dealership —
-          // means the candidate query and the constraints disagree. That is broken reference
-          // data rather than anything the client sent, so it is the system's fault.
-          deps.logger.error(
-            {
-              event: REFERENCE_DATA_EVENT,
-              constraint: outcome.constraint,
-              dealershipId: command.dealershipId,
-              bayId,
-              technicianId,
-            },
-            'a candidate was refused by a composite foreign key',
-          );
-          return { kind: 'reference-data-invalid', detail: outcome.constraint };
-        }
-
-        case 'no-verdict': {
-          // T-02-9 / ADR-0018, ADR-0030. NOT RETRIED, and that is a deliberate choice to fail
-          // loudly. Under the locks a deadlock can only mean some write path did not lock every
-          // resource it was in flight against, and a retry would convert that into a latency
-          // blip nobody investigates — a guard hiding the fault it exists to detect. F-02-9
-          // makes it a live risk from slice 06 onward.
-          deps.logger.error(
-            { event: DEADLOCK_EVENT, bayId, technicianId, attempt: attempts },
-            DEADLOCK_EVENT,
-          );
-          return { kind: 'no-verdict' };
-        }
-
-        case 'other':
-          // Not this module's to interpret. `classify` is total, and everything it cannot name
-          // is a fault rather than a refusal.
-          throw error;
+  // 6. The loop — `attemptLoop.ts` (F-06-1), starting from the whole-tree shuffle already drawn
+  // above. `runAttempt` is ADR-0018's two lock acquisitions plus ONE `INSERT`; `onBadReference`
+  // is ADR-0017's ownership disambiguation, never retried either way.
+  const loopOutcome: AttemptLoopOutcome<AppointmentRow, BookOutcome> = await runAttemptLoop({
+    db,
+    logger: deps.logger,
+    attemptCap: deps.attemptCap,
+    candidates,
+    strategy: { kind: 'shuffled', seed, order: initialOrder },
+    spanName: 'appointment.insert',
+    deadlockEvent: DEADLOCK_EVENT,
+    successEvent: CONFIRMED_EVENT,
+    runAttempt: async (trx, bayId, technicianId) => {
+      // ADR-0018. Two lock acquisitions that read no table and decide nothing, then ONE INSERT.
+      // AC-5's amended wording is exactly this transaction's contents. ADR-0026: the lock is a
+      // value the insert takes, carrying the pair it locked — there is no second copy of
+      // `bayId`/`technicianId` on `NewAppointment` for it to disagree with. ADR-0030: `leave:
+      // null` — a booking vacates nothing, so `lockResources` locks only the pair it takes.
+      const lock = await lockResources(trx, bayId, technicianId, null);
+      return await insertAppointment(
+        trx,
+        {
+          id: appointmentId,
+          dealershipId: command.dealershipId,
+          customerId: command.customerId,
+          vehicleId: command.vehicleId,
+          serviceTypeId: command.serviceTypeId,
+          startsAt,
+          endsAt,
+        },
+        lock,
+      );
+    },
+    onBadReference: async (constraint, bayId, technicianId) => {
+      // NEVER RETRIED. A reference that does not resolve resolves no better on another bay.
+      if (constraint === VEHICLE_OWNERSHIP_CONSTRAINT) {
+        // ADR-0017: the three failures sharing this one constraint name are separated AFTER the
+        // insert was refused, never by a pre-flight check — which would make this arm
+        // unreachable, R-01-4's exact shape.
+        const verdict = await classifyOwnership(db, command.customerId, command.vehicleId);
+        if (verdict === 'not-owned') return { kind: 'vehicle-not-owned' };
+        return {
+          kind: 'unknown-reference',
+          reference: verdict === 'unknown-customer' ? 'customer' : 'vehicle',
+        };
       }
-    }
-  }
 
-  // UNREACHABLE. Every classification either returns or prunes, and pruning a whole resource per
-  // conflict empties a list by attempt `|bays| + |technicians| - 1`. A `throw` rather than a
-  // refusal because nothing is minted here: there is no verdict to build a `409` from, and a
-  // fabricated one is exactly what ADR-0016 forbids. If this ever fires, a `PgOutcome` variant
-  // gained a second `continue` and the loop lost its bound (ADR-0020's one-directional guarantee).
-  throw new Error(
-    `booking loop exceeded its structural bound of ${String(structuralBound)} attempts`,
-  );
+      // Any other composite FK — a technician not qualified, a bay in another dealership — means
+      // the candidate query and the constraints disagree. That is broken reference data rather
+      // than anything the client sent, so it is the system's fault.
+      deps.logger.error(
+        {
+          event: REFERENCE_DATA_EVENT,
+          constraint,
+          dealershipId: command.dealershipId,
+          bayId,
+          technicianId,
+        },
+        'a candidate was refused by a composite foreign key',
+      );
+      return { kind: 'reference-data-invalid', detail: constraint };
+    },
+  });
+
+  switch (loopOutcome.kind) {
+    case 'success':
+      return { kind: 'confirmed', appointment: toAppointmentView(loopOutcome.row) };
+    case 'aborted':
+      return loopOutcome.value;
+    case 'no-capacity':
+      return {
+        kind: 'no-capacity',
+        resource: loopOutcome.resource,
+        attempts: loopOutcome.attempts,
+        exit: loopOutcome.exit,
+      };
+    case 'no-verdict':
+      return { kind: 'no-verdict' };
+    case 'not-confirmed':
+      // UNREACHABLE on the booking path — `runAttempt` above never returns `null`; only
+      // reschedule's guarded `UPDATE` can. Loud rather than silent if that ever stops holding.
+      // Stryker disable next-line all : no input reaches this branch (R-06-A's shape).
+      throw new Error('bookAppointment: the attempt loop reported not-confirmed, which booking never produces');
+  }
 }
