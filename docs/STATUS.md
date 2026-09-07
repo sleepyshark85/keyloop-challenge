@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `0358cd4 chore(log): nine findings closed — one MAJOR left, and it is the tombstone` |
+| Last commit | `aa9673f docs(07): step 7 — arc42 says what merged, and F-02-9 stops overclaiming its own discharge` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E |
-| Agent runs recorded | 152 |
+| Agent runs recorded | 153 |
 | ADRs accepted | 26 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -299,7 +299,8 @@
 | 2026-09-07 00:40 | architect | 322m44 | 152 / 19,731 / 8,107,627 | `derived` |
 | 2026-09-07 00:53 | test-engineer | 11m23 | 236 / 8,730 / 9,868,582 | `derived` |
 | 2026-09-07 01:04 | reviewer | 9m59 | 180 / 6,642 / 7,785,896 | `derived` |
-| | **total** | **6236m18** | **38,448 / 2,919,191 / 3,171,020,852** | |
+| 2026-09-07 03:24 | architect | 18m03 | 198 / 2,686 / 12,154,711 | `derived` |
+| | **total** | **6254m21** | **38,646 / 2,921,877 / 3,183,175,563** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
