@@ -196,6 +196,44 @@ const row = (out, label) => (out.split('\n').find((l) => l.includes(label)) ?? '
     row(run([ciRun({}), low]), 'mutation score').startsWith('FAIL'),
     row(run([ciRun({}), low]), 'mutation score'));
 
+  // O-64. The aggregate over changed files is NOT the claim §10 makes, and slice 08 is
+  // the case that proves the difference matters: 0.8571 across five changed files while
+  // one of them sat at 71.43, a file the architect had ruled fails §10 three times over.
+  // The old reading passed it.
+  const perFile = mutationRun({ checks: {
+    mutation_score: 0.8571,
+    mutation_measures_changed_files: true,
+    mutation_per_file: { 'src/a.ts': 100, 'src/b.ts': 71.43 },
+    mutation_below_threshold: ['src/b.ts'],
+  } });
+  ok('a passing AGGREGATE fails when one changed file is below threshold',
+    row(run([ciRun({}), perFile]), 'mutation score').startsWith('FAIL'),
+    row(run([ciRun({}), perFile]), 'mutation score'));
+  ok('...and names the file rather than only the number',
+    row(run([ciRun({}), perFile]), 'mutation score').includes('src/b.ts'),
+    row(run([ciRun({}), perFile]), 'mutation score'));
+  ok('...and says the aggregate is not the reading, so the two numbers cannot be confused',
+    /aggregates to 0\.8571/.test(row(run([ciRun({}), perFile]), 'mutation score'))
+      && /per file/.test(row(run([ciRun({}), perFile]), 'mutation score')),
+    row(run([ciRun({}), perFile]), 'mutation score'));
+
+  const allAbove = mutationRun({ checks: {
+    mutation_score: 0.8,
+    mutation_measures_changed_files: true,
+    mutation_per_file: { 'src/a.ts': 100, 'src/b.ts': 76 },
+    mutation_below_threshold: [],
+  } });
+  ok('every changed file at or above threshold passes, and names the worst one',
+    row(run([ciRun({}), allAbove]), 'mutation score').startsWith('PASS')
+      && row(run([ciRun({}), allAbove]), 'mutation score').includes('src/b.ts 76'),
+    row(run([ciRun({}), allAbove]), 'mutation score'));
+
+  // A record older than the collector must not be retroactively failed — but it must not
+  // be mistaken for a per-file reading either, so it says which reading it is.
+  ok('a pre-collector record keeps the aggregate reading AND declares it',
+    row(run([ciRun({}), real]), 'mutation score').includes('AGGREGATE'),
+    row(run([ciRun({}), real]), 'mutation score'));
+
   ok('a missing score is UNVERIFIED and DOES block done',
     row(run([ciRun({})]), 'mutation score').startsWith('UNVERIFIED') && run([ciRun({})]).includes('unverified'),
     row(run([ciRun({})]), 'mutation score'));

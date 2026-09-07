@@ -477,15 +477,38 @@ if (!onlyReady) {
   // A slice that changed no mutable file gets UNVERIFIED, not PASS. That is the
   // same answer `slice:check` already gives for every other absent evidence: the
   // gate says what it does not know rather than passing on what it cannot see.
+  // O-64, and it is this criterion's THIRD reading of a number that answered a different
+  // question. §10's clause is "on changed fileS", and the aggregate over that set is not
+  // the same claim as the threshold holding for each of them. At slice 08 the changed set
+  // scored 85.71 while `routes/availability.ts` sat at 71.43 — a file the architect had
+  // ruled fails §10 across three rulings and booked into arc42 §11 as debt. THIS GATE
+  // WOULD HAVE SAID PASS. The per-file truth existed the whole time, in prose, in the
+  // `note` of a hand-written record: the honesty in a field the gate never opened, exactly
+  // as in the vacuous-score bug above.
+  //
+  // `mutation_per_file` comes from `collect-mutation.mjs`, which computes it from
+  // Stryker's own report — so the threshold is applied to a fact no one typed. A record
+  // without that field is OLDER than the collector, and is read the way it always was
+  // rather than retroactively failed: the aggregate, with the reading named in the detail
+  // so nobody mistakes it for the per-file one.
   const mut = [...events].reverse().find((e) => e.checks?.mutation_score !== undefined);
   const vacuous = mut?.checks?.mutation_measures_changed_files === false;
+  const below = mut?.checks?.mutation_below_threshold;
+  const perFile = mut?.checks?.mutation_per_file;
+  const worst = perFile && Object.entries(perFile).sort((a, b) => a[1] - b[1])[0];
   check('done', `mutation score ≥ ${MUTATION_THRESHOLD}`,
     !mut ? UNVERIFIED
       : vacuous ? NA
-      : mut.checks.mutation_score >= MUTATION_THRESHOLD ? PASS : FAIL,
+      : below ? (below.length ? FAIL : PASS)
+        : mut.checks.mutation_score >= MUTATION_THRESHOLD ? PASS : FAIL,
     !mut ? 'Stryker has not run for this slice'
       : vacuous ? `this slice changed no mutable file — ${mut.checks.mutation_score} measures the slice before it`
-      : `${mut.checks.mutation_score}`);
+      : below?.length
+        ? `${below.join(', ')} below ${MUTATION_THRESHOLD} — worst ${worst[1]}; `
+          + `the changed set aggregates to ${mut.checks.mutation_score} and §10 is per file`
+        : below
+          ? `every changed file at or above ${MUTATION_THRESHOLD} — worst ${worst ? `${worst[0]} ${worst[1]}` : 'none measured'}`
+          : `${mut.checks.mutation_score} — AGGREGATE, recorded before per-file collection`);
 
   const depcruiseConfigured = ['.dependency-cruiser.js', '.dependency-cruiser.cjs', '.dependency-cruiser.json']
     .some((f) => existsSync(resolve(f)));

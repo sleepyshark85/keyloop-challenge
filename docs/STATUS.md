@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `6ae06ad docs(08): both remedies were measured short, and one of the six was mine to take back` |
+| Last commit | `e1b75dc docs(08): step 7 — arc42 had specified a function that never existed` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process |
-| Agent runs recorded | 180 |
+| Agent runs recorded | 185 |
 | ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -337,7 +337,12 @@
 | 2026-09-07 07:37 | implementer | 9m43 | 180 / 6,711 / 7,459,769 | `derived` |
 | 2026-09-07 07:37 | test-engineer | 9m58 | 168 / 4,788 / 4,818,651 | `derived` |
 | 2026-09-07 08:00 | architect | 17m18 | 176 / 8,428 / 9,314,056 | `derived` |
-| | **total** | **6647m52** | **42,228 / 3,095,218 / 3,352,593,554** | |
+| 2026-09-07 08:12 | implementer | 8m29 | 178 / 6,913 / 5,361,168 | `derived` |
+| 2026-09-07 08:13 | test-engineer | 10m34 | 158 / 2,009 / 6,412,148 | `derived` |
+| 2026-09-07 08:46 | architect | 5m50 | 98 / 1,232 / 2,560,671 | `derived` |
+| 2026-09-07 08:49 | implementer | 2m12 | 52 / 771 / 861,276 | `derived` |
+| 2026-09-07 09:13 | architect | 23m21 | 260 / 25,445 / 17,081,978 | `derived` |
+| | **total** | **6698m17** | **42,974 / 3,131,588 / 3,384,870,795** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
