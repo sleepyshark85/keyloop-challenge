@@ -183,4 +183,72 @@ describe('GET /availability — the querystring schema', () => {
     });
     expect(response.statusCode).toBe(400);
   });
+
+  it('a non-UUID serviceTypeId is ALSO 400 — dealershipId is not the only pattern-guarded field', async () => {
+    // The dealershipId case above and this one are the querystring's two UUID members; each has
+    // its own `{ pattern: UUID_PATTERN }` option, and only asserting one leaves the other's
+    // pattern removable without any test noticing (R-08-5).
+    const app = serverAnswering((): never => {
+      throw new Error('a schema violation must never reach the handler');
+    });
+    const response = await get(app, { ...VALID_QUERY, serviceTypeId: 'not-a-uuid' });
+    expect(response.statusCode).toBe(400);
+    expect(response.contentType).toMatch(/application\/problem\+json/);
+  });
+
+  it(
+    'an unknown query parameter never reaches the use case, alongside the ones that do (R-08-5)',
+    async () => {
+      // The stripped-not-rejected test above shows the STATUS this route answers with; this one
+      // shows what `queryAvailability` actually receives — proof the extra key is gone by the
+      // time it would matter, not just that the response happened to still be 200.
+      let seen: unknown;
+      const app = serverAnswering((query) => {
+        seen = query;
+        return { kind: 'available', bays: [], technicians: [] };
+      });
+      await get(app, { ...VALID_QUERY, extra: 'nope' });
+      expect(seen).toEqual({
+        dealershipId: DEALERSHIP,
+        serviceTypeId: SERVICE_TYPE,
+        fromMillis: Date.parse(FROM),
+        toMillis: Date.parse(TO),
+      });
+      expect(seen).not.toHaveProperty('extra');
+    },
+  );
+});
+
+describe('GET /availability — the whole problem document on both error arms (R-08-5)', () => {
+  /**
+   * Until now this file asserted `type`, `status` and `reference` and never `title` or `detail`
+   * — the same shape of gap `routes/appointments.ts` closed for its own arms (that file's own
+   * `describe('every row carries a title and a detail a client can read', …)`). A `title` or
+   * `detail` string reduced to `''` passed every assertion this file had.
+   */
+  it('malformed-window (400) carries its title and detail, not just its type and status', async () => {
+    const app = serverAnswering({ kind: 'malformed-window' });
+    const response = await get(app, VALID_QUERY);
+    const body = response.json() as Record<string, unknown>;
+    expect(response.statusCode).toBe(400);
+    expect(body['type']).toBe('/problems/malformed-request');
+    expect(body['status']).toBe(400);
+    expect(body['title']).toBe('The request could not be understood');
+    expect(body['detail']).toBe('to must be strictly later than from');
+  });
+
+  it.each(['dealership', 'service-type'] as const)(
+    'unknown-reference (%s, 422) carries its title and detail, not just its type, status and reference',
+    async (reference) => {
+      const app = serverAnswering({ kind: 'unknown-reference', reference });
+      const response = await get(app, VALID_QUERY);
+      const body = response.json() as Record<string, unknown>;
+      expect(response.statusCode).toBe(422);
+      expect(body['type']).toBe('/problems/unknown-reference');
+      expect(body['status']).toBe(422);
+      expect(body['title']).toBe('A named reference does not exist');
+      expect(body['reference']).toBe(reference);
+      expect(body['detail']).toBe(`no ${reference} matches the id in this request`);
+    },
+  );
 });
