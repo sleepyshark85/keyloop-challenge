@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `8cc79e1 docs(08): step 5 ruled — and the architect rejected my classification` |
+| Last commit | `6ae06ad docs(08): both remedies were measured short, and one of the six was mine to take back` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process |
-| Agent runs recorded | 177 |
+| Agent runs recorded | 180 |
 | ADRs accepted | 27 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -334,7 +334,10 @@
 | 2026-09-07 05:54 | implementer | 18m51 | 396 / 11,964 / 34,032,502 | `derived` |
 | 2026-09-07 06:07 | reviewer | 10m36 | 196 / 9,490 / 9,935,094 | `derived` |
 | 2026-09-07 07:18 | architect | 12m11 | 172 / 8,533 / 7,020,464 | `derived` |
-| | **total** | **6610m53** | **41,704 / 3,075,291 / 3,331,001,078** | |
+| 2026-09-07 07:37 | implementer | 9m43 | 180 / 6,711 / 7,459,769 | `derived` |
+| 2026-09-07 07:37 | test-engineer | 9m58 | 168 / 4,788 / 4,818,651 | `derived` |
+| 2026-09-07 08:00 | architect | 17m18 | 176 / 8,428 / 9,314,056 | `derived` |
+| | **total** | **6647m52** | **42,228 / 3,095,218 / 3,352,593,554** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
