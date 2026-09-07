@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **325** |
-| Severity | 12 blocking · 163 major · 150 minor |
+| Findings recorded | **329** |
+| Severity | 12 blocking · 164 major · 153 minor |
 | Verdicts | 20 narrowed · 119 accepted · 4 escalated · 27 deferred · 2 rejected |
-| Raised by | test-engineer 68 · reviewer 66 · orchestrator 65 · architect 64 · implementer 50 · scribe 10 · human 2 |
-| Awaiting a ruling | **153** |
-| Mean escape distance | 1.63 step(s) |
+| Raised by | test-engineer 68 · architect 66 · orchestrator 66 · reviewer 66 · implementer 50 · scribe 10 · human 3 |
+| Awaiting a ruling | **157** |
+| Mean escape distance | 1.61 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2016,6 +2016,10 @@ rather than narrated.*
 | **A-R-1** | MAJOR | 6 *(+0)* | architect | ADR-0013 IS GENUINELY ARCHITECTURAL and the architect executed its retirement UNDER PROTEST | **open** |
 | **O-67** | MINOR | 6 *(+0)* | orchestrator | An earlier appended line says a sample file STAYS PUT BY INSTRUCTION and this run DELETED it — the correction can only be appended, not made in place | **open** |
 | **O-68** | MINOR | 6 *(+0)* | orchestrator | ADR-0018 NOW GIVES THREE DEADLOCK-FREEDOM REASONS, BUT NOT THE THREE A-04-1 FOUND — the provenance line remains a criticism and correctly so | **open** |
+| **H-1** | MAJOR | 6 *(+0)* | human | THE HUMAN AUDITED THE TRACE AND FOUND IT GOES QUIET ON THE PROJECT'S MOST CONSEQUENTIAL INTERPRETATION — the brief says A USER and every document says SERVICE ADVISOR | **open** |
+| **A-R-2** | MINOR | 6 *(+0)* | architect | Section 12's closing footnote was ALREADY BROKEN before the glossary row was added, in two ways, and no tool can see either | **open** |
+| **A-R-3** | MINOR | 6 *(+0)* | architect | A TERM-INTRODUCTION CHECK WOULD HAVE CAUGHT H-1 ON THE DAY IT WAS WRITTEN, and it is cheap because both tables are already machine-readable | **open** |
+| **O-69** | MINOR | 6 *(+0)* | orchestrator | O-61 RECURRED TWICE IN ONE SESSION and is now fixed at the trigger rather than recorded a third time | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2240,6 +2244,26 @@ rather than narrated.*
 
 - *scenario:* THE ARCHITECT REFUSED TO CLAIM THIS AND ASKED FOR IT TO BE CHECKED, WHICH WAS THE RIGHT CALL. ADR-0018's ai-input block closes with the implementer's A-04-1 checking the deadlock-freedom argument against the code and finding it holds FOR THREE INDEPENDENT REASONS WHERE THIS RECORD GIVES ONE. The readability pass restored an argument giving THREE reasons, so the line looked as though it had stopped being a criticism. IT HAS NOT. THE ORCHESTRATOR READ A-04-1 IN THE LOG AND THE SETS DO NOT MATCH. A-04-1's three are: the design's own DISJOINT-CLASS reason; that lockResources takes both locks in ONE SELECT OVER unnest, so it is one literal statement whose evaluation order is THE SAME AT EVERY ATTEMPT and a cycle needs two transactions taking the same objects in OPPOSITE orders, which identical statement text rules out WITHOUT DEPENDING ON unnest ROW ORDER; and that src/domain/candidates.ts CANNOT REACH THE LOCK CLASSES AT ALL because domain-is-pure is to-empty-object, absolute. THE RESTORED THREE ARE: different lock classes, bay-then-technician as a total order no attempt can reverse, and the locks being TRANSACTION-SCOPED so none is held across candidates. ONLY THE FIRST IS SHARED. The second is adjacent but argued from ordering rather than from identical statement text, and the third is a different property entirely. SO THE PROVENANCE LINE IS STILL TRUE AS WRITTEN and must stay: the record still does not enumerate A-04-1's reasons. NOTHING IS LOST — slice 04's design ENUMERATES THEM, moved there at that slice's step 7 precisely because ADR-0018 records THAT there are three, does not enumerate them, and is immutable. Recorded so nobody re-asks the question and answers it by assuming.
 - *file:* `docs/adr/0018-lock-the-bay-and-the-technician-before-each-insert.md`
+
+**H-1** — THE HUMAN AUDITED THE TRACE AND FOUND IT GOES QUIET ON THE PROJECT'S MOST CONSEQUENTIAL INTERPRETATION — the brief says A USER and every document says SERVICE ADVISOR
+
+- *scenario:* FOUND BY THE HUMAN READING ADR-0001 AND ASKING WHAT A SERVICE ADVISOR IS, THEN CHECKING Requirements.md AND FINDING THE TERM IS NOT THERE. IT IS NOT: the brief says allow A USER to request a service appointment, and the only salesperson in the file belongs to scenario B, which was not built. SERVICE ADVISOR IS INVENTED VOCABULARY. IT WAS NOT INVENTED SILENTLY, and that part of the process worked — section 1.1's open-question register carries OQ-2, who is the actor and is authentication in scope, answered service advisor, no authentication, ruled by ADR-0002 and marked accepted as recommended; and ADR-0002's own reasoning is visibly an inference, THE ACTOR THE BRIEF'S WORDING BEST SUPPORTS IS DEALERSHIP STAFF REPLACING A PAPER DIARY, rather than a quotation. THE DEFECT IS THAT THE INTERPRETATION IS INVISIBLE WHERE THE TERM IS INTRODUCED. Section 1.1's stakeholder table and section 3.1.1's actor table both present Service advisor as settled fact with a parenthetical ADR pointer, and NEITHER SHOWS THE BRIEF'S ACTUAL WORD. For a document whose section 1.1 claims to quote the brief and trace every requirement to it, the trace goes quiet at exactly the point it matters most. AND IT IS LOAD-BEARING: this reading is what puts authentication out of scope, carries customer_id in the request body, and makes ownership a 4xx validation failure rather than a 403 security control. If the actor were the CUSTOMER booking their own car, authentication would be in scope and ownership would be a security boundary — one word in the brief, two materially different systems. A SECOND GAP FOUND WITH IT: section 12's glossary lists fourteen domain terms and DOES NOT DEFINE THE SYSTEM'S ONLY ACTOR. That is worse after the readability pass than before, because the point of removing cross-references was that a reader should not have to chase a pointer to understand a sentence, and service advisor is now the term most likely to send one hunting. THE TOOLING COULD NOT HAVE CAUGHT THIS: docs:refs checks that citations resolve, not that a term traces to the brief.
+- *file:* `docs/arc42/01-introduction-goals.md`
+
+**A-R-2** — Section 12's closing footnote was ALREADY BROKEN before the glossary row was added, in two ways, and no tool can see either
+
+- *scenario:* RAISED BY THE ARCHITECT AGAINST A SENTENCE IT DECLINED TO REWRITE BECAUSE IT BELONGS TO THE SCRIBE. The footnote reads THE TWELVE DOMAIN TERMS BELOW THE FIRST FOUR WERE PROPOSED IN docs/slices/01-design.md SECTION 12.1. BOTH HALVES ARE WRONG AND BOTH PREDATE THIS CHANGE: the table had THIRTEEN rows, not sixteen as the arithmetic implies, and 01-design.md HAS NO SECTION 12.1 — the design condensation removed it, so the citation resolves to nothing. docs:refs CANNOT SEE THIS because it checks D-, F-, DA-, OQ- and A- identifiers, NOT SECTION POINTERS INTO SLICE DESIGNS. THE ARCHITECT THEN FACED A CHOICE WITH NO CLEAN ANSWER and reported its reasoning rather than picking quietly: there is no insertion point for a new row that leaves the footnote's meaning intact, because adding FIRST sweeps Appointment into the slice-01 attribution and adding LAST sweeps in the new row. IT CHOSE LAST, ON THE GROUND THAT THE MISATTRIBUTION THEN LANDS ON THE ROW IT CONTROLS, and neutralised it inline with Added 2026-09-07, not a slice-01 term. Every pre-existing row's provenance is therefore exactly as the footnote states it. The footnote itself is the scribe's sentence in the scribe's section and is left for the scribe.
+- *file:* `docs/arc42/12-glossary.md`
+
+**A-R-3** — A TERM-INTRODUCTION CHECK WOULD HAVE CAUGHT H-1 ON THE DAY IT WAS WRITTEN, and it is cheap because both tables are already machine-readable
+
+- *scenario:* PROPOSED BY THE ARCHITECT WHEN ASKED WHETHER ANY CHECK COULD HAVE CAUGHT THE HUMAN'S FINDING, AND DELIBERATELY NOT BUILT — the instruction was to name it, not to build it inside a readability pass. THE SHAPE: section 1.1 already declares the brief's three requirements AS BLOCK QUOTATIONS. A tool could extract every quoted span there, then require that any role named in section 1.3's stakeholder table or section 3.1.1's actor table EITHER APPEARS INSIDE ONE OF THOSE QUOTATIONS OR SITS WITHIN A FEW LINES OF A MARKER SAYING IT DOES NOT. That is exactly the defect's shape: A TERM PRESENTED AS SETTLED WHOSE WORD NEVER APPEARS IN THE SOURCE THE DOCUMENT CLAIMS TO TRACE TO. It would have fired on Service advisor the day section 1.3 was written. Recorded as available work with a named mechanism rather than as an aspiration, because the project has learned repeatedly that a guard whose only enforcement is discipline is not a guard.
+- *file:* `tools/docs/refs.mjs`
+
+**O-69** — O-61 RECURRED TWICE IN ONE SESSION and is now fixed at the trigger rather than recorded a third time
+
+- *scenario:* DOCS/DEFECTS.MD AND DOCS/STATUS.MD ARE DERIVED FROM THE LOG, so every append makes them stale and defects:check red until someone remembers npm run defects. O-61 named that and was RECORDED RATHER THAN FIXED. It then broke a running agent test:tools TWICE IN ONE SESSION — once on the O-67 append and once on the H-1 append — and BOTH TIMES THE FAILURE LANDED ON AN AGENT DOING UNRELATED WORK, which then had to diagnose an orchestrator-owned artifact to clear itself. The architect diagnosed it exactly both times, including that guard-paths blocking it from touching the log was the guard working correctly. O-61 OWN WORDS WERE THAT A DERIVED FILE REGENERATED BY HAND IS STALE BY DEFAULT and that the project keeps rediscovering that DERIVED ARTIFACTS NEED A TRIGGER NOT A HABIT — the same shape as O-40 STATUS.md regression and the slice:check mutation criterion. THE APPEND IS THE TRIGGER: it is the only event that can invalidate them and the moment the writer is present. Now regenerated automatically after a successful append, BEST-EFFORT AND NEVER FAILING THE APPEND, because a write that succeeded must not be reported as failed for a derived view; defects:check still catches staleness if the regeneration does not run. --no-regen exists for loop callers.
+- *file:* `tools/team-log/append.mjs`
 
 </details>
 

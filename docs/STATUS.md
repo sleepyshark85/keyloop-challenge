@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `7156927 docs(adr): 0018 gets its deadlock-freedom argument back, and the flag it should have had` |
+| Last commit | `4b8b531 docs(arc42): the brief says "a user" — say so where "service advisor" is introduced` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 190 |
+| Agent runs recorded | 191 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -334,7 +334,8 @@
 | 2026-09-07 12:30 | architect | 50m57 | 462 / 27,487 / 46,964,047 | `derived` |
 | 2026-09-07 12:36 | architect | 57m22 | 528 / 28,077 / 59,574,813 | `derived` |
 | 2026-09-07 12:39 | architect | 60m18 | 550 / 28,146 / 63,934,599 | `derived` |
-| | **total** | **6974m20** | **45,654 / 3,258,296 / 3,715,209,199** | |
+| 2026-09-07 13:43 | architect | 124m14 | 608 / 28,285 / 75,192,181 | `derived` |
+| | **total** | **7098m34** | **46,262 / 3,286,581 / 3,790,401,380** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
