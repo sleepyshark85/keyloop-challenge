@@ -4,9 +4,9 @@ title: Close-out — observability, the OpenAPI contract with its cURL harness, 
 status: ready
 depends_on: ["08"]
 absorbs: ["10", "11"]
-arc42: ["§3.1", "§8.4", "§8.6", "§10.2", "§11.1"]
+arc42: ["§3.1", "§5.3", "§8.4", "§8.6", "§10.2", "§11.1"]
 adr: [5, 6, 10]
-quality_scenarios: [QS-13, QS-11, QS-14]
+quality_scenarios: [QS-13, QS-11, QS-14, QS-10, QS-12]
 inherits: ["OQ-05-2", "F-06-1", "A-06-2", "T-06-5", "I-04-5", "R-07-12"]   # deferred here by ruling; slice:check enforces it (A-05-5). I-04-5 and R-07-12 admitted by the human at O-59, 2026-09-08
 loopbacks: 0
 gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/BLOCKING
@@ -17,8 +17,8 @@ gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/B
 >
 > **Seventeen acceptance criteria and six inherited obligations: the largest slice in the project,
 > stated rather than hidden.** The three parts are *not* independent — `A-06-4`, plus three further
-> couplings in [the design](09-design.md) — so this is **one red commit** across three test files and
-> one observed red run (§7), whose ~150-line guidance still governs every green commit after it.
+> couplings in [the design](09-design.md) — so this is **one red commit**, one observed red run
+> (§7). The red set is a property, not a count (`T-09-2`): every criterion fails in it.
 
 ## Goal
 
@@ -51,7 +51,7 @@ goal with no number is a goal nobody can fail.
 ### The OpenAPI document and the harness *(carried from slice 10)*
 
 - **AC-7** — Given the route schemas, when the document is generated, then it matches the committed
-  `openapi.json` byte for byte; a drifted document fails CI. *(QS-11, second half)*
+  `docs/api/openapi.json` byte for byte; a drifted document fails CI. *(QS-11, second half)*
 - **AC-8** — Given the document, when it is validated, then it is a valid OpenAPI 3.1 description
   covering all five operations of §8.6.
 - **AC-9** — Given every error `type` in §8.6, when the document is read, then each is described as

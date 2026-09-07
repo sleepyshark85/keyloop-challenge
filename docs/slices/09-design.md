@@ -1,8 +1,8 @@
 # Slice 09 — design
 
 Slice file: [`09-observability.md`](09-observability.md). Gate D folded slices 10 and 11 into it and
-`O-59` admitted a sixth inherited obligation. arc42 §3.1, §8.4, §8.6, §10.2 and §11.1 are *proposed*
-here and edited at step 7.
+`O-59` admitted a sixth inherited obligation. arc42 §3.1, §5.3, §8.4, §8.6, §10.2 and §11.1 are
+*proposed* here and edited at step 7.
 
 ## One slice, and the seam is more false than when the gate ruled it
 
@@ -29,7 +29,8 @@ Cutting anywhere separates a change from the only thing that proves it. **Not sp
 | `src/http/server.ts` | The document is emitted by a **callable function**, not only by a script |
 | `src/main.ts` | Starts and shuts the SDK down; the only module that may see it |
 | `.dependency-cruiser.js` | `otel-sdk-only-in-platform`, with QS-10's plant for it |
-| `openapi.json`, `harness/` | The committed document and the cURL scripts |
+| `docs/api/openapi.json`, `harness/` | The committed document — emitted by `buildOpenApiDocument()`, written by `npm run docs:openapi` (`T-09-1`) — and the cURL scripts |
+| `vitest.config.ts`, `tools/ci/run-tests.mjs` | A third `perf` project, run alone (`T-09-3`). Test-engineer's files: specified here, built there |
 
 **Data-model delta: none.** Nothing here adds a behaviour; each part puts a number or a document
 against behaviour that already exists.
@@ -74,8 +75,17 @@ fallen, because after `F-06-1` the signature changes once rather than twice.
 `vitest.mutation.config.ts` includes `tests/unit/**` only (§11 R-12), so a byte-for-byte assertion in
 `tests/contract/` leaves them **killable and still not killed** — the score would not move and
 `routes/availability.ts` would merge a second time under §10's 0.75. Hence decision 4: the document
-comes from a function the unit layer can also call. The arithmetic, so step 5 can falsify it rather
-than re-derive it — 30 / 42 → **37 / 42 = 88.1 %**. The three `DISCLAIMER` mutants are a runtime body
+comes from a function the unit layer can also call. The arithmetic was stated so step 5 could falsify
+it rather than re-derive it, and `I-09-1` falsified it — with a live `@fastify/swagger` 9.8.1 harness
+where I had only read. **The response body's object-level `description` survives into the document;
+the querystring's does not**, the object being exploded into `in: query` parameters and the wrapper's
+own description dropped. So the floor is 30 / 42 → **34 / 42 = 80.95 %**, which still clears §10's
+0.75 and still closes `D-08-1`. An **operation-level `schema.description`** — Fastify's field sibling
+to `querystring` and `response` — *is* preserved, so relocating the querystring's prose there carries
+the same three literals onto a property the document keeps: **37 / 42 = 88.1 %**. It touches no
+criterion (AC-5b names the response schema) and renders text that today renders nowhere. The
+*mechanism* is now measured; the *figure* is still a projection over seven literals, and step 5
+falsifies it. The three `DISCLAIMER` mutants are a runtime body
 value and not a schema description; **nothing here kills them** and they stay in `D-08-1` with the two
 unkillable `default:`-arm mutants at `159`.
 
@@ -86,6 +96,9 @@ A budget is a threshold, so what it measures is pinned before anyone measures it
 - **Boundary:** the HTTP request, end to end. Measuring the use case hides pool acquisition, which is
   `D-07-1`'s subject.
 - **Serially.** *Uncontended* means one request in flight, or the figure describes the pool.
+- **Exclusively.** *Uncontended* is a property of the runner too, not only of the test.
+  `tests/performance/**` leaves the `db` project for its own `perf` project and its own sequential
+  `run-tests.mjs` invocation, so it holds its own container (`T-09-3`).
 - **Warm.** A stated warm-up count is discarded, or p95 over 100 runs describes Node's start-up.
 - **p95 is nearest-rank over 100 samples** — the fifth worst. Three estimators differ by more than the
   margin this budget has.
@@ -120,17 +133,65 @@ not a decision, and minting it is the shape seventeen files were retired for.
 
 - **AC-5b added: seventeen criteria, not sixteen.** `R-08-2` named it at slice 08 and it was never
   written down. Cost if wrong: the largest slice grows again.
-- **One red commit** (§7), three test files, one observed red run. The slice file said *"three reds if
-  they need three"*, which contradicts §7; corrected. One run failing seventeen criteria is also the
-  stronger baseline, because it proves none was passing beforehand — which is why `AC-7` was withdrawn
-  at slice 08.
+- **One red commit** (§7), **one observed red run**, and the file set is a *property* rather than a
+  count — a count is precisely what `T-09-2` found wrong. **Every one of the seventeen criteria and
+  both architecture controls fails in that run.** The five files the decisions above commit:
+  `tests/integration/telemetry-booking.test.ts` (QS-13), the contract file over the emitted document
+  (QS-11's second half, `A-06-2`), `tests/performance/availability-budget.test.ts` (QS-14),
+  `tests/architecture/layering.test.ts` (decision 1's plant, QS-10) and `ambiguity-containment.test.ts`
+  (decision 2's marker, QS-12). AC-6b, AC-10 and AC-11 need homes the test-engineer places. The slice
+  file said *"three reds if they need three"*, which contradicts §7; corrected. One run failing
+  seventeen criteria is also the stronger baseline, because it proves none was passing beforehand —
+  which is why `AC-7` was withdrawn at slice 08.
+- **The document is `docs/api/openapi.json`** (`T-09-1`) — ADR-0005's path, which three files in the
+  tree already name. Emitted by `buildOpenApiDocument()`, written by `npm run docs:openapi`.
+- **`tests/performance/**` runs alone** (`T-09-3`): its own project, its own invocation, its own
+  container.
 - **`D-07-1` split** (decision 5); **`T-06-5` accepted** (decision 6).
+
+## Step 2 adjudication — four objections, none deferred
+
+| # | Verdict | Rule | Why |
+|---|---|---|---|
+| `I-09-1` | **AGREE**; remedy taken | (a) | It ran `@fastify/swagger` where I read it. A falsifiable figure that gets falsified is the mechanism working |
+| `T-09-1` | **AGREE**; remedy taken verbatim | (a) | §4 already decides it — the ADR wins over a slice file, and three files in the tree agree with the ADR. Ruling root-level would supersede an accepted ADR to move a file for no reason I can state, which is the shape the 2026-09-07 bar retired seventeen files for. **No ADR minted, none superseded** |
+| `T-09-2` | **AGREE**, both halves; it does not get to concede | (a) | Neither control is optional. A fifth `dependency-cruiser` rule asserted by nothing is what QS-10 exists to prevent, in decision 1's own words; `dependency-cruiser` is per file and cannot see a one-increment-site rule, so decision 2's marker is its only executable form. **Checking it turned up the same class once more, and mine rather than theirs: `arc42:` was missing §5.3**, where the fifth rule's row lives |
+| `T-09-3` | **AGREE** the finding entire; exclusivity accepted, **mechanism changed**; the §11 alternative **refused** | (a) | Below |
+
+### `T-09-3` — the budget runs alone, and why this is (a)
+
+Every file re-read confirms the measurement. What the (c) test asks to be named is **AC-13's own
+word**: a booking measured while `no-spurious-refusal` drives 20 racers at the same PostgreSQL is not
+*uncontended*. The protocol above pinned the test's own concurrency and said nothing about the
+runner's.
+
+**The §11 alternative is refused on the objector's own reasoning.** `A-09-1`'s machine class
+discriminates a starved runner because starvation is visible *in the class*; it cannot discriminate a
+contended run from a clean one on the *same* class. A "noisy upper bound" is `O-70`'s trade with the
+discriminating half removed — and §11 would record it as a number.
+
+**The mechanism changes.** `fileParallelism: false` on `db` serialises 21 files to isolate one, on
+every run of every future slice. A third `perf` project instead: `run-tests.mjs` already spawns
+projects strictly sequentially, and per-project `globalSetup` hands it its own container —
+exclusivity at the container rather than at the file, stronger than what was asked, for one container
+start. That file's *"a project that did not run is a loud, distinct failure"* then covers the budget
+for free, which is the same failure class one layer up. Two things to **demonstrate rather than
+assume**, per its own `globalSetup` precedent: that three projects merge into the single
+`test-results.json` `red-proof` reads, and that `perf` genuinely runs alone.
+
+**Not (c).** (c) loops back to step 1, supersedes the ADR at fault and revises prior work. No ADR is
+at fault, and at step 2 there is no prior work — this amendment *is* the loop back. The decision was
+right and stated; the mechanism making it true was missing, which is a specification gap. The counter
+measures slicing pressure, and spending one of two here would report this slice to the gate as three
+designs deep when it is one. **The gate should check me on that**; `gate: light` is the human's to
+keep or revoke and I have not touched the field.
 
 ## Proposed arc42 edits, made at step 7
 
 §8.4 gains the one-increment-site rule and loses the sentence `A-04-15` says slice 04 made false.
+§5.3's ruleset table gains `otel-sdk-only-in-platform` and QS-10's row its fifth plant (`T-09-2`).
 §10.2's QS-11 loses *"the OpenAPI half is slice 09's and unasserted"*, and QS-14 gains the measurement
-protocol above. §3.1 gains the harness as the stubbed client. §11 gains R-1's measured figure and
+protocol above, exclusivity included. §3.1 gains the harness as the stubbed client. §11 gains R-1's measured figure and
 `D-07-1`'s stated reason. **§8, §10 and §11 are over budget: every addition names its deletion.**
 
 ## Assumptions and open questions
