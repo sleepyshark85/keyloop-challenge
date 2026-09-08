@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `42abe73 docs(10): the slice design shrinks to its as-built record` |
+| Last commit | `b0c2526 docs(close-out): the account of how this was built, sourced from 369 findings` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E |
-| Agent runs recorded | 236 |
+| Agent runs recorded | 237 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -394,7 +394,8 @@
 | 2026-09-08 09:35 | scribe | 47m26 | 132 / 3,917 / 3,469,885 | `derived` |
 | 2026-09-08 10:38 | architect | 110m08 | 378 / 11,397 / 23,746,288 | `derived` |
 | 2026-09-08 10:53 | architect | 13m12 | 184 / 7,879 / 8,222,897 | `derived` |
-| | **total** | **8865m17** | **62,788 / 4,299,553 / 5,575,756,009** | |
+| 2026-09-08 11:18 | scribe | 26m45 | 498 / 23,619 / 54,540,309 | `derived` |
+| | **total** | **8892m02** | **63,286 / 4,323,172 / 5,630,296,318** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
