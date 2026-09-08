@@ -3,29 +3,59 @@ import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import SwaggerParser from '@apidevtools/swagger-parser';
+import buildStringify from 'fast-json-stringify';
 
 /**
- * Slice 09 — the OpenAPI contract, `tests/contract/openapi-document.test.ts` (QS-11's second
- * half). `docs/slices/09-observability.md` AC-7, AC-8, AC-9, AC-5b · arc42 §8.5, §8.6 ·
- * ADR-0005 · `T-09-1`'s ruling (§4 already decides the path: `docs/api/openapi.json`, emitted
- * by `buildOpenApiDocument()`, written by `npm run docs:openapi`).
+ * Slice 10 — `docs/slices/10-openapi-and-curl-harness.md`, `docs/slices/10-design.md`. AC-1,
+ * AC-3, AC-3 (README half excepted — gate-verified, not mechanical, see design's "What cannot
+ * fail"), AC-7 (this slice's own, not slice 09's) · arc42 §8.5, §8.6 · ADR-0005, ADR-0025.
+ * Slice 09's AC-7 (docs:openapi --check), AC-8 (valid OpenAPI 3.1) and AC-5b (availability's
+ * "not a reservation" / "interval queried" pair) are STANDING GUARDS this slice must keep
+ * green — kept below unweakened.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * BLACK BOX ONLY. This file never imports `src/` — `outside-in-tests-do-not-import-src`
- * covers `tests/contract/`. It reaches `buildOpenApiDocument()` the only way an outside-in
- * test may: by running the `npm run docs:openapi` script the design pins as that function's
- * caller (AC-7), and by reading the COMMITTED artifact the script writes (AC-8, AC-9, AC-5b).
+ * BLACK BOX ONLY, as before. This file never imports `src/`.
  *
- * AC-7's own wording is "a drifted document fails CI", which is a claim about a CHECK MODE,
- * never about mutating the working tree from inside a test run. `docs:check`,
- * `defects:check`, `docs:budget:check` and `docs:adr-check` are this repository's own
- * established shape for that: a `--check` flag that reports drift and exits non-zero without
- * writing anything. This file assumes `npm run docs:openapi -- --check` follows that same
- * shape — an assumption rather than an observation, because neither the script nor its flag
- * exist at this commit. If the implementer wires the check under a different name or flag,
- * AC-7's case below fails with "Missing script" or a non-zero exit for that reason, which is
- * a real, diagnosable answer for a criterion whose mechanism does not exist yet, and never a
- * silent pass.
+ * THREE OF THIS SLICE'S CRITERIA WERE ASSERTED BY TESTS THAT COULD NOT FAIL (step 1). This
+ * file exists to fix that:
+ *
+ *   AC-1  the old "AC-9" describe block asserted TYPE PRESENCE by string-scanning for
+ *         `/problems/*`, never the MEDIA TYPE it arrived under. `equalityPairs()` below walks
+ *         each response's `content` MEDIA-TYPE KEYS directly (step-2 commitment 1) so a `422`
+ *         declared as `application/json` — today's actual defect, `problem.ts:76` has sent
+ *         `application/problem+json` since slice 03 — is a mismatch, not a pass. The 2xx
+ *         direction is asserted the same way: a `201` arriving as `problem+json` is §8.6's
+ *         own "worse failure".
+ *   AC-3  no operation's `requestBody` or `parameters` can carry a caller-supplied appointment
+ *         id — the CONTRACT half of `A-06-2` (the MINTING half is `tests/architecture/
+ *         uuid-mint.test.ts`, owned separately per the design's ownership table).
+ *   I-10-1 / M2  a one-member `Type.Union` collapsing to `Type.Literal` reproduces §8.5's
+ *         substitution defect inside AC-1's own narrowing (seven cells: read/cancel's 400 &
+ *         404, availability's 400 & 422, book's 409). The property asserted below is
+ *         OBSERVABLE BEHAVIOUR under the actual serialiser Fastify uses
+ *         (`fast-json-stringify`, `@fastify/fast-json-stringify-compiler`'s own dependency,
+ *         confirmed present via `fastify`'s own `package.json`) — never the schema's SHAPE
+ *         (`anyOf` vs. bare `const`), which is a mechanism a future refactor could satisfy
+ *         differently while remaining correct, or vary while reintroducing the defect. Traced
+ *         empirically before being written into an assertion: a bare `{const: x}` schema
+ *         SILENTLY SUBSTITUTES `x` back regardless of the input value; a one-member `anyOf`
+ *         THROWS on a mismatch. Reject, not substitute, is the property; which schema shape
+ *         produces it is the implementer's to choose (step 2: `Type.Unsafe` with a hand-built
+ *         one-member `anyOf` — not pinned here by name).
+ *   AC-7 (slice 10)  `R-09-13`: the querystring description constant was doing two jobs and is
+ *         split — three concatenated contract-prose facts (what the operation answers, the
+ *         rule, the consequence) replace it, and TypeBox's rationale moves to the file's own
+ *         docblock, which publishes nothing. `D-08-1`'s three surviving mutants (one per
+ *         emptied literal) are what the three `it()` cases below are bound to — the architect's
+ *         corrected boundary (`to` strictly later than `from`, not "at or after") is the rule
+ *         asserted, per the mid-slice ruling in `10-design.md` §3.
+ *
+ * OQ-10-1, ANSWERED (step 2, measured): `SwaggerParser.validate` 13.0.0 accepts an
+ * unreferenced `components.responses` entry, so `route-not-found` — raised by
+ * `setNotFoundHandler`, answering no operation — can live there. The document-wide
+ * type-presence check below is widened past `doc.paths` to `doc.paths` ∪ `doc.components`
+ * accordingly; a check that only walked `paths` would false-red a correct implementation that
+ * takes that home for the row.
  */
 
 const REPO_ROOT = process.cwd();
@@ -33,15 +63,27 @@ const DOCUMENT_PATH = resolve(REPO_ROOT, 'docs/api/openapi.json');
 
 // ───────────────────────────────────────────────────────────────── reading the document ──
 
+interface ResponseObject {
+  readonly content?: Record<string, { readonly schema?: unknown }>;
+}
+interface ParameterObject {
+  readonly name?: string;
+  readonly in?: string;
+}
+interface RequestBodyObject {
+  readonly content?: Record<string, { readonly schema?: { readonly properties?: Record<string, unknown> } }>;
+}
 interface OpenApiDoc {
   readonly openapi?: string;
   readonly paths?: Record<string, Record<string, OperationObject>>;
-  readonly components?: { readonly schemas?: Record<string, unknown> };
+  readonly components?: { readonly schemas?: Record<string, unknown>; readonly responses?: Record<string, unknown> };
 }
 interface OperationObject {
   readonly operationId?: string;
   readonly description?: string;
-  readonly responses?: Record<string, unknown>;
+  readonly responses?: Record<string, ResponseObject>;
+  readonly parameters?: readonly ParameterObject[];
+  readonly requestBody?: RequestBodyObject;
 }
 
 function readDocument(): { readonly doc?: OpenApiDoc; readonly error?: string } {
@@ -124,6 +166,32 @@ function collectDescriptions(node: unknown, doc: OpenApiDoc, seen: Set<unknown> 
   return parts.join('\n');
 }
 
+/**
+ * `node`, with every `$ref` resolved and inlined — cycle-safe via `seen`. Needed only for the
+ * I-10-1/M2 probe below: `fast-json-stringify` does not understand this document's `#/...`
+ * pointer format, so the schema handed to it must be fully dereferenced first.
+ */
+function dereference(node: unknown, doc: OpenApiDoc, seen: Map<unknown, unknown> = new Map()): unknown {
+  if (node === null || typeof node !== 'object') return node;
+  const cached = seen.get(node);
+  if (cached !== undefined) return cached;
+  if (Array.isArray(node)) {
+    const out: unknown[] = [];
+    seen.set(node, out);
+    for (const item of node) out.push(dereference(item, doc, seen));
+    return out;
+  }
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['$ref'] === 'string') {
+    const resolved = resolveRef(doc, obj['$ref']);
+    return dereference(resolved, doc, seen);
+  }
+  const out: Record<string, unknown> = {};
+  seen.set(node, out);
+  for (const [key, value] of Object.entries(obj)) out[key] = dereference(value, doc, seen);
+  return out;
+}
+
 /** arc42 §8.6's closed `type` set, transcribed independently from the table — never from src/. */
 const ALL_PROBLEM_TYPES = [
   '/problems/malformed-request',
@@ -150,9 +218,9 @@ function operation(doc: OpenApiDoc, path: string, method: string): OperationObje
   return doc.paths?.[path]?.[method];
 }
 
-// ───────────────────────────────────────────────────────────────────────── AC-7 ──
+// ───────────────────────────────────────────────────────────────────────── AC-7 (slice 09) ──
 
-describe('AC-7 — the committed document matches buildOpenApiDocument(), and CI can tell when it drifts', () => {
+describe('AC-7 (slice 09) — the committed document matches buildOpenApiDocument(), and CI can tell when it drifts', () => {
   it('npm run docs:openapi -- --check exits 0 against the committed docs/api/openapi.json', () => {
     const run = spawnSync('npm', ['run', 'docs:openapi', '--', '--check'], {
       cwd: REPO_ROOT,
@@ -168,9 +236,9 @@ describe('AC-7 — the committed document matches buildOpenApiDocument(), and CI
   });
 });
 
-// ───────────────────────────────────────────────────────────────────────── AC-8 ──
+// ───────────────────────────────────────────────────────────────────────── AC-8 (slice 09) ──
 
-describe('AC-8 — a valid OpenAPI 3.1 description covering all five operations', () => {
+describe('AC-8 (slice 09) — a valid OpenAPI 3.1 description covering all five operations', () => {
   it('the committed document exists, parses as JSON, and is a valid OpenAPI 3.1 document', async () => {
     const { doc, error } = readDocument();
     expect(error, error).toBeUndefined();
@@ -179,7 +247,9 @@ describe('AC-8 — a valid OpenAPI 3.1 description covering all five operations'
     );
 
     // SwaggerParser.validate resolves $ref and validates against the OpenAPI 3.1 meta-schema
-    // — a structural check no hand-rolled scan below can substitute for.
+    // — a structural check no hand-rolled scan below can substitute for. OQ-10-1 measured
+    // (step 2) that it accepts an unreferenced components.responses entry, so route-not-found
+    // living there is not itself a validity problem.
     await expect(SwaggerParser.validate(DOCUMENT_PATH)).resolves.toBeDefined();
   });
 
@@ -191,59 +261,295 @@ describe('AC-8 — a valid OpenAPI 3.1 description covering all five operations'
   });
 });
 
-// ───────────────────────────────────────────────────────────────────────── AC-9 ──
+// ───────────────────────────────────────────────────────────────────────── AC-1 ──
 
-describe('AC-9 — every §8.6 error type is described as an application/problem+json response', () => {
+describe('AC-1 — every §8.6 error type is document-wide, over paths AND components (OQ-10-1)', () => {
   it('every type in the closed set appears somewhere in the document as a problem+json response', () => {
     const { doc, error } = readDocument();
     expect(error, error).toBeUndefined();
     if (doc === undefined) return;
 
-    const documentWide = collectProblemTypes(doc.paths ?? {}, doc);
+    // Widened past `doc.paths` alone (slice 09's shape): `route-not-found` has no operation
+    // (`setNotFoundHandler`) and OQ-10-1 measured that an unreferenced `components.responses`
+    // entry is a legal home for it under OpenAPI 3.1. A check that only walked `paths` would
+    // false-red a correct implementation that takes that home for the row.
+    const documentWide = collectProblemTypes({ paths: doc.paths, components: doc.components }, doc);
     const missing = ALL_PROBLEM_TYPES.filter((t) => !documentWide.has(t));
-    expect(missing, `types absent from the document entirely: ${JSON.stringify(missing)}`).toEqual([]);
+    expect(missing, `types absent from paths ∪ components entirely: ${JSON.stringify(missing)}`).toEqual([]);
   });
+});
 
-  /**
-   * A CONSERVATIVE subset, scoped deliberately narrower than the full type x operation
-   * matrix. Two rows of §8.6 are excluded from a per-operation claim rather than guessed at:
-   *
-   *   - `/problems/internal` structurally carries no response schema (§8.5: "the 500 alone
-   *     carries no response schema") — there is nothing for a per-operation OpenAPI response
-   *     to describe, so its presence is asserted document-wide above and not pinned here.
-   *   - `/problems/route-not-found` is raised by `setNotFoundHandler`, which is a FASTIFY
-   *     fallback rather than a route's own schema (§8.6) — it has no operation to be a
-   *     response of, so the same document-wide check above is what AC-9 can mean for it.
-   *
-   * The four rows below are the ones §8.6's own prose names against a SPECIFIC operation
-   * unambiguously, so they are asserted there and not merely document-wide.
-   */
-  it.each([
-    { type: '/problems/appointment-not-found', path: '/appointments/{id}', method: 'get', why: 'the read that a move needs anyway (ADR-0025)' },
-    { type: '/problems/appointment-not-confirmed', path: '/appointments/{id}', method: 'patch', why: 'moving a cancelled appointment (ADR-0003)' },
-    { type: '/problems/vehicle-not-owned', path: '/appointments', method: 'post', why: 'the composite FK on booking (A-6, GC-2)' },
-    { type: '/problems/no-capacity', path: '/appointments', method: 'post', why: 'every candidate refused, or the cap reached (ADR-0004/0009)' },
-    { type: '/problems/no-capacity', path: '/appointments/{id}', method: 'patch', why: 'F-06-1: reschedule shares the extracted attempt loop' },
-  ])('$type is a documented response of $method $path — $why', ({ type, path, method }) => {
+/**
+ * §8.6's matrix, transposed to one row per operation — `10-design.md` §1's table, verbatim.
+ * `/problems/internal` (500) is EXCLUDED from every row on purpose: §8.5 measured it carries
+ * no response schema, so there is no `type` literal for a content-media-type walk to find, and
+ * it is asserted document-wide above instead (as slice 09's AC-9 already did). Likewise
+ * `/problems/route-not-found` never appears here — it answers no operation.
+ *
+ * The 2xx entry is `application/json` with no `type` — §8.6's stated "worse failure" is a
+ * SUCCESS response arriving as `problem+json`, so the media type itself is the assertion.
+ */
+const EXPECTED_PAIRS: Record<string, readonly string[]> = {
+  'POST /appointments': [
+    '201 application/json',
+    '400 /problems/malformed-request',
+    '400 /problems/outside-opening-hours',
+    '409 /problems/no-capacity',
+    '422 /problems/unknown-reference',
+    '422 /problems/vehicle-not-owned',
+  ],
+  'GET /appointments/{id}': [
+    '200 application/json',
+    '400 /problems/malformed-request',
+    '404 /problems/appointment-not-found',
+  ],
+  'PATCH /appointments/{id}': [
+    '200 application/json',
+    '400 /problems/malformed-request',
+    '400 /problems/outside-opening-hours',
+    '404 /problems/appointment-not-found',
+    '409 /problems/no-capacity',
+    '409 /problems/appointment-not-confirmed',
+  ],
+  'POST /appointments/{id}/cancellation': [
+    '200 application/json',
+    '400 /problems/malformed-request',
+    '404 /problems/appointment-not-found',
+  ],
+  'GET /availability': [
+    '200 application/json',
+    '400 /problems/malformed-request',
+    '422 /problems/unknown-reference',
+  ],
+};
+
+/**
+ * The operation's actual `(status, type)` pairs, walking each response's `content`
+ * MEDIA-TYPE KEYS directly — step-2 commitment 1, and the fix for the old AC-9's own defect
+ * (string-scanning for `/problems/*` regardless of which media type it was declared under,
+ * so `application/json` carrying the right literal passed just as well as
+ * `application/problem+json` would have).
+ *
+ * `500` is skipped: §8.5 measured it carries no response schema, so it has no `type` to pair
+ * and is covered by the document-wide check above instead, exactly as slice 09's AC-9 scoped
+ * it.
+ */
+function actualPairs(op: OperationObject, doc: OpenApiDoc): string[] {
+  const pairs = new Set<string>();
+  for (const [status, response] of Object.entries(op.responses ?? {})) {
+    if (status === '500') continue;
+    const content = response?.content ?? {};
+    const mediaTypes = Object.keys(content);
+    if (mediaTypes.length === 0) {
+      pairs.add(`${status} (no content declared)`);
+      continue;
+    }
+    for (const mediaType of mediaTypes) {
+      if (mediaType === 'application/problem+json') {
+        const types = collectProblemTypes(content[mediaType]?.schema, doc);
+        if (types.size === 0) pairs.add(`${status} application/problem+json (no type literal found)`);
+        for (const type of types) pairs.add(`${status} ${type}`);
+      } else {
+        // Deliberately not filtered to "application/json" — an unexpected THIRD media type
+        // shows up in the actual set just as wrong as the defect this replaces, and equality
+        // catches it exactly the same way.
+        pairs.add(`${status} ${mediaType}`);
+      }
+    }
+  }
+  return [...pairs].sort();
+}
+
+describe('AC-1 — each operation\'s (status, type) pairs, asserted BY EQUALITY, both directions, including 2xx', () => {
+  it.each(Object.entries(EXPECTED_PAIRS))('%s', (opKey, expected) => {
     const { doc, error } = readDocument();
     expect(error, error).toBeUndefined();
     if (doc === undefined) return;
 
+    const spaceIndex = opKey.indexOf(' ');
+    const method = opKey.slice(0, spaceIndex).toLowerCase();
+    const path = opKey.slice(spaceIndex + 1);
     const op = operation(doc, path, method);
-    expect(op, `no ${method.toUpperCase()} ${path} operation in the document`).toBeDefined();
+    expect(op, `no ${opKey} operation in the document`).toBeDefined();
     if (op === undefined) return;
 
-    const found = collectProblemTypes(op.responses ?? {}, doc);
+    const actual = actualPairs(op, doc);
     expect(
-      found.has(type),
-      `${type} not found among ${method.toUpperCase()} ${path}'s responses; found ${JSON.stringify([...found])}`,
-    ).toBe(true);
+      actual,
+      `${opKey}'s (status,type) pairs must equal §8.6's matrix exactly — an extra pair (a type ` +
+        `the operation cannot produce) fails just as a missing one does, and a pair whose media ` +
+        `type is application/json where problem+json was expected (or vice versa) fails too.\n` +
+        `expected: ${JSON.stringify([...expected].sort())}\nactual:   ${JSON.stringify(actual)}`,
+    ).toEqual([...expected].sort());
   });
 });
 
-// ───────────────────────────────────────────────────────────────────────── AC-5b ──
+// ─────────────────────────────────────────────── I-10-1 / M2: reject, not substitute ──
 
-describe('AC-5b — GET /availability documents AC-5a\'s two facts: not a reservation, and only of the interval queried', () => {
+/**
+ * The seven cells AC-1's narrowing collapses to a single member (step-2 measurement,
+ * `10-design.md` "Measure, do not choose in advance" / M2): read and cancel's 400 & 404,
+ * availability's 400 & 422, book's 409. Each row names the cell's own correct literal and one
+ * OTHER closed-set literal to probe it with — never a value outside the closed set, because
+ * the property under test is specifically about a value that IS legitimate for a DIFFERENT
+ * cell of the SAME taxonomy leaking into this one.
+ */
+const SINGLE_TYPE_CELLS: ReadonlyArray<{
+  readonly label: string;
+  readonly path: string;
+  readonly method: string;
+  readonly status: string;
+  readonly correctType: string;
+  readonly wrongType: string;
+}> = [
+  { label: 'Read 400', path: '/appointments/{id}', method: 'get', status: '400', correctType: '/problems/malformed-request', wrongType: '/problems/appointment-not-found' },
+  { label: 'Read 404', path: '/appointments/{id}', method: 'get', status: '404', correctType: '/problems/appointment-not-found', wrongType: '/problems/malformed-request' },
+  { label: 'Cancel 400', path: '/appointments/{id}/cancellation', method: 'post', status: '400', correctType: '/problems/malformed-request', wrongType: '/problems/appointment-not-found' },
+  { label: 'Cancel 404', path: '/appointments/{id}/cancellation', method: 'post', status: '404', correctType: '/problems/appointment-not-found', wrongType: '/problems/malformed-request' },
+  { label: 'Availability 400', path: '/availability', method: 'get', status: '400', correctType: '/problems/malformed-request', wrongType: '/problems/unknown-reference' },
+  { label: 'Availability 422', path: '/availability', method: 'get', status: '422', correctType: '/problems/unknown-reference', wrongType: '/problems/malformed-request' },
+  { label: 'Book 409', path: '/appointments', method: 'post', status: '409', correctType: '/problems/no-capacity', wrongType: '/problems/vehicle-not-owned' },
+];
+
+function extractTypeSchema(doc: OpenApiDoc, path: string, method: string, status: string): unknown {
+  const op = operation(doc, path, method);
+  const content = op?.responses?.[status]?.content?.['application/problem+json'];
+  const schema = content?.schema;
+  if (schema === undefined) return undefined;
+  const deref = dereference(schema, doc) as { readonly properties?: Record<string, unknown> } | undefined;
+  return deref?.properties?.['type'];
+}
+
+describe("I-10-1 / M2 — each single-type cell's schema REJECTS a wrong closed-set value, it does not silently substitute the right one", () => {
+  it.each(SINGLE_TYPE_CELLS)('$label — $method $path at $status', ({ path, method, status, correctType, wrongType }) => {
+    const { doc, error } = readDocument();
+    expect(error, error).toBeUndefined();
+    if (doc === undefined) return;
+
+    const typeSchema = extractTypeSchema(doc, path, method, status);
+    expect(
+      typeSchema,
+      `no application/problem+json response with a 'type' property schema at ` +
+        `${method.toUpperCase()} ${path} ${status}`,
+    ).toBeDefined();
+    if (typeSchema === undefined) return;
+
+    let stringify: ((value: unknown) => string) | undefined;
+    try {
+      stringify = buildStringify(typeSchema as never);
+    } catch (buildError) {
+      throw new Error(
+        `fast-json-stringify could not compile the 'type' schema at ${method.toUpperCase()} ${path} ` +
+          `${status}: ${String(buildError)}\nschema: ${JSON.stringify(typeSchema)}`,
+      );
+    }
+
+    // Sanity: the schema's own correct value round-trips, so a throw below is not just this
+    // schema being broken outright.
+    const correctOutput = JSON.parse(stringify(correctType)) as unknown;
+    expect(correctOutput, `the schema's own correct value ${correctType} must round-trip`).toBe(correctType);
+
+    // THE PROPERTY (not the mechanism): fed a WRONG-but-closed-set value, the schema must not
+    // let the client receive the correct literal dressed up as if the wrong value had been
+    // validated. Reject it (the serialiser throws) — never SILENTLY SUBSTITUTE the schema's
+    // own constant back, which is §8.5's defect reproduced inside this narrowing (I-10-1/M2).
+    let threw = false;
+    let wrongOutput: unknown;
+    try {
+      wrongOutput = JSON.parse(stringify(wrongType));
+    } catch {
+      threw = true;
+    }
+
+    if (!threw) {
+      expect(
+        wrongOutput,
+        `${method.toUpperCase()} ${path} ${status}'s 'type' schema SILENTLY SUBSTITUTED ` +
+          `${correctType} for the wrong value ${wrongType} instead of rejecting it. This is the ` +
+          `one-member Type.Union-collapses-to-Type.Literal defect I-10-1/M2 measured, reproduced ` +
+          `inside AC-1's own per-cell narrowing.`,
+      ).not.toBe(correctType);
+    }
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────── AC-3 ──
+
+/**
+ * AC-3 discharges A-06-2's CONTRACT half: no client-facing surface can carry an appointment id
+ * in before one exists. Transcribed from the CURRENTLY COMMITTED `docs/api/openapi.json`
+ * (design's own "Out of scope": this slice moves no requestBody or parameter shape — AC-1 and
+ * AC-7 are the only edits it makes to what is documented). Falsified by adding `appointmentId`
+ * to `BookingBody`, or any stray parameter nobody declared, per the design's own wording.
+ */
+const EXPECTED_REQUEST_BODY_PROPERTIES: Record<string, readonly string[]> = {
+  'POST /appointments': ['dealershipId', 'customerId', 'vehicleId', 'serviceTypeId', 'startsAt'],
+  'GET /appointments/{id}': [],
+  'PATCH /appointments/{id}': ['startsAt'],
+  'POST /appointments/{id}/cancellation': [],
+  'GET /availability': [],
+};
+
+const EXPECTED_PARAMETERS: Record<string, readonly string[]> = {
+  'POST /appointments': [],
+  'GET /appointments/{id}': ['id:path'],
+  'PATCH /appointments/{id}': ['id:path'],
+  'POST /appointments/{id}/cancellation': ['id:path'],
+  'GET /availability': ['dealershipId:query', 'serviceTypeId:query', 'from:query', 'to:query'],
+};
+
+function requestBodyProperties(op: OperationObject): string[] {
+  const schema = op.requestBody?.content?.['application/json']?.schema;
+  return Object.keys(schema?.properties ?? {}).sort();
+}
+
+function parameterList(op: OperationObject): string[] {
+  return (op.parameters ?? []).map((p) => `${p.name ?? '(unnamed)'}:${p.in ?? '(no in)'}`).sort();
+}
+
+describe('AC-3 — no requestBody or parameter carries a caller-supplied appointment id (A-06-2, contract half)', () => {
+  it.each(Object.entries(EXPECTED_REQUEST_BODY_PROPERTIES))(
+    '%s requestBody property set, by equality',
+    (opKey, expected) => {
+      const { doc, error } = readDocument();
+      expect(error, error).toBeUndefined();
+      if (doc === undefined) return;
+      const spaceIndex = opKey.indexOf(' ');
+      const op = operation(doc, opKey.slice(spaceIndex + 1), opKey.slice(0, spaceIndex).toLowerCase());
+      expect(op, `no ${opKey} operation in the document`).toBeDefined();
+      if (op === undefined) return;
+
+      expect(
+        requestBodyProperties(op),
+        `${opKey}'s requestBody property set must equal exactly ${JSON.stringify(expected)} — adding ` +
+          `'appointmentId' (or any other spelling of an appointment id) fails this, as does dropping ` +
+          `a legitimate field`,
+      ).toEqual([...expected].sort());
+    },
+  );
+
+  it.each(Object.entries(EXPECTED_PARAMETERS))('%s parameter (name,in) list, by equality', (opKey, expected) => {
+    const { doc, error } = readDocument();
+    expect(error, error).toBeUndefined();
+    if (doc === undefined) return;
+    const spaceIndex = opKey.indexOf(' ');
+    const op = operation(doc, opKey.slice(spaceIndex + 1), opKey.slice(0, spaceIndex).toLowerCase());
+    expect(op, `no ${opKey} operation in the document`).toBeDefined();
+    if (op === undefined) return;
+
+    expect(
+      parameterList(op),
+      `${opKey}'s parameter list must equal exactly ${JSON.stringify(expected)} — the only id ` +
+        `parameters permitted anywhere are the path 'id' on the three operations addressing an ` +
+        `appointment that already exists (read, reschedule, cancel); book and availability must ` +
+        `carry none`,
+    ).toEqual([...expected].sort());
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────── AC-5b (slice 09) ──
+
+describe('AC-5b (slice 09) — GET /availability documents AC-5a\'s two facts: not a reservation, and only of the interval queried', () => {
   it('the operation\'s description text carries both facts', () => {
     const { doc, error } = readDocument();
     expect(error, error).toBeUndefined();
@@ -253,11 +559,6 @@ describe('AC-5b — GET /availability documents AC-5a\'s two facts: not a reserv
     expect(op, 'no GET /availability operation in the document').toBeDefined();
     if (op === undefined) return;
 
-    // Collected from anywhere under the operation — its own `description`, or its response
-    // schema's — because design §"AC-7 does not kill the seven description mutants" decision
-    // 4 places the rescued prose at the OPERATION level (Fastify's `schema.description`,
-    // OpenAPI's `operation.description`) rather than pinning a single JSON pointer this test
-    // would have to guess exactly.
     const text = collectDescriptions(op, doc).toLowerCase();
 
     expect(
@@ -269,5 +570,74 @@ describe('AC-5b — GET /availability documents AC-5a\'s two facts: not a reserv
       `expected the availability operation's description to say the answer is true ONLY OF ` +
         `THE INTERVAL QUERIED.\n${text}`,
     ).toBe(true);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────── AC-7 (slice 10) ──
+
+/**
+ * `R-09-13` / `10-design.md` §3: `AVAILABILITY_QUERYSTRING_DESCRIPTION` is split into three
+ * concatenated contract-prose facts (what the operation answers, the rule, the consequence);
+ * the TypeBox rationale stays in the file's own docblock and publishes nothing. `D-08-1`'s
+ * three surviving mutants are one per emptied literal — hence three separate `it()` cases
+ * below, each bound to exactly one of the three pieces, so that emptying any ONE of them
+ * fails that one case (never all three at once, which would be indistinguishable from a
+ * single combined assertion and would leave two of the three mutants unkilled, reopening
+ * `D-08-1`).
+ *
+ * The boundary is the ARCHITECT'S CORRECTED wording (mid-slice AC authority, `10-design.md`
+ * §3, provisional until the gate): `to` strictly later than `from` — not "at or after" as the
+ * slice file's AC-7 literally says. `availability.ts` rejects `to <= from`, so "at or after"
+ * would publish a rule the code does not implement; `A-10-4` is the assumption id this
+ * correction is filed under.
+ */
+describe("AC-7 (slice 10) — GET /availability's description states the rule and its consequence, without naming the implementation", () => {
+  function availabilityDescriptionText(): { readonly text?: string; readonly error?: string } {
+    const { doc, error } = readDocument();
+    if (error !== undefined) return { error };
+    if (doc === undefined) return { error: 'document undefined' };
+    const op = operation(doc, '/availability', 'get');
+    if (op === undefined) return { error: 'no GET /availability operation in the document' };
+    return { text: collectDescriptions(op, doc).toLowerCase() };
+  }
+
+  it('states what the operation answers — whether the window has capacity', () => {
+    const { text, error } = availabilityDescriptionText();
+    expect(error, error).toBeUndefined();
+    if (text === undefined) return;
+    expect(
+      /\b(capacity|availab\w*)\b/.test(text) && /\bfrom\b/.test(text) && /\bto\b/.test(text),
+      `expected the description to say what the operation answers — capacity/availability over ` +
+        `the requested from/to window.\n${text}`,
+    ).toBe(true);
+  });
+
+  it('states the rule — `to` must be STRICTLY LATER than `from` (A-10-4, not "at or after")', () => {
+    const { text, error } = availabilityDescriptionText();
+    expect(error, error).toBeUndefined();
+    if (text === undefined) return;
+    expect(
+      /\bstrictly\s+later\b/.test(text),
+      `expected the description to state the rule as 'to' strictly later than 'from' — the ` +
+        `architect's corrected boundary (A-10-4), not the slice file's own "at or after".\n${text}`,
+    ).toBe(true);
+  });
+
+  it('states the consequence — a violation is 400 /problems/malformed-request', () => {
+    const { text, error } = availabilityDescriptionText();
+    expect(error, error).toBeUndefined();
+    if (text === undefined) return;
+    expect(
+      /400/.test(text) && /malformed-request/.test(text),
+      `expected the description to state the consequence: 400 /problems/malformed-request.\n${text}`,
+    ).toBe(true);
+  });
+
+  it('names neither TypeBox nor the schema', () => {
+    const { text, error } = availabilityDescriptionText();
+    expect(error, error).toBeUndefined();
+    if (text === undefined) return;
+    expect(/typebox/.test(text), `the published description must not name TypeBox.\n${text}`).toBe(false);
+    expect(/\bschema\b/.test(text), `the published description must not name "schema".\n${text}`).toBe(false);
   });
 });
