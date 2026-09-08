@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **364** |
-| Severity | 14 blocking · 179 major · 171 minor |
+| Findings recorded | **365** |
+| Severity | 14 blocking · 179 major · 172 minor |
 | Verdicts | 20 narrowed · 128 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | architect 78 · test-engineer 75 · orchestrator 72 · reviewer 66 · implementer 59 · scribe 10 · human 4 |
-| Awaiting a ruling | **183** |
+| Raised by | architect 78 · test-engineer 75 · orchestrator 72 · reviewer 66 · implementer 59 · scribe 10 · human 5 |
+| Awaiting a ruling | **184** |
 | Mean escape distance | 1.49 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2454,6 +2454,7 @@ rather than narrated.*
 | **I-10-1** | MAJOR | 2 *(+1)* | implementer | M2 IS POSITIVE — a one-member Type.Union COLLAPSES TO A LITERAL AND SILENTLY SUBSTITUTES, reproducing SECTION 8.5's DEFECT INSIDE THE FIX FOR IT, and SEVEN CELLS REACH IT | **open** |
 | **I-10-2** | MINOR | 2 *(+1)* | implementer | M1 IS POSITIVE WITH A DIFFERENCE WORTH RECORDING — the per-response content form keeps the serialiser and survives charset, but FAILS DIFFERENTLY FROM THE CLASSIC FORM | **open** |
 | **I-10-3** | MINOR | 2 *(+0)* | implementer | THE DESIGN'S OWNERSHIP TABLE WENT STALE BECAUSE THE ORCHESTRATOR FIXED THE GAP IT NAMED, MINUTES AFTER IT WAS WRITTEN | **open** |
+| **O-76** | MINOR | 2 *(+0)* | human | THE HUMAN NOTICED A MISSING PR COMMENT BEFORE THE CHECK DID — the orchestrator omitted the section 6 posting instruction from three dispatches in one session | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2501,6 +2502,11 @@ rather than narrated.*
 
 - *scenario:* The design's row for the harness scripts reads ENFORCED BY: NOTHING — harness slash is unguarded, which was TRUE WHEN WRITTEN and is the finding A-10-3 recorded. THE ORCHESTRATOR THEN CLOSED IT at commit a1d1717, adding HARNESS_OWNED to the guard hook and denying every role but the implementer, AFTER the design commits. THE IMPLEMENTER DID NOT TAKE THE DESIGN'S WORD OR THE DISPATCH'S: it read git log to establish the ordering and THEN READ THE HOOK DIRECTLY to confirm the rule is live. Not a design defect — a cell that says nothing where it should now say guard-paths, to be corrected when the architect reconciles at step 7, and the dispatch brief's own boundaries section should be read the same way. RECORDED BECAUSE THE PATTERN IS GENERAL: a design is a snapshot, and a fix landing between design and implementation makes the snapshot wrong in the direction NOBODY CHECKS, since a table that understates enforcement is not a rule anyone will trip over.
 - *file:* `docs/slices/10-design.md`
+
+**O-76** — THE HUMAN NOTICED A MISSING PR COMMENT BEFORE THE CHECK DID — the orchestrator omitted the section 6 posting instruction from three dispatches in one session
+
+- *scenario:* THE HUMAN SAID I DON'T SEE IMPLEMENTER AGREEMENT IN THE PR YET, AND WAS RIGHT. Only the test-engineer had commented on PR 21, and it did so WITHOUT BEING TOLD TO — its dispatch's return section asked for a structured report and said nothing about posting. The implementer's dispatch had the same omission and it did not post. The architect's step-1 dispatch said NO PR, I OPEN IT, which was true at the time and left its design reasoning with nowhere to go once the PR existed — A SEQUENCING ERROR RATHER THAN AN OMISSION, and also the orchestrator's. THIS IS O-72's PATTERN A THIRD TIME IN ONE SESSION: an orchestrator dispatch that is wrong or incomplete, survived by a role reading past it. T-09-5 was an ownership table right about the work and wrong about the owner, which the test-engineer covered; O-72 was a dispatch omitting a finding entirely, which the implementer covered; THIS TIME THE TEST-ENGINEER COVERED AGAIN AND THE IMPLEMENTER DID NOT, WHICH IS THE HONEST OUTCOME — a role should not have to infer a constitutional obligation from silence. THE CHECK WOULD HAVE CAUGHT IT: slice:check's reasoning-is-on-the-PR criterion, built under O-55 after six slices ran with no PR reasoning at all, reports it precisely. IT DID NOT CATCH IT FIRST BECAUSE NOBODY RAN IT BETWEEN THE ROLES REPORTING AND THE HUMAN ASKING. THE REMEDY IS NOT ANOTHER REMINDER TO MYSELF: the posting obligation is generated into every agent definition already, under METHODOLOGY section 8's agents-pr-comment block, and the failure is that a DISPATCH can still contradict the definition by silence. Recorded for the retro, and the orchestrator ran slice:check before every subsequent report rather than after.
+- *file:* `docs/team-log/prompts/`
 
 </details>
 
