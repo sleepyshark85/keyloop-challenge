@@ -53,6 +53,11 @@ still starts against a dead database and answers `503`.
 | `GET /health` | operational probe, outside the RFC 9457 taxonomy |
 | `POST /appointments` | book — `201`, or a problem document (`409` conflict, `422` unknown reference, `400` invalid request) |
 | `GET /appointments/:id` | read back — `200` or `404` |
+| `PATCH /appointments/:id` | reschedule — `200`, or a problem document (`404`, `409`) |
+| `POST /appointments/:id/cancellation` | cancel — `200`, or `404` |
+
+The full contract, including every `(status, type)` pair per operation, is
+[`docs/api/openapi.json`](docs/api/openapi.json) — this table omits nothing as of slice 10 (`S-10-1`).
 
 ## Demonstrate it: the cURL harness
 
@@ -91,12 +96,12 @@ test-engineer-owned suite failed*. A project that did not run is a loud, distinc
 
 | Command | Covers |
 |---|---|
-| `npm test` | everything, both projects merged. Last local run: **470 tests, 30 files, all passing** |
-| `npm run test:nodb` | 22 files, no Docker — unit and architecture |
-| `npm run test:db` | 8 files against real PostgreSQL via Testcontainers |
+| `npm test` | all three projects merged. Last local run: **829 tests, 59 files, all passing** |
+| `npm run test:nodb` | 33 files, no Docker — unit, architecture, contract, most property |
+| `npm run test:db` | 25 files against real PostgreSQL via Testcontainers |
 | `npm run typecheck` | `src` **and** `tests` (the build config narrows to `src`) |
 | `npm run lint:arch` | dependency-cruiser through a wrapper that asserts per-root coverage first |
-| `npm run mutation` | Stryker. Slice 02 scored **0.9595** on changed files against a 0.75 gate |
+| `npm run mutation` | Stryker, per changed file against a 0.75 gate. Not always cleared: the human overrode a 71.43% merge at slice 08 (arc42 §13.6); slice 10 missed by 0.7 of a point and was fixed rather than argued |
 | `npm run test:tools` | the process tooling's own regression suite, plus the docs guards |
 
 Test ownership is enforced by path and symmetrically (`CLAUDE.md` §5): `tests/{acceptance,contract,
@@ -115,14 +120,14 @@ the first instance of this project's signature defect and it is why the wrapper 
 | `npm run status` | where the project is, derived from the event log, ADRs, slices and git |
 | `npm run board` | `docs/board.html` — slices, events, findings |
 | `npm run log -- --slice 02` | the raw event log, filtered; `=` derived, `·` reported, `~` narrated |
-| `npm run defects` | regenerates `docs/DEFECTS.md` — 130 findings with escape distance |
+| `npm run defects` | regenerates `docs/DEFECTS.md` — 369 findings, mean escape distance 1.48 steps |
 | `npm run slice:check 02` | pass/fail against the Definition of Ready and Done |
 | `npm run docs:budget` | word budgets; `docs:budget:check` is the CI ratchet |
 
 | Artifact | What it is |
 |---|---|
 | [`docs/arc42/`](docs/arc42/) | the single source of truth for architecture |
-| [`docs/adr/`](docs/adr/) | 21 MADR decision records, each with an `ai-input` provenance block |
+| [`docs/adr/`](docs/adr/) | 18 MADR decision records (33 were written; 17 retired into the slice designs that own them), each with an `ai-input` provenance block |
 | [`docs/slices/`](docs/slices/) | units of work and their designs |
 | [`docs/team-log/`](docs/team-log/) | append-only event log, every prompt as sent and every report as returned |
 | [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) · [`CLAUDE.md`](CLAUDE.md) | the process, and the rules binding every agent |
@@ -156,9 +161,14 @@ for a mechanism claim, name the call site.**
 
 **Quality assurance.** A slice is done when `npm run slice:check` says so — not when an agent does.
 The human overrode the agents where it mattered: ADR-0001 records a recommendation **overridden**,
-and at slice 01 the human ruled acceptance criterion AC-6 *literally* against the architect's
-preference, reshaping module signatures and booking four items of debt. Disagreement is expected:
-`CLAUDE.md` §6 says a round with none is deference, not consensus.
+at slice 01 the human ruled acceptance criterion AC-6 *literally* against the architect's
+preference, and at slice 09 the human reopened a slice Gate D had folded away after all three
+BLOCKING findings landed on the folded-in half. Disagreement is expected: `CLAUDE.md` §6 says a
+round with none is deference, not consensus — slice 09's step 5 produced this project's **first (c)
+ruling**, the architect naming two acceptance criteria and a quality scenario rather than settling
+for the softer reading.
 
-**What it cost, and what did not work,** including a gate taken in the human's absence and recorded
-as such, are in §13.5 and §13.6.
+**The project is done: 11 built slices (00a–10; 03, 11–13 folded in), 18 ADRs surviving a 33→16
+retirement, 369 logged findings.** What it cost per role, what recurred despite the process, and
+where §6(b) has no terminal case for a `proposed` ADR on the last slice — none of it smoothed over —
+are in §13.5 and §13.6.

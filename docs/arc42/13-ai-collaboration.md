@@ -2,155 +2,139 @@
 
 > Owner: scribe · Outside the standard twelve arc42 sections
 
-Sourced from artifacts, never memory: `docs/team-log/events.jsonl` (407 records), the 130-row
-register in [`../DEFECTS.md`](../DEFECTS.md), the ADRs, PR threads, 130 files of prompts and
-reports under `docs/team-log/prompts/`, and git.
+Sourced from artifacts, never memory: `docs/team-log/events.jsonl` (1,249 lines), the 369-row
+register in [`../DEFECTS.md`](../DEFECTS.md), 18 ADRs, 21 PRs, prompts and reports under
+`docs/team-log/prompts/`, and git. Project closed: 11 built slices, backlog empty.
 
 ## 13.1 Team structure and bounded authority
 
 | Role | Decides | Cannot |
 |---|---|---|
-| architect | interfaces, layering, data model; `docs/arc42/`, `docs/adr/` | *(until 2026-09-06)* change scope, acceptance criteria or quality goals |
-| test-engineer | how *done* is asserted; the outside-in suites | read `src/`; write `tests/unit/` |
+| architect | interfaces, layering, data model; scope, AC, quality goals mid-slice (provisional until gate); `docs/arc42/`, `docs/adr/` | rule and edit in one pass; rule on a dispatch it did not log |
+| test-engineer | how *done* is asserted; outside-in suites | read `src/`; write `tests/unit/` |
 | implementer | `src/`, `tests/unit/` | edit an acceptance test — it raises a DCR |
 | reviewer | may block a merge, may raise a DCR | change the design or fix what it finds |
 | scribe | this section, `README.md`, §12 | claim anything an artifact does not support |
 | orchestrator | routing; sole writer of the event log | decide anything, or mark work done |
-| human | overrides anyone | — |
+| human | overrides anyone, at the gate and by ruling | — |
 
-§5's bound carries the most weight: the test-engineer defines *done* without having seen the
-implementation, and the implementer cannot edit the test that judges it. Enforced by path, by a
-`PreToolUse` hook, and by `git commit --only <paths>` — the last added after a bare commit took
-another role's staged files and briefly recorded the architect committing `src/` (O-10).
+§5's bound carries the most weight: the test-engineer defines *done* without seeing the
+implementation, and the implementer cannot edit the test that judges it. Enforced by path, a
+`PreToolUse` hook, and `git commit --only <paths>` — added after a bare commit recorded the
+architect committing `src/` (O-10).
 
 ## 13.2 Verification — what it caught
 
-**The red commit is observed, not asserted.** Every slice has a collected failing run and a passing
-one after it, collected from the GitHub API rather than the workflow:
+The red commit is observed from CI, not asserted. Mutation is an audit, not a target — at slice 02 the reviewer reproduced a
+byte-identical survivor set independently; at slice 08 the test-engineer ran its own remedy's
+mutant 35 times rather than once and found 8 of 35 trials survived, then refused to raise
+`numRuns` or the generator weight to close the gap because "choosing the number that makes its own
+test look like a gate is the choice it should not make alone" (`T-08-7`) — the architect took the
+fault onto its own specification instead. At slice 09 the implementer
+built a live `@fastify/swagger` harness and disproved the architect's own projected 37-of-42 mutant
+count — the true mechanism reached 34, not 37, because nobody had run it (`I-09-1`).
 
-| Slice | red | green | mutation as logged (§10 gates changed files, 0.75) |
-|---|---|---|---|
-| 00a | 33831214774 | 33844632820 | 0.9577 |
-| 00 | 33856015886 | 33862313022 | ruled **N/A** — no mutable file changed |
-| 01 | 33911942612 | 33913702060 | 0.9806 (155 mutants, 152 killed, 3 survivors) |
-| 02 | 33984418682 | 33994990813 | 0.9595 (790 mutants, 747 killed, 11 timeout, 32 survived) |
-
-`N/A`, and `depcruise`'s third value `not-run`, exist for one reason: an absent check must never
-read as a pass.
-
-**Mutation is an audit, not a target.** At slice 01 the implementer *reported* its three survivors
-rather than writing tests shaped to kill them. At slice 02 the reviewer re-ran Stryker
-independently, reproduced 747/11/32 with a **byte-identical survivor set**, and re-measured
-ADR-0018's three cells on `postgres:16-alpine`, finding it honest.
-
-**The register is generated from the log** and cannot drift: 130 findings — 10 blocking, 71 major,
-49 minor — from test-engineer 32, reviewer 28, orchestrator 26, implementer 23, architect 19,
-human 2. Mean escape distance 1.66 steps.
+**One defect shape recurred and was named**: *a mechanism that reports success over work it never
+did.* `depcruise` cruising nothing; Stryker scoring mutants never run; a collector reading one
+file's report as the whole slice's (`O-73`); an aggregate mutation score hiding a failing member
+(`O-64`); a `loopbacks` field the governor that blocks a third loopback never read (`O-74`). Over twenty-five instances are on the register, several in the project's own tooling. The rule: **for a discrimination claim, name the mutant; for a mechanism
+claim, name the call site.**
 
 ## 13.3 Where the human overrode the agents
 
-Each ADR carries an `ai-input` provenance block. Of 21, one is **overridden** and one
-**modified**; the rest were accepted as recommended or are still proposed.
+- **ADR-0001** — the architect's recommendation overridden; a third option taken.
+- **AC-6, slice 01** — ruled *literally* against the architect's preference, reshaping module
+  signatures and booking four items of debt.
+- **Slice 08's mutation gate** — the human merged at 71.43% against §10's 0.75, the override of the
+  *metric*, not the evidence: every survivor was documentation prose or an unreachable arm, and two
+  roles had already refused to force the number green.
+- **H-1** — the human, not a tool, audited arc42 and found "service advisor" named about 85 times
+  while the brief says only *"a user"* — an invented actor, load-bearing because it put
+  authentication out of scope. Ruled: unname the actor everywhere. **ADR-0034 supersedes ADR-0002**
+  — this project's first ADR supersession — keeping the argument
+  (a stubbed client cannot verify a credential) and dropping the invented role.
+- **H-2** — a superseded ADR still read `status: accepted`; the human asked whether it was still
+  valid and the file said two different things. Fixed to `superseded`; `STATUS.md`'s accepted count
+  fell from 16 to 15 — the tell a withdrawn decision had counted as standing.
+- **The ADR retirement** — the human, reading ADR-0032: *"it doesn't seem to be in the level of
+  decision that require an ADR."* 33 ADRs → 16, folded into the slice designs that own them; then all 16 were rewritten so every cross-reference became the fact it pointed at.
+- **Slice 09's reopening of slice 10** — the architect argued at Gate D's fold-in step 1 that the
+  contract seam was *falser* than the cut assumed; at slice 09's review all three BLOCKING findings
+  landed on exactly that folded-in half, and it reversed on the evidence, recommending the human
+  un-fold it. The human agreed, naming the cost of the alternative: shipping without the
+  brief's own named OpenAPI deliverable.
 
-- **ADR-0001** — the architect recommended *"time is unbounded"*. The human rejected the conclusion,
-  kept the reasoning, and took a third option the architect had not separated out.
-- **ADR-0003** — accepted in part and deliberately *expanded*: both cancellation and rescheduling.
-- **AC-6, slice 01** — the architect proposed amending arc42 §5.2 to fit its design; the
-  test-engineer objected (T-01-1) that a third path existed, so the reading was the human's. The
-  human ruled the criterion **literally**, against the architect's preference:
-  `appointmentInterval` and `withinOpeningHours` took raw millisecond parameters, the brands stopped
-  crossing module boundaries, and four items of debt were booked rather than argued away. At the
-  gate the human then ruled AC-6's **second clause unmet** (R-01-3) — the rule carried a standing
-  exemption for exactly the imports the ruling forbade, so it held by implementer discipline
-  alone.
-- **Slice 00** — AC-10 added at step 5, recovering the UPDATE property ADR-0003 rests on, which
-  arc42 named in three places and carried in none.
-- **Gate D** — C6's remedy is a disjunction, *cut slices or reduce agent count*. The human ruled
-  the first and **refused the second** on the record: the reviewer produced 17 of 56 findings, and
-  the architect's runs were adjudication.
-- **Concision** — overriding §4's ADR immutability *for length only*, on the argument that what
-  immutability protects is the decision a later reader gets, which a meaning-preserving
-  condensation does not touch.
+## 13.4 Design changes and the first (c)
 
-## 13.4 Design changes, and the supersession chain that does not exist
+Two loopbacks from **(c) design defects** at slices 01 and 02 (`T-01-2`, `T-02-9`), both ruled
+against the architect's own design — T-01-2 naming §2.4 directly, T-02-9 on a re-measured deadlock rate. **Slice 09 step 5 produced this project's first
+literal `(c)` ruling** (`docs/slices/09-observability.md`): fifteen findings, all agreed —
+but two got (c) rather than the softer (a), naming **AC-9** and **QS-11**
+(the OpenAPI document declared `application/problem+json` on 0 of 25 responses) and **AC-6** (a
+"trace-correlated" claim certified by one log line, because `telemetry.ts` registered no
+instrumentations at all) — because §6 requires exactly that naming to block, and both were
+nameable. Loopback 1 of 2 spent; a second red commit followed only because of it.
 
-Two loopbacks, each from a **(c) design defect** — and §6 requires naming the criterion that would
-fail, which is what makes (c) unreachable on preference:
+**Slice 10 reproduced the shape it was convened to remove — twice.** First, in design: measuring
+rather than reading, the architect found TypeBox collapses a one-member `Type.Union` to a bare
+literal and silently *substitutes* a wrong value — §8.5's documented defect, reproduced **inside its
+own fix**, reachable through eight narrowed response cells (`I-10-1`/M2). Caught before code existed
+by refusing to decide by reading. Second, past the fix: the reviewer re-measured
+rather than trusting the new contract test, and found *that very test* could not fail on the
+collapse it was written to guard — `fast-json-stringify` passes an `enum` value through rather than
+substituting it, so the probe stayed green regardless (`R-10-2`) — caught only by a
+reviewer who ran the falsification rather than trusting the guard.
 
-- **T-01-2** — the test-engineer measured that a Docker failure aborts the whole invocation and
-  writes zero tests, so the red could still arrive as a crash. The architect ruled against **its own
-  design**, naming §2.4: *"§8.3 reason 2 is not imprecise, it is false."* Remedy accepted and
-  *extended*: merging two project results would let a run that never happened merge as zero
-  failures. Result: `tools/ci/run-tests.mjs`.
-- **T-02-9** — the architect re-ran the finding before ruling and it was **worse than reported**:
-  285 of 400 losers deadlocked, not one race in three. It noted that had it ruled from the reported
-  number, retry would have looked survivable — and retry livelocks, measured five ways. Result:
-  ADR-0018.
-
-The second DCR raised was ruled **(a) clarification**, consuming no loopback. The counterweight is
-that (b) must be ruled when no criterion can be named, and the
-architect did so explicitly against its own view: *"it is (b), and I would rule the same way if I
-disliked the answer."*
-
-**What is not here.** All 21 ADRs carry `supersedes: null`. §6 says a (c) ruling supersedes the
-ADR; neither (c) did — T-01-2 had no ADR to supersede, and T-02-9 produced a new one. There is no
-supersession chain to show, and that is recorded rather than dressed up as one.
+**Dispatches contradicted role definitions by silence, at least four times in one remediation
+round**: an ownership table assigned an outside-in half to the implementer alone and the
+test-engineer built it anyway (`T-09-5`); a dispatch named the wrong file and omitted
+an item it had ruled implementer-owned (`O-72`, two instances); the PR-posting obligation was
+missing from three dispatches in one session until the human — not a check — noticed no implementer
+comment on PR 21 (`O-76`). Each time, work survived because a role read past its instructions. That
+is not a mechanism, and the orchestrator said so on the record.
 
 ## 13.5 What the process cost
 
-**Reconstructed from session transcripts by the token collector, not a billing record.**
+**Reconstructed from session transcripts, not a billing record.** 236 agent runs across the whole
+project; 232 of them (146.7 agent-hours) in the slice loop proper.
 
-| | runs | summed agent duration | elapsed wall | billable tokens | architect share |
-|---|---|---|---|---|---|
-| 00a | 25 | 26.1 h | 12.1 h | 23.90 M | 52% |
-| 00 | 17 | 30.7 h | 5.3 h | 30.53 M | 68% |
-| 01 | 19 | 11.1 h | 15.3 h | 10.69 M | 72% |
-| 02 | 23 | 10.2 h | 16.7 h | 16.35 M | 63% |
+| | runs | agent-hours | billable | architect share |
+|---|---|---|---|---|
+| 00a | 25 | 26.1 h | 23.90 M | 52% |
+| 00 | 17 | 30.7 h | 30.53 M | 68% |
+| 01–10 | 190 | 89.9 h | 110.37 M | 38% |
 
-Neither time column is *the* cost. Summed duration overstates — 24 of the pilot's 42 runs carry
-`duration_caveat: agent was resumed`, and a resumed span includes the idle gap — while elapsed
-counts the gaps between dispatches. Billable excludes cache reads; with them the four slices are
-606 M, 505 M, 223 M and 477 M.
-
-**No dollar figure is computed.** The collector was itself untested — delete the accumulator and
-all 216 assertions still passed (R-5) — so a cost derived from it would be the exact defect this
-project spent two slices cataloguing. C6, *the budget is real*, **failed**: 45 minutes and $8 were
-agreed in advance for slice 00; the most favourable honest reading gives 299 minutes.
-
-The figures moved after the fact: the light-gate ruling read slice 01 at 9.5 h / 8.30 Mtok over 15
-runs, and the log now reads 19 runs / 11.1 h / 10.69 Mtok, because a stale scope marker filed four
-slice-02 runs under slice 01 (O-20).
+**Was the ceremony worth it?** Slice 09 spent four adjudication rounds and fifteen findings on a
+seventeen-criterion slice — and every BLOCKING finding sat on the half Gate D had folded in without
+review of its own. That is the ceremony finding the seam the cut missed, not spending for
+nothing. Architect share fell from 68% at slice 00 to 12% by slice 10, as the work shifted from
+adjudication to implementer-run measurement (`I-09-1`, `I-10-1`) — cost moving from decision to
+verification. C6's ceiling (10 h / $100 over 13 slices) failed at the
+pilot and was never re-met: 146.7 agent-hours in under 5 calendar days, 11 slices. No dollar figure
+is computed — METHODOLOGY prices tokens rather than storing a figure, and R-5 found the collector
+itself untested until fixed.
 
 ## 13.6 What did not work
 
-**One defect shape, twenty-five times: a mechanism that reports success over work it never did.**
-The retro catalogued eight in the pilot. Since then, by reference: R-5, R-10, T-01-2, O-14,
-O-17, O-19, O-20, O-24, O-25, O-27, O-31, O-32, O-33, R-02-1, AB-01-5, AB-01-7, and the ADR guard
-that printed *"every considered option and chosen option survives"* over a decision record it had
-never opened — and could not have read anyway, because its options were in the table form the
-concision ruling encourages. The project's own counters say *five*, *seven*, *eight* and *nine*
-across four files, each counting a different set — a disagreement left standing rather than
-reconciled to a number nobody measured.
+**§6(b) has no terminal case on a final slice.** `ADR-0035`'s counter semantics were ruled *correct
+under the agreed design, a better idea available* — textbook (b) — and (b)'s remedy is a backlog
+slice. There was none: slice 09 was last. The ADR exits `proposed` permanently — the rule
+assumes a project that keeps running.
 
-Not one was found by reading code; every one came from asking *what would happen if this were
-removed?* Hence the rule, first written by the architect against its own work at slice 00 and now
-binding on every role: **for a discrimination claim, name the mutant; for a mechanism claim, name
-the call site.**
+**The tooling caught its own author, repeatedly.** The orchestrator built the per-file mutation
+check (`O-64`) after an aggregate score hid a failing file, then wrote a false pass under its own
+new check when a file-scoped Stryker run overwrote its own report (`O-73`) — caught
+by the same orchestrator re-reading its own record. It set `loopbacks: 1` in a slice
+file and the governor that blocks a third loopback went on reading zero, because the governor counts
+log events, not frontmatter (`O-74`). None were caught by a different role — each was the same one, minutes
+later, testing its own new check.
 
-**Gates in the right place are not gates that are read.** Slice 00a merged without ever being set
-`status: done`, so `slice:check` reported `FAIL dependencies merged` on every run for a whole slice
-and nobody looked (R00-1). C5 failed, 7 interventions against a ceiling of 1 — every one a decision
-§6 reserves to the human, so the *threshold* was wrong, and it is recorded as failed anyway:
-redefining a criterion after seeing the result is forbidden.
+**Gates and governors are only as good as what feeds them**, true past the pilot too:
+a criterion can pass on a number that answers a different question (`O-6`, `O-64`,
+`O-73`), and a machine-readable field can silently disagree with the human-readable one it mirrors
+(`O-74`, and slice 02's `loopbacks: 0` against a log recording one). Two homes for one fact is a
+standing risk this project never fully closed.
 
-**The tooling produced its own worst defects.** The word-budget meter watched 2,698 words of
-overage become 18,607 in one slice and stopped nothing, having been kept out of CI on the sound
-ground that a red guard commits a broken build (O-32). The stale scope marker cost more than
-bookkeeping: the architect adjudicated eleven objections **without the reports**, said so, and
-ruled from a relay. Both hooks warn when that marker is absent, never when it is wrong.
-
-**Two things the record must not soften.** Slice 02's Gate E was taken by the **orchestrator, not
-the human**, under explicit delegation, and is logged `actor: orchestrator` with decision
-`approved-under-delegated-authority`: a gate the human did not see must never read later as one
-they did. The orchestrator named the conflict itself — it routed that work and then gated it. And
-**67 of 130 findings await a ruling** — the shape of a project logging more than it closes.
+**A stale fixture outlived its own instruction — and this section's reach.**
+`docs/slices/99-availability.md` said *"delete once slice 00 has run"*; slice 00 ran nine slices
+ago. The scribe's write guard denies `docs/slices/`, so this is the flag, not the fix.

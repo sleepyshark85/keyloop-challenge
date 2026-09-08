@@ -19,9 +19,15 @@ Domain terms only. Process vocabulary lives in `docs/METHODOLOGY.md`.
 | Absolute duration | Minutes added on the timeline, not on the wall clock. Sixty minutes from 00:30 local on a spring-forward night ends at 02:30 local (AC-3) |
 | Wall-clock duration | What a clock on the wall shows between two instants. Differs from the absolute duration across a DST transition, and is **not** what occupies a bay |
 | Ambiguous local time | A wall-clock time that occurs twice, on a fall-back night. Ambiguous only for local → instant; this system never performs that conversion (§8.3) |
+| Actor | The caller of the API. Deliberately unnamed: documentation says *a user* or *the caller*, never a role, because the brief says only *"a user"* and a stubbed client cannot authenticate anyone in particular (ADR-0034; H-1) |
+| Candidate | A (bay, technician) pair considered for one booking attempt. A dealership presents hundreds; ordering is a pure function of the candidate set and a seed (ADR-0009) |
+| Attempt cap | The bound on how many candidates a booking attempt tries before refusing for capacity — pruning drops a whole resource per conflict, not one pair at a time (ADR-0009) |
+| Contended resource | The bay or technician a `409` names, constructible only from a `23P01` SQLSTATE the database actually raised — never from an application-side guess (ADR-0016) |
+| Move | This system's term for a reschedule: one atomic, conditional `UPDATE` that adjudicates both the pair a booking takes and the pair it leaves (ADR-0025, ADR-0030) |
 
 *The twelve domain terms below the first four were proposed in `docs/slices/01-design.md` §12.1 and
 applied by the architect at slice 01 step 7, under that slice's declared arc42 scope — slice 01 is
 where those concepts entered the system, and a glossary that omitted them would have been stale from
-the merge onward. The section's owner is the scribe and the phase-6 pass is theirs; these entries are
-as-built records, not a claim on the section.*
+the merge onward. The five below Ambiguous local time are the scribe's own close-out addition,
+closing the gap H-1 named: a glossary of fourteen domain terms that did not define the system's only
+actor. The section's owner is the scribe; these entries are as-built records, not a claim on §1–§11.*
