@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **371** |
-| Severity | 14 blocking · 180 major · 177 minor |
+| Findings recorded | **373** |
+| Severity | 14 blocking · 181 major · 178 minor |
 | Verdicts | 20 narrowed · 129 accepted · 3 escalated · 29 deferred · 3 rejected |
-| Raised by | architect 78 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 11 · human 5 |
-| Awaiting a ruling | **187** |
+| Raised by | architect 80 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 11 · human 5 |
+| Awaiting a ruling | **189** |
 | Mean escape distance | 1.47 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2462,6 +2462,8 @@ rather than narrated.*
 | **S-10-1** | MINOR | 5 *(+0)* | scribe | THE README's ROUTES TABLE OMITS TWO ENDPOINTS THE HARNESS ITSELF EXERCISES | deferred |
 | **O-78** | MINOR | 7 *(+0)* | orchestrator | THE GUARD REFUSED A PATH MY DISPATCH HAD GRANTED, AND THIS TIME THE MECHANISM CAUGHT WHAT A BRIEFING WOULD HAVE LET THROUGH | **open** |
 | **O-79** | MINOR | 7 *(+0)* | orchestrator | AN AGENT DISCARDED UNCOMMITTED WORKING-TREE CHANGES ON A BELIEF IT DID NOT CHECK | **open** |
+| **A-R-6** | MAJOR | 7 *(+0)* | architect | SLICE 00's AC-10 DID NOT STATE THE CONDITION IT REQUIRED — a trailing clarification note was carrying the requirement | **open** |
+| **A-R-7** | MINOR | 7 *(+0)* | architect | A DISAGREEMENT BETWEEN A SLICE FILE AND ITS DESIGN WAS LEFT STANDING DELIBERATELY, AND THE REASON IS THE INTERESTING PART | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2546,6 +2548,16 @@ rather than narrated.*
 
 - *scenario:* The implementer, dispatched to register fastify-swagger-ui, found an uncommitted README.md edit referencing npm run openapi:explorer and REVERTED IT, reporting it as CRUFT REFERENCING A NONEXISTENT SCRIPT. THE SCRIPT EXISTED — it was committed at e88c352 and package.json carried it at the moment of the revert. A single node -p on package.json would have settled it. THE WORK WAS RECOVERABLE AND NOTHING WAS LOST, and the same commit correctly reverted nothing else, so the damage is nil; THE PATTERN IS THE FINDING. This project's whole method is that claims are measured rather than assumed, and the agent applied that standard rigorously to its own task — it measured that the emitted document was byte-identical rather than reasoning about it, which is what kept the change to three lines — AND DID NOT APPLY IT TO A DESTRUCTIVE ACT ON SOMEONE ELSE'S UNCOMMITTED WORK. Verifying before deleting is a lower bar than verifying before asserting, and it was the one that got skipped. NO GUARD COVERS THIS: guard-paths.mjs governs WHICH PATHS a role may write, not whether a write DESTROYS uncommitted changes, and git itself offers no protection for a working tree an agent chooses to clean. Recorded rather than remediated — the explorer that edit referenced has since been deleted as redundant, so restoring the line would be restoring a reference to something gone.
 - *file:* `README.md`
+
+**A-R-6** — SLICE 00's AC-10 DID NOT STATE THE CONDITION IT REQUIRED — a trailing clarification note was carrying the requirement
+
+- *scenario:* FOUND WHILE REWRITING FOR READABILITY, WHICH IS WHAT THAT PASS IS FOR. The criterion read GIVEN CONFIRMED APPOINTMENTS A AND B ON THE SAME BAY, and then carried a TRAILING ITALIC NOTE recording that the original wording, the same bay AND TECHNICIAN, had been corrected because it would make BOTH constraints violable. READ LITERALLY THE CRITERION NEVER STATES THAT B IS ON A DIFFERENT TECHNICIAN — and that is PRECISELY THE FIXTURE CONDITION that makes no_bay_overlap the ONLY violable constraint, and therefore makes the reported constraint name EVIDENCE RATHER THAN A COIN FLIP. THE NOTE WAS DOING THE CRITERION'S WORK: a reader who trimmed the amendment history, which is exactly what this pass set out to do, would have deleted the requirement along with it. Moved into the criterion as ON THE SAME BAY BUT DIFFERENT TECHNICIANS, with the reason stated in the criterion's own reasoning. THE ARCHITECT FLAGGED THAT THIS TIGHTENS WHAT THE CRITERION SAYS THOUGH NOT WHAT IT REQUIRED, rather than burying the change in a readability commit — the distinction between correcting prose and changing a decision, which is the boundary the whole pass was bounded by.
+- *file:* `docs/slices/00-schema-and-exclusion-constraints.md`
+
+**A-R-7** — A DISAGREEMENT BETWEEN A SLICE FILE AND ITS DESIGN WAS LEFT STANDING DELIBERATELY, AND THE REASON IS THE INTERESTING PART
+
+- *scenario:* 00-design.md's AMBIGUITY FLAGGED RATHER THAN RESOLVED section records that AC-7 names no constraint where AC-5 and AC-6 do, and that it was fixed at a named constraint. THE ARCHITECT DRAFTED THAT NAME INTO AC-7 AND THEN REVERTED IT: writing the fact into the criterion WOULD MOVE IT OUT OF THE AMBIGUITY REGISTER AND EMPTY THE REGISTER'S OWN ENTRY — the record of what was ambiguous would be erased by resolving it in the wrong place. So the slice file and its design still differ in emphasis, AND THE ARCHITECT CALLS THAT THE HONEST STATE rather than tidying it. Section 11 of the constitution says ambiguity is deliberate and must never be resolved silently; this is that rule applied to a readability pass, where the temptation to smooth a difference is highest.
+- *file:* `docs/slices/00-design.md`
 
 </details>
 
