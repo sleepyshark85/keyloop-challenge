@@ -10,11 +10,16 @@
 # demonstration, it is a print statement.
 #
 # REQUEST_COUNT defaults to 10 (AC-6, `R-09-12`) rather than being required: the happy-path
-# collision case needs no more than "more than one", and AC-5's own negative control sets it to 1
-# explicitly to test the OTHER shape (an already-taken slot, zero 201s).
+# collision case needs no more than "more than one", and AC-5's own negative control fires 2
+# racers at an already-taken slot to test the OTHER shape (zero 201s, both refused).
+#
+# REQUEST_COUNT=1 is refused outright (`R-10-5`): a single racer against a free slot gets its
+# one 201, zero 409s were ever possible, and the invariant below is trivially true without any
+# contention having been demonstrated at all. Two racers is the smallest count that can actually
+# collide, so REQUEST_COUNT < 2 is a usage error, not a run.
 #
 # Env: BASE_URL, DEALERSHIP_ID, SERVICE_TYPE_ID, CUSTOMER_ID, VEHICLE_ID, STARTS_AT.
-# Env (optional): REQUEST_COUNT (default 10).
+# Env (optional): REQUEST_COUNT (default 10, minimum 2).
 set -euo pipefail
 
 : "${BASE_URL:?BASE_URL is required}"
@@ -24,6 +29,11 @@ set -euo pipefail
 : "${VEHICLE_ID:?VEHICLE_ID is required}"
 : "${STARTS_AT:?STARTS_AT is required}"
 REQUEST_COUNT="${REQUEST_COUNT:-10}"
+
+if [ "$REQUEST_COUNT" -lt 2 ]; then
+  echo "double-booking.sh: REQUEST_COUNT must be at least 2 to demonstrate contention (got $REQUEST_COUNT)." >&2
+  exit 2
+fi
 
 PAYLOAD=$(printf '{"dealershipId":"%s","customerId":"%s","vehicleId":"%s","serviceTypeId":"%s","startsAt":"%s"}' \
   "$DEALERSHIP_ID" "$CUSTOMER_ID" "$VEHICLE_ID" "$SERVICE_TYPE_ID" "$STARTS_AT")
@@ -68,7 +78,7 @@ echo "summary: ${count_201} confirmed, ${count_409} refused, ${REQUEST_COUNT} fi
 
 # THE INVARIANT, AS AN EXIT CODE: exactly one racer wins the slot and every other racer is
 # refused — fewer refusals than that would mean a spurious refusal happened, and any count of
-# confirmations other than exactly one is a double-booking or (REQUEST_COUNT=1 against an
+# confirmations other than exactly one is a double-booking or (the negative control, an
 # already-taken slot) a run that never had a winner among these racers at all.
 if [ "$count_201" -eq 1 ] && [ "$count_409" -eq $((REQUEST_COUNT - 1)) ]; then
   echo "PASS: exactly one confirmed and the rest refused."

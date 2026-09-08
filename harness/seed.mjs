@@ -34,12 +34,19 @@ if (databaseUrl === undefined || databaseUrl === '') {
 }
 
 /**
- * A Tuesday, 10:00 `Europe/London` (BST, +01:00) — well inside the 08:00-18:00 opening hours
- * this script seeds for every day of the week, and with two hours' headroom either side for
- * `book-read-reschedule-cancel.sh`'s own reschedule-offset convention (`+2 hours`, pinned in
- * `tests/acceptance/harness.test.ts`'s `RESCHEDULE_OFFSET_MS`).
+ * Tomorrow, 09:00Z (`R-10-7`) — rolled forward from whatever day this script actually runs on,
+ * rather than a pinned literal that ages into a past instant as soon as the day it names has
+ * passed. `+1 day` rather than `today` so the instant stays in the future no matter what time of
+ * day the seed runs. Opening hours are seeded 08:00-18:00 for every day of the week (below), so
+ * which day "tomorrow" lands on never matters, and 09:00Z leaves two hours' headroom either side
+ * for `book-read-reschedule-cancel.sh`'s own reschedule-offset convention (`+2 hours`, pinned in
+ * `tests/acceptance/harness.test.ts`'s `RESCHEDULE_OFFSET_MS`) to stay inside that window by
+ * construction rather than by accident of the day the constant was written.
  */
-const STARTS_AT = '2026-09-08T09:00:00.000Z';
+const startsAt = new Date();
+startsAt.setUTCDate(startsAt.getUTCDate() + 1);
+startsAt.setUTCHours(9, 0, 0, 0);
+const STARTS_AT = startsAt.toISOString();
 
 /** Seventeen uppercase hex characters — `vehicle.vin`'s shape, without I/O/Q (hex has none). */
 function randomVin() {
