@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `b46b3c3 feat(09): the server span, hand-written — @opentelemetry/instrumentation-http does not patch under ESM (R-09-9 finding 6)` |
+| Last commit | `6ae4c5b fix(09): a partial mutation report cannot clear the slice — O-73` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
 | Agent runs recorded | 213 |
 | ADRs accepted | 15 |

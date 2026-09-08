@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **353** |
-| Severity | 14 blocking · 174 major · 165 minor |
+| Findings recorded | **354** |
+| Severity | 14 blocking · 174 major · 166 minor |
 | Verdicts | 20 narrowed · 127 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | test-engineer 75 · architect 72 · orchestrator 70 · reviewer 66 · implementer 56 · scribe 10 · human 4 |
-| Awaiting a ruling | **173** |
-| Mean escape distance | 1.54 step(s) |
+| Raised by | test-engineer 75 · architect 72 · orchestrator 71 · reviewer 66 · implementer 56 · scribe 10 · human 4 |
+| Awaiting a ruling | **174** |
+| Mean escape distance | 1.53 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2310,6 +2310,7 @@ rather than narrated.*
 | **I-09-6** | MINOR | 5 *(+0)* | implementer | @opentelemetry/instrumentation-http MEASURABLY DOES NOT PATCH UNDER THIS PROJECT'S ESM ENTRY POINT, so the server span is hand-written — the design's own named fallback | **open** |
 | **O-72** | MINOR | 5 *(+0)* | orchestrator | THE ORCHESTRATOR'S REMEDIATION DISPATCHES WERE WRONG IN ONE PLACE AND INCOMPLETE IN ANOTHER, AND BOTH TIMES A ROLE COVERED FOR IT | **open** |
 | **O-73** | MAJOR | 5 *(+0)* | orchestrator | THE COLLECTOR REPORTED NO FILES BELOW THRESHOLD FROM A REPORT CONTAINING ONE FILE — a vacuous pass, and the orchestrator wrote it into the log before catching it | **open** |
+| **O-74** | MINOR | 5 *(+0)* | orchestrator | THE SLICE FILE SAID loopbacks 1 AND THE GOVERNOR READ 0 — two records of one fact, and only one of them is the one the check believes | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2425,6 +2426,11 @@ rather than narrated.*
 
 - *scenario:* THE IMPLEMENTER RAN STRYKER FILE-SCOPED, AS INSTRUCTED, TO MEASURE THE THREE REMEDIATED FILES — AND EACH FILE-SCOPED RUN OVERWRITES reports/mutation/mutation.json. The last one left a report containing EXACTLY ONE FILE, src/http/server.ts. The orchestrator then ran collect-mutation against it and the collector did precisely what it was built to do with what it was given: it intersected the report with the eleven changed files, FOUND ONE, scored it at 85.57, and reported mutation_below_threshold AS AN EMPTY ARRAY. THAT EMPTY ARRAY IS TRUE OF THE REPORT AND FALSE OF THE SLICE. It would have satisfied slice:check's per-file criterion — the criterion built THIS WEEK under O-64 to stop exactly this class of error — while telemetry.ts and attemptLoop.ts went unmeasured. THIS IS THE THIRD TIME THE MUTATION CRITERION HAS BEEN GIVEN A NUMBER THAT ANSWERED A DIFFERENT QUESTION: O-6 let a mutation record satisfy tests green; a vacuous score let a SQL-only slice clear the clause on the previous slice's measurement; O-64 let an aggregate hide a member. THIS ONE IS THE FIRST WHERE THE ORCHESTRATOR WROTE THE FALSE RECORD ITSELF, having built the guard. THE COLLECTOR IS NOT WRONG AND MUST NOT BE BLAMED — it computes from the report it is handed and has no way to know a full run was intended. WHAT IS MISSING IS A CHECK THAT THE REPORT COVERS THE CHANGED SET: mutation_files_measured is already recorded and was ONE against ELEVEN changed files, so the evidence of vacuity was IN THE RECORD AND NOTHING READ IT — the honesty sitting in a field nothing opens, for the third time in two days. THE IMPLEMENTER'S THREE FIGURES ARE NOT IN DOUBT: telemetry.ts 82.86, attemptLoop.ts 92.54, server.ts 85.57, each measured file-scoped and each above 0.75. WHAT IS IN DOUBT IS WHETHER THE OTHER EIGHT CHANGED FILES STILL CLEAR IT after five commits of remediation, AND ONLY A FULL RUN ANSWERS THAT.
 - *file:* `tools/team-log/collect-mutation.mjs`
+
+**O-74** — THE SLICE FILE SAID loopbacks 1 AND THE GOVERNOR READ 0 — two records of one fact, and only one of them is the one the check believes
+
+- *scenario:* THE ORCHESTRATOR SET loopbacks: 1 IN THE FRONTMATTER AFTER THE (c) RULING, as the architect asked, and slice:check WENT ON REPORTING 0 OF MAX 2. The governor does not read the frontmatter at all: it COUNTS loopback EVENTS IN THE LOG, and no loopback event had been appended. So THE BOARD STATE AND THE GOVERNOR DISAGREED, and the governor — the thing that actually blocks a third loopback and auto-escalates a slicing problem — WAS THE ONE READING ZERO. THE CHECK ITSELF PREDICTED THIS EXACT FAILURE IN ITS OWN DOCBLOCK: had a ruling been (c), a loopback would have been due AND THE MAX-2 GOVERNOR WOULD NOT HAVE COUNTED IT, BECAUSE THE GOVERNOR IS WORTH EXACTLY WHAT THE LOG IS. It wrote that about a different mechanism — an unaccounted dispatch — and the same sentence turned out to be true of the ordinary path, where the orchestrator updates the file and forgets the event. THE ARCHITECT ALSO ASKED FOR THE FRONTMATTER SPECIFICALLY, saying it does not write the slice file's board state, WHICH IS WHY THE FILE WAS UPDATED AND THE LOG WAS NOT. Corrected by appending the loopback event; the frontmatter and the governor now agree. Recorded because a project with two homes for one fact will keep discovering which one its checks believe.
+- *file:* `docs/slices/09-observability.md`
 
 </details>
 
