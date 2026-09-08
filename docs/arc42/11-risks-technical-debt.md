@@ -16,151 +16,153 @@ real and not fixed, under §6 **(b)**.
 <!-- /generated:debt-register -->
 
 **A row states what is owed, never that anything is correct.** Seventeen ADRs were retired into
-their slice designs on 2026-09-07, five `proposed`; where one said a decision was **ruled by the
-architect and never put to the human**, its design says so. **Free-first candidate ordering was one
-of them and slice 09 declined it** (`I-04-5`): its warrant was that AC-13 would follow deductively,
-and AC-13 has since been measured passing under its 100 ms budget without the bias. A premise
-replaced by a measurement does not buy an optimisation where §1.2 ranks performance last.
+their slice designs on 2026-09-07, five `proposed`; where one recorded a decision **ruled by the
+architect and never put to the human**, its design says so. **Free-first candidate ordering was one,
+and slice 09 declined it** (`I-04-5`): its warrant was that AC-13 would follow deductively, and
+AC-13 has since measured passing under its 100 ms budget without the bias — a premise replaced
+by a measurement buys no optimisation §1.2 ranks last.
 
 ### The cost of the literal AC-6 ruling — slice 01
 
-A `src/domain` module imports **nothing at all**, siblings included (§5.2). These are the standing
-price of that ratified decision; **none is an argument for revisiting it.**
+A `src/domain` module imports **nothing at all**, siblings included (§5.2) — the standing price of a
+ratified decision; **none of it is an argument for revisiting it.**
 
 | id | The cost |
 |---|---|
-| **D-01-2** | Both inter-module handoffs take a bare `number`, so minutes passed where milliseconds are expected compiles into a plausible interval rather than a crash — the brands catch that *inside* a module, never between them. **Cashed in**: the epoch bound sits in two domain files with nothing able to share it, one concept with two homes that only review holds equal |
-| **D-01-4** | The three-file split lost one of its two justifications — the types no longer compose — and rests on ambiguity containment alone. *"The scan requires it"* is thinner than *"the types require it"*: the reason not to inline `interval.ts` later |
-| **D-01-1, D-01-3** | The settled remainder: composition order is written out by a use case rather than made uncallable by branded types, and `malformed-interval` is a branch existing only because `Interval` cannot cross the boundary carrying *"ordered, same interval"* |
+| **D-01-2** | Both inter-module handoffs take a bare `number`, so minutes passed where milliseconds are expected compiles into a plausible interval — the brands catch that *inside* a module, never between them. **Cashed in**: the epoch bound sits in two domain files with nothing able to share it, one concept with two homes that only review holds equal |
+| **D-01-4** | The three-file split lost one of its two justifications — the types no longer compose — and rests on ambiguity containment alone. *"The scan requires it"* is thinner than *"the types require it"*: the reason not to inline `interval.ts` |
+| **D-01-1, D-01-3** | The settled remainder: composition order is written out by a use case rather than made uncallable by branded types, and `malformed-interval` exists only because `Interval` cannot cross the boundary carrying *"ordered, same interval"* |
 
 ### What the slice-01 scans and tests do not catch
 
 QS-12 scans `duration-arithmetic` as a *concept* against an open spelling set, and what escapes is
 **irreducible for a text scan**: exponent notation, a conversion through an imported constant, any
 computed form. A quantity naming neither minutes nor seconds escapes **deliberately** — scoping by
-the quantity's name keeps `kilobytes * 1000` out. Two things committed tests do not evidence:
+name keeps `kilobytes * 1000` out. Two things committed tests do not evidence:
 **QS-9 examines one zone and one year**, leaving a southern-hemisphere transition, a non-whole-hour
 offset and a mid-year rule change untested; and **the `Intl` global is an ICU dependency the purity
-rule cannot see**, so a small-icu build would change `withinOpeningHours`'s answers without changing
-a line of `src/`.
+rule cannot see**, so a small-icu build changes `withinOpeningHours`'s answers without touching `src/`.
 
 ### The cost of ADR-0018's locks — slice 02
 
 | id | The cost |
 |---|---|
-| **D-02-1** | **ADR-0018 weakens ADR-0016's argument, as ADR-0016's own Consequences record**: inside a per-resource lock a reintroduced check-then-act would be *correct*, not merely harmless. What survives is the brand, the `appointment-table-access` marker and §6.1 |
-| **F-02-9** | **Discharged at slice 07**: a write locks **every resource it is in flight against** (ADR-0030 — 11.7 % of contended moves deadlocked without it, 0 / 1000 after), computed in its own transaction. The transaction-identity hole stays open (D-09-2) |
-| **F-02-8** | `hashtext` is an **undocumented internal function**; ADR-0018 needs a deterministic `int4` per id, so an application hash would serve |
+| **D-02-1** | **ADR-0018 weakens ADR-0016's argument, as ADR-0016's own Consequences record**: inside a per-resource lock a reintroduced check-then-act is *correct*, not merely harmless. What survives is the brand, the `appointment-table-access` marker and §6.1 |
+| **F-02-9** | **Discharged at slice 07**: a write locks **every resource it is in flight against** (ADR-0030 — 11.7 % of contended moves deadlocked without it, 0 / 1000 after). The transaction-identity hole stays open (D-09-2) |
+| **F-02-8** | `hashtext` is an **undocumented internal function**; ADR-0018 needs a deterministic `int4` per id, so an application hash serves |
 
 ### The cost of slice 05
 
 **F-05-1 and D-05-1 discharged at slice 06** by the `ResourceLock` brand and `setNotFoundHandler`;
-**OQ-05-2 and F-06-1 at slice 09**, by a content-type parser routing an empty body through TypeBox
+**OQ-05-2 and F-06-1 at slice 09**, by a content-type parser routing an empty body through TypeBox,
 and by the extracted attempt loop.
 
 | id | The cost |
 |---|---|
-| **D-05-3** | **ADR-0019's deferral criterion is 1-for-2 on outcomes and 0-for-2 on premises at its first destination.** R-02-2's *"cheaper"* was true of the file, false of the branch; R-02-3 argued from an already-killed mutant while the survivor went unnamed. Slice 09 adds both readings: F-06-1's premise held and the work landed, T-06-5's premise held and the work did not (D-09-2). Either supersede the criterion or make a deferral re-measure on arrival |
+| **D-05-3** | **ADR-0019's deferral criterion is 1-for-2 on outcomes and 0-for-2 on premises at its first destination.** R-02-2's *"cheaper"* was true of the file, false of the branch; R-02-3 argued from an already-killed mutant while the survivor went unnamed. Slice 09 adds both readings: F-06-1's premise held and the work landed, T-06-5's held and the work did not (D-09-2). Either supersede the criterion or make a deferral re-measure on arrival |
 
 ### The cost of slice 06
 
 | id | The cost |
 |---|---|
-| **D-06-1** | The move guards on an allowlist where the constraints carry a denylist, so a third status would be automatically occupying *and* unmovable — the direction `0003_appointment.sql` calls unsafe |
-| **F-06-2** | **`problem.ts`'s taxonomy is invisible to the mutation score.** `PROBLEM_TYPES` is `as const`, which Stryker's instrumenter skips whole, so a deleted row scores as *no change* — silence on what QS-11 is about. `error-taxonomy.test.ts`'s ∀responses ∃row is the guard |
-| **D-06-2** | **A `ResourceLock` cannot be forgotten and can be forged.** Omitting it is `TS2554`, a bare pair `TS2345`, but a hand-written `__brand` compiles clean, so *"the only minting site"* is convention rather than construction. A `unique symbol` closes it |
-| **D-06-3** | **AC-2's audit instrument can fail falsely and cannot pass falsely.** Test directories share one container without `fileParallelism: false`, so a concurrent zero-row `UPDATE` satisfies its `affected = 0` discriminator (T-06-7). Remedy on first bite: a filtered `application_name` |
+| **D-06-1** | The move guards on an allowlist where the constraints carry a denylist, so a third status is automatically occupying *and* unmovable — the direction `0003_appointment.sql` calls unsafe |
+| **F-06-2** | **`problem.ts`'s taxonomy is invisible to the mutation score.** `PROBLEM_TYPES` is `as const`, which Stryker's instrumenter skips whole, so a deleted row scores as *no change* — silence on what QS-11 is about. `error-taxonomy.test.ts`'s ∀responses ∃row is the guard. **Slice 10 adds a second blind spot**: `server.ts`'s `components.responses`, unscored because the run includes `tests/unit/**` only, so 79.05 is partly unmeasured, guarded by slice 09's document check |
+| **D-06-2** | **A `ResourceLock` cannot be forgotten and can be forged.** Omitting it is `TS2554`, a bare pair `TS2345`, but a hand-written `__brand` compiles clean, so *"the only minting site"* is convention, not construction. A `unique symbol` closes it |
+| **D-06-3** | **AC-2's audit instrument can fail falsely and cannot pass falsely.** Test directories share one container without `fileParallelism: false`, so a concurrent zero-row `UPDATE` satisfies the `affected = 0` discriminator (T-06-7). Remedy on first bite: a filtered `application_name` | 
 
 ### The cost of slice 07
 
 | id | The cost |
 |---|---|
-| **D-07-1** | **Split at slice 09, half still open.** The ceiling is one named value — `config.poolMax` from `DB_POOL_MAX`, default 10, `db.ts` holding no second default and the concurrency test dictating rather than copying it (`R-07-12`). What a saturated pool **answers** is still `500` and still undecided: `503` is right (§8.6) but it is a **new row in a closed taxonomy** (ADR-0024) that QS-11 requires reached end to end, so it is booking-path work rather than a close-out edit. `CONNECTION_TIMEOUT_MS` still does two jobs on one timer |
+| **D-07-1** | **Split at slice 09, half still open, and slice 10 declined it.** The ceiling is one named value — `config.poolMax` from `DB_POOL_MAX`, default 10, the concurrency test dictating rather than copying it (`R-07-12`). What a saturated pool **answers** is still `500` and undecided: `503` is right (§8.6) but a **new row in a closed taxonomy** (ADR-0024) that QS-11 requires reached end to end — booking-path work, not a close-out edit. `CONNECTION_TIMEOUT_MS` still does two jobs on one timer |
 
 ### The cost of slice 08
 
 | id | The cost |
 |---|---|
-| **D-08-1** | **Closed at slice 09 at 88.10 %: the projection this row made, measured.** It merged at 30 / 42 = 71.43 %, under §10's 0.75 and nothing suppressed to hide it (`O-62`), on the reading that seven of its twelve survivors were schema `description` literals unobservable until the OpenAPI document existed. Relocating that prose to an operation-level `schema.description` and asserting it from a unit test — the document reachable through `buildOpenApiDocument()` — killed them |
-| **D-08-2** | **Five `Stryker disable next-line` directives**, per-construct and never `all`, each permitted only where R-12's `dist/` recipe measures no observable difference at the module's boundary and the only killer restates the literal. A sixth was refused on measurement, a seventh because suppressing to lift a **failing** score makes the suppression load-bearing on the verdict |
-| **D-08-3** | **The `status <> 'cancelled'` denylist is unassertable**: extensionally equal to `status = 'confirmed'` over a two-value enum, so nothing separates them until a third status exists and `0003_appointment.sql`'s argument stays prose. Ruled §6 **(b)** *with the deviation stated* — (b) wants a backlog slice, and no work exists until a requirement adds a status |
+| **D-08-1** | **Closed at slice 09 at 88.10 %: the projection this row made, measured.** It merged at 30 / 42 = 71.43 %, under §10's 0.75 and nothing suppressed to hide it (`O-62`), on the reading that seven of twelve survivors were schema `description` literals unobservable until the document existed. Relocating that prose to an operation-level `schema.description` and asserting it from a unit test killed them |
+| **D-08-2** | **Five `Stryker disable next-line` directives**, per-construct and never `all`, each permitted only where R-12's `dist/` recipe measures no observable difference at the module boundary and the killer restates the literal. A sixth was refused on measurement, a seventh because suppressing to lift a **failing** score makes the suppression load-bearing on the verdict |
+| **D-08-3** | **The `status <> 'cancelled'` denylist is unassertable**: extensionally equal to `status = 'confirmed'` over a two-value enum, so nothing separates them until a third status exists. Ruled §6 **(b)** *with the deviation stated* — (b) wants a backlog slice, and no work exists until a requirement adds a status |
 
 ### The cost of slice 09
 
 | id | The cost |
 |---|---|
-| **D-09-1** | **The contract describes a media type it does not send** (§8.6, QS-11), and AC-9's test reads the `type` strings rather than `content[…]`, so the half its own sentence names is asserted by nothing. **Slice 10** (`A-09-4`) |
+| **D-09-1** | **Closed at slice 10.** Every error response is keyed on `application/problem+json` and declares only its own operation's `type` values, asserted per operation by equality (§8.6, QS-11) |
 | **D-09-2** | **`ResourceLock` still does not carry the `Db` it was taken on** (`appointmentRepository.ts:86`). The design accepted the type remedy because `F-06-1`'s extraction made it a one-signature change; the extraction landed, the change did not. Declined at step 7 on the test that made it (b) at slice 06 — nothing nameable fails without it (`T-06-5`) |
-| **D-09-3** | **`@opentelemetry/instrumentation-http` does not patch under this entry point, measured.** It left `http.Server.prototype.emit` alone and produced no span: `@opentelemetry/instrumentation` patches through `require-in-the-middle`, which a native ESM `import` never invokes. The fix is a launch flag outside `src/`; shipped instead is a hand-written span |
-| **D-09-4** | **`I-09-7` is resolved on evidence, not disproved.** Twenty racers occasionally answered `500` on a connection timeout — two of three local runs *with* the server span, zero of two without, never in isolation — and three green CI runs did not reproduce it, supporting the environment reading (`O-70`). The proposed mechanism, per-request span work on a pool-bound path, **stays plausible and unrefuted**; a constrained CPU quota on CI would settle it. The invariant held throughout |
-| **D-09-5** | **ADR-0035 is `proposed` and §6(b) has no terminal case.** The counter increments once per contended *request*, not per exclusion violation; §8.4 fixes its trigger and not its arity, so the merged semantics are correct — but (b)'s remedy is a `proposed` ADR **plus a backlog slice** a last slice cannot cut |
-| **D-09-6** | **QS-14's headroom is the regression baseline**: ≈9 ms against a 200 ms ceiling, 22× under, `cpus=16 i5-13400F`. AC-12 is a standing guard rather than something this slice earned, so the ceiling is the alarm and the headroom the baseline — a regression halving throughput passes it in silence |
+| **D-09-3** | **`@opentelemetry/instrumentation-http` does not patch under this entry point, measured.** It left `http.Server.prototype.emit` alone and produced no span: `@opentelemetry/instrumentation` patches through `require-in-the-middle`, which a native ESM `import` never invokes. The fix is a launch flag outside `src/`; shipped is a hand-written span |
+| **D-09-4** | **`I-09-7` is resolved on evidence, not disproved.** Twenty racers occasionally answered `500` on a connection timeout — two of three local runs *with* the server span, zero of two without, never in isolation — and three green CI runs did not reproduce it, supporting the environment reading (`O-70`). The proposed mechanism, per-request span work on a pool-bound path, **stays plausible and unrefuted**; a constrained CPU quota on CI would settle it. The invariant held throughout. **Seen again at slice 10**: twenty racers, ten answers, under a full parallel run and green in CI — the missing answers being `D-07-1`'s saturated-pool half, and no slice remains to take either |
+| **D-09-5** | **ADR-0035 is `proposed` and §6(b) has no terminal case.** The counter increments once per contended *request*, not per exclusion violation; §8.4 fixes its trigger and not its arity, so the merged semantics are correct — but (b)'s remedy is a `proposed` ADR **plus a backlog slice** no last slice can cut |
+| **D-09-6** | **QS-14's headroom is the regression baseline**: ≈9 ms against a 200 ms ceiling, 22× under, `cpus=16 i5-13400F`. AC-12 is a standing guard rather than something the slice earned, so the ceiling is the alarm and the headroom the baseline — a regression halving throughput passes in silence |
+
+### The cost of slice 10
+
+| id | The cost |
+|---|---|
+| **D-10-1** | **§8.6's operations column and the contract test's matrix are two transcriptions tied by nothing** — AC-2 is prose, and only review catches a divergence. Parsing §8.6 from a test was declined: it makes arc42 a machine-readable input. `A-06-2`'s minting half is the same shape — a denylist, not a proof |
 
 ## 11.2 Known risks
 
-Ordered by the cost of being wrong, not likelihood.
+Ordered by the cost of being wrong, not by likelihood.
 
 ### R-1 · The write-throughput ceiling bought with goal 1
 
 §1.2 ranks integrity first and performance last with the cost stated; this is it. Two limits,
 routinely confused. **Per contended key**, conflicting inserts serialise — three round trips per
 attempt since ADR-0018, four for a contended move — but only one succeeds, so what it caps is how
-fast losers hear *no*. **Measured: 229.47 attempts/s** — 20 racers from one barrier onto one
-`(bay, technician)` pair in 87.2 ms, one `201` and nineteen `409`, `cpus=16 i5-13400F, 15801 MB`
-(AC-15). **In aggregate**, every insert maintains two partial GiST indexes, costlier than a btree:
-low thousands per second on modest hardware.
+fast losers hear *no*. **Measured: 229.47 attempts/s** — 20 racers onto one `(bay, technician)` pair
+in 87.2 ms, one `201` and nineteen `409`, `cpus=16 i5-13400F` (AC-15). **In aggregate**, every insert
+maintains two partial GiST indexes, costlier than a btree: low thousands per second.
 
 **Binding scale.** Against §1.1's *tens of appointments a day*, the contended figure binds at roughly
-two hundred simultaneous bookers on one slot, which no dealership generates organically — it arrives
-as a campaign or an integration funnelling many at one advertised slot. The aggregate limit binds
-first, at sustained bookings in the low thousands per second or `appointment` past single-digit
-millions of rows. **The first move is partitioning by `dealership_id`**, which A-9 permits: an
+two hundred simultaneous bookers on one slot — which no dealership generates organically; it arrives
+as a campaign funnelling many at one advertised slot. The aggregate limit binds first, at sustained
+bookings in the low thousands per second. **The first move is partitioning by `dealership_id`**, which A-9 permits: an
 exclusion constraint cannot span partitions and need not.
 
-### R-2 · A capacity-*n* resource would need a different mechanism (A-2)
+### R-2 · A capacity-*n* resource needs a different mechanism (A-2)
 
-An exclusion constraint expresses capacity **one**, so a technician overseeing two jobs makes the
-mechanism the wrong shape. The cheapest route changes the model: *n* numbered slots, each
+An exclusion constraint expresses capacity **one**, so a technician overseeing two jobs makes it the
+wrong shape. The cheapest route changes the model: *n* numbered slots, each
 capacity-one, so only candidate generation changes. A counting constraint, or `SERIALIZABLE` plus an
-application count, moves correctness back into code against §2.1.
+application count, moves correctness back into code, against §2.1.
 
 ### R-3 to R-6 · Four couplings that nothing structural enforces
 
 | id | The coupling | What holds it, and what does not |
 |---|---|---|
-| R-3 | **The constraint names are behaviour, not documentation.** ADR-0009 prunes from `err.constraint`; §8.4 labels `booking_conflicts_total{resource}` from it | Renaming `no_bay_overlap` degrades the retry loop to a multiplicative bound and mislabels the metric, without failing to compile or looking wrong single-threaded. QS-1 and QS-2 assert the names, nothing else |
-| R-4 | **The attempt cap refuses while capacity exists (D-04-1).** ADR-0004 accepted a residual refusal as a liveness guard; ADR-0009 set the cap at 16 | That cap is **below the bound ADR-0009's own Bound-2 paragraph computed**, `\|bays\| + \|technicians\| − 1`, which exceeds 16 at §1.1 scale — so *"a non-zero `capped` means the cap is wrong"* is already false: it is expected. **Slice 09 measured AC-13 passing anyway** and declined free-first ordering on that measurement, leaving the pre-filter or a higher cap; the number is human-decided. `D-04-2` — the cap's placement being a rule about where a `return` goes — no test can help with: a refusal minted in the `23P01` arm and one cast outside render identically |
-| R-5 | **The exclusion constraint's range expression and the availability query's are one idea in two files** | §4.2 records why a shared `IMMUTABLE` SQL function cannot hold them together, and **there is no runtime signal**: `booking_conflicts_total` counts `23P01`, which an under-reporting query never produces. QS-8 is all that stands there |
-| R-6 | **The `Database` interface can drift from the migrations.** ADR-0006 keeps schema types in `schema.ts`, the schema in `.sql` | Nothing, until a CI check regenerates from a migrated database and diffs: a migration merged without a type edit compiles |
+| R-3 | **The constraint names are behaviour, not documentation.** ADR-0009 prunes from `err.constraint`; §8.4 labels `booking_conflicts_total{resource}` from it | Renaming `no_bay_overlap` degrades the retry loop to a multiplicative bound and mislabels the metric, without failing to compile or looking wrong. QS-1 and QS-2 assert the names |
+| R-4 | **The attempt cap refuses while capacity exists (D-04-1).** ADR-0004 accepted a residual refusal as a liveness guard; ADR-0009 set the cap at 16 | That cap is **below the bound ADR-0009's own Bound-2 paragraph computed**, `\|bays\| + \|technicians\| − 1`, which exceeds 16 at §1.1 scale — so *"a non-zero `capped` means the cap is wrong"* is already false: it is expected. **Slice 09 measured AC-13 passing anyway** and declined free-first ordering on it, leaving the pre-filter or a higher cap; the number is human-decided. `D-04-2` — where the cap's `return` goes — no test can help with: a refusal minted in the `23P01` arm and one cast outside render identically |
+| R-5 | **The exclusion constraint's range expression and the availability query's are one idea in two files** | §4.2 records why a shared `IMMUTABLE` SQL function cannot hold them together, and **there is no runtime signal**: `booking_conflicts_total` counts `23P01`, which an under-reporting query never produces. QS-8 stands alone there |
+| R-6 | **The `Database` interface can drift from the migrations.** ADR-0006 keeps schema types in `schema.ts`, the schema in `.sql` | Nothing, until a CI check regenerates from a migrated database and diffs: a migration merged without a type edit still compiles |
 
 ### R-7 · Smaller structural gaps, recorded so they are not discovered
 
 | id | Gap | Why it is accepted |
 |---|---|---|
 | R-7a | ADR-0009's seed must vary per request; if it does not, ordering degrades to sorted order and retry work goes quadratic under burst with no test failing, the symptom being latency | **Mitigated and asserted against the running artifact**: a startup `warn`, two refusals logging different seeds |
-| R-7b–d | `src/http` may import `src/domain` and not merely its types, so policy in a route handler cruises clean; `src/platform` is importable-by-all and imports nothing, the shape of a junk drawer; down migrations are exercised by no test | QS-12 catches the ambiguities that matter; the leaf rule stops `platform` acquiring behaviour, not contents; a fresh container each deployment, rollback in anger not being this system's story |
-| R-7e | **The transaction boundary must be exactly one attempt wide**, enforced by nothing structural: wider, the second attempt fails `25P02`; narrower, `pg_advisory_xact_lock` has no transaction to scope to | QS-3 fails on the first; the second does not compile |
-| R-7i | `exclusion-constraint-adjudicates.test.ts` asserts simultaneity in phase 4 only, discriminating by **one unit** | An equality at the boundary is the tightest assertion available; the residual is a control silently ceasing to discriminate, and slice 07's is worse — its corrected instrument was never observed failing |
-| R-7h | The RFC 3339 request pattern is a regex, so `2026-02-30T10:00:00Z` is accepted and `Date.parse` yields 2 March | Fixing it needs a leap-year calculation in `src/http` — the second calendar slice 01 ruled against. **OQ-02-1** carries it |
-| R-7g | Case 0's constraint-set assertion filters `contype <> 'p'`, but **PostgreSQL 18 surfaces `NOT NULL` as `contype = 'n'`**; the fix is an allowlist | Cannot fail today, the image being pinned. **The direction of failure is the finding**: a denylist breaks with a dozen names nobody added, so a version bump reads as *"too strict"* |
+| R-7b–d | `src/http` may import `src/domain`, not merely its types, so policy in a route handler cruises clean; `src/platform` is importable-by-all and imports nothing, the shape of a junk drawer; down migrations are exercised by no test | QS-12 catches the ambiguities that matter; the leaf rule stops `platform` acquiring behaviour, not contents; a fresh container each deployment, rollback in anger not being this system's story |
+| R-7e | **The transaction boundary must be exactly one attempt wide**, enforced by nothing structural: wider, the second attempt fails `25P02`; narrower, `pg_advisory_xact_lock` has no transaction to scope to | QS-3 catches the first; the second does not compile |
+| R-7i | `exclusion-constraint-adjudicates.test.ts` asserts simultaneity in phase 4 only, discriminating by **one unit** | An equality at the boundary is the tightest assertion available; the residual is a control silently ceasing to discriminate — slice 07's is worse, its corrected instrument never observed failing |
+| R-7h | The RFC 3339 request pattern is a regex, so `2026-02-30T10:00:00Z` is accepted and `Date.parse` yields 2 March | Fixing it needs a leap-year calculation in `src/http` — the second calendar slice 01 ruled against. **OQ-02-1** |
+| R-7g | Case 0's constraint-set assertion filters `contype <> 'p'`, but **PostgreSQL 18 surfaces `NOT NULL` as `contype = 'n'`**; the fix is an allowlist | Cannot fail today, the image being pinned. **The direction of failure is the finding**: a denylist breaks with names nobody added, so a version bump reads as *"too strict"* |
 
 ### R-8 · Three things CI is *said* to enforce and does not
 
 | Claimed | Claimed by | State today |
 |---|---|---|
 | The diagram scripts run in CI | METHODOLOGY §4 | **Cannot run** — a plugin cache nothing vendors. CI checks the honest subset: every `.html` has a committed `.svg` |
-| Link integrity and ADR existence are enforced | METHODOLOGY §4 | Partly: `docs:refs` holds design-local citations and `docs:adr-check` an ADR's decisions, but ordinary markdown links are checked only for diagrams |
-| `QS-*` names a real test, or CI fails | METHODOLOGY §4, §10.2 | No tool, and no longer blocked now `tests/` exists — the traceability chain's last link and the oldest unpaid item here |
+| Link integrity and ADR existence are enforced | METHODOLOGY §4 | Partly: `docs:refs` holds design-local citations and `docs:adr-check` an ADR's decisions; ordinary markdown links are checked only for diagrams |
+| `QS-*` names a real test, or CI fails | METHODOLOGY §4, §10.2 | No tool, and no longer blocked now `tests/` exists — the traceability chain's last link, and the oldest unpaid item here |
 
 ### R-12 · The mutation gate's failure mode is silence, and it is held by a workaround
 
 The tool producing §8.5's score has a demonstrated mode in which it reports survivors it never
 tested — twice, the second behind a green gate. **Each was caught by a low score, which is luck**: a
 broken runner reporting 0.81 against a 0.75 threshold satisfies every check `slice:check` makes. The
-remedy is §5.3's — assert **inside the thing that produces the pass**. **Slice 09 built one layer of
-it** (`O-73`): a file-scoped run overwrites the report, so the collector now refuses a reading
-covering fewer files than the slice changed, naming the unmeasured ones. That catches a partial
-report, not an unrun one; the `testsCompleted` check is still owed.
+remedy is §5.3's — assert **inside the thing that produces the pass**. **Slice 09 built one layer**
+(`O-73`): the collector refuses a reading covering fewer files than the slice changed, naming the
+unmeasured ones. That catches a partial report, not an unrun one; the `testsCompleted` check is owed.
 
 **And it is blind to every guard outside `tests/unit/`** (§8.5), so a line guarded outside-in and a
 line guarded by nothing score alike: the number understates the true score and cannot say by how

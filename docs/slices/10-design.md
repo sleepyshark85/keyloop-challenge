@@ -23,19 +23,8 @@ per row; the operation dimension is the only *new* fact. A second grid would re-
 `type` — the duplication seventeen ADRs were retired for. **Ruling: one new column on §8.6's existing
 nine-row table.** A table with a type axis and an operation axis is a matrix however it is drawn.
 
-| `type` | status | operations |
-|---|---|---|
-| `malformed-request` | 400 | all five |
-| `outside-opening-hours` | 400 | book, reschedule |
-| `appointment-not-found` | 404 | read, reschedule, cancel |
-| `route-not-found` | 404 | **none** — `setNotFoundHandler` answers no operation |
-| `no-capacity` | 409 | book, reschedule |
-| `appointment-not-confirmed` | 409 | reschedule |
-| `unknown-reference` | 422 | book, availability |
-| `vehicle-not-owned` | 422 | **book only** |
-| `internal` | 500 | all five, **carrying no response schema** (§8.5) |
-
-Read transposed, that deletes `404` from book, `409`+`422` from read and cancel, and `422` from
+**The column itself lives in §8.6 as built** (step 7); the draft table that stood here is gone rather
+than kept as a second copy of it. Read transposed, that deletes `404` from book, `409`+`422` from read and cancel, and `422` from
 reschedule, and narrows every surviving cell's union. `/health` is **outside** §8.6's surface (§3.1's
 operator boundary; its `503` is a health document, not a problem) and is excluded *by name* with an
 asserted-empty type set, never by silent omission.
@@ -161,6 +150,12 @@ fact**, which slice 09 had to do and said was the worse order); §3.1 — the ha
 seed; §10.2 — QS-11's "its media types are wrong and asserted by nothing" retired; §11.1 — `D-09-1`
 closes, with the residuals below opened.
 
+**Step 7, as built.** §8.5 took *two* corrections rather than a row: the collapse-and-rewrite pair
+above (`R-10-2`), and `I-10-2`'s measurement that the `content` form **stays at the status already
+set** with a generic `application/json` body where the bare form escalates to `500` — §8.5 described
+only the second, so it was half wrong about the mechanism that shipped. `D-10-1` opens; `D-10-2`
+folded into `F-06-2`, mutation-score blindness having a home already.
+
 ## No ADR
 
 The human's 2026-09-07 bar: *closes off an alternative someone would reasonably take, and expensive
@@ -175,7 +170,9 @@ helper. **Nothing here reaches the bar**, and this section is the record that it
   §8.6 from the test and declined it: it makes arc42 a machine-readable input and breaks on
   reformatting. Verified at the gate, and recorded as debt rather than dressed up.
 - **AC-6's README half** is a gate item (the DoD already requires the run by hand); only the
-  `package.json` scripts and the seed-only environment are mechanical.
+  `package.json` scripts and the seed-only environment are mechanical. ~~Ruled at step 1~~ —
+  **withdrawn at step 5, `R-10-1`.** It was assertable in three lines and was then not written at
+  all; see the adjudication below.
 - **AC-3b is a denylist**, not a proof of minting.
 
 ## Assumptions and open questions
@@ -186,3 +183,122 @@ helper. **Nothing here reaches the bar**, and this section is the record that it
 - **OQ-10-1** — an unreferenced `components.responses` entry for `route-not-found` is valid OpenAPI
   3.1, but whether `SwaggerParser.validate` accepts it under AC-8 is unverified. If not, the row is
   documented in `info.description` and asserted absent from all five operations instead.
+
+
+## Step 5 adjudication — eight findings, eight verdicts
+
+Loopbacks **0 of 2 and unchanged**: nothing below is a `(c)`, and the two that block are not DCR
+outcomes at all. `R-10-1` and `R-10-3` are **conformance defects** — the design was right
+and plainly stated, and was not built. §6's table adjudicates *disputes about a design*; returning
+to step 1 to re-issue a design nobody disagrees with is ceremony, so the remedy is to build what is
+already agreed, at the step that owns it. That distinction is recorded here because it is the one an
+architect is most tempted to blur in its own favour: **neither finding is softened by it.** Both
+block the merge.
+
+| # | Verdict | Owner | Remedy |
+|---|---|---|---|
+| `R-10-1` | **UPHELD — blocking**, conformance | scribe · test-engineer | README run section; a mechanical assertion |
+| `R-10-2` | **UPHELD — (a) clarification** | test-engineer | probe the shape at document level |
+| `R-10-3` | **UPHELD — blocking**, conformance | test-engineer | `/health` by name, empty type set, no path unvisited |
+| `R-10-4` | **UPHELD** | test-engineer | derive the cell list; stop transcribing it |
+| `R-10-5` | **UPHELD, remedy amended** | implementer · test-engineer | `REQUEST_COUNT >= 2`; the negative control moves to 2 |
+| `R-10-6` | **UPHELD as measured** | architect | §11.1, no code |
+| `R-10-7` | **UPHELD** | implementer | compute the date; keep the time of day |
+| `R-10-8` | **UPHELD, out of scope** | architect | §11.1 `D-09-4` |
+
+### `R-10-1` — I withdraw "gate-verified rather than mechanical"
+
+The reviewer calls that ruling **convenient rather than honest**, and it is right. The test is
+three lines; I ruled it unassertable and the half was then not written at all, which is precisely
+what an unassertable criterion buys. AC-6's README half is **mechanical from here**.
+
+**The remedy is amended, and strengthened.** A grep for `harness:seed` asserts one string. Assert
+**set equality** instead: every `harness:*` key in `package.json` appears in `README.md`, and
+`README.md` names the `eval "$(npm run --silent harness:seed)"` line and both scripts. That catches
+the realistic regression a grep misses — a *new* harness script added and never documented — for the
+same three lines. Content is the scribe's (`CLAUDE.md` §4); the assertion is the test-engineer's.
+
+### `R-10-2` — **(a)**, and the wording that was ambiguous was mine
+
+Re-measured independently before ruling, on this toolchain: `@fastify/swagger` rewrites TypeBox's
+`const` to `enum` in the emitted document, and `fast-json-stringify` **passes an `enum` value
+through unvalidated** — it neither throws nor substitutes. So a collapsed cell emits
+`{type: string, enum: [x]}`, the probe's wrong value comes back as *itself*, `not.toBe(correctType)`
+holds, and all seven cells stay green while the runtime schema substitutes. The finding is exact.
+
+M2 said the property must be *shown*; **it never said at which level**, and that omission is the
+defect. Fixed here: **the M2 property is asserted at the runtime schema** — `tests/unit/http/
+problem.test.ts`, which already does it and does fail on the collapse. At **document** level the
+distinction the property rests on has been erased by the emitter before the test can see it, so
+behaviour-probing is impossible in principle there and the only faithful assertion is the
+**artifact's shape**: each single-type cell's `type` schema is a one-member `anyOf`, never a bare
+`enum` or `const`. That is a mechanism assertion, which step 1 declined by name — I am reversing
+that here for the document level only, because at that level the mechanism is the sole observable,
+and it discriminates all three measured constructions (`Union` collapse, `String({enum})`, `Unsafe`
++ `anyOf`). Falsification the test-engineer must run: switch the single-member branch to
+`Type.Union`, re-emit, contract suite red.
+
+Keep the serialiser probe beside it as a second signal, and **delete the header's claim that this
+block asserts behaviour rather than shape** — that sentence is now false of the block below it.
+
+### `R-10-3` — my own ruling, and it is nameable
+
+`10-design.md` §1: `/health` is *"excluded by name with an asserted-empty type set, never by silent
+omission"*. `EXPECTED_PAIRS` has five keys and the walk visits only those, so the document's sixth
+operation is unasserted and a problem response added to its `503` is green everywhere. **The
+criterion that fails is AC-1** — *"each operation's set is asserted by equality"* — which today holds
+over five of six operations, and equality over a subset chosen by the test is not equality.
+
+Remedy, exactly the ruling: a sixth key `GET /health` with `['200 application/json',
+'503 application/json']` — an empty problem-type set, stated — **plus** the assertion that closes
+the class rather than this instance: `EXPECTED_PAIRS`' key set **equals** the set of
+`(method, path)` pairs in `doc.paths`. A future route that nobody adds to the matrix then fails
+rather than passing unseen.
+
+### `R-10-4` — derive it, do not extend it
+
+Eight cells, header says seven, `PATCH /appointments/{id}` `404` absent — confirmed against the
+emitted document. Adding the missing row fixes the instance and leaves the shape. **`SINGLE_TYPE_CELLS`
+is derived from `EXPECTED_PAIRS` instead**: the cells with exactly one `/problems/*` entry at a
+status. One transcription of §8.6, not two, and the residual named at step 2 (nothing ties the
+transcription to §8.6) does not double.
+
+### `R-10-5` — the finding is right and the remedy as offered breaks AC-5's negative control
+
+`REQUEST_COUNT=1` against a free slot prints PASS having demonstrated no contention. Upheld. But a
+bare `>= 2` guard collides with the negative control step 1 specified — `REQUEST_COUNT=1` against an
+**already-taken** slot — which would then exit non-zero because of the guard rather than because it
+counted, and a negative control that passes for the wrong reason is this slice's own subject.
+
+**Both change, together** (mid-slice AC authority, provisional to the gate): the script requires
+`REQUEST_COUNT >= 2`, and AC-5's negative control fires **two** racers at an already-taken slot,
+expecting zero `201`s and two `409`s and a non-zero exit. It still proves counting, and it now also
+proves the script does not accept the vacuous configuration. Cost if wrong: one acceptance case
+rewritten, and the one-racer shape is no longer exercised — deliberate, since it is the shape being
+forbidden.
+
+### The residuals this slice leaves — `D-10-1`
+
+- **`D-10-1` — §8.6's operations column and the contract test's matrix are two transcriptions tied
+  by nothing.** AC-2 is prose; only review catches a divergence, and parsing §8.6 from a test was
+  declined at step 1 because it makes arc42 a machine-readable input. `A-06-2`'s minting half is the
+  same shape — `tests/architecture/` holds a denylist over `src/**`, not a proof. §11.1 carries it,
+  with no destination slice because there is none.
+
+### `R-10-6`, `R-10-7`, `R-10-8`
+
+**`R-10-6`** — true as measured; `vitest.mutation.config.ts` includes `tests/unit/**` only, so the
+`components` block cannot be scored. No code: the guard is real (slice 09's AC-7 fails when the
+committed document loses the entries) and it is the *number* that is partial. **§11.1 carries the
+caveat**, because `server.ts`'s 79.05 is read as evidence elsewhere.
+
+**`R-10-7`** — fixed. `seed.mjs` is Node, so `R-09-12`'s no-coreutils constraint never applied to
+it and the literal bought nothing. Roll the **date** forward from today and keep `09:00Z`: the
+`+2h` reschedule target stays inside the seeded 08:00–18:00 window by construction, which the
+literal only achieved by accident of the day it was written.
+
+**`R-10-8`** — out of scope, and I am not widening the last slice to take it. Twenty racers
+answering ten times is `D-09-4`'s open mechanism seen again, and the missing answers are the
+saturated-pool half of `D-07-1` — a **new taxonomy row** that QS-11 requires reached end to end,
+which is booking-path work. Recorded in §11.1 against both rows, with no destination slice and the
+reason there is none stated there rather than implied.
