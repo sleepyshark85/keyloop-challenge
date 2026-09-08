@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **368** |
-| Severity | 14 blocking · 180 major · 174 minor |
-| Verdicts | 20 narrowed · 128 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | architect 78 · test-engineer 75 · orchestrator 73 · reviewer 66 · implementer 61 · scribe 10 · human 5 |
+| Findings recorded | **369** |
+| Severity | 14 blocking · 180 major · 175 minor |
+| Verdicts | 20 narrowed · 129 accepted · 3 escalated · 28 deferred · 2 rejected |
+| Raised by | architect 78 · test-engineer 75 · orchestrator 73 · reviewer 66 · implementer 61 · scribe 11 · human 5 |
 | Awaiting a ruling | **187** |
-| Mean escape distance | 1.49 step(s) |
+| Mean escape distance | 1.48 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2449,7 +2449,7 @@ rather than narrated.*
 | **OQ-10-1** | MINOR | 1 *(+0)* | architect | WHETHER AN UNREFERENCED components.responses ENTRY SURVIVES AC-8's VALIDATOR IS UNVERIFIED | **open** |
 | **A-10-2** | MAJOR | 1 *(+0)* | architect | THE DESIGN NAMES ITS OWN UNFALSIFIABLE CRITERIA RATHER THAN LETTING THE REVIEW FIND THEM | **open** |
 | **A-10-3** | MINOR | 1 *(+0)* | architect | harness/ IS UNGUARDED, SO AN OWNERSHIP TABLE IS THE ONLY THING PREVENTING T-09-5 A THIRD TIME | **open** |
-| **A-10-4** | MAJOR | 1 *(+0)* | architect | AC-7 WOULD HAVE PUBLISHED A RULE THE CODE DOES NOT IMPLEMENT, AND THE ARCHITECT CORRECTED THE CRITERION | **open** |
+| **A-10-4** | MAJOR | 1 *(+0)* | architect | AC-7 WOULD HAVE PUBLISHED A RULE THE CODE DOES NOT IMPLEMENT, AND THE ARCHITECT CORRECTED THE CRITERION | accepted |
 | **A-10-5** | MAJOR | 1 *(+0)* | architect | TWO MECHANISMS ARE RULED MEASURE-DO-NOT-CHOOSE, AND ONE COULD REINTRODUCE THE EXACT DEFECT THIS SLICE CORRECTS | **open** |
 | **I-10-1** | MAJOR | 2 *(+1)* | implementer | M2 IS POSITIVE — a one-member Type.Union COLLAPSES TO A LITERAL AND SILENTLY SUBSTITUTES, reproducing SECTION 8.5's DEFECT INSIDE THE FIX FOR IT, and SEVEN CELLS REACH IT | **open** |
 | **I-10-2** | MINOR | 2 *(+1)* | implementer | M1 IS POSITIVE WITH A DIFFERENCE WORTH RECORDING — the per-response content form keeps the serialiser and survives charset, but FAILS DIFFERENTLY FROM THE CLASSIC FORM | **open** |
@@ -2458,6 +2458,7 @@ rather than narrated.*
 | **I-10-4** | MINOR | 4 *(+3)* | implementer | NARROWING MADE A SECOND TYPE HOMELESS THAT THE DESIGN DID NOT ANTICIPATE — internal, not just route-not-found | **open** |
 | **I-10-5** | MINOR | 4 *(+0)* | implementer | AC-3 AND AC-3b NEEDED NO SOURCE CHANGE AT ALL, AND THAT WAS ESTABLISHED BY RUNNING THE TESTS RATHER THAN BY ASSUMING IT | **open** |
 | **O-77** | MAJOR | 4 *(+0)* | orchestrator | src/http/problem.ts IS AT 74.29, UNDER SECTION 10's 0.75 BY SEVEN-TENTHS OF A POINT — and being close is exactly when it is tempting to argue | **open** |
+| **S-10-1** | MINOR | 5 *(+0)* | scribe | THE README's ROUTES TABLE OMITS TWO ENDPOINTS THE HARNESS ITSELF EXERCISES | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2485,6 +2486,7 @@ rather than narrated.*
 
 - *scenario:* AC-7's boundary said one thing and availability.ts does another: THE ROUTE REJECTS to LESS-THAN-OR-EQUAL-TO from, so the rule is to STRICTLY LATER THAN from. As written the criterion would have shipped contract prose describing a boundary the implementation does not have — the same class as section 8.4 claiming auto-instrumentation that does not patch, found one slice earlier. Corrected under mid-slice acceptance-criteria authority and PROVISIONAL UNTIL THE GATE. Also ruled here: R-09-13's prose SPLITS rather than moving whole — contract prose stays at operation level with one fact per concatenated literal, the TypeBox rationale returns to the file docblock where it already lives, and the querystring object's duplicate description is DROPPED because @fastify/swagger was measured to discard it, so NO EMITTED BYTE CHANGES and AC-7's own --check proves that. D-08-1's three surviving mutants bind to three AC-7 assertions, and AC-7 must fail when ANY ONE literal is emptied.
 - *file:* `docs/slices/10-openapi-and-curl-harness.md`
+- *accepted* by architect — THE AC-7 BOUNDARY CORRECTION STANDS, AND IT WAS CONFIRMED AGAINST THE CODE TWICE. The criterion as originally written would have PUBLISHED A RULE THE IMPLEMENTATION DOES NOT HAVE: queryAvailability rejects to-less-than-or-equal-from, so the rule is TO STRICTLY LATER THAN FROM. The architect corrected it at step 1 under mid-slice acceptance-criteria authority and marked it PROVISIONAL UNTIL THE GATE; the implementer then verified it against the source line at step 2 rather than accepting the design's word. Same class as section 8.4 claiming auto-instrumentation that does not patch, caught one slice earlier and now caught BEFORE it shipped rather than after. Provisional status discharged at the gate.
 
 **A-10-5** — TWO MECHANISMS ARE RULED MEASURE-DO-NOT-CHOOSE, AND ONE COULD REINTRODUCE THE EXACT DEFECT THIS SLICE CORRECTS
 
@@ -2525,6 +2527,11 @@ rather than narrated.*
 
 - *scenario:* THE FULL STRYKER RUN COVERS TWENTY-SIX FILES AND FOUR OF THEM CHANGED IN THIS SLICE. THREE CLEAR: routes/availability.ts 88.37, server.ts 79.05, routes/appointments.ts 76.13. problem.ts IS 26 KILLED AGAINST 9 SURVIVED, 74.29 PERCENT, AND SECTION 10's THRESHOLD IS 0.75. IT MISSES BY LESS THAN ONE MUTANT — killing a single further survivor takes it to 27 of 35, 77.14. THAT IS PRECISELY WHY IT MUST NOT BE ARGUED. A threshold that bends when the gap is small is not a threshold, and this project has already recorded what happens when a number is reasoned toward rather than measured: R-05-7 sat at exactly 0.75 with three survivors, slice 08 merged at 71.43 on a human override, and O-64 and O-73 were both cases of a number that answered a different question. THE SURVIVORS ARE CONCENTRATED AND MOSTLY IN ONE STRUCTURE: line 96's ObjectLiteral and 97's ArrowFunction are ProblemSchema's shape and the type union's mapping callback; 102 carries an ArrayDeclaration and two StringLiterals, the resource enumeration of bay and technician; 108 carries an ObjectLiteral, a BooleanLiteral and a StringLiteral, which are additionalProperties false and the schema description; and 178 is a further StringLiteral. SEVERAL LOOK LIKE THE SCHEMA-OPTIONS AND DESCRIPTION CLASS THAT SLICE 08 BOOKED AS DEBT AND SLICE 09 KILLED BY MAKING THE DOCUMENT READABLE FROM A UNIT TEST — THE SAME REMEDY MAY APPLY HERE, since this slice has just made the emitted document assert far more than it did. THE ORCHESTRATOR IS NOT MERGING ON THIS. The human delegated the gate conditionally on the architect and the orchestrator agreeing, and stated hold conditions that name this one exactly: ANY CHANGED FILE UNDER 0.75.
 - *file:* `src/http/problem.ts`
+
+**S-10-1** — THE README's ROUTES TABLE OMITS TWO ENDPOINTS THE HARNESS ITSELF EXERCISES
+
+- *scenario:* The table lists GET health, POST appointments and GET appointments-by-id, AND OMITS THE PATCH AND THE CANCELLATION ROUTES — both of which the happy-path harness script drives, so THE README NOW DOCUMENTS A DEMONSTRATION OF ENDPOINTS THE README DOES NOT LIST. THE GAP PREDATES THIS SLICE and is outside R-10-1's scope, which is specifically the missing harness section. THE SCRIBE LEFT IT ALONE RATHER THAN EXPANDING SCOPE UNILATERALLY and reported it instead — the right call, and the second time this session a role has declined to widen its own remit and said why. Worth the architect's attention if completeness of that table matters, and it is the kind of omission that gets worse rather than better once a project stops.
+- *file:* `README.md`
 
 </details>
 

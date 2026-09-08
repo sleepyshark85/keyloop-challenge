@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `1a578a8 chore(10): step 4 green, CI green, and one file seven-tenths under — O-77` |
+| Last commit | `a5fb1ba test(10): /health by name, derived single-type cells, and a shape probe at document level (R-10-2, R-10-3, R-10-4)` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process |
-| Agent runs recorded | 227 |
+| Agent runs recorded | 233 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -381,7 +381,13 @@
 | 2026-09-08 07:17 | implementer | 131m00 | 836 / 43,648 / 95,533,728 | `derived` |
 | 2026-09-08 07:21 | implementer | 135m19 | 842 / 43,654 / 95,954,239 | `derived` |
 | 2026-09-08 07:22 | implementer | 135m48 | 844 / 43,663 / 96,333,170 | `derived` |
-| | **total** | **8422m33** | **60,192 / 4,204,630 / 5,390,800,502** | |
+| 2026-09-08 08:34 | implementer | 208m30 | 864 / 43,703 / 99,405,920 | `derived` |
+| 2026-09-08 08:46 | reviewer | 12m25 | 210 / 2,647 / 10,730,764 | `derived` |
+| 2026-09-08 08:52 | scribe | 4m10 | 112 / 3,287 / 2,892,173 | `derived` |
+| 2026-09-08 09:09 | architect | 21m41 | 346 / 11,293 / 20,975,182 | `derived` |
+| 2026-09-08 09:14 | implementer | 3m17 | 106 / 2,020 / 2,563,507 | `derived` |
+| 2026-09-08 09:33 | test-engineer | 21m53 | 264 / 8,780 / 12,948,891 | `derived` |
+| | **total** | **8694m31** | **62,094 / 4,276,360 / 5,540,316,939** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
