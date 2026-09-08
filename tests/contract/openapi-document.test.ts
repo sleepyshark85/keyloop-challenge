@@ -30,18 +30,26 @@ import buildStringify from 'fast-json-stringify';
  *         id — the CONTRACT half of `A-06-2` (the MINTING half is `tests/architecture/
  *         uuid-mint.test.ts`, owned separately per the design's ownership table).
  *   I-10-1 / M2  a one-member `Type.Union` collapsing to `Type.Literal` reproduces §8.5's
- *         substitution defect inside AC-1's own narrowing (seven cells: read/cancel's 400 &
- *         404, availability's 400 & 422, book's 409). The property asserted below is
- *         OBSERVABLE BEHAVIOUR under the actual serialiser Fastify uses
- *         (`fast-json-stringify`, `@fastify/fast-json-stringify-compiler`'s own dependency,
- *         confirmed present via `fastify`'s own `package.json`) — never the schema's SHAPE
- *         (`anyOf` vs. bare `const`), which is a mechanism a future refactor could satisfy
- *         differently while remaining correct, or vary while reintroducing the defect. Traced
- *         empirically before being written into an assertion: a bare `{const: x}` schema
- *         SILENTLY SUBSTITUTES `x` back regardless of the input value; a one-member `anyOf`
- *         THROWS on a mismatch. Reject, not substitute, is the property; which schema shape
- *         produces it is the implementer's to choose (step 2: `Type.Unsafe` with a hand-built
- *         one-member `anyOf` — not pinned here by name).
+ *         substitution defect inside AC-1's own narrowing (eight cells, DERIVED from
+ *         `EXPECTED_PAIRS` below — never hand-listed, `R-10-4`). Step 5 (`R-10-2`) ruled the
+ *         property apart by LEVEL, because it was never said at which level it must be shown:
+ *         the BEHAVIOURAL property — reject a wrong closed-set value, never silently substitute
+ *         the schema's own constant back — is the real guard and is asserted at the RUNTIME
+ *         SCHEMA, `tests/unit/http/problem.test.ts`, which already fails on the collapse. At
+ *         DOCUMENT level `@fastify/swagger` rewrites `const` to `enum` and
+ *         `fast-json-stringify` passes an `enum` value through UNVALIDATED — neither throwing
+ *         nor substituting — so the emitter erases the behavioural distinction before a
+ *         document-level probe can observe it; measured directly (`node -e`, `fast-json-
+ *         stringify` 5.x): `{const: x}` substitutes `x` back for any input, `{type:'string',
+ *         enum:[x]}` echoes the wrong input through unrejected, and `{anyOf:[{type:'string',
+ *         enum:[x]}]}` throws on a mismatch. The only faithful assertion at THIS level is
+ *         therefore the artifact's SHAPE — each single-type cell's `type` property is a
+ *         one-member `anyOf`, never a bare `enum` or `const` — which is a mechanism assertion
+ *         step 1 declined by name; it is reversed here for the document level only, because at
+ *         that level the mechanism is the sole observable. The serialiser probe stays beside it
+ *         as a second signal (it throws on the shape this document actually emits today), but
+ *         the shape check is what can fail on the collapse — falsified by switching the
+ *         single-member branch back to a bare `Type.Union`/`Type.Literal` and re-emitting.
  *   AC-7 (slice 10)  `R-09-13`: the querystring description constant was doing two jobs and is
  *         split — three concatenated contract-prose facts (what the operation answers, the
  *         rule, the consequence) replace it, and TypeBox's rationale moves to the file's own
@@ -288,8 +296,16 @@ describe('AC-1 — every §8.6 error type is document-wide, over paths AND compo
  *
  * The 2xx entry is `application/json` with no `type` — §8.6's stated "worse failure" is a
  * SUCCESS response arriving as `problem+json`, so the media type itself is the assertion.
+ *
+ * `GET /health` (`R-10-3`) is included too, by NAME, with an asserted-EMPTY `/problems/*` set —
+ * it is §3.1's operator boundary, outside §8.6's error surface, and its `503` is a health
+ * document rather than a problem response. The key set below is asserted EQUAL to every
+ * `(method, path)` the document declares (the `it` immediately below the `it.each`'s
+ * describe), so a future operation nobody adds a row for here fails loudly rather than passing
+ * unseen — equality over a subset the test chose is not equality (`R-10-3`).
  */
 const EXPECTED_PAIRS: Record<string, readonly string[]> = {
+  'GET /health': ['200 application/json', '503 application/json'],
   'POST /appointments': [
     '201 application/json',
     '400 /problems/malformed-request',
@@ -360,7 +376,33 @@ function actualPairs(op: OperationObject, doc: OpenApiDoc): string[] {
   return [...pairs].sort();
 }
 
+/** Every `(method, path)` the document declares, `METHOD /path` — the same shape as `EXPECTED_PAIRS`' own keys. */
+function allOperationKeys(doc: OpenApiDoc): string[] {
+  const keys: string[] = [];
+  for (const [path, methods] of Object.entries(doc.paths ?? {})) {
+    for (const method of Object.keys(methods ?? {})) {
+      keys.push(`${method.toUpperCase()} ${path}`);
+    }
+  }
+  return keys.sort();
+}
+
 describe('AC-1 — each operation\'s (status, type) pairs, asserted BY EQUALITY, both directions, including 2xx', () => {
+  it("EXPECTED_PAIRS' key set equals every (method, path) operation the document declares (R-10-3)", () => {
+    const { doc, error } = readDocument();
+    expect(error, error).toBeUndefined();
+    if (doc === undefined) return;
+
+    const documented = allOperationKeys(doc);
+    const asserted = Object.keys(EXPECTED_PAIRS).sort();
+    expect(
+      asserted,
+      `EXPECTED_PAIRS must cover every (method, path) the document declares, not a subset the ` +
+        `test chose — a future operation added and never given a row here must fail rather than ` +
+        `pass unseen.\ndocumented: ${JSON.stringify(documented)}\nasserted:   ${JSON.stringify(asserted)}`,
+    ).toEqual(documented);
+  });
+
   it.each(Object.entries(EXPECTED_PAIRS))('%s', (opKey, expected) => {
     const { doc, error } = readDocument();
     expect(error, error).toBeUndefined();
@@ -386,30 +428,60 @@ describe('AC-1 — each operation\'s (status, type) pairs, asserted BY EQUALITY,
 
 // ─────────────────────────────────────────────── I-10-1 / M2: reject, not substitute ──
 
-/**
- * The seven cells AC-1's narrowing collapses to a single member (step-2 measurement,
- * `10-design.md` "Measure, do not choose in advance" / M2): read and cancel's 400 & 404,
- * availability's 400 & 422, book's 409. Each row names the cell's own correct literal and one
- * OTHER closed-set literal to probe it with — never a value outside the closed set, because
- * the property under test is specifically about a value that IS legitimate for a DIFFERENT
- * cell of the SAME taxonomy leaking into this one.
- */
-const SINGLE_TYPE_CELLS: ReadonlyArray<{
+interface SingleTypeCell {
   readonly label: string;
   readonly path: string;
   readonly method: string;
   readonly status: string;
   readonly correctType: string;
   readonly wrongType: string;
-}> = [
-  { label: 'Read 400', path: '/appointments/{id}', method: 'get', status: '400', correctType: '/problems/malformed-request', wrongType: '/problems/appointment-not-found' },
-  { label: 'Read 404', path: '/appointments/{id}', method: 'get', status: '404', correctType: '/problems/appointment-not-found', wrongType: '/problems/malformed-request' },
-  { label: 'Cancel 400', path: '/appointments/{id}/cancellation', method: 'post', status: '400', correctType: '/problems/malformed-request', wrongType: '/problems/appointment-not-found' },
-  { label: 'Cancel 404', path: '/appointments/{id}/cancellation', method: 'post', status: '404', correctType: '/problems/appointment-not-found', wrongType: '/problems/malformed-request' },
-  { label: 'Availability 400', path: '/availability', method: 'get', status: '400', correctType: '/problems/malformed-request', wrongType: '/problems/unknown-reference' },
-  { label: 'Availability 422', path: '/availability', method: 'get', status: '422', correctType: '/problems/unknown-reference', wrongType: '/problems/malformed-request' },
-  { label: 'Book 409', path: '/appointments', method: 'post', status: '409', correctType: '/problems/no-capacity', wrongType: '/problems/vehicle-not-owned' },
-];
+}
+
+/**
+ * `R-10-4`: DERIVED from `EXPECTED_PAIRS` — one transcription of §8.6, not two. A "single-type
+ * cell" is a `(operation, status)` with exactly one `/problems/*` entry; the hand-written list
+ * this replaced had seven and its own header said seven, while the document actually carries
+ * eight (`PATCH /appointments/{id}` `404` was the absent row — confirmed against the emitted
+ * document, not assumed). `wrongType` is drawn from the SAME operation's OTHER cells where one
+ * exists (a realistic leak within the same taxonomy — e.g. Read 400 probed with Read 404's own
+ * type), falling back to the closed set at large only for a cell whose operation has none.
+ * Never a value outside the closed set: the property is about a sibling cell's value leaking
+ * in, not an arbitrary string.
+ */
+function deriveSingleTypeCells(pairs: Record<string, readonly string[]>): SingleTypeCell[] {
+  const cells: SingleTypeCell[] = [];
+  for (const [opKey, opPairs] of Object.entries(pairs)) {
+    const spaceIndex = opKey.indexOf(' ');
+    const method = opKey.slice(0, spaceIndex).toLowerCase();
+    const path = opKey.slice(spaceIndex + 1);
+    const label = OPERATIONS.find((o) => o.path === path && o.method === method)?.label ?? opKey;
+
+    const byStatus = new Map<string, string[]>();
+    for (const pair of opPairs) {
+      const match = /^(\d\d\d) (\/problems\/[a-z-]+)$/.exec(pair);
+      if (match === null) continue; // 2xx / application/json entries are not problem cells
+      const status = match[1] as string;
+      const type = match[2] as string;
+      const list = byStatus.get(status) ?? [];
+      list.push(type);
+      byStatus.set(status, list);
+    }
+
+    for (const [status, types] of byStatus) {
+      if (types.length !== 1) continue; // not a single-type cell
+      const correctType = types[0] as string;
+      const siblings = [...byStatus.entries()]
+        .filter(([otherStatus]) => otherStatus !== status)
+        .flatMap(([, otherTypes]) => otherTypes);
+      const wrongType = siblings.find((t) => t !== correctType) ?? ALL_PROBLEM_TYPES.find((t) => t !== correctType);
+      if (wrongType === undefined) continue;
+      cells.push({ label: `${label} ${status}`, path, method, status, correctType, wrongType });
+    }
+  }
+  return cells;
+}
+
+const SINGLE_TYPE_CELLS: ReadonlyArray<SingleTypeCell> = deriveSingleTypeCells(EXPECTED_PAIRS);
 
 function extractTypeSchema(doc: OpenApiDoc, path: string, method: string, status: string): unknown {
   const op = operation(doc, path, method);
@@ -470,6 +542,48 @@ describe("I-10-1 / M2 — each single-type cell's schema REJECTS a wrong closed-
           `inside AC-1's own per-cell narrowing.`,
       ).not.toBe(correctType);
     }
+  });
+});
+
+/**
+ * `R-10-2`, document level: a bare `{type: 'string', enum: [x]}` or `{const: x}` is exactly
+ * what `@fastify/swagger` emits when a one-member `Type.Union` collapses to `Type.Literal`, and
+ * `fast-json-stringify` passes either through without validating the input — the behavioural
+ * probe above cannot observe that at this level (it is fed the schema this document ALREADY
+ * has, not the collapsed one). The shape itself is therefore the assertion: each single-type
+ * cell's `type` property must carry a one-member `anyOf`, never a bare `enum` or `const` beside
+ * it. Falsified (confirmed before this commit) by switching the single-member branch back to a
+ * bare `Type.Union`/`Type.Literal` and re-emitting — this describe block goes red, the
+ * behavioural one above does not.
+ */
+function isOneMemberAnyOf(schema: unknown): boolean {
+  if (typeof schema !== 'object' || schema === null) return false;
+  const obj = schema as Record<string, unknown>;
+  if ('enum' in obj || 'const' in obj) return false;
+  return Array.isArray(obj['anyOf']) && obj['anyOf'].length === 1;
+}
+
+describe("I-10-1 / M2 (document shape) — each single-type cell's 'type' is a one-member anyOf, never a bare enum or const", () => {
+  it.each(SINGLE_TYPE_CELLS)('$label — $method $path at $status', ({ path, method, status }) => {
+    const { doc, error } = readDocument();
+    expect(error, error).toBeUndefined();
+    if (doc === undefined) return;
+
+    const typeSchema = extractTypeSchema(doc, path, method, status);
+    expect(
+      typeSchema,
+      `no application/problem+json response with a 'type' property schema at ` +
+        `${method.toUpperCase()} ${path} ${status}`,
+    ).toBeDefined();
+    if (typeSchema === undefined) return;
+
+    expect(
+      isOneMemberAnyOf(typeSchema),
+      `${method.toUpperCase()} ${path} ${status}'s 'type' property must be a one-member anyOf, ` +
+        `never a bare enum or const — a bare literal here reproduces I-10-1/M2's collapse at the ` +
+        `document level, where fast-json-stringify passes it through unvalidated.\n` +
+        `schema: ${JSON.stringify(typeSchema)}`,
+    ).toBe(true);
   });
 });
 
