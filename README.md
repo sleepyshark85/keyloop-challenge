@@ -91,21 +91,30 @@ hours, the error taxonomy — see [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
 
 ## Tests
 
-`npm test` runs the two Vitest projects as **separate invocations** and merges the results. That is
-not a style choice: a single run over both projects aborts in `globalSetup` when Docker is
+`npm test` runs the **three** Vitest projects as **separate invocations** and merges the results.
+That is not a style choice: a single run across all three aborts in `globalSetup` when Docker is
 unavailable and writes a results file containing **0 tests**, which `red-proof` reads as *no
 test-engineer-owned suite failed*. A project that did not run is a loud, distinct failure
-(`tools/ci/run-tests.mjs`; finding T-01-2, ruled a design defect against `CLAUDE.md` §2.4).
+(`tools/ci/run-tests.mjs`; finding T-01-2, ruled a design defect against `CLAUDE.md` §2.4). The
+third project, `perf`, exists because a performance budget measured beside the twenty-racer
+concurrency suite against the same database measures the runner, not the service (`T-09-3`, raised
+BLOCKING); it runs alone, in its own container.
 
 | Command | Covers |
 |---|---|
-| `npm test` | all three projects merged. Last local run: **829 tests, 59 files, all passing** |
-| `npm run test:nodb` | 33 files, no Docker — unit, architecture, contract, most property |
+| `npm test` | all three projects merged |
+| `npm run test:nodb` | 33 files, no Docker — unit, architecture, most property |
 | `npm run test:db` | 25 files against real PostgreSQL via Testcontainers |
+| `npm run test:report` | regenerates [`docs/TEST-REPORT.md`](docs/TEST-REPORT.md) from the Vitest and Stryker JSON output — per-suite counts, what each suite is for, and the per-file mutation table |
 | `npm run typecheck` | `src` **and** `tests` (the build config narrows to `src`) |
 | `npm run lint:arch` | dependency-cruiser through a wrapper that asserts per-root coverage first |
 | `npm run mutation` | Stryker, per changed file against a 0.75 gate. Not always cleared: the human overrode a 71.43% merge at slice 08 (arc42 §13.6); slice 10 missed by 0.7 of a point and was fixed rather than argued |
 | `npm run test:tools` | the process tooling's own regression suite, plus the docs guards |
+
+Counts and pass/fail drift the moment anything changes, so this README doesn't restate them —
+[`docs/TEST-REPORT.md`](docs/TEST-REPORT.md) is generated from the tools' own JSON output and
+carries the current breakdown, per-suite counts and the per-file mutation table (a snapshot as of
+commit `c91eb5a`: 829 tests, all passing).
 
 Test ownership is enforced by path and symmetrically (`CLAUDE.md` §5): `tests/{acceptance,contract,
 property,concurrency,architecture,performance}/` are the test-engineer's, `tests/unit/` is the
