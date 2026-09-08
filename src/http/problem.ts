@@ -35,9 +35,26 @@
  *     it renders exactly what the handler sent with the right content type. The last-resort
  *     renderer must not be able to fail — a schema on the one status whose job is to catch
  *     everything is a dependency the catch-all cannot afford.
+ *
+ * ── SLICE 10 — NARROWING PER OPERATION, AND A SECOND COLLAPSE THE FIRST FIX DID NOT COVER ─────
+ *
+ * §8.6's per-operation columns (`10-design.md` §1) mean each `routes/*.ts` response now declares
+ * only the `type` values that operation can produce, not all nine — {@link narrowedProblemType}
+ * and {@link narrowedProblemSchema} below build that per-cell schema, and {@link problemResponse}
+ * wraps it in Fastify's per-response `content` form (M1) so the emitted document's media type is
+ * `application/problem+json`, not the bare-schema form's `application/json` (AC-1's own defect).
+ *
+ * A set narrowed to ONE member reproduces `Type.Union`'s own collapse (I-10-1/M2, measured):
+ * TypeBox's `Union()` returns a bare `Type.Literal` when given a single member, and a bare
+ * literal SILENTLY SUBSTITUTES its own constant back regardless of the value actually sent —
+ * exactly the defect this file's `ProblemSchema` union was built to avoid, reintroduced by
+ * narrowing it. `Type.Unsafe` with a hand-built one-member `anyOf` rejects a mismatch instead
+ * (`fast-json-stringify` throws on it) while `Static<>` still infers the narrowed literal type
+ * via the explicit type parameter. Two-or-more-member sets keep `Type.Union`, exactly as
+ * `ProblemSchema` above — nothing collapses there.
  */
 import { Type } from '@sinclair/typebox';
-import type { Static } from '@sinclair/typebox';
+import type { Static, TSchema } from '@sinclair/typebox';
 import type { FastifyReply } from 'fastify';
 
 /**
@@ -119,4 +136,58 @@ export function problem(
  */
 export async function sendProblem(reply: FastifyReply, body: Problem): Promise<void> {
   await reply.code(body.status).type(PROBLEM_CONTENT_TYPE).send(body);
+}
+
+/**
+ * The bare RFC 9457 media type — no `; charset=utf-8` suffix. This is the exact `content` key a
+ * per-response schema below is registered under; {@link sendProblem}'s `.type(PROBLEM_CONTENT_TYPE)`
+ * call appends the charset, and Fastify's content-type matching still resolves against this bare
+ * key (measured, I-10-2/M1: the content-keyed form survives the suffix).
+ */
+export const PROBLEM_MEDIA_TYPE = 'application/problem+json';
+
+/**
+ * The `type` property's schema for a response narrowed to fewer than all nine §8.6 rows. See the
+ * file docblock's "SLICE 10" section for why a single-member set is `Type.Unsafe`, not
+ * `Type.Union`.
+ */
+function narrowedProblemType<T extends ProblemType>(types: readonly [T, ...T[]]): TSchema {
+  if (types.length === 1) {
+    return Type.Unsafe<T>({ anyOf: [{ const: types[0], type: 'string' }] });
+  }
+  return Type.Union(types.map((type) => Type.Literal(type)));
+}
+
+/**
+ * {@link ProblemSchema}'s own shape, narrowed to `types`' `type` values — so a client parses one
+ * document shape from any operation regardless of which cell answered, and `docs/api/openapi.json`
+ * declares only what that operation can actually produce.
+ */
+function narrowedProblemSchema<T extends ProblemType>(types: readonly [T, ...T[]]) {
+  return Type.Object(
+    {
+      type: narrowedProblemType(types),
+      title: Type.String(),
+      status: Type.Integer(),
+      detail: Type.Optional(Type.String()),
+      resource: Type.Optional(Type.Union([Type.Literal('bay'), Type.Literal('technician')])),
+      reference: Type.Optional(Type.String()),
+      opensAt: Type.Optional(Type.String()),
+      closesAt: Type.Optional(Type.String()),
+    },
+    { additionalProperties: false, description: 'RFC 9457 problem detail.' },
+  );
+}
+
+/**
+ * A `routes/*.ts` `schema.response` entry, narrowed to exactly the `type` values the calling
+ * operation names. Declared via Fastify's per-response `content` form (M1, `10-design.md`
+ * "Measure, do not choose in advance") rather than the classic bare-schema form: measured, the
+ * bare form emits `application/json` in the document regardless of what {@link sendProblem}
+ * actually sends on the wire, which is AC-1's whole defect.
+ */
+export function problemResponse<T extends ProblemType>(
+  ...types: readonly [T, ...T[]]
+): { readonly content: Record<string, { readonly schema: TSchema }> } {
+  return { content: { [PROBLEM_MEDIA_TYPE]: { schema: narrowedProblemSchema(types) } } };
 }
