@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **354** |
-| Severity | 14 blocking · 174 major · 166 minor |
+| Findings recorded | **355** |
+| Severity | 14 blocking · 175 major · 166 minor |
 | Verdicts | 20 narrowed · 128 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | test-engineer 75 · architect 72 · orchestrator 71 · reviewer 66 · implementer 56 · scribe 10 · human 4 |
-| Awaiting a ruling | **173** |
+| Raised by | test-engineer 75 · architect 72 · orchestrator 72 · reviewer 66 · implementer 56 · scribe 10 · human 4 |
+| Awaiting a ruling | **174** |
 | Mean escape distance | 1.53 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2311,6 +2311,7 @@ rather than narrated.*
 | **O-72** | MINOR | 5 *(+0)* | orchestrator | THE ORCHESTRATOR'S REMEDIATION DISPATCHES WERE WRONG IN ONE PLACE AND INCOMPLETE IN ANOTHER, AND BOTH TIMES A ROLE COVERED FOR IT | **open** |
 | **O-73** | MAJOR | 5 *(+0)* | orchestrator | THE COLLECTOR REPORTED NO FILES BELOW THRESHOLD FROM A REPORT CONTAINING ONE FILE — a vacuous pass, and the orchestrator wrote it into the log before catching it | **open** |
 | **O-74** | MINOR | 5 *(+0)* | orchestrator | THE SLICE FILE SAID loopbacks 1 AND THE GOVERNOR READ 0 — two records of one fact, and only one of them is the one the check believes | **open** |
+| **O-75** | MAJOR | 7 *(+0)* | orchestrator | STEP 7's COMPRESSION BROKE AC-15 BY REWORDING THE SENTENCE THE TEST GREPS — a hyphen, and the criterion went red | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2432,6 +2433,11 @@ rather than narrated.*
 
 - *scenario:* THE ORCHESTRATOR SET loopbacks: 1 IN THE FRONTMATTER AFTER THE (c) RULING, as the architect asked, and slice:check WENT ON REPORTING 0 OF MAX 2. The governor does not read the frontmatter at all: it COUNTS loopback EVENTS IN THE LOG, and no loopback event had been appended. So THE BOARD STATE AND THE GOVERNOR DISAGREED, and the governor — the thing that actually blocks a third loopback and auto-escalates a slicing problem — WAS THE ONE READING ZERO. THE CHECK ITSELF PREDICTED THIS EXACT FAILURE IN ITS OWN DOCBLOCK: had a ruling been (c), a loopback would have been due AND THE MAX-2 GOVERNOR WOULD NOT HAVE COUNTED IT, BECAUSE THE GOVERNOR IS WORTH EXACTLY WHAT THE LOG IS. It wrote that about a different mechanism — an unaccounted dispatch — and the same sentence turned out to be true of the ordinary path, where the orchestrator updates the file and forgets the event. THE ARCHITECT ALSO ASKED FOR THE FRONTMATTER SPECIFICALLY, saying it does not write the slice file's board state, WHICH IS WHY THE FILE WAS UPDATED AND THE LOG WAS NOT. Corrected by appending the loopback event; the frontmatter and the governor now agree. Recorded because a project with two homes for one fact will keep discovering which one its checks believe.
 - *file:* `docs/slices/09-observability.md`
+
+**O-75** — STEP 7's COMPRESSION BROKE AC-15 BY REWORDING THE SENTENCE THE TEST GREPS — a hyphen, and the criterion went red
+
+- *scenario:* CI FAILED ON THE perf PROJECT ALONE — nodb 31 files exit 0, db 25 files exit 0, PERF 1 FILE EXIT 1 — which is the third project doing exactly what T-09-3 was raised to make it do: the budget failed in its own container, visibly, instead of being lost in a shared run. AC-15 REQUIRES ARC42 SECTION 11 TO RECORD THE MEASURED WRITE THROUGHPUT for one contended resource, and the test asserts it with a regex requiring the literal phrase write-space-throughput within 400 characters of a figure. BEFORE STEP 7 SECTION 11 READ Measured write throughput there: 229.47 attempts/s AND MATCHED. STEP 7 COMPRESSED IT TO Measured: 229.47 attempts/s, and the only surviving occurrence of the phrase is HYPHENATED in the heading, The write-throughput ceiling bought with goal 1 — which the space-requiring regex does not match. A HYPHEN. THE ARCHITECT DID NOTHING WRONG IN SUBSTANCE: the figure is still recorded, the heading still names the concept, section 11 came in at or under its ratchet ceiling, and the compression was necessary to pay for six new debt entries. THE TEST IS WHAT IS BRITTLE — it pins a stylistic variant of a phrase rather than the fact AC-15 actually demands, which is that a measured figure for contended write throughput appears in section 11. THIS IS THE A-R-5 CLASS INVERTED. There, code comments quoted arc42 prose and nothing checked they still matched. Here an acceptance test greps arc42 prose and the prose moved underneath it. BOTH ARE THE SAME UNDERLYING GAP: prose and the things that depend on it drift, and only one direction has ever been checked. NOTED IN PASSING AND NOT A DEFECT: the CI figure is 105.33 per second against the recorded 229.47, roughly half, on a different machine — D-09-6 already records that the headroom rather than the ceiling is the baseline, and AC-15 asserts only that A figure is recorded, not that it matches.
+- *file:* `tests/performance/availability-budget.test.ts`
 
 </details>
 

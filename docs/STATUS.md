@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `7519274 docs(09): step 7 — arc42 says what merged, including the four things it had wrong` |
+| Last commit | `b4c5626 test(09): AC-15's matcher pinned a hyphen, not the concept` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 215 |
+| Agent runs recorded | 216 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -361,7 +361,8 @@
 | 2026-09-07 23:17 | implementer | 95m58 | 1,938 / 92,540 / 397,096,062 | `derived` |
 | 2026-09-08 00:04 | test-engineer | 142m36 | 482 / 35,047 / 38,590,404 | `derived` |
 | 2026-09-08 02:52 | architect | 51m15 | 674 / 16,188 / 79,966,708 | `derived` |
-| | **total** | **7795m23** | **55,038 / 3,863,087 / 4,867,660,069** | |
+| 2026-09-08 03:10 | test-engineer | 7m51 | 92 / 1,301 / 2,318,129 | `derived` |
+| | **total** | **7803m14** | **55,130 / 3,864,388 / 4,869,978,198** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
