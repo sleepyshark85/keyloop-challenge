@@ -11,27 +11,27 @@ loopbacks: 0
 deferred_from: ["R-01-1", "R-01-4"]
 ---
 
-> **Absorbs slice 03** (Gate D, 2026-09-04) and **slices 12 and 13** (the human's cost ruling,
-> 2026-09-05). AC-7–AC-12 are slice 03's criteria; AC-13–AC-19 apply slices 12 and 13's remedies, both
-> ratified, so this slice implements agreed decisions rather than proposing them. Rationale for both
-> folds is in `docs/team-log/events.jsonl` (`s-02-ruling-fold-12-13`, Gate D).
+> **This slice carries three things at once.** Its own booking path; the error taxonomy, folded in
+> from slice 03 at the phase-4 gate as AC-7 to AC-12; and two domain fixes the human ratified before
+> folding them in as AC-13 to AC-19. Both folds are recorded in the event log. Because the remedies
+> were already agreed, this slice implements decisions rather than proposing them.
 >
 > **Sequence it**: booking path green first, taxonomy on top, the two domain fixes independent of
-> both. This slice carries three things at once, which is why it keeps the full human gate. If it
-> needs a second red commit it is two slices after all — a DCR, not a workaround.
-
+> both. Three things at once is why it keeps the full human gate. If it needs a second red commit it
+> was two slices after all — which is a DCR, not a workaround.
 
 ## Goal
 
 `POST /appointments` books, and `GET /appointments/{id}` reads it back. The request names a customer,
 vehicle, service type, dealership and desired start — never a bay or technician, which the system
-allocates. The service attempts the insert and maps SQLSTATE `23P01` to `409`; it never asks whether
-a slot is free before writing. This is the slice where the flagship concurrency scenarios become
-executable end to end.
+allocates. The service attempts the insert and maps the exclusion violation PostgreSQL raises to
+`409`; it never asks whether a slot is free before writing. This is the slice where the flagship
+concurrency scenarios become executable end to end.
 
-And every row of §8.6's status table is reachable and produces exactly that status and that `type`,
-as RFC 9457 `application/problem+json`. A client distinguishes an out-of-hours request from a
-contended one from an unknown vehicle without parsing prose.
+And every failure the system can produce gets one status and one machine-readable `type`, served as
+RFC 9457 `application/problem+json`. A client tells an out-of-hours request from a contended one from
+an unknown vehicle without parsing prose. The catalogue of those rows is the error taxonomy in
+arc42 §8.6.
 
 ## Acceptance criteria
 
@@ -52,28 +52,29 @@ contended one from an unknown vehicle without parsing prose.
   reported is `no_technician_overlap`. *(QS-2)*
 - **AC-5** — Given the source tree, when it is inspected, then no code path reads availability and
   then decides whether to insert. Each booking attempt is one transaction containing exactly one
-  `INSERT` into `appointment`, preceded only by ADR-0018's two advisory-lock acquisitions — which
-  read no table and decide nothing.
+  `INSERT` into `appointment`, preceded only by the two advisory-lock acquisitions, which read no
+  table and decide nothing.
 - **AC-6** — Given a request carrying an explicit end time, when it is booked, then the supplied end
-  is ignored and the interval is derived from the service type's duration (A-1).
+  is ignored and the interval is derived from the service type's duration.
 
-### The error taxonomy *(carried from slice 03)*
+### The error taxonomy
 
 - **AC-7** — Given a request whose derived interval leaves the dealership's opening hours, when it is
   booked, then `400` with `type=/problems/outside-opening-hours` — **not** `409`. The decision is
-  made by `domain/openingHours.ts`, which reads no booking (GC-1).
+  made by the pure opening-hours module, which reads no booking.
 - **AC-8** — Given a malformed body or an unparseable timestamp, when it is submitted, then `400`
   with `type=/problems/malformed-request`, rejected by the route schema before any handler runs.
 - **AC-9** — Given an unknown dealership, service type, customer or vehicle, when it is named, then
   `422` with `type=/problems/unknown-reference` carrying `reference` — **not** `404`.
 - **AC-10** — Given a vehicle that is not the named customer's, when it is booked, then `422` with
-  `type=/problems/vehicle-not-owned` — **not** `403`. It is validation, not authorisation (ADR-0002).
+  `type=/problems/vehicle-not-owned` — **not** `403`. It is validation, not authorisation: this
+  system authenticates nobody, so there is no permission to refuse.
 - **AC-11** — Given a contended booking, when every candidate is refused, then `409` with
   `type=/problems/no-capacity` carrying `resource` set to the contended resource.
-- **AC-12** — Given every row of §8.6's table, when the contract test runs, then each is reachable and
+- **AC-12** — Given every row of the taxonomy, when the contract test runs, then each is reachable and
   no two rows collide — the taxonomy is total and stable. *(QS-11)*
 
-### Absorbed from slice 12 — an `Instant` is renderable by construction
+### An `Instant` is renderable by construction
 
 - **AC-13** — Given `epochMillis` with `Math.abs(epochMillis) > 8_640_000_000_000_000`, when
   `instant()` is called, then it returns `null`. *(QS-12)*
@@ -86,60 +87,61 @@ contended one from an unknown vehicle without parsing prose.
   `withinOpeningHours` is called, then it returns `malformed-interval` and does not throw. The
   existing verdict variant is reused; no new variant is introduced. *(QS-12)*
 
-### Absorbed from slice 13 — an interval ending at local midnight
+### An interval ending at local midnight
 
 - **AC-17** — Given a dealership open 09:00–24:00 local and a 60-minute job starting 23:00 local, when
-  `withinOpeningHours` is called, then the verdict is **within**, not `spans-local-days`. *(QS-9)*
+  `withinOpeningHours` is called, then the verdict is **within**, not *spans local days*. *(QS-9)*
 - **AC-18** — Given an interval that genuinely spans two local days — 23:00 to 01:00 the next — then
-  the verdict is still `spans-local-days`. This is the negative control: AC-17 alone is satisfied by
+  the verdict is still *spans local days*. This is the negative control: AC-17 alone is satisfied by
   deleting the check.
 - **AC-19** — Given reference data holding `'24:00:00'` in a closing-time column, when it is read and
-  parsed, then it yields `86400` and is **not** rejected as `malformed-hours`. PostgreSQL accepts
+  parsed, then it yields `86400` and is **not** rejected as malformed. PostgreSQL accepts
   `'24:00:00'` and a row can hold it, so rejecting it at the parser would turn valid reference data
   into an error.
 
 ## In scope
 
-- `src/http` route with TypeBox schemas, `src/application` booking use case, `src/persistence` insert
-  and the single SQLSTATE translation site (§5.2).
+- The route with its TypeBox schemas, the booking use case, the persistence insert, and the single
+  place where a PostgreSQL error code is translated into a domain outcome.
 - `tests/concurrency/no-bay-overlap.test.ts` and `tests/concurrency/no-technician-overlap.test.ts`.
-- `tests/contract/error-taxonomy.test.ts`, the problem+json serialiser, and the
-  outcome-not-exception mapping of §8.6.
-- **The minimal prune-and-retry loop (ADR-0004), brought into scope by the human's ruling of
-  2026-09-06.** Attempt, classify the `23P01`, prune *that candidate value*, retry; a list that empties
-  is the refusal, and the resource named is the list that emptied. Candidate *ordering* stays slice
-  04's; this is the loop only.
-- The two ratified domain fixes: the epoch bound in `src/domain/interval.ts`'s `instant()` **and** in
-  `src/domain/openingHours.ts` step 1, and step 4's midnight normalisation.
+- `tests/contract/error-taxonomy.test.ts`, the `problem+json` serialiser, and the mapping from a use
+  case's outcome to a status.
+- **The minimal prune-and-retry loop, brought into scope by the human on 2026-09-06.** Attempt,
+  classify the exclusion violation, prune *that candidate value*, retry; a list that empties is the
+  refusal, and the resource named is the list that emptied. How candidates are *ordered* stays the
+  next slice's; this is the loop only.
+- The two ratified domain fixes: the epoch bound in the interval constructor **and** in the
+  opening-hours module's first step, and the midnight normalisation.
 
 ## Out of scope
 
-- **ADR-0009's candidate *ordering* and attempt cap** — the seeded shuffle and the cap of 16 remain
-  slice 04's, with QS-3. Only the minimal loop is here.
-- `appointment-not-confirmed` (`409` on moving a cancelled appointment) — it needs rescheduling, so
-  it lands with slice 06 and extends the taxonomy test.
-- Asserting the emitted OpenAPI document matches the committed one — slice 09, where the document
-  exists.
+- **Candidate ordering and the attempt cap** — the seeded shuffle and the cap of 16 belong to the
+  next slice, with the no-spurious-refusal scenario. Only the minimal loop is here.
+- `appointment-not-confirmed`, the `409` for moving a cancelled appointment. It needs rescheduling, so
+  it lands with that slice and extends the taxonomy test.
+- Asserting that the emitted OpenAPI document matches the committed one — the slice where the
+  document exists.
 - Cancellation, rescheduling, availability, telemetry.
-- **Sharing the `8_640_000_000_000_000` constant between the two domain files.** Under the literal
-  AC-6 ruling no domain module may import another, so it appears twice with no mechanism to share it.
-  That is **D-01-2** cashing in, booked as debt in design §11 and arc42 §11 rather than resolved here;
-  reversing the AC-6 ruling to avoid a duplicated constant is a scope change and the human's.
-- **Deleting the `'24:00:00'` parse arm.** Refused explicitly at slice 13, on the
-  `'24:00:00'::time` measurement. The dead branch was the *symptom*; the live defect is that a
+- **Sharing the `8_640_000_000_000_000` constant between the two domain files.** No domain module may
+  import another, so the literal appears twice with no mechanism to share it. That is the debt the
+  ruling booked, recorded in arc42 §11 rather than resolved here; reversing the ruling to avoid a
+  duplicated constant is a scope change and the human's.
+- **Deleting the `'24:00:00'` parse arm**, refused on measurement: PostgreSQL round-trips that value,
+  so real reference data can hold it. The dead branch was the *symptom*; the live defect is that a
   midnight-ending job is refused.
-- Opening hours that wrap past midnight into the next day (an 18:00–02:00 window). A genuinely
-  two-day window, addressed by neither ADR-0001 nor slice 13.
+- Opening hours that wrap past midnight into the next day — an 18:00–02:00 window. A genuinely
+  two-day window, which neither the opening-hours ADR nor the midnight fix addresses.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
 - The concurrency tests run against real PostgreSQL with several pooled connections released from a
-  barrier, and record ADR-0009's seed in the failure message so a failing interleaving is re-runnable
-  rather than a flake.
+  barrier, and record the shuffle's seed in the failure message so a failing interleaving is
+  re-runnable rather than a flake.
 - AC-15's property and AC-18's negative control are reported as **named mutants**, not as a score:
-  *for a discrimination claim, name the mutant.* AC-19 additionally retires slice 01's
-  unreachable-branch finding by making the `'24:00:00'` arm reachable **and killed**.
-- §8.6's recorded tension is left recorded, not harmonised: out-of-hours stays `400` although `422`
-  would sit more naturally beside the reference failures. Changing it means superseding ADR-0001.
+  for a discrimination claim, name the mutant. AC-19 additionally retires the unreachable-branch
+  finding from the previous slice by making the `'24:00:00'` arm reachable **and** killed.
+- The taxonomy's one recorded tension is left recorded, not harmonised: out-of-hours stays `400`
+  although `422` would sit more naturally beside the reference failures. Changing it means
+  superseding the opening-hours ADR.

@@ -11,10 +11,10 @@ loopbacks: 0
 
 ## Goal
 
-A booking that loses a race for one candidate tries the next, and refuses only when the candidate
-list is exhausted or the attempt cap is reached. The candidate read stays advisory — correctness
-still comes from the insert — so this is not check-then-act. Ordering is a seeded shuffle, and a
-failed attempt prunes by the constraint that actually fired (ADR-0009).
+A booking that loses a race for one bay-and-technician pair tries the next, and refuses only when the
+candidate list is exhausted or the attempt cap is reached. The candidate read stays advisory —
+correctness still comes from the insert — so this is not check-then-act. Ordering is a seeded
+shuffle, and a failed attempt prunes by the constraint that actually fired.
 
 ## Acceptance criteria
 
@@ -23,11 +23,11 @@ failed attempt prunes by the constraint that actually fired (ADR-0009).
   receive `409`. Asserted for (N,M) ∈ {(2,1), (5,3), (20,8), (8,20)}. A refusal while capacity
   remained fails this slice. *(QS-3)*
 - **AC-2** — Given a booking whose first candidate loses, when it retries, then the retry is **not**
-  wrapped in a transaction — a second attempt inside an aborted transaction would raise `25P02`
-  rather than retrying, and the test asserts the absence of that code (§6.2).
-- **AC-3** — Given an attempt fails with `no_bay_overlap`, when the next candidate is chosen, then
-  every candidate sharing that bay is pruned; the same for `no_technician_overlap`. The loop's bound
-  is additive, not multiplicative.
+  wrapped in a transaction. A second attempt inside an aborted transaction raises `25P02` instead of
+  retrying, and the test asserts the absence of that code.
+- **AC-3** — Given an attempt fails on the bay constraint, when the next candidate is chosen, then
+  every candidate sharing that bay is pruned; the same for the technician constraint. The loop's
+  bound is additive, not multiplicative.
 - **AC-4** — Given the attempt cap of 16 is reached with candidates remaining, when the loop stops,
   then `409` with `type=/problems/no-capacity` is returned and the cap is visible in telemetry rather
   than silent.
@@ -36,78 +36,73 @@ failed attempt prunes by the constraint that actually fired (ADR-0009).
 
 ## In scope
 
-- The retry loop in `src/application`, the seeded shuffle, and pruning on `err.constraint` — which is
-  only available because ADR-0006 chose a query layer that preserves it.
+- The retry loop in `src/application`, the seeded shuffle, and pruning on the constraint name the
+  driver reports — available only because the query layer preserves it.
 - `tests/concurrency/no-spurious-refusal.test.ts`.
 
 ## Out of scope
 
-- Load balancing across bays. ADR-0009 rejected it: it degenerates to sorted order under burst, which
-  is the O(n²) failure ADR-0004 named.
-- Changing what the client is told on refusal — that is slice 03's taxonomy, already fixed.
+- Load balancing across bays. It was rejected because it degenerates to sorted order under burst,
+  which is the quadratic contention the retry decision named.
+- Changing what the client is told on refusal — the taxonomy is already fixed.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
-- The pruning rule is the architect's own addition and was flagged at Gate B as theoretically
-  over-eager if a blocking appointment is cancelled mid-loop. The reviewer checks that case
-  explicitly; if it is real, it is a `(b)` deferral, not a defect.
+- The pruning rule is the architect's own addition and was flagged at the phase-2 gate as
+  theoretically over-eager if a blocking appointment is cancelled mid-loop. The reviewer checks that
+  case explicitly; if it is real, it is a deferred improvement, not a defect.
 
-## I-04-10 — ruled (a), step 4, provisional until the gate
+## The concurrency fixture's two-attempt assertion is removed — ruled at step 4
 
-`CLAUDE.md` §6 makes "update the slice file" the remedy for (a), so the ruling lands here.
+Provisional until the gate; the constitution makes updating the slice file the remedy for a
+clarification, so the ruling lands here.
 
-**The defect.** ADR-0009's Order-C removes the premise `tests/concurrency/no-technician-overlap.test.ts`
-states in its own header. With 24 bays and 1 technician a loser conflicts on the **technician** at
-attempt 1 and refuses correctly unless it drew the winner's bay, so the closing distinct-attempt
-assertion holds only at `1 − (23/24)¹⁹ ≈ 0.56`. The implementer's measurement is confirmed.
+**The defect.** The seeded shuffle removes the premise `no-technician-overlap.test.ts` states in its
+own header. With 24 bays and one technician, a loser conflicts on the **technician** at attempt 1 and
+refuses correctly unless it happened to draw the winner's bay — so the closing assertion that two
+distinct attempts occurred holds only about 56 % of the time. The implementer's measurement is
+confirmed.
 
-**Why (a).** Not **(c)**: (c) supersedes an ADR at fault and returns to step 1 — ADR-0009, this
-design and the implementation are all correct, and nothing in slice 04 fails. Not **(b)**: (b) merges
-as-is, and this cannot, because it is green in the merge run 56 % of the time. What (b) would cost is
-nameable — **§2.4**. A suite failing ~44 % independently of the change under test makes "red observed
-in CI", and its green counterpart, non-evidential for slice 05 onward. No loopback consumed (0 of 2);
-resume from step 3. Precedent: I-02-9, a step-4 test defect ruled (a). It failed **loudly**; this one
-fails in the passing direction, which is strictly worse.
+**Why a clarification and not a defect or a deferral.** It is not a design defect: the ordering
+decision, this design and the implementation are all correct, and nothing in this slice fails. Nor is
+it a deferred improvement, because that outcome merges as-is and this cannot — it is green in the
+merge run only 56 % of the time. The cost of merging it is nameable, and it is the standing invariant
+that every slice begins with an observed failing test: a suite that fails ~44 % of the time
+independently of the change under test makes both *red observed in CI* and its green counterpart
+non-evidential for every slice after it. No loopback consumed; resume from step 3. A step-4 test
+defect was ruled the same way once before — but that one failed loudly, and this one fails in the
+passing direction, which is strictly worse.
 
-**The obligation — the assertion is the test-engineer's to write (§5).** The two-attempt claim is
-unrepairable in this fixture and must be **removed, not substituted**. What must still hold, and
-already does under every permutation: the 1/19 split, `technicianConflicts >= 19`, and
-`resource === 'technician'` — which is E-02-1's guard. The *loop actually looped* obligation needs no
-new home: it is deterministic in `tests/acceptance/candidate-retry.test.ts` AC-3 (exactly
-`['1:no_bay_overlap','2:no_bay_overlap']`, both bays blocked) and gated in
-`tests/concurrency/no-spurious-refusal.test.ts` AC-2 (`max(attempt) >= 2`). The header prose goes
-with the assertion. Verified by repeated runs, not one green.
+**The obligation, which is the test-engineer's to write.** The two-attempt claim is unrepairable in
+this fixture and must be **removed, not substituted**. What must still hold, and does under every
+permutation: the 1/19 split, at least 19 technician conflicts, and a refusal naming the technician as
+the contended resource. The *loop actually looped* obligation needs no new home — it is deterministic
+in the acceptance test, where both bays are blocked and the attempt sequence is fixed, and gated in
+the concurrency test's own maximum-attempt assertion. The header prose goes with the assertion.
+Verified by repeated runs, not by one green.
 
-**Blast radius — one file breaks; the rest was checked and withdrawn.** Every other assertion is
-permutation-independent. `no-bay-overlap.test.ts` is the mirror and is safe *because* its scarce
-resource is the singleton list; `error-taxonomy.test.ts`'s two AC-11 cases assert terminal state
-only; `no-spurious-refusal.test.ts` and `candidate-retry.test.ts` were authored against the shuffle.
-Four files carry stale premise **prose** with sound assertions — `no-bay-overlap.test.ts`,
-`error-taxonomy.test.ts`, `tests/support/booking.ts` (test-engineer) and
-`tests/unit/persistence/candidateRepository.test.ts` (implementer, `ORDER BY` is now the shuffle's
-stable *input*, which is a better reason than the one recorded). Non-blocking, but fixed this slice:
-I-02-9 ruled the false comment the more dangerous half.
+**Blast radius: one file breaks.** Every other assertion is permutation-independent. The bay mirror
+is safe *because* its scarce resource is the singleton list; the taxonomy test's two refusal cases
+assert terminal state only; the two concurrency files were authored against the shuffle. Four files
+carry stale premise **prose** with sound assertions, and they are fixed this slice anyway: a comment
+that is false is the more dangerous half.
 
-## A-04-13 — the declaration is amended, and the gate had already said so
+## The arc42 declaration is amended to §7.3 and §13 — ruled at step 5
 
-Frontmatter `arc42:` gains **§7.3** and **§13**. Both moved on this branch; neither was declared.
+Both sections moved on this branch and neither was declared. §7.3 gained the environment-variable
+table and the sentence saying it is the deployment contract, which is mine. §13 is scribe-owned
+prose, and it is **declared rather than exempted**: the declaration governs the branch, not the
+author, and nobody silences a guard by writing a name into it.
 
-- **§7.3** — `9dfde0d`, the environment table and its contract sentence (T-04-5). Mine.
-- **§13** — `4d172cc`, scoped `chore(04)`, +139 lines, and `ee868c3`. Scribe-owned prose, but the
-  declaration governs the **branch**, not the author, so §13 is declared rather than exempted —
-  I-04-12's rule, that nobody silences a guard by writing a name into it.
+Ruled a clarification. The content of both edits is correct and only the declaration was missing, so
+no acceptance criterion, quality scenario or standing invariant fails either way. No loopback.
 
-Ruled **(a)**: the content of both edits is correct and only the declaration was missing, so no AC,
-QS or §2 clause fails either way. No loopback (0 of 2).
-
-**The derivation the finding asks for exists and had already fired.** `npm run slice:check 04`
-prints `FAIL · arc42 edits match the declaration · hand-edited but not declared:
-07-deployment-view.md, 13-ai-collaboration.md`. It has been red since `4d172cc` at 13:15 — 98
-minutes before step 5 — because R-01-7 asked for exactly this and O-14 built it, branch-selected
-so a subject line cannot hide a mid-slice edit. The reviewer re-derived it by reading the diff and
-found one of the two files; the tool had both. **What is missing is the reading, not the
-derivation**: `check.run` records CI job outcomes only, so no artifact carries this verdict and
-nothing failed loudly. Carrying the `slice:check` grid into `check.run` is a `tools/` change and
-not the architect's (F-02-10, F-04-1, A-04-4 — the fourth slice running).
+**The derivation the finding asks for already existed and had already fired.** `npm run slice:check
+04` had been printing both undeclared files since the commit that made the second edit — 98 minutes
+before step 5 — because it is branch-selected, so a commit subject cannot hide a mid-slice edit. The
+reviewer re-derived it by reading the diff and found one of the two; the tool had both. **What is
+missing is the reading, not the derivation**: the CI evidence record carries job outcomes only, so no
+artifact carried this verdict and nothing failed loudly. Carrying the check grid into that record is
+a change under `tools/`, which is not the architect's — the fourth slice running.

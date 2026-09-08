@@ -3,18 +3,18 @@ id: "06"
 title: Rescheduling — one atomic UPDATE, and a row that does not conflict with itself
 status: done
 depends_on: ["05"]
-arc42: ["§5.2", "§6.3", "§6.6", "§8.2", "§8.6", "§10", "§11"]   # §5.2 added at slice 05 step 7 — appointment.ts; §6.6/§10/§11 declared at step 5, design §4 planned them and QS-6 was already corrected under T-06-6
+arc42: ["§5.2", "§6.3", "§6.6", "§8.2", "§8.6", "§10", "§11"]
 adr: [3, 24, 25]
 quality_scenarios: [QS-6, QS-11]
-inherits: ["F-02-9", "F-05-1", "R-05-7", "R-05-9"]   # deferred here by ruling; slice:check enforces it (A-05-5)
+inherits: ["F-02-9", "F-05-1", "R-05-7", "R-05-9"]   # deferred here by ruling; slice:check enforces it
 loopbacks: 0
 ---
 
 ## Goal
 
 `PATCH /appointments/{id}` moves an appointment with a **single atomic `UPDATE`**, guarded by the
-same exclusion constraints — never a cancel followed by an insert, because a move must not transiently
-release the slot. The id survives the move.
+same exclusion constraints — never a cancel followed by an insert, because a move must not
+transiently release the slot. The id survives the move.
 
 The subtle case is pinned rather than assumed: a move onto an interval overlapping the appointment's
 *own* current interval must succeed. It is the one place the constraint's semantics are relied on
@@ -22,103 +22,88 @@ without being obvious.
 
 ## Acceptance criteria
 
-- **AC-1** — *Worked example amended at step 3 under T-06-6: the original's second move extended
-  `[09:15, 10:15)` to `[09:15, 11:15)`, a duration change `PATCH` cannot express — it carries
-  `startsAt` only and the interval's length is the service type's (ADR-0025). What the criterion
-  asserts is unchanged; §10's QS-6 is corrected with it.* Given A confirmed `[09:00, 10:00)`, when A
-  is rescheduled to `[09:15, 10:15)` and then again to `[09:45, 10:45)`, then both succeed, **each
-  move overlapping the interval it replaces**, the id is unchanged, **the bay and technician are
-  unchanged** (asserted on the response body, which carries both), and **no `23P01` is raised** — the
-  row does not conflict with the version it replaces. *(QS-6)*
-  <br>The bay-and-technician clause was added at step 2 under I-06-2 and it is what makes AC-1 pin
-  QS-6 at all: the self-overlap semantics are only exercised if the new version lands in the *same*
-  bay with the *same* technician, so under a shuffle-from-first candidate order `[09:00,10:00) →
-  [09:15,10:15)` could be satisfied by allocating bay 2 and **AC-1 could not fail**. Attempting the
-  incumbent pair first fixes the order; this clause makes the criterion able to observe it.
+- **AC-1** — Given A confirmed `[09:00, 10:00)`, when A is rescheduled to `[09:15, 10:15)` and then
+  again to `[09:45, 10:45)`, then both succeed, **each move overlapping the interval it replaces**,
+  the id is unchanged, **the bay and technician are unchanged** (asserted on the response body, which
+  carries both), and **no exclusion violation is raised** — the row does not conflict with the
+  version it replaces. *(QS-6)*
+  <br>The bay-and-technician clause is what makes AC-1 able to fail. Self-overlap is only exercised
+  if the new version lands in the *same* bay with the *same* technician, so under a shuffle from the
+  first candidate the move could be satisfied by allocating a second bay and the criterion could
+  never fail. Attempting the incumbent pair first fixes the order; this clause lets the criterion
+  observe it.
 - **AC-2** — Given A is moved, when the database is inspected, then exactly one statement modified it
   **in the course of that move**: a single `UPDATE`. A `DELETE`-then-`INSERT`, or a cancel-then-book,
-  fails this criterion. The window is the request, not the row's lifetime: the fixture's own arrange
-  writes the same row and is not counted (`R-06-1`).
+  fails this criterion. The window is the request, not the row's lifetime, so the fixture's own
+  arrange step writes the same row and is not counted.
 - **AC-3** — Given A is moved to an interval outside the dealership's opening hours, then `400` with
   `type=/problems/outside-opening-hours` — the same domain rule as booking, not a second copy of it.
 - **AC-4** — Given A is `cancelled`, when it is rescheduled, then `409` with
   `type=/problems/appointment-not-confirmed` — a **different** `type` from a contended `409`, and one
-  that does **not** increment `booking_conflicts_total` (§8.4).
-- **AC-5** — *Amended at step 1 by [ADR-0025](../adr/0025-existence-is-the-reads-legality-is-the-statements.md);
-  the original required the `404` to come from the `UPDATE`'s zero rows, which is unimplementable
-  because the `UPDATE` cannot be built without first reading the row.* Given an unknown id, when a
-  move is requested, then `404` with `type=/problems/appointment-not-found`, decided by the
-  appointment read the move needs anyway to know its own dealership and service type — **and the
-  `UPDATE` is never issued.** Zero rows from the `UPDATE` therefore means exactly one thing, which
-  is what makes AC-4 assertable.
+  that does **not** increment the conflict counter.
+- **AC-5** — Given an unknown id, when a move is requested, then `404` with
+  `type=/problems/appointment-not-found`, decided by the appointment read the move needs anyway to
+  learn its own dealership and service type — **and the `UPDATE` is never issued.** Zero rows from
+  the `UPDATE` therefore means exactly one thing, which is what makes AC-4 assertable.
 
-## Inherited scope — written here, not only where it was deferred
+## Inherited scope — five arrived, two re-ruled at step 1, all five written out here
 
-Five obligations named this slice. **Two were re-ruled at step 1** — see
-[`06-design.md`](06-design.md) §1 — and the three that remain are recorded here so slice 06's
-Definition of Ready fails if they are dropped, which is the remedy for R-05-2.
-
-- **A concurrency test for racing moves — DEFERRED TO SLICE 07 at step 1** (ref `A-06-3`), where
-  it is written in full. The reason for keeping it here — *"ADR-0003's claim is what slice 06 ships
-  on"* — is equally true of QS-4 and QS-5, which are already slice 07's; a reason that does not
-  distinguish its own case is not one. ADR-0019's criterion is met and re-measurable on arrival.
-- **F-05-1 — `lockResources` returns a branded `ResourceLock` that `insertAppointment` takes as a
-  parameter** (slice 05 §6, deferred under ADR-0019). Type-only, erased, one minting cast, the
-  ADR-0016 shape: *"forgot the lock"* becomes a compile error and *"correctly exempt"* (the cancel
-  path) becomes a signature that does not ask for one. Slice 06 is the destination **because it
-  writes `rescheduleAppointment`, a newly written locking path** — the first moment the mistake is live
-  rather than historical. *As built the lock carries its keys, so that residue is closed
-  between lock and write. What is left: the lock does not prove the write shares its transaction
-  (declined, deferred to slice 09), and a `ResourceLock` can be written by hand with no cast (§11 D-06-2). **`F-02-9`'s slice-06 half is discharged by the required parameter**, not by the minting
-  site being unique.*
-- **ADR-0024 — `setNotFoundHandler`, the `404 /problems/route-not-found` row, and the hostile-request
-  corpus.** *Both merged: `GET /nope` now answers `404 /problems/route-not-found`; the
-  `application/xml` `500` is the invariant's one residual (§8.6).* `server.ts`'s docblock claimed §8.6's totality was kept in
-  `setErrorHandler`; corrected with the handler. The corpus
-  is `tests/contract/`, the test-engineer's, asserted in the direction that can fail (∀responses ∃row).
-  **§8.6 gained the row at step 7.** Two warnings, both ruled at slice 05 step 5 so they
-  are not discovered here: registering the handler **breaks the media-type half of AC-4's vacuity
-  guard** in `cancel-appointment.test.ts:247`, which discriminates on Fastify's default body — the
-  `type` member still discriminates, and the test-engineer re-derives that case rather than deleting
-  it; and `src/http/problem.ts`, which renders every row, sits at **exactly §10's 0.75 threshold with
-  three survivors** (`R-05-7`). *Corrected by `I-06-1`, confirmed on the merged report:
-  `PROBLEM_TYPES` is `as const`, which the instrumenter skips, so the file is immune rather than
-  one survivor from failing.*
-- **`src/domain/appointment.ts` — RETIRED at step 1, not deferred** *(no ref — a §5.2 prediction,
-  never a logged finding)*, by
-  [ADR-0025](../adr/0025-existence-is-the-reads-legality-is-the-statements.md) decision 6: under
-  that ruling transition legality is a database verdict on ADR-0016's ground, so a module holding
-  one allowlist whose only consumer is a SQL predicate is a relocation of a literal. §5.2 records the retirement at step 7.
-  The residue — the constraints' denylist against the move's allowlist — goes to §11.
-- **The Stryker exhaustiveness disables** (`R-05-9`). ~13 structurally unkillable mutants cap
-  `routes/appointments.ts` near 88%, so 83.04 has stopped discriminating (reviewer, slice 05).
-  A `// Stryker disable all : <reason>` … `// Stryker restore all` pair around each
-  `const unhandled: never` arm — **those arms only**, not the schema-options or description mutants, which are inert for reasons that change
-  when Fastify's config or slice 09's OpenAPI assertion does. Slice 06 adds the fourth arm, so doing it
-  once costs one pass instead of two. The *decision* is
-  the architect's, on the same ground as `stryker.config.mjs`'s `mutate` list; the *edit* is in `src/`
-  and is the implementer's. *The pair suppressed 93 mutants where 8 were ruled;
-  ruled at step 5 under `R-05-9`.*
+- **`A-06-3` — a concurrency test for racing moves. Deferred on to slice 07**, where it is written
+  in full. The reason for keeping it here — *"the atomic-move ADR's claim is what this slice ships
+  on"* — is equally true of the two scenarios that are already slice 07's, and a reason that does not
+  distinguish its own case is not one. The deferral criterion is met and re-measurable on arrival.
+- **`F-05-1` — the lock becomes a value the write takes.** `lockResources` returns a branded
+  `ResourceLock` that the insert requires as a parameter. Type-only, erased at runtime, with one
+  minting cast: *forgot the lock* becomes a compile error, and *correctly exempt* becomes a signature
+  that does not ask for one. This slice is the destination because it writes a **new** locking path,
+  which is the first moment the mistake is live rather than historical. *As built the lock also
+  carries the keys it took, so nothing can disagree between locking and writing. **`F-02-9`'s half
+  here is discharged by that required parameter**, not by the minting site being unique. What is left:
+  the lock does not prove the write shares its transaction — declined and deferred to the close-out
+  slice — and a `ResourceLock` can still be written by hand with no cast.*
+- **`R-05-7` — a handler for unmatched routes, the `404 /problems/route-not-found` row, and a corpus
+  of hostile requests.** *Both merged: `GET /nope` now answers `404 /problems/route-not-found`, and
+  an `application/xml` request producing a `500` is the taxonomy's one remaining residual.* The
+  corpus lives in `tests/contract/` and is the test-engineer's, asserted in the direction that can
+  fail: every response has a row, rather than every row has a response. Two warnings were ruled a
+  slice early so they would not be discovered here: registering the handler **breaks the media-type
+  half of AC-4's vacuity guard**, where the `type` member still discriminates and the test-engineer
+  re-derives the case rather than deleting it; and `problem.ts`, which renders every row, sits at
+  exactly the mutation threshold with three survivors. *That second warning was wrong, and the
+  merged report says so: `PROBLEM_TYPES` is `as const`, which the instrumenter skips, so the file is
+  immune to mutation rather than one survivor away from failing.*
+- **`R-05-9` — the exhaustiveness disables.** About thirteen structurally unkillable mutants cap the
+  appointments route near 88 %, so its published score had stopped discriminating. A
+  `// Stryker disable` … `// Stryker restore` pair goes around each `const unhandled: never` arm —
+  **those arms only**, not the schema-option or description mutants, which are inert for reasons that
+  change when Fastify's configuration or the OpenAPI assertion does. This slice adds the fourth arm,
+  so doing it once costs one pass instead of two. The *decision* is the architect's; the *edit* is in
+  `src/` and is the implementer's. *As applied the pair suppressed 93 mutants where 8 were ruled, and
+  was narrowed at step 5.*
+- **`src/domain/appointment.ts` — retired at step 1, not deferred** *(no ref — a prediction in arc42
+  §5.2, never a logged finding)*. Under this slice's ADR, whether a transition is legal is a database
+  verdict, so a module holding one allowlist whose only consumer is a SQL predicate is a relocation
+  of a literal. arc42 §5.2 records the retirement; the residue — the constraints denylist where the
+  move's guard allowlists — goes to §11.
 
 ## In scope
 
-- The reschedule route, use case, candidate loop and `UPDATE`; `tests/contract/error-taxonomy.test.ts`
-  extended to nine rows — `appointment-not-confirmed` and `route-not-found` land together, so the
-  taxonomy changes once.
+- The reschedule route, use case, candidate loop and `UPDATE`; the taxonomy contract test extended to
+  nine rows, `appointment-not-confirmed` and `route-not-found` landing together so the taxonomy
+  changes once.
 - `tests/integration/reschedule-self-overlap.test.ts` and
-  `tests/integration/reschedule-is-one-statement.test.ts` (AC-2's audit-trigger instrument).
+  `tests/integration/reschedule-is-one-statement.test.ts`, which carries AC-2's audit trigger.
 
 ## Out of scope
 
 - Moving to a different dealership, changing the service type, or reassigning to a named technician.
   A move changes `startsAt`; anything else is a cancel plus a booking.
-- Rescheduling under contention — slice 07, where the concurrency scenarios live.
+- Rescheduling under contention — the next slice, where the concurrency scenarios live.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
-- AC-2 is asserted by the audit trigger in `reschedule-is-one-statement.test.ts`, **and** the
-  reviewer reads the generated SQL. Two independent checks, because AC-2 is the criterion most
-  easily satisfied by a test that passes for the wrong reason and *"the reviewer looked"* is not
-  executable.
+- AC-2 is asserted by the audit trigger **and** the reviewer reads the generated SQL. Two independent
+  checks, because AC-2 is the criterion most easily satisfied by a test that passes for the wrong
+  reason, and *"the reviewer looked"* is not executable.
