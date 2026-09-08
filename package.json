@@ -41,6 +41,7 @@
     "docs:refs": "node tools/docs/refs.mjs",
     "predocs:openapi": "npm run build",
     "docs:openapi": "node tools/docs/openapi.mjs",
+    "harness:seed": "node harness/seed.mjs",
     "docs:adr-check": "node tools/docs/adr-invariants.mjs",
     "defects:check": "node tools/defects/generate.mjs --check",
     "mutation": "stryker run",
