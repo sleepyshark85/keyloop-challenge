@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `6ae4c5b fix(09): a partial mutation report cannot clear the slice — O-73` |
+| Last commit | `1500e19 chore(09): the loopback event the governor actually counts — O-74` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 213 |
+| Agent runs recorded | 214 |
 | ADRs accepted | 15 |
 | Slices defined | 10 |
 | Open DCRs | none |
@@ -359,7 +359,8 @@
 | 2026-09-07 22:05 | test-engineer | 23m51 | 436 / 31,078 / 33,450,317 | `derived` |
 | 2026-09-07 22:06 | test-engineer | 24m13 | 444 / 31,150 / 34,408,186 | `derived` |
 | 2026-09-07 23:17 | implementer | 95m58 | 1,938 / 92,540 / 397,096,062 | `derived` |
-| | **total** | **7601m33** | **53,882 / 3,811,852 / 4,749,102,957** | |
+| 2026-09-08 00:04 | test-engineer | 142m36 | 482 / 35,047 / 38,590,404 | `derived` |
+| | **total** | **7744m09** | **54,364 / 3,846,899 / 4,787,693,361** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
