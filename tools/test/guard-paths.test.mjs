@@ -20,6 +20,24 @@ const DENY = 2;
 
 /** [description, expected exit, payload] */
 const CASES = [
+  // --- A-10-3: the harness scripts are the implementer's, and were nobody's ---
+  // The cURL scripts are deliverables the implementer builds; harness.test.ts is the
+  // test-engineer's assertion ABOUT them. `harness/` was in no deny list, so every role
+  // could write it. Slice 09 lost work twice to an ownership table being right about the
+  // work and wrong about the owner (T-09-5, O-72) — a table is a briefing, not a guard.
+  ['implementer MAY write a harness script — they are its deliverable', ALLOW,
+    { tool_name: 'Write', agent_type: 'implementer', file_path: 'harness/double-booking.sh' }],
+  ['test-engineer may not write a harness script — it asserts about them, it does not author them', DENY,
+    { tool_name: 'Write', agent_type: 'test-engineer', file_path: 'harness/double-booking.sh' }],
+  ['architect may not write a harness script', DENY,
+    { tool_name: 'Write', agent_type: 'architect', file_path: 'harness/seed.mjs' }],
+  ['scribe may not write a harness script — the README run section is its half, not the scripts', DENY,
+    { tool_name: 'Write', agent_type: 'scribe', file_path: 'harness/book-read-reschedule-cancel.sh' }],
+  ['reviewer may not write a harness script — it audits and cannot author', DENY,
+    { tool_name: 'Write', agent_type: 'reviewer', file_path: 'harness/seed.mjs' }],
+  ['...and the shell door is closed too, not just Write', DENY,
+    { tool_name: 'Bash', agent_type: 'test-engineer', command: 'rm harness/double-booking.sh' }],
+
   // --- the two boundaries the verification story rests on -------------------
   ['implementer may not write an acceptance test', DENY,
     { tool_name: 'Write', agent_type: 'implementer', file_path: 'tests/acceptance/03.spec.ts' }],

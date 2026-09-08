@@ -54,6 +54,33 @@ still starts against a dead database and answers `503`.
 | `POST /appointments` | book — `201`, or a problem document (`409` conflict, `422` unknown reference, `400` invalid request) |
 | `GET /appointments/:id` | read back — `200` or `404` |
 
+## Demonstrate it: the cURL harness
+
+With the service from **Install, run, call** still running, this reaches every state transition
+and the concurrency invariant from a terminal — no test suite, no other tooling (AC-6,
+`docs/api/openapi.json` is the full contract).
+
+```bash
+export DATABASE_URL=postgresql://keyloop:keyloop@127.0.0.1:5432/keyloop
+export BASE_URL=http://localhost:3000
+eval "$(npm run --silent harness:seed)"       # exports DEALERSHIP_ID, SERVICE_TYPE_ID, CUSTOMER_ID, VEHICLE_ID, STARTS_AT
+
+bash harness/book-read-reschedule-cancel.sh   # book, read, reschedule, cancel
+bash harness/double-booking.sh                # REQUEST_COUNT (default 10) racers at the same slot
+```
+
+`harness:seed` (`harness/seed.mjs`) inserts a fresh, unrelated dealership subtree on every
+invocation and prints the five ids above as `export` lines — `eval` on its own output is the whole
+setup. Run it again before a second demonstration; re-using one `STARTS_AT` re-books an already
+non-free slot.
+
+`book-read-reschedule-cancel.sh` prints each step's HTTP status and `type`, and exits non-zero the
+moment one status is not the one that step must answer. `double-booking.sh` fires `REQUEST_COUNT`
+concurrent bookings at the identical slot, prints every response, and exits non-zero unless exactly
+one is `201` and the rest `409` — the one invariant, demonstrated rather than asserted. Both scripts
+need `bash` and `curl` only — no GNU coreutils, no `jq` — and were run by hand on a clean checkout
+before this slice was claimed done.
+
 ## Tests
 
 `npm test` runs the two Vitest projects as **separate invocations** and merges the results. That is

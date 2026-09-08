@@ -311,8 +311,8 @@ production, not only in tests.
 | `availability.candidates` | `candidates.bays`, `candidates.technicians` | **Deliberately separate from the insert.** The gap between this span's end and the next one's start *is* the window check-then-act would have raced in. It is drawn so a reader can see nothing depends on it |
 | `appointment.insert` | `booking.attempt`, `bay.id`, `technician.id`; on failure `db.sqlstate`, `db.constraint` | **One span per attempt**, so a retried booking's waterfall shows the retries rather than one long bar — ADR-0004's loop made legible in production |
 
-Rescheduling emits `appointment.update`, same shape, **same extracted attempt loop**; cancellation
-emits `appointment.cancel` with `appointment.id`.
+Rescheduling emits `appointment.update`, same shape, **same attempt loop**; cancellation emits
+`appointment.cancel` with `appointment.id`.
 
 ### Metrics
 
@@ -350,17 +350,16 @@ say.
 | Level | Owner | Runs against | What it is for |
 |---|---|---|---|
 | `tests/unit/` | implementer | `src/`, with the database's **driver** stubbed where a container is not needed | A design tool, freely rewritable during refactor. **This is where the Stryker mutation budget is spent**, scoped to `src/**` less `main.ts` |
-| `tests/property/` | test-engineer | the **built artifact** under `dist/`, and real PostgreSQL only where the property needs it | `fast-check` over interval arithmetic, candidate ordering, opening hours across DST — and QS-8, the only thing holding the availability query and the exclusion constraint in agreement. **Split by database need**, not by subject |
+| `tests/property/` | test-engineer | the **built artifact** under `dist/`, and real PostgreSQL only where the property needs it | `fast-check` over interval arithmetic, candidate ordering, opening hours across DST — and QS-8, the only thing holding the availability query and the exclusion constraint in agreement |
 | `tests/integration/` | shared; DB-invariant tests are the test-engineer's | Testcontainers PostgreSQL | Single-threaded persistence behaviour: self-overlapping reschedule, cancellation releasing a slot |
 | `tests/concurrency/` | test-engineer | Testcontainers PostgreSQL, several pooled connections | The invariant. Genuinely simultaneous statements; nothing here is simulatable |
 | `tests/contract/` | test-engineer | the running service | The emitted OpenAPI document, and the error taxonomy of §8.6 |
 | `tests/acceptance/` | test-engineer | the running service | *Done*, expressed as the slice's acceptance criteria over HTTP |
 
-Two structural supports rather than conventions: **`outside-in-tests-do-not-import-src`** (§5.3) makes
-OC-5 structural — tests that define *done* reach the system the way a client does, and the path hook
-cannot catch it, the file being one the test-engineer legitimately owns; and **isolation is by data,
-not truncation** (§7.2), each test seeding its own dealership, so the suite parallelises and every
-test implicitly asserts A-9's scoping.
+Two structural supports, not conventions: **`outside-in-tests-do-not-import-src`** (§5.3) makes
+OC-5 structural — the path hook cannot catch a file the test-engineer legitimately owns; and
+**isolation is by data, not truncation** (§7.2), each test seeding its own dealership, so the suite
+parallelises and every test implicitly asserts A-9's scoping.
 
 ### How an outside-in test reaches a module with no boundary
 
@@ -369,15 +368,15 @@ no HTTP route and no SQL. Three clauses resolve it, all in force
 ([slice 01's design](../slices/01-design.md) has the alternatives):
 
 1. **An outside-in test reaches a pure module through the built artifact.** It loads `dist/domain/*.js`
-   — `npm run build`'s output, which `pretest` keeps current — never `src/`. The dependency rule
-   stands unwidened and the test exercises what ships, at a dynamic `import()` per file.
+   — `npm run build`'s output, which `pretest` keeps current — never `src/`, so the dependency rule
+   stands unwidened and the test exercises what ships.
 2. **`tests/property/` splits by whether the property needs a database** — `*.db.test.ts` in the `db`
    project behind `globalSetup: tests/setup/postgres.ts`, the rest in `nodb` with no container, so a
    Docker failure cannot turn QS-9's red evidence into a `globalSetup` crash.
 3. **`npm test` runs the projects as separate invocations, and one that did not run is a loud
    failure**: `tools/ci/run-tests.mjs` exits `EXIT_DID_NOT_RUN = 2` rather than merging a missing
-   report as zero failures. Slice 09 adds a third, `perf`, with its own container — *uncontended* is
-   a property of the runner too. §7.2 carries the failure mode.
+   report as zero failures. A third project, `perf`, has its own container — *uncontended* is a
+   property of the runner too. §7.2 carries the failure mode.
 
 The residue those mechanisms leave — computed paths to `src/`, which no text scan can separate from
 imports — is review, and §11 records it.
@@ -385,33 +384,31 @@ imports — is review, and §11 records it.
 ### What a unit test may substitute, and where the line falls
 
 **A unit test may replace the driver beneath Kysely. It may not replace what the database decides.**
-The stub keeps the production dialect — compiler, adapter, introspector — and swaps only the transport,
-so the SQL a test observes is the SQL PostgreSQL would receive, and a `catch` block a reachable
-database would never enter becomes reachable. The boundary is the assertion, not the seam:
+The stub keeps the production dialect and swaps only the transport, so the SQL a test observes is the
+SQL PostgreSQL would receive, and a `catch` a reachable database would never enter becomes reachable.
+The boundary is the assertion, not the seam:
 
 | The assertion is about | Legitimate substitute | Why |
 |---|---|---|
 | the code *around* the database — an outcome mapping, a `catch`, a released handle, the SQL emitted | driver stub, `tests/unit/` | The database's answer is not the evidence; the code's response to a given answer is |
 | what the database **decides** — a constraint firing, a SQLSTATE, an ordering, an interleaving | **none.** Real PostgreSQL, `tests/integration/` or `tests/concurrency/` | This is `CLAUDE.md` §2.2 verbatim, and §4.1's reason: the invariant lives in the database, so a test that substitutes it tests the substitute's imitation — and the imitation would necessarily be check-then-act |
 
-So the unit-testable surface is not `src/domain` alone: `checkHealth` is a use case in
-`src/application`, takes a `Db`, and is unit-tested with no container. Removing the repository port
-(§5.2) forecloses substituting the *repository*; it does not foreclose substituting the *transport*.
+So the unit-testable surface is not `src/domain` alone: `checkHealth` is a use case taking a `Db`,
+unit-tested with no container. Removing the repository port (§5.2) forecloses substituting the
+*repository*, not the *transport*.
 
 ### Mutation testing runs through Stryker's command runner, not its Vitest runner
 
 The score is run by the **reviewer** at step 5 and deliberately not in CI: survivors are findings for
-a role that wrote neither the tests nor the code, and a number in a pipeline answers that by ignoring
-it. Scope is `src/**` less `main.ts`; the 0.75 per-file bar is `CLAUDE.md` §10's.
+a role that wrote neither the tests nor the code, and a number in a pipeline answers by ignoring it. Scope is `src/**` less `main.ts`; the 0.75 per-file bar is `CLAUDE.md` §10's.
 
 **The `command` runner, over a separate `vitest.mutation.config.ts`, is a workaround for a measured
 defect rather than a preference.** `@stryker-mutator/vitest-runner@10.0.0` **does not activate mutants**
 under `vitest@5.0.0` — 118 of 130 survivors on the blocking run had `testsCompleted: 0`, every mutant
-of a file with six dedicated tests surviving, the one emptying its body included — while its peer
-range `vitest: ">=2.0.0"` means npm warns about nothing. The command runner has no framework
-integration to break: Stryker sets `__STRYKER_ACTIVE_MUTANT__`, runs the command, reads the exit
-code. Its one consequence is `coverageAnalysis: 'off'`, so every mutant runs the whole suite — the
-conservative direction.
+of a six-test file surviving — while its peer range `vitest: ">=2.0.0"` means npm warns about nothing.
+The command runner has no framework integration to break: Stryker sets `__STRYKER_ACTIVE_MUTANT__`,
+runs the command, reads the exit code. Its one consequence is `coverageAnalysis: 'off'`, so every
+mutant runs the whole suite — the conservative direction.
 
 **What would make removing the workaround safe.** The broken runner's tell is unrun tests, not a low
 score, so a plausible score after an upgrade proves nothing. Restore `testRunner: 'vitest'`, then
@@ -434,20 +431,23 @@ out**, through `fast-json-stringify`. Six behaviours, measured on this repositor
 | a wrong value for `Type.String({ enum })` | the wrong value | **passed through**, unvalidated |
 
 Substitution is the dangerous one, and a property of every route: a handler emitting
-`{status:'', checks:{database:''}}` produces a byte-identical
-`200 {"status":"ok","checks":{"database":"up"}}`, which is why four mutants of the health route
-survived a thorough-looking suite. **Nothing proves substitution from the wire.** Three consequences
-bind every later slice:
+`{status:'', checks:{database:''}}` renders a byte-identical healthy `200`, which is why four mutants
+of the health route survived a thorough-looking suite. **Nothing proves substitution from the wire.**
+Three consequences bind every later slice:
 
 1. **Pin a computed enum-valued field as a `Type.Union` of literals.** It is the only one of the three
    pinning forms that both enforces and does not substitute. Under `Type.Literal` a computed value is
    silently rewritten to the constant and a contract test asserting on the body reads it back and
    passes — **QS-11's own test unable to fail for the reason it names**; under `Type.String({ enum })`
    the wrong value reaches the client. §8.6's `type` URIs and the appointment's `status` are unions
-   for that reason.
-2. **The backstop can become the defect, so it is not the only guard.** A body that fails a response
-   schema renders `FST_ERR_FAILED_ERROR_SERIALIZATION` as `application/json` — wrong status, no
-   `type`, not `problem+json`. §8.6's compile-time closure is the other guard.
+   for that reason. **Narrowed to one member a union collapses back to a literal**, so §8.6's
+   per-operation cells build a one-member `anyOf` by hand (slice 10); `@fastify/swagger` rewrites
+   `const` to `enum`, so that distinction is asserted against the runtime schema and the emitted
+   document can only be checked for the shape.
+2. **The backstop can become the defect, so it is not the only guard**, and it fails differently by
+   form. The bare schema renders `FST_ERR_FAILED_ERROR_SERIALIZATION` as `application/json` — wrong
+   status, no `type`. The `content` form stays at the status already set and answers a generic
+   `application/json` body: observable, but no `500`. §8.6's compile-time closure is the other guard.
 3. **A test through this seam proves the schema, not the handler.** To hold a handler to a computed
    value, assert on what it passed to `send`: everything a wire-body assertion tells you about a
    pinned field, it would tell you about an empty handler too.
@@ -457,8 +457,8 @@ bind every later slice:
 refused. `additionalProperties: false` is therefore load-bearing for **ADR-0005's emitted OpenAPI
 document**, where it is the published statement of what the operation takes, and is not a runtime
 rejection: where a request must be *refused* for what it carries, something else has to refuse it.
-AC-6 holds regardless, by a second and independent route — no parameter on the booking path could
-receive a client-supplied end.
+Slice 10 asserts the published half by equality: no operation's `requestBody` or `parameters` can
+carry an appointment id or an end.
 
 ## 8.6 Error handling and API semantics
 
@@ -474,30 +474,31 @@ TC-4 fixes REST; A-7 keeps reference data out of the API. Five operations.
 | Cancel | `POST /appointments/{id}/cancellation` | `200`, idempotent |
 | Availability | `GET /availability?dealershipId&serviceTypeId&from&to` | `200`, **advisory** |
 
-`PATCH` for a move because ADR-0003's mechanism *is* "modify this resource in place" — the verb and the
-`UPDATE` say the same thing. Cancellation is a sub-resource rather than `DELETE` because the appointment
-remains readable at its URL afterwards with `status: cancelled`, which `DELETE` would misdescribe. The
-availability response carries an explicit advisory flag, and it answers **only about the interval
-queried** (§6.5).
+`PATCH` for a move, because ADR-0003's mechanism *is* modify-in-place — the verb and the `UPDATE` say
+the same thing. Cancellation is a sub-resource rather than `DELETE`: the appointment stays readable at
+its URL with `status: cancelled`, which `DELETE` would misdescribe. The availability response carries
+an explicit advisory flag and answers **only about the interval queried** (§6.5).
 
 ### Status codes
 
 Errors are RFC 9457 `application/problem+json`, with a stable `type` per failure so a client
-distinguishes cases without parsing prose (§3.2 left the media type to Gate B). **As built the emitted
-document does not say so**: all 25 responses declare `application/json` and the table below carries
-no `type` × operation matrix. §11, slice 10.
+distinguishes cases without parsing prose (§3.2 left the media type to Gate B). **The emitted document
+says so as built** (slice 10): each error response is keyed on that media type and declares only its
+own operation's `type` values — the *operations* column, asserted by equality. `/health`'s `503` is a
+health document, outside this surface and excluded there by name.
 
-| Status | `type` | When | Decided by |
-|---|---|---|---|
-| `400` | `/problems/malformed-request` | Schema violation, unparseable timestamp; and, from slice 05, an empty or unparseable JSON body | TypeBox before any handler (ADR-0005), or `setErrorHandler` on two named Fastify parser codes |
-| `400` | `/problems/outside-opening-hours` | The derived interval leaves the dealership's hours | `domain/openingHours.ts` — **reads no booking** (GC-1) |
-| `404` | `/problems/appointment-not-found` | The id in the path does not exist | The read a move needs anyway (ADR-0025) |
-| `404` | `/problems/route-not-found` | The path matches no route — distinct from a missing appointment, which shares the status | `setNotFoundHandler` (ADR-0024) |
-| `409` | `/problems/no-capacity` | Every candidate refused, or the cap reached (ADR-0004, ADR-0009). Carries `resource` | **PostgreSQL, `23P01`, repeatedly** |
-| `409` | `/problems/appointment-not-confirmed` | Moving a cancelled appointment (ADR-0003) | The guarded `UPDATE`'s zero rows (ADR-0025) |
-| `422` | `/problems/unknown-reference` | Unknown dealership, service type, customer or vehicle. Carries `reference` | Reference read, then `23503` |
-| `422` | `/problems/vehicle-not-owned` | The vehicle is not the named customer's | Composite FK, `23503` (A-6, GC-2) |
-| `500` | `/problems/internal` | Reference data the client cannot see or correct — a described class, not a catch-all (ADR-0024) | The use case, or the fallback handler |
+| Status | `type` | Operations | When | Decided by |
+|---|---|---|---|---|
+| `400` | `/problems/malformed-request` | all five | Schema violation, unparseable timestamp; and, from slice 05, an empty or unparseable JSON body | TypeBox before any handler (ADR-0005), or `setErrorHandler` on two named Fastify parser codes |
+| `400` | `/problems/outside-opening-hours` | book, reschedule | The derived interval leaves the dealership's hours | `domain/openingHours.ts` — **reads no booking** (GC-1) |
+| `404` | `/problems/appointment-not-found` | read, reschedule, cancel | The id in the path does not exist | The read a move needs anyway (ADR-0025) |
+| `404` | `/problems/route-not-found` | **none** | The path matches no route — distinct from a missing appointment, which shares the status | `setNotFoundHandler` (ADR-0024) |
+| `409` | `/problems/no-capacity` | book, reschedule | Every candidate refused, or the cap reached (ADR-0004, ADR-0009). Carries `resource` | **PostgreSQL, `23P01`, repeatedly** |
+| `409` | `/problems/appointment-not-confirmed` | reschedule | Moving a cancelled appointment (ADR-0003) | The guarded `UPDATE`'s zero rows (ADR-0025) |
+| `422` | `/problems/unknown-reference` | book, availability | Unknown dealership, service type, customer or vehicle. Carries `reference` | Reference read, then `23503` |
+| `422` | `/problems/vehicle-not-owned` | **book only** | The vehicle is not the named customer's | Composite FK, `23503` (A-6, GC-2) |
+| `500` | `/problems/internal` | all five | Reference data the client cannot see or correct — a described class, not a catch-all (ADR-0024) | The use case, or the fallback handler |
+
 
 Four deliberate choices in that table:
 
@@ -505,34 +506,34 @@ Four deliberate choices in that table:
 - **Two distinct `409`s, and only one touches the conflict metric.** `no-capacity` is contention;
   `appointment-not-confirmed` is a state conflict, and `booking_conflicts_total` counts `23P01` so it
   cannot see the second (§8.4).
-- **Out-of-hours is a `400` although `422` would sit more naturally beside the reference failures.**
-  ADR-0001 fixed the code as a Gate A ruling. The inconsistency is real and recorded rather than
-  quietly harmonised; changing it means superseding the ADR.
+- **Out-of-hours is a `400`, where `422` would sit more naturally beside the reference failures.**
+  ADR-0001 fixed it as a Gate A ruling; the inconsistency is recorded rather than quietly harmonised,
+  and changing it means superseding the ADR.
 - **The `500` row is reachable, and it is not only a fallback.** Four reference-data faults route to
-  it — a dealership whose `time_zone` does not resolve, one whose `opens_at` does not parse, one with
-  no service bays, and a candidate refused by a composite foreign key — as does a `40P01` (ADR-0030: a
-  path locked less than it wrote). A `4xx` would tell the caller to correct something they did not send and
-  cannot see, so the body says nothing actionable and the detail goes to the log. **The residual is
-  an invariant rather than this row: every response with status ≥ 400 is `problem+json` carrying a
-  `type` from the closed set** — asserted ∀responses ∃row over a hostile corpus, the direction that
-  can fail (ADR-0024). `GET /nope` answers `404 /problems/route-not-found`; `content-type: application/xml` still renders
-  `500 /problems/internal`, 415 having no row, which is the invariant holding rather than a gap.
+  it — an unresolvable `time_zone`, an unparseable `opens_at`, a dealership with no service bays, and
+  a candidate refused by a composite foreign key — as does a `40P01` (ADR-0030). A `4xx` would ask the
+  caller to correct something they did not send and cannot see, so the body says nothing actionable
+  and the detail goes to the log. **The residual is an invariant rather than this row:
+  every response with status ≥ 400 is `problem+json` carrying a `type` from the closed set** —
+  asserted ∀responses ∃row over a hostile corpus, the direction that can fail (ADR-0024).
+  `content-type: application/xml` still renders `500 /problems/internal`, 415 having no row, which is
+  the invariant holding rather than a gap.
 
-Two members of `BookOutcome` render as that row, apart for §5.2's reason. Symmetrically, a dealership with **no technician qualified for the requested
-service type** is `422 /problems/unknown-reference` with `reference=service-type`: the request names a
-(dealership, service type) pair and that pair does not resolve, which is the only sense in which this
-API knows service types at all. It is not contention and there is nothing to retry.
+Two members of `BookOutcome` render as that row, apart for §5.2's reason. Symmetrically, a dealership
+with **no technician qualified for the requested service type** is `422 /problems/unknown-reference`
+with `reference=service-type`: the request names a (dealership, service type) pair that does not
+resolve. Not contention, and nothing to retry.
 
 **The taxonomy is a closed set with one constructor.** The `type` URIs are a single `as const` array,
-`ProblemSchema` is built from it, and the constructor takes that union — so a URI outside the table is
-a compile error at the call site, and §8.5's response-schema union is the runtime backstop behind it.
-The `500` alone carries no response schema, for the reason §8.5 gives. The media type is set per
-response rather than globally, because a `200` that arrived as `problem+json` is a worse failure than a
-`400` that arrived as `application/json`.
+every response schema is narrowed from it, and the constructor takes that union — so a URI outside the
+table is a compile error at the call site, and §8.5's response-schema union is the runtime backstop
+behind it. The `500` alone carries no response schema, for the reason §8.5 gives; it and
+`route-not-found` answer no operation and live unreferenced in `components.responses`, which OpenAPI
+3.1 permits. The media type is set per response, not globally: a `200` arriving as `problem+json` is
+a worse failure than a `400` arriving as `application/json`.
 
 ### Outcomes, not exceptions
 
 Use cases return the discriminated unions of §5.2, so the mapping above is one exhaustive `switch`
-that the compiler checks. Adding a domain outcome breaks the build in `src/http` rather than falling
-through to a `500` — which is the cheapest available guarantee that a known failure never renders as
-an unknown one.
+the compiler checks: adding a domain outcome breaks the build in `src/http` rather than falling
+through to a `500`.

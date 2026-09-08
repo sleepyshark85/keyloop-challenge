@@ -295,11 +295,15 @@ describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachabl
     const operation = doc.paths?.['/availability']?.['get'];
 
     expect(operation, 'no GET /availability operation in the generated document').toBeDefined();
-    expect(operation?.description).toContain('What is free for this dealership and service type');
-    expect(operation?.description).toContain('to <= from is rejected by the route (400)');
+    // `R-09-13`'s split (`10-design.md` §3): three concatenated literals, one fact each — what
+    // the operation answers, the rule (`A-10-4`), the consequence. Each assertion below binds
+    // to exactly one piece, unique to it, so `D-08-1`'s three surviving mutants (one per
+    // emptied literal) each stay separately killable.
     expect(operation?.description).toContain(
-      'because a schema cannot compare two of its own properties',
+      'for this dealership and service type over the requested from/to window',
     );
+    expect(operation?.description).toContain('strictly later than from');
+    expect(operation?.description).toContain('400 /problems/malformed-request');
   });
 
   it("the 200 response schema's own description carries AC-5's two facts", async () => {

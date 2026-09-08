@@ -15,16 +15,16 @@
 
 | | |
 |---|---|
-| Last commit | `d3699bd Merge pull request #20 from sleepyshark85/slice/09-observability` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E |
-| Agent runs recorded | 216 |
+| Last commit | `f5b5ef7 chore(10): step 5 remediation complete — every assertion falsified before trusted` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E |
+| Agent runs recorded | 235 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
+- **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md), [`10`](slices/10-openapi-and-curl-harness.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
 - **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
 - 3 slice(s) remain of 11 defined; Gate D folded 4 (03, 12, 13, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
@@ -122,6 +122,14 @@
 **Gate E** · 2026-09-08 · approved
 
 > HUMAN RULING, 2026-09-08. THE HUMAN REVIEWED AND MERGED PR 20 AT d3699bd WITH ALL TWELVE DEFINITION-OF-DONE ROWS GREEN AND NO OVERRIDE OF ANY KIND — the first slice since 07 to need none. Every changed file clears section 10's 0.75 per file, worst 82.14. THE SLICE REPAID WHAT IT OWED: routes/availability.ts holds 88.10, so D-08-1 closes and slice 08's overridden 71.43 is discharged. THE HUMAN ALSO QUESTIONED THE SCOPE BEFORE APPROVING, asking why an observability slice changed bookAppointment and cancelAppointment, and was shown that the 183-line reduction in bookAppointment is F-06-1's EXTRACTION — an inherited obligation deferred here by ruling at slice 06 — rather than new logic, that the extraction is what makes the one-increment-site rule assertable at all because the counter was previously incremented from two arms in two files, and that the reviewer verified the extraction FAITHFUL while blocking the slice on fifteen other findings. WHAT MERGES UNFINISHED AND IS NOT HIDDEN: the emitted OpenAPI document declares application/json on all twenty-five responses while the service sends application/problem+json, booked as D-09-1 and carried to slice 10 with A-06-2 and five findings. Six debts recorded in arc42 section 11, three of which are FACTS RATHER THAN WORK so the next reader does not repeat the investigation. Loopbacks 1 of 2, spent on the first (c) ruling of the project.
+
+**Gate process** · 2026-09-08 · delegate-gate-to-orchestrator-and-architect
+
+> HUMAN RULING, 2026-09-08, GOING AFK: YOU CAN GO FOR THE MERGE IF YOU AND THE ARCHITECT CAN AGREE ON IT. Section 6 gives the human step 6 and the override, so this is a DELEGATION OF THAT AUTHORITY FOR SLICE 10 AND IS RECORDED RATHER THAN REMEMBERED — the same shape as the 2026-09-06 delegation under which slice 02 was gated, and slice 05's light-gate ruling. THE CONDITION IS CONJUNCTIVE AND IS THE WHOLE OF IT: the orchestrator AND the architect must agree. EITHER ONE WITHHOLDING IS A HOLD, and the orchestrator does not get to read its own agreement into the architect's silence — the architect must say so explicitly, in a dispatch answered on the record, before any merge. WHAT THIS DOES NOT DELEGATE: it is a merge authority, not a permission to lower a bar. The orchestrator's standing hold conditions are unchanged and were stated to the human before they left — a red run failing for the wrong reasons rather than on assertions, any changed file under section 10's 0.75, a mutation report that does not cover the changed set, a third loopback which auto-escalates with no slice after this one, and A-06-2 reaching a THIRD failed discharge, since AC-3b is its last attempt and a marker that does not constrain what it claims is worth saying rather than logging as discharged. THE PRIOR DELEGATION'S PRECEDENT ALSO BINDS: on 2026-09-08 the human said MERGE IF THINGS GO RIGHT and the orchestrator held slice 09 overnight because a section 10 failure was not that. Same standard here.
+
+**Gate E** · 2026-09-08 · approved
+
+> GATE TAKEN UNDER THE HUMAN'S CONJUNCTIVE DELEGATION OF 2026-09-08 — YOU CAN GO FOR THE MERGE IF YOU AND THE ARCHITECT CAN AGREE ON IT — AND BOTH HALVES ARE ON THE RECORD RATHER THAN INFERRED. The orchestrator asked the architect the merge question DIRECTLY, listing each of the five conditions it had named and what closed them, and asking it to confirm that five booked items remain debt rather than merge conditions. THE ARCHITECT VERIFIED ALL FIVE REMEDIATIONS IN THE TREE AT f5b5ef7 RATHER THAN ACCEPTING THE REPORT, ruled S-10-1 as debt with its reasoning, and answered: I AGREE TO MERGE SLICE 10 AS IT STANDS. ELEVEN OF TWELVE DONE ROWS WERE GREEN BEFORE THIS EVENT AND THE TWELFTH WAS THIS GATE. CI green on f5b5ef7; mutation clears EVERY changed file with a worst of 76.13 and src unchanged since that run so the figures stand; arc42 reconciled; ALL SIX INHERITED OBLIGATIONS DISCHARGED INCLUDING A-06-2 ON ITS THIRD ATTEMPT, with its residual booked as D-10-1 rather than waved through; loopbacks 0 OF 2. WHAT MERGES AS DEBT AND IS NOT HIDDEN: R-10-6, the new components block being eight of server.ts's twenty-two survivors and invisible to a tests-unit-only mutation config, folded into F-06-2 so 79.05 is not read as fully scored; R-10-8, the central-invariant concurrency test being load-sensitive under a full parallel run and green in CI and in isolation; S-10-1; D-10-1, section 8.6's column and the test's matrix being two transcriptions tied by nothing; and ADR-0035 still proposed with section 6(b) having no terminal case on a final slice. THE SLICE'S OWN LESSON, RECORDED BECAUSE IT IS THE REASON IT WAS REOPENED: it was cut out of slice 09 because all three of that slice's BLOCKING findings sat on this half, and its review found IT HAD REPRODUCED THE SAME DEFECT TWICE — a document-level probe that could not fail on the collapse it guarded, and a /health exclusion the design had ruled must never be a silent omission and which shipped as one. Both were caught by a reviewer that ran the falsifications, and both were fixed by assertions that were FALSIFIED BEFORE THEY WERE TRUSTED.
 
 ## Decisions on record
 
@@ -366,7 +374,26 @@
 | 2026-09-08 00:04 | test-engineer | 142m36 | 482 / 35,047 / 38,590,404 | `derived` |
 | 2026-09-08 02:52 | architect | 51m15 | 674 / 16,188 / 79,966,708 | `derived` |
 | 2026-09-08 03:10 | test-engineer | 7m51 | 92 / 1,301 / 2,318,129 | `derived` |
-| | **total** | **7803m14** | **55,130 / 3,864,388 / 4,869,978,198** | |
+| 2026-09-08 03:44 | architect | 9m12 | 122 / 16,999 / 5,059,046 | `derived` |
+| 2026-09-08 04:11 | test-engineer | 8m45 | 98 / 3,462 / 3,856,717 | `derived` |
+| 2026-09-08 04:12 | implementer | 10m04 | 138 / 6,433 / 5,678,199 | `derived` |
+| 2026-09-08 04:15 | architect | 41m01 | 132 / 17,013 / 5,450,514 | `derived` |
+| 2026-09-08 04:16 | implementer | 13m08 | 148 / 6,713 / 6,349,722 | `derived` |
+| 2026-09-08 05:04 | test-engineer | 48m07 | 458 / 107,721 / 54,675,171 | `derived` |
+| 2026-09-08 05:48 | implementer | 41m45 | 714 / 25,462 / 74,944,988 | `derived` |
+| 2026-09-08 05:51 | implementer | 45m11 | 730 / 25,474 / 76,986,810 | `derived` |
+| 2026-09-08 07:17 | implementer | 131m00 | 836 / 43,648 / 95,533,728 | `derived` |
+| 2026-09-08 07:21 | implementer | 135m19 | 842 / 43,654 / 95,954,239 | `derived` |
+| 2026-09-08 07:22 | implementer | 135m48 | 844 / 43,663 / 96,333,170 | `derived` |
+| 2026-09-08 08:34 | implementer | 208m30 | 864 / 43,703 / 99,405,920 | `derived` |
+| 2026-09-08 08:46 | reviewer | 12m25 | 210 / 2,647 / 10,730,764 | `derived` |
+| 2026-09-08 08:52 | scribe | 4m10 | 112 / 3,287 / 2,892,173 | `derived` |
+| 2026-09-08 09:09 | architect | 21m41 | 346 / 11,293 / 20,975,182 | `derived` |
+| 2026-09-08 09:14 | implementer | 3m17 | 106 / 2,020 / 2,563,507 | `derived` |
+| 2026-09-08 09:33 | test-engineer | 21m53 | 264 / 8,780 / 12,948,891 | `derived` |
+| 2026-09-08 09:35 | scribe | 47m26 | 132 / 3,917 / 3,469,885 | `derived` |
+| 2026-09-08 10:38 | architect | 110m08 | 378 / 11,397 / 23,746,288 | `derived` |
+| | **total** | **8852m05** | **62,604 / 4,291,674 / 5,567,533,112** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

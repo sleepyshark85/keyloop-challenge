@@ -25,25 +25,33 @@
  * The disclaimer text is repeated as the response schema's own `description` — the OpenAPI half
  * AC-5 also requires, now assertable end to end via `buildOpenApiDocument()` (AC-5b).
  *
- * ── THE OPERATION-LEVEL `description`, AND WHY THE QUERYSTRING'S OWN COPY STAYS TOO ────────────
+ * ── THE OPERATION-LEVEL `description`, AND WHY THE QUERYSTRING NO LONGER CARRIES ITS OWN COPY ──
  *
  * `docs/slices/09-design.md` "AC-7 does not kill the seven description mutants", decision 4:
  * `@fastify/swagger` 9.8.1, measured, EXPLODES an object `querystring` schema into individual
- * `in: query` parameters and DROPS the object's own `description` in the process — so
- * `AVAILABILITY_QUERYSTRING_DESCRIPTION`'s three concatenated literals rendered nowhere in the
- * emitted document, unkillable from `tests/contract/openapi-document.test.ts` even though that
- * file diffs the document byte for byte. An OPERATION-level `schema.description` — a sibling of
- * `querystring`/`response`, not a property of either — IS preserved into `operation.description`.
- * The constant is reused rather than duplicated: a mutation to any of its three literal pieces
- * changes the ONE emitted copy, so `AC-5b`'s test (which reads the whole operation, not just the
- * response) can still tell. It touches no criterion — AC-5b names the response schema's own two
- * facts, which are unrelated text — and renders, in the document, a rule that previously
- * rendered nowhere in it at all.
+ * `in: query` parameters and DROPS the object's own `description` in the process — so a copy
+ * placed there rendered nowhere in the emitted document, unkillable from
+ * `tests/contract/openapi-document.test.ts` even though that file diffs the document byte for
+ * byte. An OPERATION-level `schema.description` — a sibling of `querystring`/`response`, not a
+ * property of either — IS preserved into `operation.description`, which is why
+ * {@link AVAILABILITY_QUERYSTRING_DESCRIPTION} lives there alone now: `10-design.md` §3 (`R-09-13`)
+ * measured that dropping the querystring object's own duplicate changes no emitted byte — this
+ * docblock's `@fastify/swagger` rationale above is exactly what used to be repeated, wrongly, in
+ * that published copy, and `AC-7`'s `docs:openapi -- --check` is what proves the drop is silent.
+ *
+ * ── `R-09-13`'s SPLIT — CONTRACT PROSE, NOT AN IMPLEMENTATION NOTE ────────────────────────────
+ *
+ * {@link AVAILABILITY_QUERYSTRING_DESCRIPTION} is three concatenated string literals — what the
+ * operation answers, the rule, and the consequence — each its OWN literal so `D-08-1`'s three
+ * surviving mutants (one per emptied piece) stay separately killable; a single combined literal
+ * would leave two of three unkillable. None of the three names TypeBox or "schema": that
+ * rationale is this file's own, stated above, and publishing it to a client is what the split
+ * removes.
  */
 import { Type } from '@sinclair/typebox';
 import type { Static } from '@sinclair/typebox';
 import type { FastifyInstance } from 'fastify';
-import { ProblemSchema, problem, sendProblem } from '../problem.js';
+import { problem, problemResponse, sendProblem } from '../problem.js';
 import { RFC3339_PATTERN, UUID_PATTERN } from './appointments.js';
 import type { AvailabilityOutcome, AvailabilityQuery } from '../../application/queryAvailability.js';
 
@@ -63,14 +71,17 @@ const DISCLAIMER =
   'adjudicated decision.';
 
 /**
- * The three concatenated literals `AC-7 does not kill the seven description mutants` (decision 4)
- * relocates onto the route's own operation-level `schema.description` below — SAME constant, not
- * a second copy, so a mutation to either use is caught by the one place the document keeps it.
+ * §8.6's contract prose for this operation, published ONLY at `operation.description` (see the
+ * file docblock's two sections above) — three concatenated facts, one per literal, bound to
+ * `D-08-1`'s three surviving mutants: what the operation answers, the rule (`A-10-4`: `to`
+ * strictly later than `from`, not "at or after"), and the consequence. Names neither TypeBox
+ * nor "schema" — that rationale is this file's own, not a client's concern.
  */
 const AVAILABILITY_QUERYSTRING_DESCRIPTION =
-  'What is free for this dealership and service type over [from, to). TypeBox validates ' +
-  'each instant on its own; to <= from is rejected by the route (400), not by this schema, ' +
-  'because a schema cannot compare two of its own properties.';
+  'Reports availability — capacity free for this dealership and service type over the ' +
+  'requested from/to window. ' +
+  'to must be strictly later than from. ' +
+  'A violation is 400 /problems/malformed-request.';
 
 const AvailabilityQuerystring = Type.Object(
   {
@@ -81,13 +92,14 @@ const AvailabilityQuerystring = Type.Object(
   },
   // Stryker disable next-line ObjectLiteral : {} here changes nothing observable — Fastify's ajv
   // removeAdditional strips an unknown query key regardless of this object's own
-  // additionalProperties/description (I-08-6); the dist/ recipe (R-08-3) shows no boundary
-  // difference, and the only killer left would assert this description string verbatim.
+  // additionalProperties (I-08-6); the dist/ recipe (R-08-3) shows no boundary difference. No
+  // `description` here at all (`R-09-13`, `10-design.md` §3): `@fastify/swagger` drops an object
+  // querystring schema's own `description` when it explodes it into per-parameter entries (see
+  // the file docblock), so one placed here would render nowhere and only cost AC-7 a mutant.
   {
     // Stryker disable next-line BooleanLiteral : same boundary as above — removeAdditional
     // already strips unknown keys whether this reads false or true (I-08-6).
     additionalProperties: false,
-    description: AVAILABILITY_QUERYSTRING_DESCRIPTION,
   },
 );
 
@@ -120,7 +132,14 @@ const AvailabilityBody = Type.Object(
   },
 );
 
-const PROBLEM_RESPONSES = { 400: ProblemSchema, 422: ProblemSchema } as const;
+/**
+ * `vehicle-not-owned` is gone from here (`10-design.md` §1): §8.6's matrix names it `book only`,
+ * and this operation books nothing.
+ */
+const PROBLEM_RESPONSES = {
+  400: problemResponse('/problems/malformed-request'),
+  422: problemResponse('/problems/unknown-reference'),
+} as const;
 
 export function registerAvailabilityRoute(
   app: FastifyInstance,
@@ -131,8 +150,8 @@ export function registerAvailabilityRoute(
     {
       schema: {
         // Operation-level, sibling of `querystring`/`response` — see the file docblock. Fastify
-        // maps this to the OpenAPI operation's own `description`, which survives where the
-        // querystring's own (identical) copy above does not.
+        // maps this to the OpenAPI operation's own `description`, which is the one copy of this
+        // text that survives into the emitted document at all.
         description: AVAILABILITY_QUERYSTRING_DESCRIPTION,
         querystring: AvailabilityQuerystring,
         // Stryker disable next-line ObjectLiteral : {} here drops response-schema validation

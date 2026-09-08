@@ -3,7 +3,9 @@ id: "10"
 title: The OpenAPI contract — problem+json per operation, and a harness that asserts
 status: ready
 depends_on: ["09"]
-arc42: ["§3.1", "§8.6", "§10.2", "§11.1"]
+arc42: ["§3.1", "§8.5", "§8.6", "§10.2", "§11.1"]   # §8.5 added at step 1 by the architect: M1
+              # in `10-design.md` lands a measured serialiser row, and declaring it after the fact
+              # is the worse order (slice 09).
 adr: [5, 25]
 quality_scenarios: [QS-11]
 inherits: ["A-06-2", "R-09-1", "R-09-2", "R-09-7", "R-09-12", "R-09-13"]
