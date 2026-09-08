@@ -12,12 +12,10 @@ loopbacks: 0
 ## Goal
 
 A clean checkout can be built, started and tested. `npm test` boots a real PostgreSQL through
-Testcontainers, the service answers on a port, and the layering ruleset rejects a violation in CI.
-No domain logic — the point is that every mechanism the following twelve slices depend on is proven
-to work before any of them is attempted.
-
-Split out of the pilot slice at the phase-2 gate. The scaffold is not trivial, and bundling it with
-the pilot would have made the phase-4 retro measure setup friction rather than the slice loop.
+Testcontainers, the service answers on a port, and the layering ruleset rejects a violation in CI. No
+domain logic — the point is that every mechanism the following slices depend on is proven to work before
+any of them is attempted. Split out of the pilot slice at the phase-2 gate, so the phase-4 retro measures
+the slice loop rather than setup friction.
 
 ## Acceptance criteria
 
@@ -39,27 +37,25 @@ the pilot would have made the phase-4 retro measure setup friction rather than t
 
 ## In scope
 
-- `docker-compose.yml` — PostgreSQL and the `grafana/otel-lgtm` stack, for local run and the cURL
-  harness. Explicitly **not** on the test path: Testcontainers starts its own database.
-- TypeScript, Vitest, Testcontainers, Fastify, Kysely, `node-pg-migrate`.
-- The five module directories with a composition root, empty but conformant.
-- `GET /health`.
+- `docker-compose.yml` — PostgreSQL and the telemetry stack, for local run and the cURL harness.
+  Explicitly **not** on the test path: Testcontainers starts its own database.
+- TypeScript, Vitest, Testcontainers, Fastify, Kysely, `node-pg-migrate`; the five module directories
+  with a composition root, empty but conformant; `GET /health`.
 - `tests/architecture/layering.test.ts` — test-engineer owned, by the phase-2 gate's ruling.
-- The phase-4 CI block in `.github/workflows/verify.yml`: `typecheck`, `lint:arch`, `npm test`, the
-  `red-proof` job and the run summary.
-- The CI check-run collector.
+- The phase-4 CI block in `.github/workflows/verify.yml`, the `red-proof` job, and the check-run
+  collector.
 
 ## Out of scope
 
 - Any migration, table or domain type — the pilot slice.
 - Any endpoint other than `/health`.
-- Observability wiring beyond what the OTel SDK does by default — the close-out slice.
+- Observability wiring beyond the OTel SDK's defaults — the close-out slice.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
 - CI is green on `main` with the phase-4 block enabled.
-- `npm run slice:check 00a` reports the `check.run` evidence chain populated. This slice is what
-  makes that evidence available to every slice after it.
+- `npm run slice:check 00a` reports the `check.run` evidence chain populated. This slice is what makes
+  that evidence available to every slice after it.
 - arc42 §7.2 reconciled to what compose actually starts.

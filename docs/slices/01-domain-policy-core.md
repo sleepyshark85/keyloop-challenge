@@ -11,13 +11,11 @@ loopbacks: 0
 
 ## Goal
 
-`src/domain` exists and is pure: it derives an appointment's interval from a service type's duration
-and a requested start, and decides whether that interval lies within a dealership's opening hours. It
-imports nothing at all, not even a Node builtin.
-
-Each of the three things this project expects to be asked to change — how long a job takes, what
-counts as the occupied interval, and when a dealership is open — is confined to one file, so the
-change most likely to arrive is absorbed by one module plus a migration.
+`src/domain` exists and is pure: it derives an appointment's interval from a service type's duration and a
+requested start, and decides whether that interval lies within a dealership's opening hours. It imports
+nothing at all, not even a Node builtin. Each of the three things this project expects to be asked to
+change — how long a job takes, what counts as the occupied interval, and when a dealership is open — is
+confined to one file.
 
 ## Acceptance criteria
 
@@ -43,17 +41,16 @@ change most likely to arrive is absorbed by one module plus a migration.
 
 ## In scope
 
-- `src/domain/duration.ts`, `src/domain/interval.ts`, `src/domain/openingHours.ts`.
-- The occupancy interval as a **named domain type** — "the interval the constraint sees" — so that
-  adding a cleanup buffer between jobs later is a change to one file plus one migration.
+- `src/domain/duration.ts`, `src/domain/interval.ts`, `src/domain/openingHours.ts`, with the occupancy
+  interval as a **named domain type** — "the interval the constraint sees" — so adding a cleanup buffer
+  later is one file plus one migration.
 - `tests/property/opening-hours-dst.test.ts` and `tests/architecture/ambiguity-containment.test.ts`.
 
 ## Out of scope
 
-- Any query, any HTTP concern, any allocation policy. The core decides what an interval *is* and
-  whether it is permitted; it never learns what is booked.
-- Technician shifts and holidays. They are outside the system's scope, and the opening-hours ADR
-  settled it.
+- Any query, HTTP concern or allocation policy. The core decides what an interval *is* and whether it is
+  permitted; it never learns what is booked.
+- Technician shifts and holidays — outside the system's scope, settled by the opening-hours ADR.
 
 ## Definition of done
 

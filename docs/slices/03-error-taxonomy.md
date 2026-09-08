@@ -11,20 +11,16 @@ folded_by: gate-D
 **Was:** the error taxonomy — every failure has one status, one type, and a test.
 
 **Where the work went.** All six acceptance criteria became slice 02's AC-7 to AC-12, unchanged in
-substance, together with the contract test, the `problem+json` serialiser and the mapping from a use
-case's outcome to a status. The quality scenario they carry — every row of the taxonomy is reachable
-and no two rows collide — is slice 02's, and its OpenAPI half is slice 09's.
+substance, with the contract test, the `problem+json` serialiser and the outcome-to-status mapping. The
+quality scenario they carry is slice 02's; its OpenAPI half is slice 10's.
 
-**Why it was folded.** At the phase-4 gate on 2026-09-04 the measured cost of a slice missed the
-budget by more than an order of magnitude. That criterion's own wording offers two remedies, cut
-slices or cut agents; the human cut slices — eleven remaining down to eight — and left the team and
-the loop alone. The figures are in the event log, span `p-4-gate-d`.
-
-The same gate proposed folding slice 07 into slice 06 and withdrew it, an earlier gate having
-defended that seam by name. A cut that reverses a recorded ruling has to say so rather than arrive
+**Why it was folded.** At the phase-4 gate on 2026-09-04 the measured cost of a slice missed the budget by
+more than an order of magnitude. That criterion offers two remedies, cut slices or cut agents; the human
+cut slices — eleven to eight — and left the team and the loop alone. Figures in the event log, span
+`p-4-gate-d`. The same gate proposed folding slice 07 into slice 06 and withdrew it, an earlier gate
+having defended that seam by name: a cut that reverses a recorded ruling has to say so rather than arrive
 inside a list of three.
 
-**Kept rather than deleted**, because the backlog's shape is part of the record: thirteen slices were
-approved with their reasoning stated, and later rulings cut them. Deleting the evidence of the first
-decision to make the second look tidy is the quiet change the rules on source of truth exist to
+**Kept rather than deleted**, because the backlog's shape is part of the record. Deleting the evidence of
+the first decision to make the second look tidy is the quiet change the rules on source of truth exist to
 prevent.

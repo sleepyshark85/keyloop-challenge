@@ -63,44 +63,31 @@ implementation passes every test in the previous slice.
 ## Inherited scope — written here, not only where it was deferred
 
 - **`A-05-6` — two unkilled guards inside the one place a contended resource may be minted.**
-  `src/persistence/pgError.ts` carries surviving mutants on the check that the error code is a
-  string, which is what makes classification total over `unknown`, and on the check that an exclusion
-  violation carries a constraint name. Nothing hands the classifier an error whose code is not a
-  string, and nothing hands it an exclusion violation with no constraint — so both guards are
-  specified and unproven, inside the one file permitted to mint a refusal's resource. **This slice is
-  the destination** because it is where classifying an exclusion violation on the `UPDATE` path
-  becomes live rather than historical: a reschedule racing a booking is the first execution reaching
-  that arm from a second call site. Two unit cases, the implementer's; no production change is
+  `src/persistence/pgError.ts` carries surviving mutants on the check that the error code is a string —
+  what makes classification total over `unknown` — and on the check that an exclusion violation carries a
+  constraint name. Both are specified and unproven inside the one file permitted to mint a refusal's
+  resource. **This slice is the destination** because a reschedule racing a booking is the first execution
+  reaching that arm from a second call site. Two unit cases, the implementer's; no production change
   expected, and if one is needed that is the finding.
 - **`A-06-3` — a concurrency test for racing moves.** The schema slice fixed the **single-threaded**
-  `UPDATE` semantics. The scheduling ADR claims two racing reschedules behave like two racing
-  bookings — one commits, the other is refused — and **no scenario and no test asserted it**. QS-4
-  and QS-5 cover what a *refused* move leaves behind and QS-6 the self-overlap; the mirror of QS-1 on
-  the `UPDATE` path was named by nothing. A `BEFORE UPDATE` trigger that passes everything the schema
-  slice asserts and fails only under simultaneity is the proof the gap is real, and is the mutant
-  control this test owes. **Why here rather than the previous slice:** AC-2 already builds the
-  barrier harness for a move racing *N* bookings, and racing moves is that harness with `UPDATE` on
-  both sides; and it can assert alongside AC-1 that the loser's original is untouched, which is what
-  makes *"one commits, one is refused"* mean something rather than count to one. **If either premise
-  is false on arrival, say so in the PR.**
-- **`F-02-9` — the two advisory locks *raced* rather than argued.** The previous slice discharged its
-  half with a stronger mechanism than the obligation asked for: the lock is the only value both
-  writes will accept, so *"skipped the locks"* is a compile error. What it could not do is race it.
-  Its discharge surfaced one fact the deadlock argument had never stated: **on a second or later
-  attempt a move vacates its incumbent pair while holding only the target pair's locks.** That is an
-  argument today; here it meets two `UPDATE`s at once.
-- **`O-41` — the inherited-scope guard, built before this slice reached Ready.** The original check
-  was a *subset* guard, not a *completeness* guard: the previous slice listed five obligations in
-  prose while three of its four declared refs appeared nowhere but the front-matter line. The guard
-  now runs **both ways**, with an explicit no-ref escape so it cannot demand an invented ref. It was
-  scheduled to land at this slice's dispatch so that a Definition-of-Ready rule first bites on a file
-  written under it — and it did, on this file. Nothing to build.
+  `UPDATE` semantics; the claim that two racing reschedules behave like two racing bookings was asserted
+  by **no scenario and no test**. A `BEFORE UPDATE` trigger passing everything the schema slice asserts
+  and failing only under simultaneity is the proof the gap is real, and the mutant control this test owes.
+  **Why here:** AC-2 already builds the barrier harness, and racing moves is that harness with `UPDATE` on
+  both sides. **If either premise is false on arrival, say so in the PR.**
+- **`F-02-9` — the two advisory locks *raced* rather than argued.** The previous slice discharged its half
+  with a compile error, but could not race it, and surfaced one fact the deadlock argument never stated:
+  **on a second or later attempt a move vacates its incumbent pair while holding only the target pair's
+  locks.** An argument today; here it meets two `UPDATE`s at once.
+- **`O-41` — the inherited-scope guard, built before this slice reached Ready.** It was a *subset* guard,
+  not a *completeness* guard; it now runs **both ways**, with an explicit no-ref escape so it cannot demand
+  an invented ref. Scheduled to land at this slice's dispatch so a Definition-of-Ready rule first bites on
+  a file written under it — which it did, on this file. Nothing to build.
 
 ## In scope
 
-- `tests/concurrency/refused-move-leaves-original.test.ts` and
-  `tests/concurrency/move-never-releases-slot.test.ts`.
-- Whatever the implementation must change to satisfy them — which, if the previous slice was built as
+- `tests/concurrency/refused-move-leaves-original.test.ts` and `move-never-releases-slot.test.ts`, plus
+  whatever the implementation must change to satisfy them — which, if the previous slice was built as
   specified, is nothing. A green run here on unchanged production code is the desired outcome and is
   evidence, not an empty slice.
 
@@ -110,8 +97,6 @@ implementation passes every test in the previous slice.
 
 ## Definition of done
 
-Beyond `CLAUDE.md` §10:
-
-- If no production code changed, the reviewer states that explicitly in the PR and the team log
-  records it. A slice that adds only tests is a legitimate outcome when the tests are the deliverable
-  — but it must be visible rather than look like an oversight.
+Beyond `CLAUDE.md` §10: if no production code changed, the reviewer states that explicitly in the PR and
+the team log records it. A slice that adds only tests is legitimate when the tests are the deliverable —
+but it must be visible rather than look like an oversight.
