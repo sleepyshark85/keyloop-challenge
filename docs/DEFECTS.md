@@ -21,9 +21,9 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 |---|---|
 | Findings recorded | **369** |
 | Severity | 14 blocking · 180 major · 175 minor |
-| Verdicts | 20 narrowed · 129 accepted · 3 escalated · 28 deferred · 2 rejected |
+| Verdicts | 20 narrowed · 129 accepted · 3 escalated · 29 deferred · 2 rejected |
 | Raised by | architect 78 · test-engineer 75 · orchestrator 73 · reviewer 66 · implementer 61 · scribe 11 · human 5 |
-| Awaiting a ruling | **187** |
+| Awaiting a ruling | **186** |
 | Mean escape distance | 1.48 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2458,7 +2458,7 @@ rather than narrated.*
 | **I-10-4** | MINOR | 4 *(+3)* | implementer | NARROWING MADE A SECOND TYPE HOMELESS THAT THE DESIGN DID NOT ANTICIPATE — internal, not just route-not-found | **open** |
 | **I-10-5** | MINOR | 4 *(+0)* | implementer | AC-3 AND AC-3b NEEDED NO SOURCE CHANGE AT ALL, AND THAT WAS ESTABLISHED BY RUNNING THE TESTS RATHER THAN BY ASSUMING IT | **open** |
 | **O-77** | MAJOR | 4 *(+0)* | orchestrator | src/http/problem.ts IS AT 74.29, UNDER SECTION 10's 0.75 BY SEVEN-TENTHS OF A POINT — and being close is exactly when it is tempting to argue | **open** |
-| **S-10-1** | MINOR | 5 *(+0)* | scribe | THE README's ROUTES TABLE OMITS TWO ENDPOINTS THE HARNESS ITSELF EXERCISES | **open** |
+| **S-10-1** | MINOR | 5 *(+0)* | scribe | THE README's ROUTES TABLE OMITS TWO ENDPOINTS THE HARNESS ITSELF EXERCISES | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2532,6 +2532,7 @@ rather than narrated.*
 
 - *scenario:* The table lists GET health, POST appointments and GET appointments-by-id, AND OMITS THE PATCH AND THE CANCELLATION ROUTES — both of which the happy-path harness script drives, so THE README NOW DOCUMENTS A DEMONSTRATION OF ENDPOINTS THE README DOES NOT LIST. THE GAP PREDATES THIS SLICE and is outside R-10-1's scope, which is specifically the missing harness section. THE SCRIBE LEFT IT ALONE RATHER THAN EXPANDING SCOPE UNILATERALLY and reported it instead — the right call, and the second time this session a role has declined to widen its own remit and said why. Worth the architect's attention if completeness of that table matters, and it is the kind of omission that gets worse rather than better once a project stops.
 - *file:* `README.md`
+- *deferred* by architect — RULED (b) DEBT RATHER THAN A MERGE CONDITION, AND THE DISTINCTION IS STATED RATHER THAN ASSERTED: the README's Routes table CLAIMS NO TOTALITY and names docs/api/openapi.json as the full contract, so it is INCOMPLETE RATHER THAN FALSE, and no acceptance criterion asserts it. Booked WITH D-09-5's NO-TERMINAL-CASE CAVEAT rather than into section 11.1, because there is no slice after this one to receive it. THE SCRIBE FOUND IT WHILE DOCUMENTING THE HARNESS — the table omits the two endpoints the harness it had just written actually drives — AND DECLINED TO FIX IT, reporting it instead rather than widening its own remit. That was the right call and the ruling confirms it.
 
 </details>
 

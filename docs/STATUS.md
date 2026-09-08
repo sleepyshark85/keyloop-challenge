@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `a5fb1ba test(10): /health by name, derived single-type cells, and a shape probe at document level (R-10-2, R-10-3, R-10-4)` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process |
-| Agent runs recorded | 233 |
+| Last commit | `f5b5ef7 chore(10): step 5 remediation complete — every assertion falsified before trusted` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E |
+| Agent runs recorded | 235 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -126,6 +126,10 @@
 **Gate process** · 2026-09-08 · delegate-gate-to-orchestrator-and-architect
 
 > HUMAN RULING, 2026-09-08, GOING AFK: YOU CAN GO FOR THE MERGE IF YOU AND THE ARCHITECT CAN AGREE ON IT. Section 6 gives the human step 6 and the override, so this is a DELEGATION OF THAT AUTHORITY FOR SLICE 10 AND IS RECORDED RATHER THAN REMEMBERED — the same shape as the 2026-09-06 delegation under which slice 02 was gated, and slice 05's light-gate ruling. THE CONDITION IS CONJUNCTIVE AND IS THE WHOLE OF IT: the orchestrator AND the architect must agree. EITHER ONE WITHHOLDING IS A HOLD, and the orchestrator does not get to read its own agreement into the architect's silence — the architect must say so explicitly, in a dispatch answered on the record, before any merge. WHAT THIS DOES NOT DELEGATE: it is a merge authority, not a permission to lower a bar. The orchestrator's standing hold conditions are unchanged and were stated to the human before they left — a red run failing for the wrong reasons rather than on assertions, any changed file under section 10's 0.75, a mutation report that does not cover the changed set, a third loopback which auto-escalates with no slice after this one, and A-06-2 reaching a THIRD failed discharge, since AC-3b is its last attempt and a marker that does not constrain what it claims is worth saying rather than logging as discharged. THE PRIOR DELEGATION'S PRECEDENT ALSO BINDS: on 2026-09-08 the human said MERGE IF THINGS GO RIGHT and the orchestrator held slice 09 overnight because a section 10 failure was not that. Same standard here.
+
+**Gate E** · 2026-09-08 · approved
+
+> GATE TAKEN UNDER THE HUMAN'S CONJUNCTIVE DELEGATION OF 2026-09-08 — YOU CAN GO FOR THE MERGE IF YOU AND THE ARCHITECT CAN AGREE ON IT — AND BOTH HALVES ARE ON THE RECORD RATHER THAN INFERRED. The orchestrator asked the architect the merge question DIRECTLY, listing each of the five conditions it had named and what closed them, and asking it to confirm that five booked items remain debt rather than merge conditions. THE ARCHITECT VERIFIED ALL FIVE REMEDIATIONS IN THE TREE AT f5b5ef7 RATHER THAN ACCEPTING THE REPORT, ruled S-10-1 as debt with its reasoning, and answered: I AGREE TO MERGE SLICE 10 AS IT STANDS. ELEVEN OF TWELVE DONE ROWS WERE GREEN BEFORE THIS EVENT AND THE TWELFTH WAS THIS GATE. CI green on f5b5ef7; mutation clears EVERY changed file with a worst of 76.13 and src unchanged since that run so the figures stand; arc42 reconciled; ALL SIX INHERITED OBLIGATIONS DISCHARGED INCLUDING A-06-2 ON ITS THIRD ATTEMPT, with its residual booked as D-10-1 rather than waved through; loopbacks 0 OF 2. WHAT MERGES AS DEBT AND IS NOT HIDDEN: R-10-6, the new components block being eight of server.ts's twenty-two survivors and invisible to a tests-unit-only mutation config, folded into F-06-2 so 79.05 is not read as fully scored; R-10-8, the central-invariant concurrency test being load-sensitive under a full parallel run and green in CI and in isolation; S-10-1; D-10-1, section 8.6's column and the test's matrix being two transcriptions tied by nothing; and ADR-0035 still proposed with section 6(b) having no terminal case on a final slice. THE SLICE'S OWN LESSON, RECORDED BECAUSE IT IS THE REASON IT WAS REOPENED: it was cut out of slice 09 because all three of that slice's BLOCKING findings sat on this half, and its review found IT HAD REPRODUCED THE SAME DEFECT TWICE — a document-level probe that could not fail on the collapse it guarded, and a /health exclusion the design had ruled must never be a silent omission and which shipped as one. Both were caught by a reviewer that ran the falsifications, and both were fixed by assertions that were FALSIFIED BEFORE THEY WERE TRUSTED.
 
 ## Decisions on record
 
@@ -387,7 +391,9 @@
 | 2026-09-08 09:09 | architect | 21m41 | 346 / 11,293 / 20,975,182 | `derived` |
 | 2026-09-08 09:14 | implementer | 3m17 | 106 / 2,020 / 2,563,507 | `derived` |
 | 2026-09-08 09:33 | test-engineer | 21m53 | 264 / 8,780 / 12,948,891 | `derived` |
-| | **total** | **8694m31** | **62,094 / 4,276,360 / 5,540,316,939** | |
+| 2026-09-08 09:35 | scribe | 47m26 | 132 / 3,917 / 3,469,885 | `derived` |
+| 2026-09-08 10:38 | architect | 110m08 | 378 / 11,397 / 23,746,288 | `derived` |
+| | **total** | **8852m05** | **62,604 / 4,291,674 / 5,567,533,112** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
