@@ -86,6 +86,9 @@ one is `201` and the rest `409` — the one invariant, demonstrated rather than 
 need `bash` and `curl` only — no GNU coreutils, no `jq` — and were run by hand on a clean checkout
 before this slice was claimed done.
 
+For every scenario above walked by hand — availability's staleness, a refused reschedule, opening
+hours, the error taxonomy — see [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
+
 ## Tests
 
 `npm test` runs the two Vitest projects as **separate invocations** and merges the results. That is
