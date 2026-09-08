@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **365** |
-| Severity | 14 blocking · 179 major · 172 minor |
+| Findings recorded | **368** |
+| Severity | 14 blocking · 180 major · 174 minor |
 | Verdicts | 20 narrowed · 128 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | architect 78 · test-engineer 75 · orchestrator 72 · reviewer 66 · implementer 59 · scribe 10 · human 5 |
-| Awaiting a ruling | **184** |
+| Raised by | architect 78 · test-engineer 75 · orchestrator 73 · reviewer 66 · implementer 61 · scribe 10 · human 5 |
+| Awaiting a ruling | **187** |
 | Mean escape distance | 1.49 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2455,6 +2455,9 @@ rather than narrated.*
 | **I-10-2** | MINOR | 2 *(+1)* | implementer | M1 IS POSITIVE WITH A DIFFERENCE WORTH RECORDING — the per-response content form keeps the serialiser and survives charset, but FAILS DIFFERENTLY FROM THE CLASSIC FORM | **open** |
 | **I-10-3** | MINOR | 2 *(+0)* | implementer | THE DESIGN'S OWNERSHIP TABLE WENT STALE BECAUSE THE ORCHESTRATOR FIXED THE GAP IT NAMED, MINUTES AFTER IT WAS WRITTEN | **open** |
 | **O-76** | MINOR | 2 *(+0)* | human | THE HUMAN NOTICED A MISSING PR COMMENT BEFORE THE CHECK DID — the orchestrator omitted the section 6 posting instruction from three dispatches in one session | **open** |
+| **I-10-4** | MINOR | 4 *(+3)* | implementer | NARROWING MADE A SECOND TYPE HOMELESS THAT THE DESIGN DID NOT ANTICIPATE — internal, not just route-not-found | **open** |
+| **I-10-5** | MINOR | 4 *(+0)* | implementer | AC-3 AND AC-3b NEEDED NO SOURCE CHANGE AT ALL, AND THAT WAS ESTABLISHED BY RUNNING THE TESTS RATHER THAN BY ASSUMING IT | **open** |
+| **O-77** | MAJOR | 4 *(+0)* | orchestrator | src/http/problem.ts IS AT 74.29, UNDER SECTION 10's 0.75 BY SEVEN-TENTHS OF A POINT — and being close is exactly when it is tempting to argue | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2507,6 +2510,21 @@ rather than narrated.*
 
 - *scenario:* THE HUMAN SAID I DON'T SEE IMPLEMENTER AGREEMENT IN THE PR YET, AND WAS RIGHT. Only the test-engineer had commented on PR 21, and it did so WITHOUT BEING TOLD TO — its dispatch's return section asked for a structured report and said nothing about posting. The implementer's dispatch had the same omission and it did not post. The architect's step-1 dispatch said NO PR, I OPEN IT, which was true at the time and left its design reasoning with nowhere to go once the PR existed — A SEQUENCING ERROR RATHER THAN AN OMISSION, and also the orchestrator's. THIS IS O-72's PATTERN A THIRD TIME IN ONE SESSION: an orchestrator dispatch that is wrong or incomplete, survived by a role reading past it. T-09-5 was an ownership table right about the work and wrong about the owner, which the test-engineer covered; O-72 was a dispatch omitting a finding entirely, which the implementer covered; THIS TIME THE TEST-ENGINEER COVERED AGAIN AND THE IMPLEMENTER DID NOT, WHICH IS THE HONEST OUTCOME — a role should not have to infer a constitutional obligation from silence. THE CHECK WOULD HAVE CAUGHT IT: slice:check's reasoning-is-on-the-PR criterion, built under O-55 after six slices ran with no PR reasoning at all, reports it precisely. IT DID NOT CATCH IT FIRST BECAUSE NOBODY RAN IT BETWEEN THE ROLES REPORTING AND THE HUMAN ASKING. THE REMEDY IS NOT ANOTHER REMINDER TO MYSELF: the posting obligation is generated into every agent definition already, under METHODOLOGY section 8's agents-pr-comment block, and the failure is that a DISPATCH can still contradict the definition by silence. Recorded for the retro, and the orchestrator ran slice:check before every subsequent report rather than after.
 - *file:* `docs/team-log/prompts/`
+
+**I-10-4** — NARROWING MADE A SECOND TYPE HOMELESS THAT THE DESIGN DID NOT ANTICIPATE — internal, not just route-not-found
+
+- *scenario:* THE DESIGN FORESAW ONE ORPHAN AND THERE WERE TWO. OQ-10-1 asked where route-not-found could live, since setNotFoundHandler produces it and it belongs to no operation, and the test-engineer measured that an unreferenced components.responses entry validates. WHAT NEITHER SAW IS THAT internal IS IN THE SAME POSITION ONCE AC-1 NARROWS: it was riding along inside the shared nine-member union on every operation, and narrowing each operation to its own cells LEAVES IT WITH NO OPERATION TO BELONG TO EITHER. AC-1's document-wide check — that every closed-set type appears somewhere — then requires it to be homed, so the implementer added a SECOND components.responses entry rather than either dropping the type from the document or re-widening an operation to keep it. IT SAID THE DESIGN DID NOT EXPLICITLY ANTICIPATE THIS rather than presenting it as covered. THE REASONING IS SOUND AND THE PRECEDENT IS ALREADY SET by route-not-found's own resolution, so this is a deviation to be RATIFIED AT ADJUDICATION rather than a defect — but it is a deviation, and the architect should confirm that two unreferenced component entries is the intended shape rather than a sign the narrowing needs a third answer. ALSO RECORDED: RESCHEDULE's 404 COLLAPSES IDENTICALLY to the seven cells M2 enumerated and was NOT separately listed — so the count is eight, not seven, and the Type.Unsafe shape was applied there too.
+- *file:* `src/http/server.ts`
+
+**I-10-5** — AC-3 AND AC-3b NEEDED NO SOURCE CHANGE AT ALL, AND THAT WAS ESTABLISHED BY RUNNING THE TESTS RATHER THAN BY ASSUMING IT
+
+- *scenario:* A-06-2's obligation — that no operation accepts a caller-supplied appointment id, and that uuid minting stays confined to one module — TURNED OUT TO BE ALREADY TRUE OF THE CODE. The implementer verified it BY RUNNING THE NEW ASSERTIONS rather than by reading the schemas and concluding they looked fine. THAT DISTINCTION IS THE WHOLE OF THIS OBLIGATION'S HISTORY: A-06-2 was declared discharged TWICE on assertions that did not make it — once over the emitted document by a test containing zero occurrences of requestBody, parameters or appointmentId, and once before that. THE PROPERTY WAS ALWAYS TRUE; WHAT WAS MISSING WAS ANYTHING THAT WOULD NOTICE IF IT STOPPED BEING TRUE. So the correct outcome of the third attempt is exactly this: no source change, and an assertion that now fails if a caller-supplied id is ever added. The red run proves the assertion can fail; the green run proves the code satisfies it.
+- *file:* `src/http/routes/appointments.ts`
+
+**O-77** — src/http/problem.ts IS AT 74.29, UNDER SECTION 10's 0.75 BY SEVEN-TENTHS OF A POINT — and being close is exactly when it is tempting to argue
+
+- *scenario:* THE FULL STRYKER RUN COVERS TWENTY-SIX FILES AND FOUR OF THEM CHANGED IN THIS SLICE. THREE CLEAR: routes/availability.ts 88.37, server.ts 79.05, routes/appointments.ts 76.13. problem.ts IS 26 KILLED AGAINST 9 SURVIVED, 74.29 PERCENT, AND SECTION 10's THRESHOLD IS 0.75. IT MISSES BY LESS THAN ONE MUTANT — killing a single further survivor takes it to 27 of 35, 77.14. THAT IS PRECISELY WHY IT MUST NOT BE ARGUED. A threshold that bends when the gap is small is not a threshold, and this project has already recorded what happens when a number is reasoned toward rather than measured: R-05-7 sat at exactly 0.75 with three survivors, slice 08 merged at 71.43 on a human override, and O-64 and O-73 were both cases of a number that answered a different question. THE SURVIVORS ARE CONCENTRATED AND MOSTLY IN ONE STRUCTURE: line 96's ObjectLiteral and 97's ArrowFunction are ProblemSchema's shape and the type union's mapping callback; 102 carries an ArrayDeclaration and two StringLiterals, the resource enumeration of bay and technician; 108 carries an ObjectLiteral, a BooleanLiteral and a StringLiteral, which are additionalProperties false and the schema description; and 178 is a further StringLiteral. SEVERAL LOOK LIKE THE SCHEMA-OPTIONS AND DESCRIPTION CLASS THAT SLICE 08 BOOKED AS DEBT AND SLICE 09 KILLED BY MAKING THE DOCUMENT READABLE FROM A UNIT TEST — THE SAME REMEDY MAY APPLY HERE, since this slice has just made the emitted document assert far more than it did. THE ORCHESTRATOR IS NOT MERGING ON THIS. The human delegated the gate conditionally on the architect and the orchestrator agreeing, and stated hold conditions that name this one exactly: ANY CHANGED FILE UNDER 0.75.
+- *file:* `src/http/problem.ts`
 
 </details>
 
