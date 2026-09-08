@@ -1,17 +1,15 @@
 # Slice 10 — design, as built
 
 Slice file: [`10-openapi-and-curl-harness.md`](10-openapi-and-curl-harness.md), QS-11. The
-through-line: **all three subjects were asserted by tests that could
-not fail**, so every ruling was judged on whether it produced an assertion with a reachable red. After
-step 7 the architecture is in arc42 §3.1, §8.5, §8.6, §10.2 and §11.1; this keeps the rulings and the
-debt.
+through-line: **all three subjects were asserted by tests that could not fail**, so every ruling was
+judged on whether it produced an assertion with a reachable red. After step 7 the architecture is in arc42 §3.1, §8.5, §8.6, §10.2 and
+§11.1; this keeps the rulings and the debt.
 
-*The step-1 to step-5 reasoning is on PR #21 and in the event log, its home (§4).*
+*The step-1 to step-5 reasoning is on PR #21 and in the event log, its home.*
 
 **Building blocks touched · data-model delta: none.** `src/http/problem.ts`, `src/http/routes/*.ts`,
 `tools/docs/openapi.mjs`, `harness/` (with a new `seed.mjs`), `package.json`. Layering and
 dependency-cruiser untouched: narrowing a schema adds no forbidden edge.
-
 
 ## What was designed, and what merged
 
@@ -28,14 +26,14 @@ dependency-cruiser untouched: narrowing a schema adds no forbidden edge.
   be strictly later than `from`*. As written it would have shipped a rule the code does not implement.
 - **AC-3b added.** AC-3's `requestBody` and `(name, in)` equality discharges `A-06-2`'s **contract**
   half — an appointment id is unreachable from a client, which ADR-0025's permanent `absent` rests on
-  — but not *"`deps.newId()` is the only mint"*, which I would not let be declared a third time on
-  an assertion that does not make it. A `tests/architecture/` marker asserts the uuid-minting file set
+  — but not *"`deps.newId()` is the only mint"*, which I would not let be declared a third time on an
+  assertion that does not make it. A `tests/architecture/` marker asserts the uuid-minting file set
   equals `{src/main.ts}`: a denylist, not a proof.
-- **`REQUEST_COUNT >= 2` and AC-5's negative control move together.** A bare guard collides with the
+- **`REQUEST_COUNT >= 2` and the negative control move together.** A bare guard collides with the
   control step 1 specified — one request at an already-taken slot — which would then exit non-zero
-  *because of the guard rather than because it counted*, and a control passing for the wrong reason is
-  this slice's entire subject. The control now fires **two** racers: zero `201`s, two `409`s, non-zero
-  exit. Cost: the one-racer shape goes unexercised, being the shape now forbidden.
+  *because of the guard rather than because it counted*, and a control passing for the wrong reason
+  is this slice's entire subject. The control now fires **two** racers: zero `201`s, two `409`s,
+  non-zero exit. Cost: the one-racer shape goes unexercised, being the shape now forbidden.
 - **No ADR**, checked against the human's 2026-09-07 bar and recorded as checked: per-cell narrowing
   refines ADR-0024's closed set rather than closing an alternative, and reversal is one helper.
 
@@ -65,17 +63,17 @@ which level**; that omission is the defect. Ruling: the behavioural property is 
 **runtime schema**, in the unit test that already fails on the collapse. At **document** level the
 emitter has erased the distinction before a test can see it, so behaviour-probing is impossible there
 and the only faithful assertion is **shape** — each single-type cell's `type` schema is a one-member
-`anyOf`, never a bare `enum` or `const`. A mechanism assertion, which step 1 declined
-by name; **I reverse that for the document level alone**, the mechanism being the sole
-observable there and discriminating all three measured constructions. Falsified as required: a cell
-collapsed, the contract suite red.
+`anyOf`, never a bare `enum` or `const`. A mechanism assertion, which step 1 declined by name; **I
+reverse that for the document level alone**, the mechanism being the sole observable there and
+discriminating all three measured constructions. Falsified as required: a cell collapsed, the contract
+suite red.
 
 **`R-10-3` — my own §1 ruling unbuilt, and the criterion that fails is nameable.** `EXPECTED_PAIRS`
 had five keys, leaving the sixth operation unasserted. **AC-1 fails** — *each operation's set is
 asserted by equality* — holding over five of six, and equality over a subset the test chose is not
-equality. Remedy: that ruling verbatim, plus the assertion closing the **class** and not the
-instance — `EXPECTED_PAIRS`' key set equals the `(method, path)` set in `doc.paths`, so a future route
-nobody adds to the matrix fails rather than passing unseen.
+equality. Remedy: that ruling verbatim, plus the assertion closing the **class** and not the instance
+— `EXPECTED_PAIRS`' key set equals the `(method, path)` set in `doc.paths`, so a future route nobody
+adds to the matrix fails rather than passing unseen.
 
 ## The debt this slice booked
 
