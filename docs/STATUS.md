@@ -15,18 +15,18 @@
 
 | | |
 |---|---|
-| Last commit | `1500e19 chore(09): the loopback event the governor actually counts — O-74` |
+| Last commit | `7519274 docs(09): step 7 — arc42 says what merged, including the four things it had wrong` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 214 |
+| Agent runs recorded | 215 |
 | ADRs accepted | 15 |
-| Slices defined | 10 |
+| Slices defined | 11 |
 | Open DCRs | none |
 
 ## What happens next
 
 - **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
 - **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
-- 2 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
+- 3 slice(s) remain of 11 defined; Gate D folded 4 (03, 12, 13, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
 ## Gate decisions
@@ -360,7 +360,8 @@
 | 2026-09-07 22:06 | test-engineer | 24m13 | 444 / 31,150 / 34,408,186 | `derived` |
 | 2026-09-07 23:17 | implementer | 95m58 | 1,938 / 92,540 / 397,096,062 | `derived` |
 | 2026-09-08 00:04 | test-engineer | 142m36 | 482 / 35,047 / 38,590,404 | `derived` |
-| | **total** | **7744m09** | **54,364 / 3,846,899 / 4,787,693,361** | |
+| 2026-09-08 02:52 | architect | 51m15 | 674 / 16,188 / 79,966,708 | `derived` |
+| | **total** | **7795m23** | **55,038 / 3,863,087 / 4,867,660,069** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
