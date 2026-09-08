@@ -4,7 +4,12 @@ title: Close-out — observability, the pool ceiling, and a performance budget t
 status: ready
 depends_on: ["08"]
 absorbs: ["11"]     # 10 was absorbed 2026-09-04 and REOPENED 2026-09-08 by human ruling A-09-4
-arc42: ["§3.1", "§5.3", "§8.4", "§8.6", "§10.2", "§11.1", "§11.2"]
+arc42: ["§3.1", "§5.2", "§5.3", "§8.4", "§8.5", "§8.6", "§10.2", "§11.1", "§11.2"]
+                     # §5.2 and §8.5 added at step 7, with the reason: this slice made both
+                     # false — §5.2 said telemetry was still slice 09's and that the move ran a
+                     # second attempt loop; §8.5 said `npm test` runs two projects, and `perf`
+                     # is a third. Declaring an edit after the fact is worse than leaving arc42
+                     # lying only if the edit is hidden; the gate is shown both.
 adr: [5, 6, 10]
 quality_scenarios: [QS-13, QS-14, QS-10, QS-12]   # QS-11 goes with the contract half to slice 10
 inherits: ["OQ-05-2", "F-06-1", "T-06-5", "I-04-5", "R-07-12"]   # deferred here by ruling; slice:check enforces it (A-05-5). I-04-5 and R-07-12 admitted by the human at O-59. A-06-2 re-deferred to slice 10 at step 7
