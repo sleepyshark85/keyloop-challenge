@@ -33,8 +33,12 @@ import { postBooking, describeAnswer } from '../support/booking.js';
  *         among its racers. The EXIT CODE is the signal under test, never a count this file
  *         takes on the script's behalf (that pattern — the test asserting the invariant "on the
  *         script's behalf" — is exactly what design calls out as the defect). The negative
- *         control: `REQUEST_COUNT=1` against an already-taken slot must yield zero `201`s and a
- *         non-zero exit.
+ *         control (`R-10-5`, remedy amended at step 5): TWO racers, not one, fired at an
+ *         already-taken slot — `REQUEST_COUNT=1` would collide with the implementer's own
+ *         `REQUEST_COUNT >= 2` guard, exiting non-zero for the GUARD's reason rather than for
+ *         having counted zero `201`s, which is a control passing for the wrong reason and this
+ *         slice's own subject. Two racers at an already-taken slot must yield zero `201`s, two
+ *         `409`s, and a non-zero exit.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * PINNING THE RESCHEDULE OFFSET IS A DELIBERATE INTERFACE COMMITMENT, NOT AN IMPLEMENTATION
@@ -201,6 +205,62 @@ describe('AC-6 — no GNU-only coreutils: harness/*.sh needs nothing beyond POSI
   });
 });
 
+// ────────────────────────────────────────────────────────────── AC-6 (README, R-10-1) ──
+
+/**
+ * `R-10-1`: the reviewer's proposed grep for `harness:seed` asserts one string; the architect
+ * withdrew "gate-verified rather than mechanical" and strengthened the remedy to SET EQUALITY —
+ * every `harness:*` key `package.json` declares must be named in `README.md`. A grep would miss
+ * a NEW harness script added and never documented; equality does not. Content is the scribe's
+ * (`CLAUDE.md` §4); this assertion is the test-engineer's.
+ */
+describe('AC-6 (README) — README.md names every harness:* script package.json declares, by set equality (R-10-1)', () => {
+  function packageHarnessScriptKeys(): string[] {
+    const pkg = JSON.parse(readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')) as {
+      readonly scripts?: Record<string, string>;
+    };
+    return Object.keys(pkg.scripts ?? {})
+      .filter((key) => key.startsWith('harness:'))
+      .sort();
+  }
+
+  function readmeMentionedHarnessScripts(readme: string): string[] {
+    const found = new Set<string>();
+    const pattern = /harness:[A-Za-z0-9_-]+/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(readme)) !== null) found.add(match[0]);
+    return [...found].sort();
+  }
+
+  it('every harness:* package.json script is named in README.md, and README.md names none that do not exist', () => {
+    const readme = readFileSync(resolve(REPO_ROOT, 'README.md'), 'utf8');
+    const declared = packageHarnessScriptKeys();
+    const mentioned = readmeMentionedHarnessScripts(readme);
+    expect(
+      mentioned,
+      `README.md must name exactly the harness:* scripts package.json declares — a NEW script ` +
+        `added and never documented fails this the same way a documented one that no longer ` +
+        `exists would.\ndeclared:  ${JSON.stringify(declared)}\nmentioned: ${JSON.stringify(mentioned)}`,
+    ).toEqual(declared);
+  });
+
+  it('README.md states the eval line and both harness scripts verbatim', () => {
+    const readme = readFileSync(resolve(REPO_ROOT, 'README.md'), 'utf8');
+    expect(
+      readme,
+      `expected README.md to state 'eval "$(npm run --silent harness:seed)"' verbatim — the whole ` +
+        `terminal path AC-6 requires (R-09-12).`,
+    ).toContain('eval "$(npm run --silent harness:seed)"');
+    expect(
+      readme,
+      `expected README.md to name harness/book-read-reschedule-cancel.sh.`,
+    ).toContain('harness/book-read-reschedule-cancel.sh');
+    expect(readme, `expected README.md to name harness/double-booking.sh.`).toContain(
+      'harness/double-booking.sh',
+    );
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────── AC-4 / AC-6 ──
 
 describe('AC-4 / AC-6 — the happy-path harness, driven ONLY from npm run harness:seed\'s output', () => {
@@ -346,7 +406,7 @@ describe('AC-5 / AC-6 — the double-booking harness, driven ONLY from npm run h
     expect(row.rows[0]?.n, 'exactly one confirmed appointment must have been persisted').toBe(1);
   });
 
-  it('AC-5 negative control — REQUEST_COUNT=1 against an already-taken slot yields zero 201s, and the script must exit non-zero', async () => {
+  it('AC-5 negative control — REQUEST_COUNT=2 against an already-taken slot yields zero 201s and two 409s, and the script must exit non-zero (R-10-5)', async () => {
     expect(existsSync(DOUBLE_BOOKING_SCRIPT), `${DOUBLE_BOOKING_SCRIPT} does not exist`).toBe(true);
 
     const { failure, value } = await withService(async (service): Promise<ScriptRunOutcome> => {
@@ -371,7 +431,7 @@ describe('AC-5 / AC-6 — the double-booking harness, driven ONLY from npm run h
         ...process.env,
         ...env,
         BASE_URL: service.baseUrl,
-        REQUEST_COUNT: '1',
+        REQUEST_COUNT: '2',
       });
       return { run };
     });
@@ -383,11 +443,18 @@ describe('AC-5 / AC-6 — the double-booking harness, driven ONLY from npm run h
 
     const output = outputOf(outcome.run);
     const twoOhOnes = output.match(/\b201\b/g) ?? [];
-    expect(twoOhOnes.length, `the sole slot was already taken, so no racer should see 201.\n${output}`).toBe(0);
+    expect(twoOhOnes.length, `the sole slot was already taken, so neither racer should see 201.\n${output}`).toBe(0);
+    const fourOhNines = output.match(/\b409\b/g) ?? [];
+    expect(
+      fourOhNines.length,
+      `both racers fired at an already-taken slot must see 409.\n${output}`,
+    ).toBe(2);
     expect(
       outcome.run.status,
       `zero 201s among the requests fired must make the script exit non-zero — today it always ` +
-        `exits 0 regardless of what it saw.\n${output}`,
+        `exits 0 regardless of what it saw. This also proves the >= 2 guard does not itself make ` +
+        `this control pass: it fires at an already-taken slot, so the non-zero exit must come from ` +
+        `the count of 201s/409s seen, not from the guard rejecting REQUEST_COUNT=1 (R-10-5).\n${output}`,
     ).not.toBe(0);
   });
 });
