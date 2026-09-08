@@ -74,8 +74,11 @@
  * decorates routes as they are added via an `onRoute` hook, so it must be registered BEFORE
  * `registerAppointmentRoutes`/`registerAvailabilityRoute`/`registerHealthRoute` run — which rules
  * out registering it only inside `buildOpenApiDocument`, after `buildServer` has already added
- * every route. It adds no HTTP route of its own (that is `@fastify/swagger-ui`'s job, not used
- * here) and costs nothing a production server would notice.
+ * every route. It adds no HTTP route of its own; `@fastify/swagger-ui`, registered immediately
+ * after it below at `routePrefix: '/documentation'`, serves the interactive explorer from that
+ * same document — measured not to add any operation of its own to `doc.paths` (its own routes
+ * carry no schema, and `@fastify/swagger` documents schema-bearing routes only), so
+ * `EXPECTED_PAIRS` in `tests/contract/openapi-document.test.ts` is unaffected.
  *
  * ── `POST /appointments` SERVER SPAN — HAND-WRITTEN, NOT `@opentelemetry/instrumentation-http`
  * (step 5 finding 6, the NAMED fallback taken) ───────────────────────────────────────────────
@@ -101,6 +104,7 @@
 import Fastify, { errorCodes } from 'fastify';
 import type { FastifyBaseLogger, FastifyError, FastifyInstance, FastifyServerFactory } from 'fastify';
 import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 import { SpanStatusCode, context, trace } from '@opentelemetry/api';
 import http from 'node:http';
 import { registerHealthRoute } from './routes/health.js';
@@ -257,19 +261,25 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   // ADR-0005 — registered before any route, so its `onRoute` hook sees every schema.
   //
-  // BOTH `.register()` CALLS, DELIBERATELY — measured. `@fastify/swagger` attaches its
-  // `onRoute` hook from INSIDE its own plugin body, which `.register()` defers to Fastify's
-  // boot sequence (avvio); the route-registration functions below call `.get()`/`.post()`
-  // directly, which fire `onRoute` SYNCHRONOUSLY, at the moment they run. Calling them as plain
-  // functions at this same top level — as they were before this slice — runs them BEFORE
-  // swagger's plugin body ever executes, so its hook does not exist yet and the emitted document
-  // has an empty `paths`. Wrapping them in their own `.register()` puts them in the SAME
-  // deferred boot queue as swagger, in registration order, so swagger's hook is attached by the
-  // time these routes are added. No `hideUntagged`, no exposed UI route: `buildOpenApiDocument`
-  // below is the only consumer.
+  // ALL THREE `.register()` CALLS BELOW, DELIBERATELY ORDERED — measured. `@fastify/swagger`
+  // attaches its `onRoute` hook from INSIDE its own plugin body, which `.register()` defers to
+  // Fastify's boot sequence (avvio); the route-registration functions further below call
+  // `.get()`/`.post()` directly, which fire `onRoute` SYNCHRONOUSLY, at the moment they run.
+  // Calling them as plain functions at this same top level — as they were before this slice —
+  // runs them BEFORE swagger's plugin body ever executes, so its hook does not exist yet and the
+  // emitted document has an empty `paths`. Wrapping them in their own `.register()` puts them in
+  // the SAME deferred boot queue as swagger, in registration order, so swagger's hook is attached
+  // by the time these routes are added. `@fastify/swagger-ui` is registered second — after
+  // swagger (it decorates `app.swagger()`, which it depends on) and still before the routes — so
+  // it too joins the queue in order; it needs no schema from any route it precedes.
   void app.register(fastifySwagger, {
     openapi: { openapi: '3.1.0', info: OPENAPI_INFO, components: OPENAPI_COMPONENTS },
   });
+
+  // `@fastify/swagger-ui` — a post-close addition. Serves the interactive explorer at
+  // `/documentation`, reading the SAME document `@fastify/swagger` builds above (ADR-0005: one
+  // document, not two). `/documentation/json` (the plugin's own default) exposes it raw.
+  void app.register(fastifySwaggerUi, { routePrefix: '/documentation' });
 
   app.setErrorHandler<FastifyError>(async (error, request, reply) => {
     if (isValidationError(error) || isMalformedBody(error)) {
