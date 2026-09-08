@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **361** |
-| Severity | 14 blocking · 178 major · 169 minor |
+| Findings recorded | **364** |
+| Severity | 14 blocking · 179 major · 171 minor |
 | Verdicts | 20 narrowed · 128 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | architect 78 · test-engineer 75 · orchestrator 72 · reviewer 66 · implementer 56 · scribe 10 · human 4 |
-| Awaiting a ruling | **180** |
-| Mean escape distance | 1.50 step(s) |
+| Raised by | architect 78 · test-engineer 75 · orchestrator 72 · reviewer 66 · implementer 59 · scribe 10 · human 4 |
+| Awaiting a ruling | **183** |
+| Mean escape distance | 1.49 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2451,6 +2451,9 @@ rather than narrated.*
 | **A-10-3** | MINOR | 1 *(+0)* | architect | harness/ IS UNGUARDED, SO AN OWNERSHIP TABLE IS THE ONLY THING PREVENTING T-09-5 A THIRD TIME | **open** |
 | **A-10-4** | MAJOR | 1 *(+0)* | architect | AC-7 WOULD HAVE PUBLISHED A RULE THE CODE DOES NOT IMPLEMENT, AND THE ARCHITECT CORRECTED THE CRITERION | **open** |
 | **A-10-5** | MAJOR | 1 *(+0)* | architect | TWO MECHANISMS ARE RULED MEASURE-DO-NOT-CHOOSE, AND ONE COULD REINTRODUCE THE EXACT DEFECT THIS SLICE CORRECTS | **open** |
+| **I-10-1** | MAJOR | 2 *(+1)* | implementer | M2 IS POSITIVE — a one-member Type.Union COLLAPSES TO A LITERAL AND SILENTLY SUBSTITUTES, reproducing SECTION 8.5's DEFECT INSIDE THE FIX FOR IT, and SEVEN CELLS REACH IT | **open** |
+| **I-10-2** | MINOR | 2 *(+1)* | implementer | M1 IS POSITIVE WITH A DIFFERENCE WORTH RECORDING — the per-response content form keeps the serialiser and survives charset, but FAILS DIFFERENTLY FROM THE CLASSIC FORM | **open** |
+| **I-10-3** | MINOR | 2 *(+0)* | implementer | THE DESIGN'S OWNERSHIP TABLE WENT STALE BECAUSE THE ORCHESTRATOR FIXED THE GAP IT NAMED, MINUTES AFTER IT WAS WRITTEN | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2482,6 +2485,21 @@ rather than narrated.*
 **A-10-5** — TWO MECHANISMS ARE RULED MEASURE-DO-NOT-CHOOSE, AND ONE COULD REINTRODUCE THE EXACT DEFECT THIS SLICE CORRECTS
 
 - *scenario:* ON D-09-3's PRECEDENT — where the auto-instrumentation was assumed to work and measurably did not patch under this entry point — the architect refused to choose two mechanisms by reading. M1: whether Fastify's per-response content form KEEPS THE SERIALISER and survives a charset suffix, which decides how application/problem+json can be declared at all. M2: WHETHER TYPEBOX COLLAPSES A ONE-MEMBER Type.Union TO Type.Literal — and if it does, THE SILENT SUBSTITUTION SECTION 8.5 RECORDS WOULD BE REINTRODUCED INSIDE THE FIX FOR IT. Both must be measured before the design's shape is fixed. No ADR minted: checked against the human's 2026-09-07 bar AND RECORDED AS CHECKED rather than silently skipped.
+- *file:* `docs/slices/10-design.md`
+
+**I-10-1** — M2 IS POSITIVE — a one-member Type.Union COLLAPSES TO A LITERAL AND SILENTLY SUBSTITUTES, reproducing SECTION 8.5's DEFECT INSIDE THE FIX FOR IT, and SEVEN CELLS REACH IT
+
+- *scenario:* THE ARCHITECT REFUSED TO DECIDE THIS BY READING AND WAS RIGHT TO. MEASURED AGAINST THE PINNED STACK — fastify 5.12.1, fastify-swagger 9.8.1, typebox 0.34.52 — with throwaway fixtures removed after capture. BARE TYPEBOX: Type.Union of a single Literal returns Kind Literal with a const, TRACED TO SOURCE in union.js which literally does types-length-one-question-mark CreateType of types-zero. NO OPTION SUPPRESSES IT; IT IS UNCONDITIONAL. FULL ROUND TRIP THROUGH FASTIFY: a route declaring a one-member union for type, with a handler sending a wrong value, RETURNED 404 WITH THE CORRECT CONTENT TYPE AND A BODY CARRYING THE SCHEMA'S CONSTANT — THE WRONG VALUE SILENTLY REPLACED. That is section 8.5's documented defect exactly, and IT IS REACHABLE: reading the four route files' exhaustive switches, SEVEN CELLS COLLAPSE TO ONE MEMBER under the design's own matrix — read's 400 and 404, cancel's 400 and 404, availability's 400 and 422, and book's 409 — each currently sharing a wider response map that AC-1's narrowing will reduce to exactly one type. SO NARROWING THE DECLARATION, WHICH IS THE WHOLE POINT OF AC-1, IS WHAT WOULD HAVE ARMED THE DEFECT. THE OTHER CANDIDATE IS WORSE, ALSO MEASURED: Type.String with an enum of one lets the wrong value through UNVALIDATED AND UNSUBSTITUTED, so the client sees the wrong string verbatim. A WORKING FIX IS VERIFIED THE SAME WAY: a hand-built Type.Unsafe carrying a one-member anyOf with a const AVOIDS THE COLLAPSE AND ENFORCES — the wrong value is REJECTED, the status is preserved, and Type.Unsafe's type parameter keeps Static inference correct. No design change is needed because the design left the MECHANISM rather than the PROPERTY to measurement.
+- *file:* `src/http/problem.ts`
+
+**I-10-2** — M1 IS POSITIVE WITH A DIFFERENCE WORTH RECORDING — the per-response content form keeps the serialiser and survives charset, but FAILS DIFFERENTLY FROM THE CLASSIC FORM
+
+- *scenario:* MEASURED SIDE BY SIDE RATHER THAN ASSUMED. CHARSET SURVIVES: sending with application/problem+json semicolon charset utf-8 matched the content key in both directions and came back intact, with and without the charset parameter on the send side. IT ENFORCES RATHER THAN PASSING THROUGH: a value outside the enum is rejected. BUT THE FAILURE MODE DIFFERS FROM THE CLASSIC NON-CONTENT FORM, and problem.ts's own docblock documents only the classic one. CLASSIC: escalates to 500 with application/json and a serialization error, which is what the docblock says. CONTENT-KEYED: STAYS AT THE STATUS ALREADY SET, flips content-type to application/json, and the body becomes Fastify's generic shape — IT NEVER ESCALATES TO 500. This is not a blocker and the implementer says so: the failure is still OBSERVABLE through wrong content-type and wrong body at the same status, and AC-1's strengthened equality would catch it. IT IS A LINE OWED TO WHICHEVER SECTION 8.5 ROW THIS MECHANISM LANDS IN AT STEP 7, so a future reader does not assume content-keyed failures escalate the way the docblock describes for the classic form. THE SAME CLASS AS SECTION 8.4 CLAIMING AUTO-INSTRUMENTATION THAT DOES NOT PATCH — a document describing one mechanism's behaviour while the code uses another.
+- *file:* `src/http/problem.ts`
+
+**I-10-3** — THE DESIGN'S OWNERSHIP TABLE WENT STALE BECAUSE THE ORCHESTRATOR FIXED THE GAP IT NAMED, MINUTES AFTER IT WAS WRITTEN
+
+- *scenario:* The design's row for the harness scripts reads ENFORCED BY: NOTHING — harness slash is unguarded, which was TRUE WHEN WRITTEN and is the finding A-10-3 recorded. THE ORCHESTRATOR THEN CLOSED IT at commit a1d1717, adding HARNESS_OWNED to the guard hook and denying every role but the implementer, AFTER the design commits. THE IMPLEMENTER DID NOT TAKE THE DESIGN'S WORD OR THE DISPATCH'S: it read git log to establish the ordering and THEN READ THE HOOK DIRECTLY to confirm the rule is live. Not a design defect — a cell that says nothing where it should now say guard-paths, to be corrected when the architect reconciles at step 7, and the dispatch brief's own boundaries section should be read the same way. RECORDED BECAUSE THE PATTERN IS GENERAL: a design is a snapshot, and a fix landing between design and implementation makes the snapshot wrong in the direction NOBODY CHECKS, since a table that understates enforcement is not a rule anyone will trip over.
 - *file:* `docs/slices/10-design.md`
 
 </details>

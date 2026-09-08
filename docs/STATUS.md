@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `622bd28 chore(10): step 1 designed — and it named its own unfalsifiable criteria` |
+| Last commit | `a1d1717 fix(10): harness/ belonged to nobody, so everybody could write it — A-10-3` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E |
-| Agent runs recorded | 217 |
+| Agent runs recorded | 219 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -367,7 +367,9 @@
 | 2026-09-08 02:52 | architect | 51m15 | 674 / 16,188 / 79,966,708 | `derived` |
 | 2026-09-08 03:10 | test-engineer | 7m51 | 92 / 1,301 / 2,318,129 | `derived` |
 | 2026-09-08 03:44 | architect | 9m12 | 122 / 16,999 / 5,059,046 | `derived` |
-| | **total** | **7812m26** | **55,252 / 3,881,387 / 4,875,037,244** | |
+| 2026-09-08 04:11 | test-engineer | 8m45 | 98 / 3,462 / 3,856,717 | `derived` |
+| 2026-09-08 04:12 | implementer | 10m04 | 138 / 6,433 / 5,678,199 | `derived` |
+| | **total** | **7831m15** | **55,488 / 3,891,282 / 4,884,572,160** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
