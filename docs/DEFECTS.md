@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **373** |
-| Severity | 14 blocking · 181 major · 178 minor |
+| Findings recorded | **374** |
+| Severity | 14 blocking · 181 major · 179 minor |
 | Verdicts | 20 narrowed · 129 accepted · 3 escalated · 29 deferred · 3 rejected |
-| Raised by | architect 80 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 11 · human 5 |
-| Awaiting a ruling | **189** |
-| Mean escape distance | 1.47 step(s) |
+| Raised by | architect 80 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
+| Awaiting a ruling | **190** |
+| Mean escape distance | 1.46 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2464,6 +2464,7 @@ rather than narrated.*
 | **O-79** | MINOR | 7 *(+0)* | orchestrator | AN AGENT DISCARDED UNCOMMITTED WORKING-TREE CHANGES ON A BELIEF IT DID NOT CHECK | **open** |
 | **A-R-6** | MAJOR | 7 *(+0)* | architect | SLICE 00's AC-10 DID NOT STATE THE CONDITION IT REQUIRED — a trailing clarification note was carrying the requirement | **open** |
 | **A-R-7** | MINOR | 7 *(+0)* | architect | A DISAGREEMENT BETWEEN A SLICE FILE AND ITS DESIGN WAS LEFT STANDING DELIBERATELY, AND THE REASON IS THE INTERESTING PART | **open** |
+| **S-10-2** | MINOR | 7 *(+0)* | scribe | THE README's TESTS SECTION CARRIED THREE STALE CLAIMS, AND THE THIRD WAS FOUND ONLY BY CHECKING THE CONFIG | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2558,6 +2559,11 @@ rather than narrated.*
 
 - *scenario:* 00-design.md's AMBIGUITY FLAGGED RATHER THAN RESOLVED section records that AC-7 names no constraint where AC-5 and AC-6 do, and that it was fixed at a named constraint. THE ARCHITECT DRAFTED THAT NAME INTO AC-7 AND THEN REVERTED IT: writing the fact into the criterion WOULD MOVE IT OUT OF THE AMBIGUITY REGISTER AND EMPTY THE REGISTER'S OWN ENTRY — the record of what was ambiguous would be erased by resolving it in the wrong place. So the slice file and its design still differ in emphasis, AND THE ARCHITECT CALLS THAT THE HONEST STATE rather than tidying it. Section 11 of the constitution says ambiguity is deliberate and must never be resolved silently; this is that rule applied to a readability pass, where the temptation to smooth a difference is highest.
 - *file:* `docs/slices/00-design.md`
+
+**S-10-2** — THE README's TESTS SECTION CARRIED THREE STALE CLAIMS, AND THE THIRD WAS FOUND ONLY BY CHECKING THE CONFIG
+
+- *scenario:* ASKED TO POINT THE README AT THE GENERATED TEST REPORT, THE SCRIBE WAS ALSO TOLD TO REPORT ANYTHING ELSE STALE IN THE SAME PARAGRAPH — AND FOUND ONE NOBODY HAD NAMED. FIRST, ALREADY KNOWN: the section opened npm test RUNS THE TWO VITEST PROJECTS while the table two lines below said ALL THREE PROJECTS MERGED — the paragraph contradicted itself, stale since slice 09 added the perf project. Corrected to three, with one clause on WHY perf exists, which is T-09-3's finding: a budget measured beside the twenty-racer concurrency suite is measuring the runner rather than the service. SECOND, ALREADY KNOWN: a hand-typed LAST LOCAL RUN 829 TESTS 59 FILES ALL PASSING, correct that day and wrong on the next change — the A-04-14 and O-61 shape, six hand-copied figures wrong within two hours. Replaced by a pointer to the generated report, with ONE snapshot figure LABELLED AS A SNAPSHOT AND PINNED TO A COMMIT rather than floating free. THIRD, AND THIS ONE WAS FOUND RATHER THAN GIVEN: the test:nodb row CREDITED THAT PROJECT WITH CONTRACT TESTS, and vitest.config.ts PUTS tests/contract IN THE db PROJECT — the scribe checked the config rather than trusting the table it was editing. So a reader running test:nodb expecting the contract suite would have got no contract coverage and no signal. THE PATTERN ACROSS ALL THREE IS ONE THING: prose about the tooling drifts from the tooling, and only reading the tooling catches it. docs:refs verifies that citations RESOLVE, never that a claim about a config is TRUE.
+- *file:* `README.md`
 
 </details>
 

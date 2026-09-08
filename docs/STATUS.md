@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `c91eb5a docs(slices): rewrite the two close-out design records` |
+| Last commit | `6211c48 docs: point README at the generated test report, fix stale test-project claims` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E, process |
-| Agent runs recorded | 240 |
+| Agent runs recorded | 241 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -402,7 +402,8 @@
 | 2026-09-08 12:32 | scribe | 20m07 | 284 / 6,943 / 13,808,325 | `derived` |
 | 2026-09-08 14:35 | implementer | 5m52 | 166 / 2,460 / 4,412,827 | `derived` |
 | 2026-09-08 15:51 | architect | 53m34 | 574 / 15,824 / 74,690,954 | `derived` |
-| | **total** | **8971m36** | **64,310 / 4,348,399 / 5,723,208,424** | |
+| 2026-09-08 16:50 | scribe | 4m30 | 106 / 1,830 / 2,914,778 | `derived` |
+| | **total** | **8976m06** | **64,416 / 4,350,229 / 5,726,123,202** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
