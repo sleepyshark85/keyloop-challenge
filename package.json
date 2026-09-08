@@ -46,7 +46,6 @@
     "defects:check": "node tools/defects/generate.mjs --check",
     "mutation": "stryker run",
     "mutation:collect": "node tools/team-log/collect-mutation.mjs",
-    "openapi:explorer": "node tools/openapi-explorer.mjs",
     "slice:close": "node tools/slice/close.mjs"
   },
   "devDependencies": {

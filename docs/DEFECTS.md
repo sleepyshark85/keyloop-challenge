@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **370** |
-| Severity | 14 blocking · 180 major · 176 minor |
+| Findings recorded | **371** |
+| Severity | 14 blocking · 180 major · 177 minor |
 | Verdicts | 20 narrowed · 129 accepted · 3 escalated · 29 deferred · 3 rejected |
-| Raised by | architect 78 · test-engineer 75 · orchestrator 74 · reviewer 66 · implementer 61 · scribe 11 · human 5 |
-| Awaiting a ruling | **186** |
-| Mean escape distance | 1.48 step(s) |
+| Raised by | architect 78 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 11 · human 5 |
+| Awaiting a ruling | **187** |
+| Mean escape distance | 1.47 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2461,6 +2461,7 @@ rather than narrated.*
 | **O-77** | MAJOR | 4 *(+0)* | orchestrator | src/http/problem.ts IS AT 74.29, UNDER SECTION 10's 0.75 BY SEVEN-TENTHS OF A POINT — and being close is exactly when it is tempting to argue | **open** |
 | **S-10-1** | MINOR | 5 *(+0)* | scribe | THE README's ROUTES TABLE OMITS TWO ENDPOINTS THE HARNESS ITSELF EXERCISES | deferred |
 | **O-78** | MINOR | 7 *(+0)* | orchestrator | THE GUARD REFUSED A PATH MY DISPATCH HAD GRANTED, AND THIS TIME THE MECHANISM CAUGHT WHAT A BRIEFING WOULD HAVE LET THROUGH | **open** |
+| **O-79** | MINOR | 7 *(+0)* | orchestrator | AN AGENT DISCARDED UNCOMMITTED WORKING-TREE CHANGES ON A BELIEF IT DID NOT CHECK | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2540,6 +2541,11 @@ rather than narrated.*
 
 - *scenario:* THE ORCHESTRATOR'S CLOSE-OUT DISPATCH LISTED docs/slices/99 AMONG THE SCRIBE'S PATHS, asking it to delete the synthetic fixture whose own text says DELETE ONCE SLICE 00 HAS RUN. THE HOOK REFUSED: SCRIBE MAY NOT MODIFY docs/slices — because docs/slices belongs to the orchestrator under section 4, and the guard reflects the PERSISTENT ROLE DEFINITION RATHER THAN A PER-TASK GRANT. THE SCRIBE DID NOT ATTEMPT TO BYPASS IT, flagged it in arc42 section 13.6 rather than silently claiming the deletion was handled, AND CAUGHT ITS OWN DRAFT: it had already written DELETED AT CLOSE-OUT before the guard fired, and corrected that before publishing rather than shipping a false claim about its own work. THIS IS O-72's PATTERN WITH THE OUTCOME REVERSED AND IT IS THE POINT. Four times this session a dispatch of mine contradicted a role definition by silence or by error, and each time the work survived ONLY BECAUSE A ROLE READ PAST ITS INSTRUCTIONS — T-09-5, O-72's two halves, O-76. HERE THE INSTRUCTION WAS WRONG IN THE OTHER DIRECTION, granting a path the constitution does not grant, AND A MECHANISM STOPPED IT RATHER THAN A JUDGEMENT. A briefing cannot be trusted to be right; a guard can be checked. The deletion is the orchestrator's own to make.
 - *file:* `.claude/hooks/guard-paths.mjs`
+
+**O-79** — AN AGENT DISCARDED UNCOMMITTED WORKING-TREE CHANGES ON A BELIEF IT DID NOT CHECK
+
+- *scenario:* The implementer, dispatched to register fastify-swagger-ui, found an uncommitted README.md edit referencing npm run openapi:explorer and REVERTED IT, reporting it as CRUFT REFERENCING A NONEXISTENT SCRIPT. THE SCRIPT EXISTED — it was committed at e88c352 and package.json carried it at the moment of the revert. A single node -p on package.json would have settled it. THE WORK WAS RECOVERABLE AND NOTHING WAS LOST, and the same commit correctly reverted nothing else, so the damage is nil; THE PATTERN IS THE FINDING. This project's whole method is that claims are measured rather than assumed, and the agent applied that standard rigorously to its own task — it measured that the emitted document was byte-identical rather than reasoning about it, which is what kept the change to three lines — AND DID NOT APPLY IT TO A DESTRUCTIVE ACT ON SOMEONE ELSE'S UNCOMMITTED WORK. Verifying before deleting is a lower bar than verifying before asserting, and it was the one that got skipped. NO GUARD COVERS THIS: guard-paths.mjs governs WHICH PATHS a role may write, not whether a write DESTROYS uncommitted changes, and git itself offers no protection for a working tree an agent chooses to clean. Recorded rather than remediated — the explorer that edit referenced has since been deleted as redundant, so restoring the line would be restoring a reference to something gone.
+- *file:* `README.md`
 
 </details>
 

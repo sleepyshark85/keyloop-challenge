@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `83ceab1 docs: add docs/WALKTHROUGH.md, a by-hand scenario walkthrough` |
+| Last commit | `ccbed47 feat: serve the OpenAPI document via @fastify/swagger-ui at /documentation` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E, process |
-| Agent runs recorded | 238 |
+| Agent runs recorded | 239 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -400,7 +400,8 @@
 | 2026-09-08 10:53 | architect | 13m12 | 184 / 7,879 / 8,222,897 | `derived` |
 | 2026-09-08 11:18 | scribe | 26m45 | 498 / 23,619 / 54,540,309 | `derived` |
 | 2026-09-08 12:32 | scribe | 20m07 | 284 / 6,943 / 13,808,325 | `derived` |
-| | **total** | **8912m10** | **63,570 / 4,330,115 / 5,644,104,643** | |
+| 2026-09-08 14:35 | implementer | 5m52 | 166 / 2,460 / 4,412,827 | `derived` |
+| | **total** | **8918m01** | **63,736 / 4,332,575 / 5,648,517,470** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
