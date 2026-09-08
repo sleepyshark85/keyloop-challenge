@@ -4,8 +4,9 @@ import { PROBLEM_MEDIA_TYPE, problemResponse } from '../../../src/http/problem.j
 
 interface NarrowedProblemSchema {
   readonly additionalProperties: boolean;
+  readonly description: string;
   readonly required: readonly string[];
-  readonly properties: Record<string, unknown> & { readonly type: unknown };
+  readonly properties: Record<string, unknown> & { readonly type: unknown; readonly resource: unknown };
 }
 
 /** `problemResponse()`'s return type is deliberately loose (`TSchema`) at the call site — this
@@ -64,9 +65,27 @@ describe('problemResponse() — narrowed to one member, rejects rather than subs
   it('the narrowed schema keeps the rest of the RFC 9457 shape — title, status and the optional members', () => {
     const schema = narrowedSchemaOf(problemResponse('/problems/no-capacity'));
     expect(schema.additionalProperties).toBe(false);
+    expect(schema.description).toBe('RFC 9457 problem detail.');
     expect(schema.required).toEqual(['type', 'title', 'status']);
     expect(Object.keys(schema.properties).sort()).toEqual(
       ['closesAt', 'detail', 'opensAt', 'reference', 'resource', 'status', 'title', 'type'].sort(),
     );
+  });
+
+  /**
+   * ADR-0016's ground, not decoration (the coordinator's own framing, O-77): `resource` names
+   * WHICH of a `no-capacity` refusal's two contended things was unavailable, and the schema that
+   * carries it must enforce the closed set the same way `type` does, never merely describe it.
+   * Direct on the schema's own `resource` property rather than through an HTTP round trip, so
+   * this kill does not depend on `appointments.test.ts`'s own — coincidental — 500-on-bad-value
+   * case continuing to reach exactly this property.
+   */
+  it("the resource property enforces {bay, technician} the same way `type` does — reject, not decorate", () => {
+    const resourceSchema = narrowedSchemaOf(problemResponse('/problems/no-capacity')).properties
+      .resource;
+    const stringify = buildStringify(resourceSchema as never);
+    expect(JSON.parse(stringify('bay')) as unknown).toBe('bay');
+    expect(JSON.parse(stringify('technician')) as unknown).toBe('technician');
+    expect(() => stringify('lift')).toThrow();
   });
 });

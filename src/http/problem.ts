@@ -92,21 +92,20 @@ export type ProblemType = (typeof PROBLEM_TYPES)[number];
 /** RFC 9457's media type. Half the contract: a right `type` as `application/json` is a client that has to sniff. */
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json; charset=utf-8';
 
-export const ProblemSchema = Type.Object(
-  {
-    type: Type.Union(PROBLEM_TYPES.map((type) => Type.Literal(type))),
-    title: Type.String(),
-    status: Type.Integer(),
-    detail: Type.Optional(Type.String()),
-    /** `no-capacity` only. ADR-0016: it exists because PostgreSQL produced a verdict. */
-    resource: Type.Optional(Type.Union([Type.Literal('bay'), Type.Literal('technician')])),
-    /** `unknown-reference` only — four failures share one `type`, and this is which. */
-    reference: Type.Optional(Type.String()),
-    opensAt: Type.Optional(Type.String()),
-    closesAt: Type.Optional(Type.String()),
-  },
-  { additionalProperties: false, description: 'RFC 9457 problem detail.' },
-);
+/**
+ * `narrowedProblemSchema(PROBLEM_TYPES)` (defined below, hoisted — a `function` declaration, not
+ * a `const`) — the full nine-row taxonomy is simply the widest possible narrowing, so this is
+ * the SAME object-shape construction every per-cell response schema uses, not a second, hand-kept
+ * copy of it.
+ *
+ * O-77: a second copy here is what slice 10 measured as nine DEAD mutants — this file's own
+ * `resource`/`additionalProperties`/`description` literals, built a second time, exercised by no
+ * route once every response narrowed away from this exact object (AC-1). One construction site,
+ * reached by every narrowed cell's own tests (`tests/unit/http/problem.test.ts`,
+ * `tests/unit/http/appointments.test.ts`'s resource-enforcement case), leaves nothing here for a
+ * mutant to survive on that a live caller does not already exercise.
+ */
+export const ProblemSchema = narrowedProblemSchema(PROBLEM_TYPES);
 
 export type Problem = Static<typeof ProblemSchema>;
 
@@ -150,8 +149,15 @@ export const PROBLEM_MEDIA_TYPE = 'application/problem+json';
  * The `type` property's schema for a response narrowed to fewer than all nine §8.6 rows. See the
  * file docblock's "SLICE 10" section for why a single-member set is `Type.Unsafe`, not
  * `Type.Union`.
+ *
+ * NO EXPLICIT `TSchema` RETURN TYPE, DELIBERATELY: annotating one would erase `T` from the
+ * inferred return type down to `TSchema`'s own `static: unknown`, which is exactly what breaks
+ * `Problem = Static<typeof ProblemSchema>` below (`ProblemSchema` is `narrowedProblemSchema(
+ * PROBLEM_TYPES)` now, O-77) — `type` would type-check as `unknown` everywhere `Problem` is used
+ * rather than `ProblemType`. Left inferred, TypeScript keeps the two branches' own generic
+ * return types (`TUnsafe<T>` / `TUnion<TLiteral<T>[]>`), and `Static<>` resolves either to `T`.
  */
-function narrowedProblemType<T extends ProblemType>(types: readonly [T, ...T[]]): TSchema {
+function narrowedProblemType<T extends ProblemType>(types: readonly [T, ...T[]]) {
   if (types.length === 1) {
     return Type.Unsafe<T>({ anyOf: [{ const: types[0], type: 'string' }] });
   }
