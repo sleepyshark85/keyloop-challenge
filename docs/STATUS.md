@@ -15,8 +15,8 @@
 
 | | |
 |---|---|
-| Last commit | `b4c5626 test(09): AC-15's matcher pinned a hyphen, not the concept` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
+| Last commit | `d3699bd Merge pull request #20 from sleepyshark85/slice/09-observability` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E |
 | Agent runs recorded | 216 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
@@ -118,6 +118,10 @@
 **Gate E** · 2026-09-07 · approved-with-section-10-override
 
 > HUMAN RULING, 2026-09-07. THE HUMAN MERGED PR 17 THEMSELVES AND ACCEPTED THE MUTATION RESULT FOR THIS SLICE. THE OVERRIDE IS EXPLICIT AND NARROW: routes/availability.ts merges at 71.43 percent against section 10's 0.75, PER FILE, and the row STAYS RED IN THE RECORD — approval does not repaint it, so a later reader sees the miss and the decision to take it rather than a green tick hiding both. WHAT THE HUMAN WAS SHOWN BEFORE DECIDING: that all twelve survivors are documentation prose or the unreachable never arm and EVERY BEHAVIOURAL MUTANT IN THE FILE IS DEAD; that killing the remaining ten would require assertions restating literal prose no acceptance criterion demands, which is the pathology that let appointmentRepository.ts score 100.00 while sitting on a real defect; that TWO INDEPENDENT PARTIES REFUSED TO MAKE THE NUMBER PASS, the architect declining a third Stryker directive because it lands on exactly 75.00 and contradicts its own slice-06 record, and declining to widen the mutation config under R-08-3; and the counter-argument, that seven of the ten prose survivors are killed by slice 09's OpenAPI assertion and holding slice 08 until then was available at the cost of the WIP limit. THE OVERRIDE IS OF THE METRIC, NOT OF THE EVIDENCE. Every other Definition of Done row is green on b151234, and the reason this row is red at all is that the slice fixed the tooling that was hiding it: under the pre-O-64 aggregate reading this slice would have reported PASS at 0.8271 and merged silently. A-08-3's section 6(b) deviation and the D-01-1 plus D-01-3 section 11 row merge were both put in front of the human and neither was objected to. O-59 REMAINS THE HUMAN'S AND IS NOT DECIDED HERE — it does not block this merge and is owed before slice 09 starts.
+
+**Gate E** · 2026-09-08 · approved
+
+> HUMAN RULING, 2026-09-08. THE HUMAN REVIEWED AND MERGED PR 20 AT d3699bd WITH ALL TWELVE DEFINITION-OF-DONE ROWS GREEN AND NO OVERRIDE OF ANY KIND — the first slice since 07 to need none. Every changed file clears section 10's 0.75 per file, worst 82.14. THE SLICE REPAID WHAT IT OWED: routes/availability.ts holds 88.10, so D-08-1 closes and slice 08's overridden 71.43 is discharged. THE HUMAN ALSO QUESTIONED THE SCOPE BEFORE APPROVING, asking why an observability slice changed bookAppointment and cancelAppointment, and was shown that the 183-line reduction in bookAppointment is F-06-1's EXTRACTION — an inherited obligation deferred here by ruling at slice 06 — rather than new logic, that the extraction is what makes the one-increment-site rule assertable at all because the counter was previously incremented from two arms in two files, and that the reviewer verified the extraction FAITHFUL while blocking the slice on fifteen other findings. WHAT MERGES UNFINISHED AND IS NOT HIDDEN: the emitted OpenAPI document declares application/json on all twenty-five responses while the service sends application/problem+json, booked as D-09-1 and carried to slice 10 with A-06-2 and five findings. Six debts recorded in arc42 section 11, three of which are FACTS RATHER THAN WORK so the next reader does not repeat the investigation. Loopbacks 1 of 2, spent on the first (c) ruling of the project.
 
 ## Decisions on record
 

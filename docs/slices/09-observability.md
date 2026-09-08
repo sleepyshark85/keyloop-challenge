@@ -1,7 +1,7 @@
 ---
 id: "09"
 title: Close-out — observability, the pool ceiling, and a performance budget that can fail
-status: ready
+status: done
 depends_on: ["08"]
 absorbs: ["11"]     # 10 was absorbed 2026-09-04 and REOPENED 2026-09-08 by human ruling A-09-4
 arc42: ["§3.1", "§5.2", "§5.3", "§8.4", "§8.5", "§8.6", "§10.2", "§11.1", "§11.2"]
