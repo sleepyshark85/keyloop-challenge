@@ -109,7 +109,7 @@ import { registerAppointmentRoutes } from './routes/appointments.js';
 import type { AppointmentRouteDeps } from './routes/appointments.js';
 import { registerAvailabilityRoute } from './routes/availability.js';
 import type { AvailabilityRouteDeps } from './routes/availability.js';
-import { PROBLEM_CONTENT_TYPE, problem } from './problem.js';
+import { PROBLEM_CONTENT_TYPE, problem, problemResponse } from './problem.js';
 import { createLogger } from '../platform/logger.js';
 import { tracer } from '../platform/telemetry.js';
 
@@ -171,6 +171,33 @@ const OPENAPI_INFO = {
     'Service-appointment scheduling for automotive dealerships. No authentication (ADR-0002); ' +
     'a candidate list is advisory only — every write is adjudicated by PostgreSQL (CLAUDE.md §2.1).',
   version: '1.0.0',
+};
+
+/**
+ * Two rows of §8.6's taxonomy answer no single operation, so AC-1's per-operation narrowing
+ * (`10-design.md` §1) gives neither of them anywhere to live in `paths` — `components.responses`
+ * is OpenAPI 3.1's legal home for an unreferenced response object (OQ-10-1, measured:
+ * `SwaggerParser.validate` 13.0.0 accepts it), and AC-1's document-wide sweep finds each literal
+ * here instead:
+ *
+ *   `route-not-found` (ADR-0024) — `setNotFoundHandler` below renders it for a URL that matches
+ *   nothing this document describes.
+ *   `internal` (500, I-02-5) — carries no response schema on any route on purpose (see
+ *   `routes/appointments.ts`'s docblock: the catch-all must not depend on one), so before this
+ *   narrowing it rode along inside every OTHER status's shared, unnarrowed `ProblemSchema` union;
+ *   narrowing removed that free ride, and this is its own row instead.
+ */
+const OPENAPI_COMPONENTS = {
+  responses: {
+    RouteNotFound: {
+      description: 'No route matches the requested method and path.',
+      ...problemResponse('/problems/route-not-found'),
+    },
+    Internal: {
+      description: 'The request could not be completed; the failure has been logged.',
+      ...problemResponse('/problems/internal'),
+    },
+  },
 };
 
 /**
@@ -241,7 +268,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // time these routes are added. No `hideUntagged`, no exposed UI route: `buildOpenApiDocument`
   // below is the only consumer.
   void app.register(fastifySwagger, {
-    openapi: { openapi: '3.1.0', info: OPENAPI_INFO },
+    openapi: { openapi: '3.1.0', info: OPENAPI_INFO, components: OPENAPI_COMPONENTS },
   });
 
   app.setErrorHandler<FastifyError>(async (error, request, reply) => {

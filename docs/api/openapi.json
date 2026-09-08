@@ -6,6 +6,122 @@
     "version": "1.0.0"
   },
   "components": {
+    "responses": {
+      "RouteNotFound": {
+        "description": "No route matches the requested method and path.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "additionalProperties": false,
+              "description": "RFC 9457 problem detail.",
+              "type": "object",
+              "required": [
+                "type",
+                "title",
+                "status"
+              ],
+              "properties": {
+                "type": {
+                  "anyOf": [
+                    {
+                      "const": "/problems/route-not-found",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "integer"
+                },
+                "detail": {
+                  "type": "string"
+                },
+                "resource": {
+                  "anyOf": [
+                    {
+                      "const": "bay",
+                      "type": "string"
+                    },
+                    {
+                      "const": "technician",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "opensAt": {
+                  "type": "string"
+                },
+                "closesAt": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Internal": {
+        "description": "The request could not be completed; the failure has been logged.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "additionalProperties": false,
+              "description": "RFC 9457 problem detail.",
+              "type": "object",
+              "required": [
+                "type",
+                "title",
+                "status"
+              ],
+              "properties": {
+                "type": {
+                  "anyOf": [
+                    {
+                      "const": "/problems/internal",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "integer"
+                },
+                "detail": {
+                  "type": "string"
+                },
+                "resource": {
+                  "anyOf": [
+                    {
+                      "const": "bay",
+                      "type": "string"
+                    },
+                    {
+                      "const": "technician",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "opensAt": {
+                  "type": "string"
+                },
+                "closesAt": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "schemas": {}
   },
   "paths": {
@@ -208,9 +324,9 @@
             }
           },
           "400": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -233,159 +349,6 @@
                           "type": "string",
                           "enum": [
                             "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
-                          ]
-                        }
-                      ]
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "resource": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "bay"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "technician"
-                          ]
-                        }
-                      ]
-                    },
-                    "reference": {
-                      "type": "string"
-                    },
-                    "opensAt": {
-                      "type": "string"
-                    },
-                    "closesAt": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "RFC 9457 problem detail.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "description": "RFC 9457 problem detail.",
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "properties": {
-                    "type": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -430,9 +393,9 @@
             }
           },
           "409": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -448,55 +411,7 @@
                         {
                           "type": "string",
                           "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
                             "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -541,9 +456,9 @@
             }
           },
           "422": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -559,30 +474,6 @@
                         {
                           "type": "string",
                           "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
                             "/problems/unknown-reference"
                           ]
                         },
@@ -590,24 +481,6 @@
                           "type": "string",
                           "enum": [
                             "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -738,9 +611,9 @@
             }
           },
           "400": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -757,54 +630,6 @@
                           "type": "string",
                           "enum": [
                             "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -849,9 +674,9 @@
             }
           },
           "404": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -867,277 +692,7 @@
                         {
                           "type": "string",
                           "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
                             "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
-                          ]
-                        }
-                      ]
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "resource": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "bay"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "technician"
-                          ]
-                        }
-                      ]
-                    },
-                    "reference": {
-                      "type": "string"
-                    },
-                    "opensAt": {
-                      "type": "string"
-                    },
-                    "closesAt": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "RFC 9457 problem detail.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "description": "RFC 9457 problem detail.",
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "properties": {
-                    "type": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
-                          ]
-                        }
-                      ]
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "resource": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "bay"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "technician"
-                          ]
-                        }
-                      ]
-                    },
-                    "reference": {
-                      "type": "string"
-                    },
-                    "opensAt": {
-                      "type": "string"
-                    },
-                    "closesAt": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "RFC 9457 problem detail.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "description": "RFC 9457 problem detail.",
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "properties": {
-                    "type": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -1288,9 +843,9 @@
             }
           },
           "400": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -1313,48 +868,6 @@
                           "type": "string",
                           "enum": [
                             "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -1399,9 +912,9 @@
             }
           },
           "404": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -1417,55 +930,7 @@
                         {
                           "type": "string",
                           "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
                             "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -1510,9 +975,9 @@
             }
           },
           "409": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -1528,166 +993,13 @@
                         {
                           "type": "string",
                           "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
                             "/problems/no-capacity"
                           ]
                         },
                         {
                           "type": "string",
                           "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
                             "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
-                          ]
-                        }
-                      ]
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "resource": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "bay"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "technician"
-                          ]
-                        }
-                      ]
-                    },
-                    "reference": {
-                      "type": "string"
-                    },
-                    "opensAt": {
-                      "type": "string"
-                    },
-                    "closesAt": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "RFC 9457 problem detail.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "description": "RFC 9457 problem detail.",
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "properties": {
-                    "type": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -1818,9 +1130,9 @@
             }
           },
           "400": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -1837,54 +1149,6 @@
                           "type": "string",
                           "enum": [
                             "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -1929,9 +1193,9 @@
             }
           },
           "404": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -1947,277 +1211,7 @@
                         {
                           "type": "string",
                           "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
                             "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
-                          ]
-                        }
-                      ]
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "resource": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "bay"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "technician"
-                          ]
-                        }
-                      ]
-                    },
-                    "reference": {
-                      "type": "string"
-                    },
-                    "opensAt": {
-                      "type": "string"
-                    },
-                    "closesAt": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "RFC 9457 problem detail.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "description": "RFC 9457 problem detail.",
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "properties": {
-                    "type": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
-                          ]
-                        }
-                      ]
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "resource": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "bay"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "technician"
-                          ]
-                        }
-                      ]
-                    },
-                    "reference": {
-                      "type": "string"
-                    },
-                    "opensAt": {
-                      "type": "string"
-                    },
-                    "closesAt": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "RFC 9457 problem detail.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "description": "RFC 9457 problem detail.",
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "properties": {
-                    "type": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -2266,7 +1260,7 @@
     },
     "/availability": {
       "get": {
-        "description": "What is free for this dealership and service type over [from, to). TypeBox validates each instant on its own; to <= from is rejected by the route (400), not by this schema, because a schema cannot compare two of its own properties.",
+        "description": "Reports availability — capacity free for this dealership and service type over the requested from/to window. to must be strictly later than from. A violation is 400 /problems/malformed-request.",
         "parameters": [
           {
             "schema": {
@@ -2345,9 +1339,9 @@
             }
           },
           "400": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -2364,54 +1358,6 @@
                           "type": "string",
                           "enum": [
                             "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]
@@ -2456,9 +1402,9 @@
             }
           },
           "422": {
-            "description": "RFC 9457 problem detail.",
+            "description": "Default Response",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "additionalProperties": false,
                   "description": "RFC 9457 problem detail.",
@@ -2474,55 +1420,7 @@
                         {
                           "type": "string",
                           "enum": [
-                            "/problems/malformed-request"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/outside-opening-hours"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-found"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/no-capacity"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
                             "/problems/unknown-reference"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/vehicle-not-owned"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/internal"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/appointment-not-confirmed"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "/problems/route-not-found"
                           ]
                         }
                       ]

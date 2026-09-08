@@ -28,7 +28,7 @@
 import { Type } from '@sinclair/typebox';
 import type { Static } from '@sinclair/typebox';
 import type { FastifyInstance } from 'fastify';
-import { ProblemSchema, problem, sendProblem } from '../problem.js';
+import { problem, problemResponse, sendProblem } from '../problem.js';
 import type { Problem } from '../problem.js';
 import type { BookCommand, BookOutcome } from '../../application/bookAppointment.js';
 import type { ReadOutcome } from '../../application/readAppointment.js';
@@ -148,12 +148,33 @@ const AppointmentBody = Type.Object(
 /**
  * `500` is ABSENT on purpose — see the file docblock. Adding it here would give the catch-all a
  * dependency it cannot afford.
+ *
+ * FOUR SEPARATE MAPS, ONE PER OPERATION (`10-design.md` §1's transposed matrix), because the
+ * four operations below no longer share one taxonomy-wide `type` set at each status: `book`'s
+ * `409` is `no-capacity` alone, `reschedule`'s is that plus `appointment-not-confirmed`, and
+ * neither `read` nor `cancellation` has a `409` at all. `problemResponse()` narrows each cell to
+ * exactly the `type` values that operation can produce (AC-1, AC-2).
  */
-const PROBLEM_RESPONSES = {
-  400: ProblemSchema,
-  404: ProblemSchema,
-  409: ProblemSchema,
-  422: ProblemSchema,
+const BOOK_RESPONSES = {
+  400: problemResponse('/problems/malformed-request', '/problems/outside-opening-hours'),
+  409: problemResponse('/problems/no-capacity'),
+  422: problemResponse('/problems/unknown-reference', '/problems/vehicle-not-owned'),
+} as const;
+
+const READ_RESPONSES = {
+  400: problemResponse('/problems/malformed-request'),
+  404: problemResponse('/problems/appointment-not-found'),
+} as const;
+
+const CANCEL_RESPONSES = {
+  400: problemResponse('/problems/malformed-request'),
+  404: problemResponse('/problems/appointment-not-found'),
+} as const;
+
+const RESCHEDULE_RESPONSES = {
+  400: problemResponse('/problems/malformed-request', '/problems/outside-opening-hours'),
+  404: problemResponse('/problems/appointment-not-found'),
+  409: problemResponse('/problems/no-capacity', '/problems/appointment-not-confirmed'),
 } as const;
 
 export function registerAppointmentRoutes(
@@ -162,7 +183,7 @@ export function registerAppointmentRoutes(
 ): void {
   app.post<{ Body: BookingBodyType }>(
     '/appointments',
-    { schema: { body: BookingBody, response: { 201: AppointmentBody, ...PROBLEM_RESPONSES } } },
+    { schema: { body: BookingBody, response: { 201: AppointmentBody, ...BOOK_RESPONSES } } },
     async (request, reply) => {
       const body = request.body;
       const outcome = await deps.bookAppointment({
@@ -247,7 +268,7 @@ export function registerAppointmentRoutes(
     {
       schema: {
         params: AppointmentParams,
-        response: { 200: AppointmentBody, ...PROBLEM_RESPONSES },
+        response: { 200: AppointmentBody, ...READ_RESPONSES },
       },
     },
     async (request, reply) => {
@@ -295,7 +316,7 @@ export function registerAppointmentRoutes(
     {
       schema: {
         params: AppointmentParams,
-        response: { 200: AppointmentBody, ...PROBLEM_RESPONSES },
+        response: { 200: AppointmentBody, ...CANCEL_RESPONSES },
       },
     },
     async (request, reply) => {
@@ -346,7 +367,7 @@ export function registerAppointmentRoutes(
       schema: {
         params: AppointmentParams,
         body: RescheduleBody,
-        response: { 200: AppointmentBody, ...PROBLEM_RESPONSES },
+        response: { 200: AppointmentBody, ...RESCHEDULE_RESPONSES },
       },
     },
     async (request, reply) => {
