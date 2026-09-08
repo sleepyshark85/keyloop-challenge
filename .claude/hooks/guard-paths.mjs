@@ -33,10 +33,31 @@ const TEST_OWNED = [
   'tests/setup/', 'tests/support/', 'vitest.config.ts',
 ];
 
+/**
+ * `harness/` IS THE IMPLEMENTER'S, AND UNTIL NOW NOTHING SAID SO — A-10-3.
+ *
+ * The cURL scripts are deliverables the implementer builds; `tests/acceptance/harness.test.ts`
+ * is the test-engineer's assertion ABOUT them. That split is in slice 10's ownership table and
+ * was in no deny list at all, so every role could write the scripts.
+ *
+ * The architect raised it while tabulating owners, and its reason is the whole point: slice 09
+ * lost work TWICE to an ownership table that was right about the work and wrong about the owner
+ * — `T-09-5`, where the table assigned an outside-in half to the implementer alone, and `O-72`,
+ * where a dispatch omitted a finding entirely. Both times a role read past its instructions and
+ * covered. **A TABLE IS A BRIEFING, NOT A GUARD**, and work that survives because agents ignored
+ * their instructions is not a mechanism.
+ *
+ * Note the asymmetry with `TEST_OWNED`: the harness scripts are denied to everyone EXCEPT the
+ * implementer, where `tests/setup/` and `tests/support/` are denied to the implementer because
+ * they are part of the test. Same reasoning, opposite direction — the artifact belongs to
+ * whoever must not be able to make the assertion pass without changing the behaviour.
+ */
+const HARNESS_OWNED = ['harness/'];
+
 /** role -> { write: [prefixes], read: [prefixes], note } */
 const POLICY = {
   'test-engineer': {
-    write: ['tests/unit/', 'src/', 'docs/arc42/', 'docs/adr/'],
+    write: [...HARNESS_OWNED, 'tests/unit/', 'src/', 'docs/arc42/', 'docs/adr/'],
     read: ['src/'],
     note: 'The test-engineer derives tests from the slice file, arc42 and the ADRs — never from the implementation. Unit tests belong to the implementer.',
   },
@@ -46,17 +67,17 @@ const POLICY = {
     note: 'Acceptance, contract, property and concurrency tests define *done*. If one is wrong, raise a DCR — do not edit it. arc42 and ADRs belong to the architect.',
   },
   reviewer: {
-    write: ['src/', 'tests/', 'docs/'],
+    write: [...HARNESS_OWNED, 'src/', 'tests/', 'docs/'],
     read: [],
     note: 'The reviewer audits and cannot author. A design problem is raised as a DCR, not fixed.',
   },
   architect: {
-    write: ['src/', 'tests/'],
+    write: [...HARNESS_OWNED, 'src/', 'tests/'],
     read: [],
     note: 'The architect owns arc42 and the ADRs, and never writes application code or tests.',
   },
   scribe: {
-    write: ['src/', 'tests/', 'docs/adr/', 'docs/slices/'],
+    write: [...HARNESS_OWNED, 'src/', 'tests/', 'docs/adr/', 'docs/slices/'],
     read: [],
     note: 'The scribe records. It owns README, arc42 §12 and §13 — not §1–§11, not code, not decisions.',
   },

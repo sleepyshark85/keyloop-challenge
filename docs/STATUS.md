@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| Last commit | `80d278b docs(10): step 1 — the matrix is a column, and every criterion gets a reachable red` |
+| Last commit | `622bd28 chore(10): step 1 designed — and it named its own unfalsifiable criteria` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E |
 | Agent runs recorded | 217 |
 | ADRs accepted | 15 |
