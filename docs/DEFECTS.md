@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **355** |
-| Severity | 14 blocking · 175 major · 166 minor |
+| Findings recorded | **361** |
+| Severity | 14 blocking · 178 major · 169 minor |
 | Verdicts | 20 narrowed · 128 accepted · 3 escalated · 28 deferred · 2 rejected |
-| Raised by | test-engineer 75 · architect 72 · orchestrator 72 · reviewer 66 · implementer 56 · scribe 10 · human 4 |
-| Awaiting a ruling | **174** |
-| Mean escape distance | 1.53 step(s) |
+| Raised by | architect 78 · test-engineer 75 · orchestrator 72 · reviewer 66 · implementer 56 · scribe 10 · human 4 |
+| Awaiting a ruling | **180** |
+| Mean escape distance | 1.50 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2438,6 +2438,51 @@ rather than narrated.*
 
 - *scenario:* CI FAILED ON THE perf PROJECT ALONE — nodb 31 files exit 0, db 25 files exit 0, PERF 1 FILE EXIT 1 — which is the third project doing exactly what T-09-3 was raised to make it do: the budget failed in its own container, visibly, instead of being lost in a shared run. AC-15 REQUIRES ARC42 SECTION 11 TO RECORD THE MEASURED WRITE THROUGHPUT for one contended resource, and the test asserts it with a regex requiring the literal phrase write-space-throughput within 400 characters of a figure. BEFORE STEP 7 SECTION 11 READ Measured write throughput there: 229.47 attempts/s AND MATCHED. STEP 7 COMPRESSED IT TO Measured: 229.47 attempts/s, and the only surviving occurrence of the phrase is HYPHENATED in the heading, The write-throughput ceiling bought with goal 1 — which the space-requiring regex does not match. A HYPHEN. THE ARCHITECT DID NOTHING WRONG IN SUBSTANCE: the figure is still recorded, the heading still names the concept, section 11 came in at or under its ratchet ceiling, and the compression was necessary to pay for six new debt entries. THE TEST IS WHAT IS BRITTLE — it pins a stylistic variant of a phrase rather than the fact AC-15 actually demands, which is that a measured figure for contended write throughput appears in section 11. THIS IS THE A-R-5 CLASS INVERTED. There, code comments quoted arc42 prose and nothing checked they still matched. Here an acceptance test greps arc42 prose and the prose moved underneath it. BOTH ARE THE SAME UNDERLYING GAP: prose and the things that depend on it drift, and only one direction has ever been checked. NOTED IN PASSING AND NOT A DEFECT: the CI figure is 105.33 per second against the recorded 229.47, roughly half, on a different machine — D-09-6 already records that the headroom rather than the ceiling is the baseline, and AC-15 asserts only that A figure is recorded, not that it matches.
 - *file:* `tests/performance/availability-budget.test.ts`
+
+</details>
+
+## Slice 10
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **A-10-1** | MINOR | 1 *(+0)* | architect | THE FOUR DROPPED OPERATION-STATUS CELLS ARE ASSUMED UNREACHABLE, READ FROM THE ROUTES' EXHAUSTIVE SWITCHES | **open** |
+| **OQ-10-1** | MINOR | 1 *(+0)* | architect | WHETHER AN UNREFERENCED components.responses ENTRY SURVIVES AC-8's VALIDATOR IS UNVERIFIED | **open** |
+| **A-10-2** | MAJOR | 1 *(+0)* | architect | THE DESIGN NAMES ITS OWN UNFALSIFIABLE CRITERIA RATHER THAN LETTING THE REVIEW FIND THEM | **open** |
+| **A-10-3** | MINOR | 1 *(+0)* | architect | harness/ IS UNGUARDED, SO AN OWNERSHIP TABLE IS THE ONLY THING PREVENTING T-09-5 A THIRD TIME | **open** |
+| **A-10-4** | MAJOR | 1 *(+0)* | architect | AC-7 WOULD HAVE PUBLISHED A RULE THE CODE DOES NOT IMPLEMENT, AND THE ARCHITECT CORRECTED THE CRITERION | **open** |
+| **A-10-5** | MAJOR | 1 *(+0)* | architect | TWO MECHANISMS ARE RULED MEASURE-DO-NOT-CHOOSE, AND ONE COULD REINTRODUCE THE EXACT DEFECT THIS SLICE CORRECTS | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**A-10-1** — THE FOUR DROPPED OPERATION-STATUS CELLS ARE ASSUMED UNREACHABLE, READ FROM THE ROUTES' EXHAUSTIVE SWITCHES
+
+- *scenario:* AC-1 narrows each operation's declared problem set to the types it can actually produce, which DROPS FOUR (operation, status) CELLS — 404 from book, 409 and 422 from read and cancel, 422 from reschedule. The architect read the routes' exhaustive switches to establish they are unreachable rather than assuming it. IF ANY IS REACHABLE, NARROWING TURNS A WORKING RESPONSE INTO A 500, which is a strictly worse failure than the over-declaration being fixed. QS-11's sweep is what would say so and it runs on every commit — so the assumption is stated WITH THE THING THAT FALSIFIES IT rather than on its own.
+- *file:* `docs/slices/10-design.md`
+
+**OQ-10-1** — WHETHER AN UNREFERENCED components.responses ENTRY SURVIVES AC-8's VALIDATOR IS UNVERIFIED
+
+- *scenario:* route-not-found is produced by Fastify's setNotFoundHandler rather than by any route, so it belongs to no operation and has nowhere to be declared under AC-1's per-operation equality. An UNREFERENCED components.responses ENTRY IS VALID OpenAPI 3.1, but whether SwaggerParser.validate ACCEPTS ONE under AC-8 IS UNVERIFIED. Left open rather than assumed, because the answer decides whether the taxonomy's ninth row has a home in the document at all.
+- *file:* `docs/api/openapi.json`
+
+**A-10-2** — THE DESIGN NAMES ITS OWN UNFALSIFIABLE CRITERIA RATHER THAN LETTING THE REVIEW FIND THEM
+
+- *scenario:* THE DISPATCH ASKED FOR ANY CRITERION THAT CANNOT BE ASSERTED IN A WAY THAT COULD FAIL, ON THE GROUND THAT THIS IS THE EXACT DEFECT SLICE 10 EXISTS TO CORRECT — every one of slice 09's three BLOCKING findings was a green test asserting the wrong thing. THE ARCHITECT NAMED FOUR. AC-2 ALONE CANNOT FAIL A BUILD: section 8.6 is prose, nothing compares its new operation column to the emitted document, and its real protection is AC-1 — it considered parsing section 8.6 from the test AND DECLINED, because that makes arc42 A MACHINE-READABLE INPUT and breaks on reformatting. Gate-verified, recorded as debt. AC-6's README half is likewise a gate item; only the package.json scripts and the seed-only environment are mechanical. AC-4 AND AC-5 ARE UNFALSIFIABLE WITHOUT NEGATIVE CONTROLS and it named one each — a single-request run against a taken slot must exit non-zero, and a non-200 on one of the three CURRENTLY UNCHECKED harness steps must exit non-zero. THE SHARPEST OBSERVATION IS ABOUT WHERE THE ASSERTION LIVES: the current test counts occurrences of 201 and 409 in stdout, WHICH IS THE TEST ASSERTING THE INVARIANT INSTEAD OF THE SCRIPT — the exit code is the primary signal and the script is what must fail.
+- *file:* `docs/slices/10-design.md`
+
+**A-10-3** — harness/ IS UNGUARDED, SO AN OWNERSHIP TABLE IS THE ONLY THING PREVENTING T-09-5 A THIRD TIME
+
+- *scenario:* The architect tabulated ownership per remedy as the dispatch required — harness.test.ts and openapi-document.test.ts to the test-engineer, the shell scripts and seed and src and the emitted document and package.json to the implementer, AND THE README RUN SECTION TO THE SCRIBE under section 4, because AC-6 names the README and that half is not the implementer's. THEN IT NOTED THE THING THAT MATTERS: harness/ IS NOT COVERED BY guard-paths.mjs AT ALL, so unlike the tests directories, NOTHING MECHANICAL STOPS THE WRONG ROLE EDITING IT. Slice 09 lost work twice to an ownership table that was right about the work and wrong about the owner, recorded as T-09-5 and O-72, and both times a role covered by reading past its instructions. A TABLE IS A BRIEFING, NOT A GUARD.
+- *file:* `tools/lib/guard-paths.mjs`
+
+**A-10-4** — AC-7 WOULD HAVE PUBLISHED A RULE THE CODE DOES NOT IMPLEMENT, AND THE ARCHITECT CORRECTED THE CRITERION
+
+- *scenario:* AC-7's boundary said one thing and availability.ts does another: THE ROUTE REJECTS to LESS-THAN-OR-EQUAL-TO from, so the rule is to STRICTLY LATER THAN from. As written the criterion would have shipped contract prose describing a boundary the implementation does not have — the same class as section 8.4 claiming auto-instrumentation that does not patch, found one slice earlier. Corrected under mid-slice acceptance-criteria authority and PROVISIONAL UNTIL THE GATE. Also ruled here: R-09-13's prose SPLITS rather than moving whole — contract prose stays at operation level with one fact per concatenated literal, the TypeBox rationale returns to the file docblock where it already lives, and the querystring object's duplicate description is DROPPED because @fastify/swagger was measured to discard it, so NO EMITTED BYTE CHANGES and AC-7's own --check proves that. D-08-1's three surviving mutants bind to three AC-7 assertions, and AC-7 must fail when ANY ONE literal is emptied.
+- *file:* `docs/slices/10-openapi-and-curl-harness.md`
+
+**A-10-5** — TWO MECHANISMS ARE RULED MEASURE-DO-NOT-CHOOSE, AND ONE COULD REINTRODUCE THE EXACT DEFECT THIS SLICE CORRECTS
+
+- *scenario:* ON D-09-3's PRECEDENT — where the auto-instrumentation was assumed to work and measurably did not patch under this entry point — the architect refused to choose two mechanisms by reading. M1: whether Fastify's per-response content form KEEPS THE SERIALISER and survives a charset suffix, which decides how application/problem+json can be declared at all. M2: WHETHER TYPEBOX COLLAPSES A ONE-MEMBER Type.Union TO Type.Literal — and if it does, THE SILENT SUBSTITUTION SECTION 8.5 RECORDS WOULD BE REINTRODUCED INSIDE THE FIX FOR IT. Both must be measured before the design's shape is fixed. No ADR minted: checked against the human's 2026-09-07 bar AND RECORDED AS CHECKED rather than silently skipped.
+- *file:* `docs/slices/10-design.md`
 
 </details>
 

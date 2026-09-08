@@ -15,16 +15,16 @@
 
 | | |
 |---|---|
-| Last commit | `d3699bd Merge pull request #20 from sleepyshark85/slice/09-observability` |
+| Last commit | `80d278b docs(10): step 1 — the matrix is a column, and every criterion gets a reachable red` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E |
-| Agent runs recorded | 216 |
+| Agent runs recorded | 217 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
+- **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md), [`10`](slices/10-openapi-and-curl-harness.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
 - **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
 - 3 slice(s) remain of 11 defined; Gate D folded 4 (03, 12, 13, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
@@ -366,7 +366,8 @@
 | 2026-09-08 00:04 | test-engineer | 142m36 | 482 / 35,047 / 38,590,404 | `derived` |
 | 2026-09-08 02:52 | architect | 51m15 | 674 / 16,188 / 79,966,708 | `derived` |
 | 2026-09-08 03:10 | test-engineer | 7m51 | 92 / 1,301 / 2,318,129 | `derived` |
-| | **total** | **7803m14** | **55,130 / 3,864,388 / 4,869,978,198** | |
+| 2026-09-08 03:44 | architect | 9m12 | 122 / 16,999 / 5,059,046 | `derived` |
+| | **total** | **7812m26** | **55,252 / 3,881,387 / 4,875,037,244** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
