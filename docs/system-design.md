@@ -10,32 +10,43 @@ stale against it.
 
 ---
 
-This is the architecture documentation for the Keyloop service scheduler, following
-[arc42](https://arc42.org) (CC BY-SA). All twelve standard sections are retained; several are
-deliberately thin and say why. One section is added outside the standard twelve: **§13 AI
-Collaboration**.
+Architecture documentation for the Keyloop service scheduler, following [arc42](https://arc42.org)
+(CC BY-SA). All twelve standard sections are retained; several are deliberately thin and say why.
+**§13 AI Collaboration** is added outside the standard twelve.
 
-**If you are assessing this submission** — §1 goals, §4 solution strategy, §9 decisions,
-§11 risks and debt, §13 AI collaboration.
-**If you are implementing** — §5 building blocks, §8 cross-cutting concepts, §10 quality scenarios.
-**If you are operating it** — §7 deployment, §8 observability.
+## What the brief asks for, and where it is
+
+The assessment's Part 1 asks a System Design Document for six things:
+
+| The brief asks for | It is in |
+|---|---|
+| An architecture diagram | §5.1 (containers and modules), §6.1 (the concurrent-booking sequence) |
+| A brief description of each component's role | §5.1, §5.2 |
+| An explanation of the data flow | §6.1–§6.6 |
+| A list of chosen technologies with justifications | §4.2, and §2.2 for what was imposed rather than chosen |
+| A strategy for observability | §8.4 — spans, metrics, logs |
+| How GenAI assisted the design | §13, and `README.md` for the collaboration narrative |
+
+Part 2's *"scalability, performance, reliability, maintainability, observability"* are §1.2's ranked
+quality goals, made executable as §10's scenarios and costed in §11.
+
+**The one thing to read if you read one thing: §4.1.** Double-booking is prevented by a PostgreSQL
+exclusion constraint rather than by application code. §8.2 is the constraint itself, §6.1 the race it
+decides.
 
 ## How to read the quality scenarios
 
-§10 numbers each scenario `QS-n`, and every one names the test that enforces it. The chain
-
-```
-§10 quality scenario → slice acceptance criterion → test name → CI result
-```
-
-is walkable in both directions, and CI fails if a `QS-*` names a test that does not exist. A quality
+§10 numbers each scenario `QS-n` and names the test that enforces it, so
+`§10 scenario → slice acceptance criterion → test name → CI result` is walkable both ways. A quality
 attribute that cannot be traced to a test is aspiration.
 
 ## As-designed versus as-built
 
-This document was written as-designed at the architecture gate and corrected to as-built at each
-slice merge. The difference is preserved on purpose: where the plan was wrong is worth more than a
-plan that reads as though it never was. §11 and §13 discuss the material deltas.
+Written as-designed at the architecture gate and corrected to as-built at each slice merge. The
+difference is preserved on purpose; §11 and §13 discuss the material deltas.
+
+*Sections are separate files under `docs/arc42/`; `docs/system-design.md` is generated from them by
+`npm run docs:build`. Edit the sections, never the generated file.*
 
 ---
 
@@ -44,18 +55,18 @@ plan that reads as though it never was. §11 and §13 discuss the material delta
 | § | Section | |
 |---|---|---|
 | **1** | [Introduction and goals](arc42/01-introduction-goals.md) | A service-appointment scheduler for automotive dealerships. |
-| **2** | [Architecture constraints](arc42/02-constraints.md) | A constraint is something **imposed** — by the brief, by the human, by the constitution, or by the environment. |
-| **3** | [Context and scope](arc42/03-context-scope.md) | The system sits alone: human actors, one persistent store, and **no neighbouring systems** — the most consequential fact about the context, justified in §3.1… |
-| **4** | [Solution strategy](arc42/04-solution-strategy.md) | Five decisions. Everything in §5 to §8 follows from them, and each links to the record that argues it. |
-| **5** | [Building block view](arc42/05-building-blocks.md) | The decomposition and the reasons for it are ADR-0008. |
-| **6** | [Runtime view](arc42/06-runtime-view.md) | Five scenarios. The first is the one the whole design exists to make safe, so it is documented before the happy path. |
+| **2** | [Architecture constraints](arc42/02-constraints.md) | A constraint is something **imposed** — by the brief, the human, the constitution or the environment. |
+| **3** | [Context and scope](arc42/03-context-scope.md) | The system sits alone: human actors, one persistent store, and **no neighbouring systems**. |
+| **4** | [Solution strategy](arc42/04-solution-strategy.md) | Five decisions. Everything in §5 to §8 follows from them. |
+| **5** | [Building block view](arc42/05-building-blocks.md) | Why this decomposition beat the alternatives is ADR-0008; this is what it *is*. |
+| **6** | [Runtime view](arc42/06-runtime-view.md) | The data flow, in five scenarios. |
 | **7** | [Deployment view](arc42/07-deployment-view.md) | npm start                                  # the scheduler, on the HOST └── scheduler      Node 22 LTS · the compiled dist/main.js · :3000 ``` |
-| **8** | [Cross-cutting concepts](arc42/08-crosscutting-concepts.md) | Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API writes, and `opening_hours` is the only one that exists becaus… |
+| **8** | [Cross-cutting concepts](arc42/08-crosscutting-concepts.md) | Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API writes. |
 | **9** | [Architecture decisions](arc42/09-architecture-decisions.md) | Decisions live as individual MADR files under `docs/adr/`. |
 | **10** | [Quality requirements](arc42/10-quality-requirements.md) | The §1.2 ranking, refined into the scenarios below it. |
 | **11** | [Risks and technical debt](arc42/11-risks-technical-debt.md) | Generated by `npm run docs:build` from the two shapes debt arrives in — an **ADR with `status: proposed`**, and a **slice carrying `deferred_from` that is no… |
 | **12** | [Glossary](arc42/12-glossary.md) | Domain terms only. Process vocabulary lives in `docs/METHODOLOGY.md`. |
-| **13** | [AI collaboration](arc42/13-ai-collaboration.md) | Sourced from artifacts, never memory: `docs/team-log/events.jsonl` (1,249 lines), the 369-row register in `../DEFECTS.md`, 18 ADRs, 21 PRs, prompts and repor… |
+| **13** | [AI collaboration](arc42/13-ai-collaboration.md) | Sourced from artifacts, never memory: `docs/team-log/events.jsonl` (1,249 lines), the 369-row register in `../DEFECTS.md`, 18 ADRs, 21 PRs, the prompts and r… |
 
 ## Decisions
 

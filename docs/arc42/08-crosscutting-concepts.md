@@ -4,11 +4,10 @@
 
 ## 8.1 Domain model
 
-Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API
-writes, and `opening_hours` is the only one that exists because of a Gate A ruling.
+Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API writes.
 
 ```
- customer 1─┬─* vehicle                    dealership 1─┬─* opening_hours   (ADR-0001)
+ customer 1─┬─* vehicle                    dealership 1─┬─* opening_hours   (GC-1)
             │                                           ├─* service_bay     (A-9)
             │                                           └─* technician      (A-3)
             │                                                  │
@@ -20,15 +19,12 @@ writes, and `opening_hours` is the only one that exists because of a Gate A ruli
 ```
 
 **The brief's requirement 2 has two halves, and neither is left to application care.** *"A qualified
-Technician"* is enforced by a composite foreign key from `appointment (technician_id,
-service_type_id)` to `technician_qualification`; *"available… for the entire service duration"* is
-enforced by §8.2's exclusion constraint. An appointment naming an unqualified technician is as
-unstorable as one that double-books a bay. The same trick carries A-9 and A-6: composite foreign keys
-make *"a bay and a technician belong to the appointment's dealership"* and *"the vehicle belongs to the
-named customer"* structural rather than procedural, so booking stays the **single `INSERT`** A-6's
-rationale depends on, with no validating pre-reads to go stale.
-
-### The schema
+Technician"* is a composite foreign key from `appointment (technician_id, service_type_id)` to
+`technician_qualification`; *"available… for the entire service duration"* is §8.2's exclusion constraint.
+The same trick carries A-9 and A-6: composite foreign keys make *"a bay and a technician belong to the
+appointment's dealership"* and *"the vehicle belongs to the named customer"* structural rather than
+procedural, so booking stays the **single `INSERT`** A-6 depends on, with no validating pre-reads to go
+stale.
 
 ```sql
 -- 0001_extensions.sql
@@ -36,9 +32,8 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;      -- TC-3: gist over (uuid =, tstz
 
 -- 0002_reference_data.sql
 CREATE TABLE dealership (
-  id         uuid PRIMARY KEY,
-  name       text NOT NULL,
-  time_zone  text NOT NULL              -- IANA, e.g. 'Europe/London'  (ADR-0001, A-8)
+  id uuid PRIMARY KEY, name text NOT NULL,
+  time_zone text NOT NULL                -- IANA, e.g. 'Europe/London'  (GC-1, A-8)
 );
 
 CREATE TABLE opening_hours (             -- a day with no row is a day the dealership is closed
@@ -51,22 +46,19 @@ CREATE TABLE opening_hours (             -- a day with no row is a day the deale
 );
 
 CREATE TABLE service_type (
-  id               uuid    PRIMARY KEY,
-  name             text    NOT NULL,
+  id uuid PRIMARY KEY, name text NOT NULL,
   duration_minutes integer NOT NULL CHECK (duration_minutes > 0)         -- A-1
 );
 
 CREATE TABLE service_bay (
-  id            uuid PRIMARY KEY,
+  id uuid PRIMARY KEY, name text NOT NULL,
   dealership_id uuid NOT NULL REFERENCES dealership (id),
-  name          text NOT NULL,
   UNIQUE (id, dealership_id)             -- target for appointment's composite FK  (A-9)
 );
 
 CREATE TABLE technician (
-  id            uuid PRIMARY KEY,
+  id uuid PRIMARY KEY, name text NOT NULL,
   dealership_id uuid NOT NULL REFERENCES dealership (id),                -- A-3
-  name          text NOT NULL,
   UNIQUE (id, dealership_id)
 );
 
@@ -76,15 +68,11 @@ CREATE TABLE technician_qualification (
   PRIMARY KEY (technician_id, service_type_id)
 );
 
-CREATE TABLE customer (
-  id uuid PRIMARY KEY, name text NOT NULL
-);
+CREATE TABLE customer (id uuid PRIMARY KEY, name text NOT NULL);
 
 CREATE TABLE vehicle (
-  id          uuid PRIMARY KEY,
+  id uuid PRIMARY KEY, vin text NOT NULL UNIQUE, description text NOT NULL,
   customer_id uuid NOT NULL REFERENCES customer (id),                    -- A-6: one owner
-  vin         text NOT NULL UNIQUE,
-  description text NOT NULL,
   UNIQUE (id, customer_id)
 );
 
@@ -118,42 +106,26 @@ CREATE TABLE appointment (
   CONSTRAINT appointment_technician_in_dealership
     FOREIGN KEY (technician_id, dealership_id) REFERENCES technician  (id, dealership_id),
 
-  -- A-6 / ADR-0002: the vehicle belongs to the named customer. Validation, not authorisation.
+  -- A-6 / GC-2: the vehicle belongs to the named customer. Validation, not authorisation.
   CONSTRAINT appointment_vehicle_owned_by_customer
     FOREIGN KEY (vehicle_id, customer_id)      REFERENCES vehicle     (id, customer_id)
 );
 ```
 
-The schema above is what runs, statement for statement, across `0001_extensions.sql`,
-`0002_reference_data.sql` and `0003_appointment.sql` (ADR-0007). Five things a reader will wonder
-about, settled rather than left to inference:
-
-- **Three columns carry no foreign key of their own, and that is complete rather than missing.**
-  `dealership_id`, `service_type_id` and `customer_id` are covered *transitively* by the three
-  composite keys. Adding the singletons would be redundant **and harmful**: with two constraints
-  violable at once, which one PostgreSQL reports is trigger order, and §8.6 maps
-  `422 /problems/unknown-reference` *by constraint name*. The absence is asserted — the set of
-  non-primary-key constraints on `appointment` is exactly seven.
-- **Three of the four composite keys are unreachable from the API.** Under A-10 the *system* allocates
-  the bay and the technician, so those three can only be violated by a bug in the allocator — defence
-  in depth, and correctly absent from §8.6's taxonomy, where such a violation is a `500`. Only
-  `appointment_vehicle_owned_by_customer` is client-reachable.
-- **`appointment.id` has no default**, so no `pgcrypto` and no `uuid-ossp`: `btree_gist` stays the only
-  extension the deployment requires (§7.1). The writer supplies the id, consistent with A-10.
-- **`updated_at` has `DEFAULT now()` and no trigger.** Nothing maintains it, deliberately — the
-  database holds the *invariant*, the application holds the convenience — so ADR-0003's `UPDATE` must
-  set it explicitly. Carried as debt in §11.2 R-10.
-- **Nothing cascades.** No `ON DELETE` clause anywhere, because nothing in this system deletes:
-  cancellation is a status transition (ADR-0003). The down migrations drop child-first for the same
-  reason — a `CASCADE` would drop whatever a wrong order got wrong instead of failing on it.
-
-Four reference-table constraints are specified above and asserted by nothing; §11.2 R-11a carries
-them, and which two slice 01's code assumes.
+Four things a reader will wonder about. **`dealership_id`, `service_type_id` and `customer_id` carry no
+foreign key of their own, and that is complete rather than missing** — they are covered *transitively*,
+and adding the singletons would be **harmful**: with two constraints violable at once, which one
+PostgreSQL reports is trigger order, and §8.6 maps `422` *by constraint name*. **Three of the four
+composite keys are unreachable from the API**, the system allocating bay and technician (A-10), so a
+violation there is a `500` rather than a taxonomy row. **`appointment.id` has no default**, keeping
+`btree_gist` the only extension the deployment requires; **`updated_at` has no trigger**, the database
+holding the *invariant* and the application the convenience (§11.2 R-10). And **nothing cascades**,
+because nothing deletes — cancellation is a status transition.
 
 ## 8.2 Persistence and the exclusion constraint
 
-Requirement 2's second half, and the reason this system exists. Reproduced from `CLAUDE.md` §2.1
-**verbatim**, because paraphrasing the one thing that must be exactly right is how it stops being so:
+Requirement 2's second half, and the reason this system exists. Reproduced **verbatim**, because
+paraphrasing the one thing that must be exactly right is how it stops being so:
 
 ```sql
 ALTER TABLE appointment ADD CONSTRAINT no_bay_overlap
@@ -165,304 +137,140 @@ ALTER TABLE appointment ADD CONSTRAINT no_technician_overlap
   WHERE (status <> 'cancelled');
 ```
 
-Six consequences, each of which something elsewhere in this document depends on:
+Six consequences, each of which something elsewhere depends on:
 
-1. **`tstzrange` is half-open, `[starts_at, ends_at)`**, so 09:00–10:00 and 10:00–11:00 do not overlap
-   and back-to-back appointments in one bay are legal. That *is* A-4 — no buffer — expressed in a
-   bound rather than in prose.
-2. **The predicate makes the index partial.** Cancelling removes a row from the constraint's scope
-   without deleting it, so the slot frees itself through the same mechanism that guards every write
-   (§6.4), and no compensating release exists to be forgotten.
-3. **The constraint's names are behaviour, not documentation.** `err.constraint` is what ADR-0009
-   prunes on and what labels `booking_conflicts_total{resource}`; QS-1 and QS-2 pin the names, and
-   §11.2 R-3 carries the coupling.
+1. **`tstzrange` is half-open, `[starts_at, ends_at)`**, so back-to-back appointments in one bay are
+   legal. That *is* A-4 — no buffer — expressed as a bound.
+2. **The predicate makes the index partial**, so cancelling frees the slot through the same mechanism
+   that guards every write and no compensating release exists to be forgotten.
+3. **The constraint names are behaviour, not documentation**: `err.constraint` is what the retry loop
+   prunes on and what labels `booking_conflicts_total{resource}`. QS-1 and QS-2 pin them (§11.2 R-3).
 4. **An `UPDATE` is checked against other rows, not against the version it replaces — and it is the
-   *index* that never sees the superseded version, not a rule anyone wrote.** That is what makes
-   ADR-0003's atomic move work, and what lets an appointment be extended or nudged onto an interval
-   overlapping its own. Asserted by AC-10, at the SQL level.
+   *index* that never sees the superseded version, not a rule anyone wrote.** That is what makes the
+   atomic move work, and **the mechanism is the load-bearing half, because the outcome alone is
+   satisfiable two ways with completely different concurrency behaviour.** `EXCLUDE USING gist` gets it
+   **structurally**: an `UPDATE` writes a new tuple, marks the old one dead, and the index compares the
+   new tuple only against *live* entries. A `BEFORE UPDATE` trigger computing overlap gets it **by
+   memory**: it reads other rows, so it *does* see the prior version, and is correct only if whoever
+   wrote it remembered `WHERE o.id <> NEW.id` — check-then-act with the check moved inside the database,
+   two concurrent triggers under `READ COMMITTED` both reading *"free"*. Measured: the naive trigger
+   fails the self-overlap step, the patched one passes. So the move rests not on *"a row does not
+   conflict with its own prior version"* but on *"the mechanism cannot be made to, because it never sees
+   it"*.
+5. **`btree_gist` is required** (TC-3): `bay_id WITH =` is an equality operator on a `uuid`, which plain
+   GiST cannot index. This is the extension dependency that constrains deployment.
+6. **The GiST indexes serve the availability query too**, so the mechanism that costs write throughput
+   pays for the read path.
 
-   **The mechanism is the load-bearing half, because the outcome alone is satisfiable two ways with
-   completely different concurrency behaviour.** `EXCLUDE USING gist` gets it **structurally**: an
-   `UPDATE` writes a new tuple, marks the old one dead, and the index compares the new tuple only
-   against *live* entries. A `BEFORE UPDATE` trigger computing overlap gets it **by memory**: it reads
-   other rows, so it *does* see the prior version, and is correct only if whoever wrote it remembered
-   `WHERE o.id <> NEW.id` — check-then-act with the check moved inside the database, two concurrent
-   triggers under `READ COMMITTED` both reading *"free"*. Measured: the naive trigger fails AC-10's
-   self-overlap step and **the patched one passes all three steps**. So what ADR-0003 rests on is not
-   *"a row does not conflict with its own prior version"* but *"the mechanism cannot be made to
-   conflict with it, because it never sees it"*.
-
-   > **AC-10 fixed the single-threaded `UPDATE` semantics and nothing more.** Slice 06's AC-1 raises it
-   > to the statement the application generates, with one control per constraint that must raise
-   > `23P01` — a bay-side control alone passes a build whose technician side can self-conflict.
-   > **Two racing reschedules are still asserted by nothing**: re-deferred to slice 07 beside QS-4 and
-   > QS-5, because a deferral recorded only at its origin is what R-05-2 measured going missing.
-5. **`btree_gist` is required** (TC-3), because `bay_id WITH =` is an equality operator on a `uuid`
-   and plain GiST cannot index it. This is the extension dependency that constrains deployment.
-6. **The GiST indexes serve the availability query too.** Its `tstzrange(...) && ...` predicate over
-   non-cancelled rows is exactly what these partial indexes cover, so the mechanism that costs write
-   throughput (§11.2) pays for the read path.
-
-**The one thing this does not give for free** is agreement between the constraint's range expression
-and the availability query's: two expressions in two files, held together by QS-8 rather than by a
-shared `IMMUTABLE` SQL function, which §4.2 records as a trap.
+**The one thing this does not give for free** is agreement between the constraint's range expression and
+the availability query's: two expressions in two files, held together by QS-8 rather than by a shared
+`IMMUTABLE` function, which §4.2 records as a trap.
 
 ## 8.3 Time, zones and the calendar
 
-A-8 decided that the boundary and the storage are **instants**. ADR-0001 then made that load-bearing
-by validating opening hours, which are stated in wall-clock time. The two coexist under one rule:
+A-8 makes the boundary and the storage **instants**; ADR-0001 then validates opening hours, stated in
+wall-clock time. One rule reconciles them:
 
-> **The dealership's zone is used for opening-hours validation and for nothing else. It never enters
-> an overlap calculation.**
+> **The dealership's zone is used for opening-hours validation and for nothing else. It never enters an
+> overlap calculation.**
 
-| Concern | Representation |
-|---|---|
-| API request and response | RFC 3339 with an offset — `2026-09-08T09:00:00+01:00` |
-| Storage | `timestamptz` (an instant; PostgreSQL stores UTC) |
-| Overlap | `tstzrange` over those instants — decided on the absolute timeline, immune to zone and DST bugs |
-| Opening hours | `time` + `day_of_week` in the dealership's local calendar, plus an IANA zone on the dealership |
-| Duration | **Absolute minutes**, added to the start instant |
+The wire carries RFC 3339 with an offset, storage is `timestamptz`, overlap is `tstzrange` on the
+absolute timeline, opening hours are `time` + `day_of_week` in the local calendar beside an IANA zone,
+and duration is **absolute minutes**. **The conversion runs one way only: instant → local wall clock** —
+total and single-valued, where the reverse has no answer at a spring-forward and two at a fall-back. Two
+consequences look like bugs and are not: a 60-minute job starting 00:30 local on a spring-forward night
+ends at **02:30** local, the car being on the ramp for sixty real minutes; and the bookable window shifts
+by an hour, in absolute terms, twice a year. Both endpoints must fall within one day's hours, so an
+interval whose local start and end land on different days is rejected — no weekly schedule contains it.
 
-**The conversion runs one way only: instant → local wall clock**, via
-`Intl.DateTimeFormat(…, { timeZone }).formatToParts()` in `src/domain/openingHours.ts`. That direction
-is *total and unambiguous*, and the other is neither: at a spring-forward, local 01:30 does not exist;
-at a fall-back it happens twice. Every instant has exactly one rendering in a zone, so this rule never
-encounters a question with no answer.
+`withinOpeningHours` runs six steps in a fixed order, and **the order is asserted**, a mutant that
+reorders them being otherwise unkillable: endpoints integral, within ±8 640 000 000 000 000 ms and
+`end > start` (`malformed-interval`) → the zone constructs a formatter (`unknown-zone`) → render both
+endpoints → same local date (`spans-local-days`) → that weekday has a row (`closed-day`) → the times
+parse and `opens ≤ start`, `end ≤ closes` (`malformed-hours` / `outside-window`). Every step fails
+closed: a gate that cannot read its own configuration refuses rather than guesses.
 
-Two consequences that look like bugs and are not:
-
-- **Duration is added in absolute time.** A 60-minute job starting at 00:30 local on a spring-forward
-  night ends at 02:30 local, not 01:30. The car is on the ramp for sixty real minutes; wall clocks are
-  not what occupies a bay.
-- **The bookable window shifts by an hour, in absolute terms, twice a year.** A dealership open
-  09:00–17:00 local is a different pair of instants in summer and winter. That is the reason QS-9
-  exists — this check is the only wall-clock reasoning in the system.
-
-Both `starts_at` and `ends_at` must fall within one day's opening hours (ADR-0001), so an interval
-whose local start and end fall on different days is rejected too: no weekly schedule can contain it.
-Holidays, one-off closures and mid-day breaks are not modelled (§3.3) and land in this module when they
-are.
-
-### The decision procedure
-
-**The order of the checks is part of the design.** `withinOpeningHours` runs six steps in a fixed
-order, and the order is asserted, because a mutant that reorders them is otherwise unkillable:
-
-| # | Step | Verdict if it fails |
-|---|---|---|
-| 1 | both endpoints are integers and `end > start` | `malformed-interval` |
-| 2 | the zone constructs a formatter (an invalid IANA zone throws `RangeError`) | `unknown-zone` |
-| 3 | render both endpoints in that zone | — |
-| 4 | both renderings fall on the same local date | `spans-local-days` |
-| 5 | that local weekday has an `opening_hours` row | `closed-day` |
-| 6 | the row's `time` values parse, and `opens ≤ start` and `end ≤ closes` | `malformed-hours` / `outside-window` |
-
-Step 1 exists **only** because the literal AC-6 ruling took the `Interval` type — which made an
-unordered or non-finite pair unrepresentable — out of this module's reach (§5.2, §11 D-01-3). Every
-step fails closed: a booking gate that cannot read its own configuration refuses rather than guesses.
-
-**Two rendering options are pinned as correctness choices rather than style**: the locale is `'en-US'`,
-never `undefined`, because a pure function must not vary with the host's default locale; and the hour is
-`hourCycle: 'h23'` rather than `hour12: false`, which has historically rendered midnight as `24`. The
-weekday comes from the formatter's `weekday: 'short'` part through an explicit seven-entry lookup, never
-hand-rolled calendar arithmetic — a second calendar implementation inside this module is exactly the
-risk the design avoids.
-
-**The transitions, measured on this runtime rather than reasoned about** (Node 24, full ICU,
-`Europe/London` open 09:00–17:00 local). Spring forward is `2026-03-29T01:00:00Z`; fall back is
-`2026-10-25T01:00:00Z`.
-
-| Instant | Renders local | Verdict |
-|---|---|---|
-| `2026-03-28T08:30:00Z` | `Sat 28/03 08:30` (GMT) | **rejected** |
-| `2026-03-29T08:30:00Z` | `Sun 29/03 09:30` (BST) | **accepted** |
-| `2026-03-29T00:30:00Z` + 60 min | `00:30` → `02:30` local | AC-3: sixty *real* minutes, two wall-clock hours |
-| `2026-10-25T00:30:00Z` | `Sun 25/10 01:30` (BST) | same verdict as the row below |
-| `2026-10-25T01:30:00Z` | `Sun 25/10 01:30` (GMT) | same verdict as the row above |
-
-The first pair is AC-2's worked pair: the same UTC wall time, the same window, opposite verdicts. The
-last is the fall-back ambiguous hour — **two distinct instants render identically and the rule gives
-them the same verdict, which is the correct answer**, because the doors are in the same state both
-times round. The ambiguity that makes fall back hard belongs to *local → instant*, which this rule
-never performs. QS-9 asserts that equality explicitly. A related consequence that reads like a bug and
-is not: on 25 October a dealership open 00:00–06:00 local is open for **seven** absolute hours and on
-29 March for **five**, which the rule produces without knowing it, because it never counts hours.
-
-**An interval ending exactly at local midnight** would render its end on the next local date and be
-rejected as `spans-local-days` — refusing a job that finishes at closing time at a dealership open
-until 00:00, and leaving the time parser's `'24:00:00'` arm, which exists to describe exactly that
-window, unreachable.
-That **shipped in slice 02** (AC-17–19);
-[slice 13's tombstone](../slices/13-interval-ending-at-local-midnight.md) argues it: an end rendering `00:00:00` on the local date immediately after
-the start's normalises to `secondsOfDay = 86400` before step 4's comparison, while a genuine crossing
-(23:00 to 01:00) stays rejected.
+**Measured** (`Europe/London`, 09:00–17:00 local): `2026-03-28T08:30:00Z` renders 08:30 GMT and is
+**rejected**, while `2026-03-29T08:30:00Z` — the same UTC wall time past spring-forward — renders 09:30
+BST and is **accepted**. And `2026-10-25T00:30:00Z` and `2026-10-25T01:30:00Z` both render `01:30` on the
+fall-back night and get the **same** verdict, **which is correct**: the doors are in the same state both
+times round, and the ambiguity belongs to *local → instant*, which this rule never performs (QS-9). **An
+interval ending exactly at local midnight** would otherwise be rejected as spanning two days, refusing a
+job that finishes at closing time, so an end rendering `00:00:00` on the day immediately after the
+start's normalises to `secondsOfDay = 86400` while a genuine crossing (23:00 to 01:00) stays rejected.
 
 ## 8.4 Observability
 
-TC-8 fixes OpenTelemetry with `pino`. §1.2 goal 4 says what for: *the check-then-act window is visible
-in a waterfall even though the code never relies on it*, and the invariant is measurable in
-production, not only in tests.
+TC-8 fixes OpenTelemetry with `pino`. §1.2 goal 4 says what for: *the check-then-act window is visible in a
+waterfall even though the code never relies on it*, and the invariant is measurable in production rather
+than only in tests.
 
-### Spans
+**Spans.** `{METHOD} {path}` carries `http.method`, `http.target` and `http.status_code`, and is
+**hand-written rather than auto-instrumented** — a `serverFactory` wrapping the raw handler, so the span
+opens before Fastify builds its request (§11.1 D-09-3). `availability.candidates` carries
+`candidates.bays` and `candidates.technicians` and is **deliberately separate from the insert**: the gap
+between its end and the next span's start *is* the window check-then-act would have raced in, drawn so a
+reader can see nothing depends on it. `appointment.insert` carries `booking.attempt`, `bay.id`,
+`technician.id`, and on failure `db.sqlstate` and `db.constraint` — **one span per attempt**, so a
+retried booking's waterfall shows the retries rather than one long bar. Rescheduling emits
+`appointment.update`, same shape and the same attempt loop; cancellation emits `appointment.cancel`.
 
-| Span | Attributes | Why it is its own span |
-|---|---|---|
-| `{METHOD} {path}` | `http.method`, `http.target`, `http.status_code` | **Hand-written, not auto-instrumented**: a `serverFactory` wrapping the raw request handler, so the span opens before Fastify builds its request. §11 says why the vendor's could not |
-| `availability.candidates` | `candidates.bays`, `candidates.technicians` | **Deliberately separate from the insert.** The gap between this span's end and the next one's start *is* the window check-then-act would have raced in. It is drawn so a reader can see nothing depends on it |
-| `appointment.insert` | `booking.attempt`, `bay.id`, `technician.id`; on failure `db.sqlstate`, `db.constraint` | **One span per attempt**, so a retried booking's waterfall shows the retries rather than one long bar — ADR-0004's loop made legible in production |
-
-Rescheduling emits `appointment.update`, same shape, **same attempt loop**; cancellation emits
-`appointment.cancel` with `appointment.id`.
-
-### Metrics
+**Metrics.**
 
 | Metric | Type | Labels | Notes |
 |---|---|---|---|
-| `booking_conflicts_total` | counter | `resource` ∈ {bay, technician}, `outcome` ∈ {absorbed, refused, capped} | **The invariant, made observable.** `absorbed` = retried successfully, `refused` = candidates exhausted, `capped` = ADR-0009's cap hit; ADR-0004 requires the first two distinguishable, conflating them making the metric unreadable when it matters. **A non-zero `capped` is expected today rather than a signal the cap is wrong** — D-04-1, §11.2 R-4 |
+| `booking_conflicts_total` | counter | `resource` ∈ {bay, technician}, `outcome` ∈ {absorbed, refused, capped} | **The invariant, made observable.** `absorbed` = retried successfully, `refused` = candidates exhausted, `capped` = the attempt cap hit. Conflating the first two would make the metric unreadable when it matters. A non-zero `capped` is expected today (§11.2 R-4) |
 | `appointments_booked_total` | counter | `dealership` | |
-| `appointments_rescheduled_total` | counter | `outcome` ∈ {moved, refused} | ADR-0003's second act; a move refused for *state* increments neither — §8.6's two `409`s |
+| `appointments_rescheduled_total` | counter | `outcome` ∈ {moved, refused} | A move refused for *state* increments neither — §8.6's two `409`s |
 | `appointments_cancelled_total` | counter | | |
-| `booking_attempts` | histogram | | Attempts per request, recorded unlabelled at the loop's exit whatever the outcome. Its tail is ADR-0009's ordering working or not |
+| `booking_attempts` | histogram | | Attempts per request, at the loop's exit whatever the outcome. Its tail is ADR-0009's ordering working or not |
 
-**`booking_conflicts_total` is incremented on SQLSTATE `23P01` and on nothing else** — never on an
-HTTP status code. That is the same discipline ADR-0001 applied when it made an out-of-hours request a
-`400`: the metric measures contention, and a taxonomy change must not be able to move it.
-**And from exactly one module**, `src/application/attemptLoop.ts`, at most once per attempt loop.
-That fixes *where*, which the sentence above does not: `pg` auto-instrumentation, a repository span
-and a use-case span otherwise count one conflict three times. A QS-12 marker holds the file set by
-equality (§10.2). The availability query has no latency instrument — QS-14 measures it, §11 records
-the figure (§4).
+**`booking_conflicts_total` is incremented on SQLSTATE `23P01` and on nothing else** — never on an HTTP
+status code, so a taxonomy change cannot move it — **and from exactly one module**,
+`src/application/attemptLoop.ts`, at most once per loop. That second clause fixes *where*: `pg`
+auto-instrumentation, a repository span and a use-case span would otherwise count one conflict three
+times. A QS-12 marker holds the file set by equality.
 
-### Logs
-
-`pino` JSON to stdout, one line per request plus one per attempt, **every** line carrying `trace_id`
-and `span_id` from a `mixin` over the active context — the server span opens before Fastify writes
-its first — so Loki and Tempo join without a correlation id of their own. **Identifiers only, never
-names**: a line names `customer.id`, not the customer (§3.3 excludes GDPR-grade handling, so the
-cheapest mitigation is to log nothing that would need it). Telemetry export failures are logged and
-dropped; a collector outage must not fail a booking (§7.1).
+**Logs.** `pino` JSON to stdout, one line per request plus one per attempt, **every** line carrying
+`trace_id` and `span_id` from a `mixin` over the active context, so Loki and Tempo join without a
+correlation id of their own. **Identifiers only, never names**: a line names `customer.id`, not the
+customer, so nothing is logged that GDPR-grade handling would have to cover. Export failures are logged
+and dropped; a collector outage must not fail a booking.
 
 ## 8.5 Testability
 
-`CLAUDE.md` §5 fixes ownership by path; this is what each level is *for*, which the path rule does not
-say.
+Ownership is fixed by path; this is what each level is *for*.
 
 | Level | Owner | Runs against | What it is for |
 |---|---|---|---|
-| `tests/unit/` | implementer | `src/`, with the database's **driver** stubbed where a container is not needed | A design tool, freely rewritable during refactor. **This is where the Stryker mutation budget is spent**, scoped to `src/**` less `main.ts` |
-| `tests/property/` | test-engineer | the **built artifact** under `dist/`, and real PostgreSQL only where the property needs it | `fast-check` over interval arithmetic, candidate ordering, opening hours across DST — and QS-8, the only thing holding the availability query and the exclusion constraint in agreement |
-| `tests/integration/` | shared; DB-invariant tests are the test-engineer's | Testcontainers PostgreSQL | Single-threaded persistence behaviour: self-overlapping reschedule, cancellation releasing a slot |
-| `tests/concurrency/` | test-engineer | Testcontainers PostgreSQL, several pooled connections | The invariant. Genuinely simultaneous statements; nothing here is simulatable |
-| `tests/contract/` | test-engineer | the running service | The emitted OpenAPI document, and the error taxonomy of §8.6 |
-| `tests/acceptance/` | test-engineer | the running service | *Done*, expressed as the slice's acceptance criteria over HTTP |
+| `tests/unit/` | implementer | `src/`, with the database **driver** stubbed | A design tool, freely rewritable during refactor. **Where the mutation budget is spent** |
+| `tests/property/` | test-engineer | the **built artifact** under `dist/`, and real PostgreSQL where the property needs it | `fast-check` over interval arithmetic, candidate ordering, DST — and QS-8 |
+| `tests/integration/` | shared; DB-invariant tests are the test-engineer's | Testcontainers PostgreSQL | Single-threaded persistence behaviour |
+| `tests/concurrency/` | test-engineer | Testcontainers, several pooled connections | The invariant. Nothing here is simulatable |
+| `tests/contract/` | test-engineer | the running service | The emitted OpenAPI document and §8.6's taxonomy |
+| `tests/acceptance/` | test-engineer | the running service | *Done*, as the slice's acceptance criteria over HTTP |
+| `tests/performance/` | test-engineer | the running service, own container | QS-14's budget |
 
-Two structural supports, not conventions: **`outside-in-tests-do-not-import-src`** (§5.3) makes
-OC-5 structural — the path hook cannot catch a file the test-engineer legitimately owns; and
-**isolation is by data, not truncation** (§7.2), each test seeding its own dealership, so the suite
-parallelises and every test implicitly asserts A-9's scoping.
+**A unit test may replace the driver beneath Kysely. It may not replace what the database decides.** The
+stub keeps the production dialect and swaps only the transport, so the SQL a test observes is the SQL
+PostgreSQL would receive. The boundary is the assertion, not the seam: an outcome mapping, a `catch`, a
+released handle or the SQL emitted may be asserted against a stub; a constraint firing, a SQLSTATE, an
+ordering or an interleaving may not — §2.1 verbatim. Because `src/domain` has no boundary to reach it
+through, an outside-in test loads `dist/domain/*.js` and never `src/`.
 
-### How an outside-in test reaches a module with no boundary
-
-**`src/domain` has no boundary to reach it through**: QS-9 is a property over three pure functions with
-no HTTP route and no SQL. Three clauses resolve it, all in force
-([slice 01's design](../slices/01-design.md) has the alternatives):
-
-1. **An outside-in test reaches a pure module through the built artifact.** It loads `dist/domain/*.js`
-   — `npm run build`'s output, which `pretest` keeps current — never `src/`, so the dependency rule
-   stands unwidened and the test exercises what ships.
-2. **`tests/property/` splits by whether the property needs a database** — `*.db.test.ts` in the `db`
-   project behind `globalSetup: tests/setup/postgres.ts`, the rest in `nodb` with no container, so a
-   Docker failure cannot turn QS-9's red evidence into a `globalSetup` crash.
-3. **`npm test` runs the projects as separate invocations, and one that did not run is a loud
-   failure**: `tools/ci/run-tests.mjs` exits `EXIT_DID_NOT_RUN = 2` rather than merging a missing
-   report as zero failures. A third project, `perf`, has its own container — *uncontended* is a
-   property of the runner too. §7.2 carries the failure mode.
-
-The residue those mechanisms leave — computed paths to `src/`, which no text scan can separate from
-imports — is review, and §11 records it.
-
-### What a unit test may substitute, and where the line falls
-
-**A unit test may replace the driver beneath Kysely. It may not replace what the database decides.**
-The stub keeps the production dialect and swaps only the transport, so the SQL a test observes is the
-SQL PostgreSQL would receive, and a `catch` a reachable database would never enter becomes reachable.
-The boundary is the assertion, not the seam:
-
-| The assertion is about | Legitimate substitute | Why |
-|---|---|---|
-| the code *around* the database — an outcome mapping, a `catch`, a released handle, the SQL emitted | driver stub, `tests/unit/` | The database's answer is not the evidence; the code's response to a given answer is |
-| what the database **decides** — a constraint firing, a SQLSTATE, an ordering, an interleaving | **none.** Real PostgreSQL, `tests/integration/` or `tests/concurrency/` | This is `CLAUDE.md` §2.2 verbatim, and §4.1's reason: the invariant lives in the database, so a test that substitutes it tests the substitute's imitation — and the imitation would necessarily be check-then-act |
-
-So the unit-testable surface is not `src/domain` alone: `checkHealth` is a use case taking a `Db`,
-unit-tested with no container. Removing the repository port (§5.2) forecloses substituting the
-*repository*, not the *transport*.
-
-### Mutation testing runs through Stryker's command runner, not its Vitest runner
-
-The score is run by the **reviewer** at step 5 and deliberately not in CI: survivors are findings for
-a role that wrote neither the tests nor the code, and a number in a pipeline answers by ignoring it. Scope is `src/**` less `main.ts`; the 0.75 per-file bar is `CLAUDE.md` §10's.
-
-**The `command` runner, over a separate `vitest.mutation.config.ts`, is a workaround for a measured
-defect rather than a preference.** `@stryker-mutator/vitest-runner@10.0.0` **does not activate mutants**
-under `vitest@5.0.0` — 118 of 130 survivors on the blocking run had `testsCompleted: 0`, every mutant
-of a six-test file surviving — while its peer range `vitest: ">=2.0.0"` means npm warns about nothing.
-The command runner has no framework integration to break: Stryker sets `__STRYKER_ACTIVE_MUTANT__`,
-runs the command, reads the exit code. Its one consequence is `coverageAnalysis: 'off'`, so every
-mutant runs the whole suite — the conservative direction.
-
-**What would make removing the workaround safe.** The broken runner's tell is unrun tests, not a low
-score, so a plausible score after an upgrade proves nothing. Restore `testRunner: 'vitest'`, then
-**count mutants with `testsCompleted: 0` in `reports/mutation/mutation.json` — over files with unit
-tests this must be zero** — and confirm with a positive control. §11.2 R-12 carries the risk and what
-slice 09 built against it.
-
-### The response-schema seam is a serialiser, not an assertion
-
-**A TypeBox `response` schema does not validate what a handler produced. It reshapes it on the way
-out**, through `fast-json-stringify`. Six behaviours, measured on this repository's pinned Fastify:
-
-| The handler sends | On the wire | Behaviour |
-|---|---|---|
-| an undeclared property | dropped | **stripped** |
-| a required property missing | `500 Internal Server Error` | **enforced**, loudly |
-| a wrongly-typed value (`"42"` for a number) | `42` | **coerced**, silently |
-| a wrong value for a `Type.Literal` | **the schema's constant** | **substituted**, silently |
-| a wrong value for a `Type.Union` of literals | `500` | **enforced**, and never substituted |
-| a wrong value for `Type.String({ enum })` | the wrong value | **passed through**, unvalidated |
-
-Substitution is the dangerous one, and a property of every route: a handler emitting
-`{status:'', checks:{database:''}}` renders a byte-identical healthy `200`, which is why four mutants
-of the health route survived a thorough-looking suite. **Nothing proves substitution from the wire.**
-Three consequences bind every later slice:
-
-1. **Pin a computed enum-valued field as a `Type.Union` of literals.** It is the only one of the three
-   pinning forms that both enforces and does not substitute. Under `Type.Literal` a computed value is
-   silently rewritten to the constant and a contract test asserting on the body reads it back and
-   passes — **QS-11's own test unable to fail for the reason it names**; under `Type.String({ enum })`
-   the wrong value reaches the client. §8.6's `type` URIs and the appointment's `status` are unions
-   for that reason. **Narrowed to one member a union collapses back to a literal**, so §8.6's
-   per-operation cells build a one-member `anyOf` by hand (slice 10); `@fastify/swagger` rewrites
-   `const` to `enum`, so that distinction is asserted against the runtime schema and the emitted
-   document can only be checked for the shape.
-2. **The backstop can become the defect, so it is not the only guard**, and it fails differently by
-   form. The bare schema renders `FST_ERR_FAILED_ERROR_SERIALIZATION` as `application/json` — wrong
-   status, no `type`. The `content` form stays at the status already set and answers a generic
-   `application/json` body: observable, but no `500`. §8.6's compile-time closure is the other guard.
-3. **A test through this seam proves the schema, not the handler.** To hold a handler to a computed
-   value, assert on what it passed to `send`: everything a wire-body assertion tells you about a
-   pinned field, it would tell you about an empty handler too.
-
-**On the request side the same seam strips rather than rejects.** Fastify's default ajv options set
-`removeAdditional: true`, so a body carrying an undeclared property is accepted with it removed, not
-refused. `additionalProperties: false` is therefore load-bearing for **ADR-0005's emitted OpenAPI
-document**, where it is the published statement of what the operation takes, and is not a runtime
-rejection: where a request must be *refused* for what it carries, something else has to refuse it.
-Slice 10 asserts the published half by equality: no operation's `requestBody` or `parameters` can
-carry an appointment id or an end.
+Two measured hazards bind every route. **Mutation score is a floor, not a verdict**: Stryker runs through
+its `command` runner because `@stryker-mutator/vitest-runner@10.0.0` does not activate mutants under
+`vitest@5.0.0` — 118 of 130 survivors on the blocking run had `testsCompleted: 0` — so it is read by the
+reviewer rather than gated in CI (§11.2 R-12). **And a TypeBox `response` schema is a serialiser, not an
+assertion**: it reshapes what a handler produced on the way out, silently **substituting** the schema's
+constant for a wrong `Type.Literal` value and **passing through** a wrong `Type.String({ enum })` value
+unvalidated. So a computed enum-valued field is pinned as a `Type.Union` of literals, the only form that
+both enforces and does not substitute — and because a union narrowed to one member collapses back to a
+literal, §8.6's per-operation cells build a one-member `anyOf` by hand. On the request side the same seam
+**strips** rather than rejects (`removeAdditional: true`), so `additionalProperties: false` is
+load-bearing for the *published* document rather than a runtime refusal.
 
 ## 8.6 Error handling and API semantics
-
-### The surface
 
 TC-4 fixes REST; A-7 keeps reference data out of the API. Five operations.
 
@@ -470,70 +278,49 @@ TC-4 fixes REST; A-7 keeps reference data out of the API. Five operations.
 |---|---|---|
 | Book | `POST /appointments` | `201` + the appointment, naming the allocated bay and technician |
 | Read | `GET /appointments/{id}` | `200` |
-| Reschedule | `PATCH /appointments/{id}` `{ startsAt }` | `200` — same id (ADR-0003) |
+| Reschedule | `PATCH /appointments/{id}` `{ startsAt }` | `200` — same id |
 | Cancel | `POST /appointments/{id}/cancellation` | `200`, idempotent |
 | Availability | `GET /availability?dealershipId&serviceTypeId&from&to` | `200`, **advisory** |
 
-`PATCH` for a move, because ADR-0003's mechanism *is* modify-in-place — the verb and the `UPDATE` say
-the same thing. Cancellation is a sub-resource rather than `DELETE`: the appointment stays readable at
-its URL with `status: cancelled`, which `DELETE` would misdescribe. The availability response carries
-an explicit advisory flag and answers **only about the interval queried** (§6.5).
+`PATCH` for a move, because the mechanism *is* modify-in-place. Cancellation is a sub-resource rather than
+`DELETE`: the appointment stays readable at its URL with `status: cancelled`, which `DELETE` would
+misdescribe.
 
-### Status codes
-
-Errors are RFC 9457 `application/problem+json`, with a stable `type` per failure so a client
-distinguishes cases without parsing prose (§3.2 left the media type to Gate B). **The emitted document
-says so as built** (slice 10): each error response is keyed on that media type and declares only its
-own operation's `type` values — the *operations* column, asserted by equality. `/health`'s `503` is a
-health document, outside this surface and excluded there by name.
+Errors are RFC 9457 `application/problem+json` with a stable `type` per failure, so a client distinguishes
+cases without parsing prose. **The emitted document says so as built**: each error response is keyed on
+that media type and declares only its own operation's `type` values, asserted by equality. `/health`'s
+`503` is a health document, outside this surface and excluded by name.
 
 | Status | `type` | Operations | When | Decided by |
 |---|---|---|---|---|
-| `400` | `/problems/malformed-request` | all five | Schema violation, unparseable timestamp; and, from slice 05, an empty or unparseable JSON body | TypeBox before any handler (ADR-0005), or `setErrorHandler` on two named Fastify parser codes |
+| `400` | `/problems/malformed-request` | all five | Schema violation, unparseable timestamp, empty or unparseable JSON body | TypeBox before any handler, or `setErrorHandler` on two named parser codes |
 | `400` | `/problems/outside-opening-hours` | book, reschedule | The derived interval leaves the dealership's hours | `domain/openingHours.ts` — **reads no booking** (GC-1) |
-| `404` | `/problems/appointment-not-found` | read, reschedule, cancel | The id in the path does not exist | The read a move needs anyway (ADR-0025) |
-| `404` | `/problems/route-not-found` | **none** | The path matches no route — distinct from a missing appointment, which shares the status | `setNotFoundHandler` (ADR-0024) |
-| `409` | `/problems/no-capacity` | book, reschedule | Every candidate refused, or the cap reached (ADR-0004, ADR-0009). Carries `resource` | **PostgreSQL, `23P01`, repeatedly** |
-| `409` | `/problems/appointment-not-confirmed` | reschedule | Moving a cancelled appointment (ADR-0003) | The guarded `UPDATE`'s zero rows (ADR-0025) |
+| `404` | `/problems/appointment-not-found` | read, reschedule, cancel | The id in the path does not exist | The read a move needs anyway |
+| `404` | `/problems/route-not-found` | **none** | The path matches no route — distinct from a missing appointment, which shares the status | `setNotFoundHandler` |
+| `409` | `/problems/no-capacity` | book, reschedule | Every candidate refused, or the cap reached. Carries `resource` | **PostgreSQL, `23P01`, repeatedly** |
+| `409` | `/problems/appointment-not-confirmed` | reschedule | Moving a cancelled appointment | The guarded `UPDATE`'s zero rows |
 | `422` | `/problems/unknown-reference` | book, availability | Unknown dealership, service type, customer or vehicle. Carries `reference` | Reference read, then `23503` |
 | `422` | `/problems/vehicle-not-owned` | **book only** | The vehicle is not the named customer's | Composite FK, `23503` (A-6, GC-2) |
-| `500` | `/problems/internal` | all five | Reference data the client cannot see or correct — a described class, not a catch-all (ADR-0024) | The use case, or the fallback handler |
+| `500` | `/problems/internal` | all five | Reference data the client cannot see or correct — a described class, not a catch-all | The use case, or the fallback handler |
 
+Four deliberate choices in that table. **Ownership failure is a `422`, not a `403`** — validation, not
+authorisation. **Two distinct `409`s, and only one touches the conflict metric**: `no-capacity` is
+contention, `appointment-not-confirmed` is a state conflict, and the counter counts `23P01` so it cannot
+see the second. **Out-of-hours is a `400`**, where `422` would sit more naturally beside the reference
+failures; ADR-0001 fixed it as a Gate A ruling and the inconsistency is recorded rather than quietly
+harmonised. And **the `500` row is reachable, not only a fallback** — four reference-data faults route to
+it, as does a `40P01` — because a `4xx` would ask the caller to correct something they did not send and
+cannot see. **The residual is an invariant rather than a row: every response with status ≥ 400 is
+`problem+json` carrying a `type` from the closed set**, asserted ∀responses ∃row over a hostile corpus,
+the direction that can fail
+([ADR-0024](../adr/0024-the-error-taxonomys-residual-is-a-property-not-a-row.md)). A dealership with **no
+technician qualified for the requested service type** is `422 /problems/unknown-reference` with
+`reference=service-type` — the request names a pair that does not resolve, so nothing to retry.
 
-Four deliberate choices in that table:
-
-- **Ownership failure is a `422`, not a `403`** — validation, not authorisation (ADR-0002).
-- **Two distinct `409`s, and only one touches the conflict metric.** `no-capacity` is contention;
-  `appointment-not-confirmed` is a state conflict, and `booking_conflicts_total` counts `23P01` so it
-  cannot see the second (§8.4).
-- **Out-of-hours is a `400`, where `422` would sit more naturally beside the reference failures.**
-  ADR-0001 fixed it as a Gate A ruling; the inconsistency is recorded rather than quietly harmonised,
-  and changing it means superseding the ADR.
-- **The `500` row is reachable, and it is not only a fallback.** Four reference-data faults route to
-  it — an unresolvable `time_zone`, an unparseable `opens_at`, a dealership with no service bays, and
-  a candidate refused by a composite foreign key — as does a `40P01` (ADR-0030). A `4xx` would ask the
-  caller to correct something they did not send and cannot see, so the body says nothing actionable
-  and the detail goes to the log. **The residual is an invariant rather than this row:
-  every response with status ≥ 400 is `problem+json` carrying a `type` from the closed set** —
-  asserted ∀responses ∃row over a hostile corpus, the direction that can fail (ADR-0024).
-  `content-type: application/xml` still renders `500 /problems/internal`, 415 having no row, which is
-  the invariant holding rather than a gap.
-
-Two members of `BookOutcome` render as that row, apart for §5.2's reason. Symmetrically, a dealership
-with **no technician qualified for the requested service type** is `422 /problems/unknown-reference`
-with `reference=service-type`: the request names a (dealership, service type) pair that does not
-resolve. Not contention, and nothing to retry.
-
-**The taxonomy is a closed set with one constructor.** The `type` URIs are a single `as const` array,
-every response schema is narrowed from it, and the constructor takes that union — so a URI outside the
-table is a compile error at the call site, and §8.5's response-schema union is the runtime backstop
-behind it. The `500` alone carries no response schema, for the reason §8.5 gives; it and
-`route-not-found` answer no operation and live unreferenced in `components.responses`, which OpenAPI
-3.1 permits. The media type is set per response, not globally: a `200` arriving as `problem+json` is
-a worse failure than a `400` arriving as `application/json`.
-
-### Outcomes, not exceptions
-
-Use cases return the discriminated unions of §5.2, so the mapping above is one exhaustive `switch`
-the compiler checks: adding a domain outcome breaks the build in `src/http` rather than falling
-through to a `500`.
+**The taxonomy is a closed set with one constructor.** The `type` URIs are a single `as const` array, every
+response schema is narrowed from it, and the constructor takes that union — so a URI outside the table is a
+compile error at the call site, with §8.5's response-schema union as the runtime backstop. The media type
+is set per response rather than globally: a `200` arriving as `problem+json` is a worse failure than a
+`400` arriving as `application/json`. And use cases return the discriminated unions of §5.2, so the mapping
+above is one exhaustive `switch` the compiler checks: adding a domain outcome breaks the build in
+`src/http` rather than falling through to a `500`.
