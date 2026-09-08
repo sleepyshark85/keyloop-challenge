@@ -310,7 +310,10 @@ describe('QS-14 — the availability and booking budgets, and the N+1/INSERT-cou
       );
 
       const arc42Risks = readFileSync(resolve(process.cwd(), 'docs/arc42/11-risks-technical-debt.md'), 'utf8');
-      const mentionsThroughputFigure = /\bwrite throughput\b[\s\S]{0,400}?\d+(\.\d+)?\s*(attempts|writes|requests|bookings)?\s*\/\s*s(ec|econd)?\b/i.test(
+      // "write throughput" / "write-throughput" — the concept is two words; prose is free to
+      // join them with a space or a hyphen (arc42 §11's heading does the latter) and the
+      // assertion must not care which. It still pins the concept, not any figure anywhere in §11.
+      const mentionsThroughputFigure = /\bwrite[\s-]+throughput\b[\s\S]{0,400}?\d+(\.\d+)?\s*(attempts|writes|requests|bookings)?\s*\/\s*s(ec|econd)?\b/i.test(
         arc42Risks,
       );
       const mentionsBindingScale = /\bdealership\b[\s\S]{0,200}?\bbinding\b|\bbinding\b[\s\S]{0,200}?\bdealership\b/i.test(
