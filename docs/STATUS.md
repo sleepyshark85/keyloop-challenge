@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `afea055 feat(10): the harness scripts check their own results and need no GNU coreutils (AC-4, AC-5, AC-6)` |
+| Last commit | `1a578a8 chore(10): step 4 green, CI green, and one file seven-tenths under — O-77` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process |
-| Agent runs recorded | 224 |
+| Agent runs recorded | 227 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -378,7 +378,10 @@
 | 2026-09-08 05:04 | test-engineer | 48m07 | 458 / 107,721 / 54,675,171 | `derived` |
 | 2026-09-08 05:48 | implementer | 41m45 | 714 / 25,462 / 74,944,988 | `derived` |
 | 2026-09-08 05:51 | implementer | 45m11 | 730 / 25,474 / 76,986,810 | `derived` |
-| | **total** | **8020m26** | **57,670 / 4,073,665 / 5,102,979,365** | |
+| 2026-09-08 07:17 | implementer | 131m00 | 836 / 43,648 / 95,533,728 | `derived` |
+| 2026-09-08 07:21 | implementer | 135m19 | 842 / 43,654 / 95,954,239 | `derived` |
+| 2026-09-08 07:22 | implementer | 135m48 | 844 / 43,663 / 96,333,170 | `derived` |
+| | **total** | **8422m33** | **60,192 / 4,204,630 / 5,390,800,502** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
