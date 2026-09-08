@@ -1,7 +1,7 @@
 ---
 id: "10"
 title: The OpenAPI contract — problem+json per operation, and a harness that asserts
-status: ready
+status: done
 depends_on: ["09"]
 arc42: ["§3.1", "§8.5", "§8.6", "§10.2", "§11.1"]   # §8.5 added at step 1 by the architect: M1
               # in `10-design.md` lands a measured serialiser row, and declaring it after the fact
