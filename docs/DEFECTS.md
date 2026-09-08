@@ -21,9 +21,9 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 |---|---|
 | Findings recorded | **370** |
 | Severity | 14 blocking · 180 major · 176 minor |
-| Verdicts | 20 narrowed · 129 accepted · 3 escalated · 29 deferred · 2 rejected |
+| Verdicts | 20 narrowed · 129 accepted · 3 escalated · 29 deferred · 3 rejected |
 | Raised by | architect 78 · test-engineer 75 · orchestrator 74 · reviewer 66 · implementer 61 · scribe 11 · human 5 |
-| Awaiting a ruling | **187** |
+| Awaiting a ruling | **186** |
 | Mean escape distance | 1.48 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2013,7 +2013,7 @@ rather than narrated.*
 | **O-64** | MAJOR | 5 *(+0)* | orchestrator | slice:check APPLIED SECTION 10's THRESHOLD TO AN AGGREGATE and would have reported PASS on a slice the architect ruled fails it | **open** |
 | **O-65** | MINOR | 5 *(+0)* | architect | The orchestrator's git add -A SWEPT THE ARCHITECT'S UNCOMMITTED RULING into a tooling commit, and the path guard cannot see that direction of the mistake | **open** |
 | **O-66** | MINOR | 5 *(+0)* | orchestrator | The light-gate row asserted AUTO-APPROVED, DoD GREEN without ever checking the Definition of Done | **open** |
-| **A-R-1** | MAJOR | 6 *(+0)* | architect | ADR-0013 IS GENUINELY ARCHITECTURAL and the architect executed its retirement UNDER PROTEST | **open** |
+| **A-R-1** | MAJOR | 6 *(+0)* | architect | ADR-0013 IS GENUINELY ARCHITECTURAL and the architect executed its retirement UNDER PROTEST | rejected |
 | **O-67** | MINOR | 6 *(+0)* | orchestrator | An earlier appended line says a sample file STAYS PUT BY INSTRUCTION and this run DELETED it — the correction can only be appended, not made in place | **open** |
 | **O-68** | MINOR | 6 *(+0)* | orchestrator | ADR-0018 NOW GIVES THREE DEADLOCK-FREEDOM REASONS, BUT NOT THE THREE A-04-1 FOUND — the provenance line remains a criticism and correctly so | **open** |
 | **H-1** | MAJOR | 6 *(+0)* | human | THE HUMAN AUDITED THE TRACE AND FOUND IT GOES QUIET ON THE PROJECT'S MOST CONSEQUENTIAL INTERPRETATION — the brief says A USER and every document says SERVICE ADVISOR | **open** |
@@ -2237,6 +2237,7 @@ rather than narrated.*
 
 - *scenario:* THE ARCHITECT DID THE WORK AND SAID IT DISAGREED, WHICH IS WHAT SECTION 6 ASKS FOR. Its case, against the human's own stated bar that only IMPORTANT decisions warrant an ADR: ADR-0013 is marked contested true; it was HUMAN-RATIFIED AT GATE E after TWO MEASURED REVISIONS rather than ruled by an architect alone; and it constrains .dependency-cruiser.js, which CLAUDE.md section 2.3 makes NON-NEGOTIABLE tooling. It does not describe code shape — the thing the human's later ruling excluded from ADRs — it DEFINES WHAT OUTSIDE-IN MEANS OPERATIONALLY for every property test in the project, and its deciding evidence is a NEGATIVE RESULT, that widening the rule does not work, which is exactly the kind of finding that is expensive to rediscover and cheap to lose. NOTHING IS LOST OPERATIONALLY: arc42 section 8.5 already carries the clauses, so only the refused alternatives moved into slice 01's design. THE DISAGREEMENT IS ABOUT WHETHER THE RECORD SHOULD HAVE BEEN DEMOTED AT ALL, not about whether the system still behaves correctly. A SECOND CASE THE BRIEF MISSED ENTIRELY, raised by the architect unprompted: ADR-0023 IS ADR-0031-SHAPED. It does not stand alone — it NARROWS ONE SENTENCE of ADR-0018's Consequences, and ADR-0018 SURVIVES, IS IMMUTABLE, AND IS THE MOST-CITED ADR IN THE LOG. That sentence, every write path to appointment must take these two locks, IS WRONG ABOUT CANCELLATION, and ADR-0023 is the correction. ADR-0030 cites it four times. The architect handled it as the brief handled 0031, with 05-design section 2.1 opening by naming which sentence it narrows, but the brief had flagged only 0031 and the architect found the second one itself.
 - *file:* `docs/adr/0013-outside-in-tests-exercise-the-built-artifact.md`
+- *rejected* by human — HUMAN RULING, 2026-09-08: THE RETIREMENT STANDS AND THE PROTEST STANDS WITH IT. The architect executed ADR-0013's retirement UNDER PROTEST and its case was strong and correctly argued: the record was contested true, HUMAN-RATIFIED AT GATE E AFTER TWO MEASURED REVISIONS, and it constrains .dependency-cruiser.js which section 2.3 makes NON-NEGOTIABLE; it defines what OUTSIDE-IN MEANS OPERATIONALLY for every property test rather than describing code shape, and its deciding evidence is a NEGATIVE RESULT — that widening the rule does not work — which is expensive to rediscover and cheap to lose. THE HUMAN OVERRULED IT ON THE BAR THEY SET: only important decisions warrant an ADR, and THE RULE ITSELF IS IN FORCE AND ENFORCED WHERE IT ACTUALLY BINDS — arc42 section 8.5 states all three clauses and 01-design.md holds why the alternatives fail. NOTHING IS BROKEN BY THE RETIREMENT; what was at stake was whether the RECORD should have been demoted. THE OBJECTION IS NOT ERASED BY BEING OVERRULED: it is on the record, it was raised while executing rather than instead of executing, and section 6 is explicit that disagreement is expected and is not failure.
 
 **O-67** — An earlier appended line says a sample file STAYS PUT BY INSTRUCTION and this run DELETED it — the correction can only be appended, not made in place
 

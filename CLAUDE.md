@@ -79,8 +79,9 @@ it. Record any new choice as an ADR with alternatives considered.
 **arc42 is the single source of truth for architecture.** Nothing else describes the system's
 structure. If a slice file and arc42 disagree, arc42 wins and the slice file is wrong.
 
-**ADRs are immutable.** Never edit an accepted ADR — supersede it with a new one that references
-it. The history of how thinking changed is the point.
+**An ADR's decision is immutable; its prose is not.** Never change what an accepted ADR decided —
+chosen option, option set, verdict, consequence, measurement — supersede it instead. Wording may be
+improved at any time; `docs:adr-check` is the check that the boundary held.
 
 ## 5. Test ownership — NON-NEGOTIABLE
 
@@ -141,10 +142,9 @@ To rule **(c)** the architect **must name the acceptance criterion, §10 quality
 standing invariant that would fail**. If it cannot name one, the outcome is (b). Preference is not
 a blocker.
 
-§2 is on that list because a design once worked around §2.4 — the red observed in CI — and
-substituted an evidence chain for it. Nothing else could be named: the end state was green either
-way, so the most serious class of defect available was the one class the rule could not reach. A §2
-breach is nameable, citable and NON-NEGOTIABLE, which is the opposite of a preference.
+§2 is on that list because a design once worked around §2.4 and substituted an evidence chain for
+it. Nothing else could be named — the end state was green either way — so the gravest defect
+was the one the rule could not reach. A §2 breach is nameable and citable, not a preference.
 
 **Max 2 loopbacks per slice.** A third auto-escalates: a slice needing three design changes is a
 slicing problem, not a design problem.

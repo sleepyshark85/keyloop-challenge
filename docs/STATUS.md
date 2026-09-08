@@ -15,8 +15,8 @@
 
 | | |
 |---|---|
-| Last commit | `b0c2526 docs(close-out): the account of how this was built, sourced from 369 findings` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E |
+| Last commit | `c581a76 chore: delete the synthetic slice, nine slices after it asked to be — O-78` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E, process |
 | Agent runs recorded | 237 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
@@ -130,6 +130,10 @@
 **Gate E** · 2026-09-08 · approved
 
 > GATE TAKEN UNDER THE HUMAN'S CONJUNCTIVE DELEGATION OF 2026-09-08 — YOU CAN GO FOR THE MERGE IF YOU AND THE ARCHITECT CAN AGREE ON IT — AND BOTH HALVES ARE ON THE RECORD RATHER THAN INFERRED. The orchestrator asked the architect the merge question DIRECTLY, listing each of the five conditions it had named and what closed them, and asking it to confirm that five booked items remain debt rather than merge conditions. THE ARCHITECT VERIFIED ALL FIVE REMEDIATIONS IN THE TREE AT f5b5ef7 RATHER THAN ACCEPTING THE REPORT, ruled S-10-1 as debt with its reasoning, and answered: I AGREE TO MERGE SLICE 10 AS IT STANDS. ELEVEN OF TWELVE DONE ROWS WERE GREEN BEFORE THIS EVENT AND THE TWELFTH WAS THIS GATE. CI green on f5b5ef7; mutation clears EVERY changed file with a worst of 76.13 and src unchanged since that run so the figures stand; arc42 reconciled; ALL SIX INHERITED OBLIGATIONS DISCHARGED INCLUDING A-06-2 ON ITS THIRD ATTEMPT, with its residual booked as D-10-1 rather than waved through; loopbacks 0 OF 2. WHAT MERGES AS DEBT AND IS NOT HIDDEN: R-10-6, the new components block being eight of server.ts's twenty-two survivors and invisible to a tests-unit-only mutation config, folded into F-06-2 so 79.05 is not read as fully scored; R-10-8, the central-invariant concurrency test being load-sensitive under a full parallel run and green in CI and in isolation; S-10-1; D-10-1, section 8.6's column and the test's matrix being two transcriptions tied by nothing; and ADR-0035 still proposed with section 6(b) having no terminal case on a final slice. THE SLICE'S OWN LESSON, RECORDED BECAUSE IT IS THE REASON IT WAS REOPENED: it was cut out of slice 09 because all three of that slice's BLOCKING findings sat on this half, and its review found IT HAD REPRODUCED THE SAME DEFECT TWICE — a document-level probe that could not fail on the collapse it guarded, and a /health exclusion the design had ruled must never be a silent omission and which shipped as one. Both were caught by a reviewer that ran the falsifications, and both were fixed by assertions that were FALSIFIED BEFORE THEY WERE TRUSTED.
+
+**Gate process** · 2026-09-08 · amend-section-4-short-form
+
+> HUMAN RULING, 2026-09-08. Section 4 said ADRs ARE IMMUTABLE, NEVER EDIT AN ACCEPTED ADR — AND THAT HAD BEEN FALSE IN PRACTICE SINCE BEFORE THIS SESSION. PR 19 rewrote all sixteen surviving ADRs' prose on the human's own ruling, and adr-invariants.mjs and budget.mjs BOTH ALREADY CARRIED HEADERS CITING A 2026-09-05 OVERRIDE THE CONSTITUTION NEVER RECORDED — two tools built on a rule the governing document did not contain, which is the exact defect class this session caught four separate times. THE SHORT FORM IS ADOPTED: an ADR's DECISION is immutable and its PROSE is not; never change what an accepted ADR decided — chosen option, option set, verdict, consequence, measurement — supersede it instead; wording may be improved at any time, AND docs:adr-check IS THE CHECK THAT THE BOUNDARY HELD. Naming the machine check inside the rule is the point: the boundary is falsifiable rather than a promise, and a prose pass that turns the check red HAS changed a decision. THE AMENDMENT WAS PAID FOR RATHER THAN GRANTED AN EXEMPTION. CLAUDE.md was 1536 against a 1500 budget and already over, so the ratchet permits it to shrink or hold and NOT TO GROW: the fifteen words were found by compressing the section 6 passage explaining why section 2 sits on the design-defect list, WITHOUT LOSING THE CLAIM — the incident it narrates is in the log and the rule it supports is stated above it. Landed at the ceiling, not through it.
 
 ## Decisions on record
 
