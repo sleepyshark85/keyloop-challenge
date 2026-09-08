@@ -300,44 +300,47 @@ the start's normalises to `secondsOfDay = 86400` before step 4's comparison, whi
 ## 8.4 Observability
 
 TC-8 fixes OpenTelemetry with `pino`. §1.2 goal 4 says what for: *the check-then-act window is visible
-in a waterfall even though the code never relies on it*, and the invariant is measurable in production
-rather than only in tests.
+in a waterfall even though the code never relies on it*, and the invariant is measurable in
+production, not only in tests.
 
 ### Spans
 
 | Span | Attributes | Why it is its own span |
 |---|---|---|
-| `POST /appointments` | route, status, `request.id` | Fastify server span (auto) |
-| `booking.validate` | `dealership.id`, `service_type.id`, `opening_hours.ok` | Reference read plus the pure rule. Cheap, and an out-of-hours refusal should be visibly cheap (ADR-0001) |
-| `availability.candidates` | `candidates.bays`, `candidates.technicians` | **Deliberately separate from the insert.** The gap between this span's end and the next one's start *is* the window check-then-act would have raced in. Nothing depends on it; it is drawn so a reader can see it is not depended on |
-| `appointment.insert` | `booking.attempt`, `bay.id`, `technician.id`; on failure `db.sqlstate`, `db.constraint` | **One span per attempt**, so a retried booking's waterfall shows the retries rather than one long bar. This is what makes ADR-0004's loop legible in production |
+| `{METHOD} {path}` | `http.method`, `http.target`, `http.status_code` | **Hand-written, not auto-instrumented**: a `serverFactory` wrapping the raw request handler, so the span opens before Fastify builds its request. §11 says why the vendor's could not |
+| `availability.candidates` | `candidates.bays`, `candidates.technicians` | **Deliberately separate from the insert.** The gap between this span's end and the next one's start *is* the window check-then-act would have raced in. It is drawn so a reader can see nothing depends on it |
+| `appointment.insert` | `booking.attempt`, `bay.id`, `technician.id`; on failure `db.sqlstate`, `db.constraint` | **One span per attempt**, so a retried booking's waterfall shows the retries rather than one long bar — ADR-0004's loop made legible in production |
 
-Rescheduling emits `appointment.update` with the same shape; cancellation emits
-`appointment.cancel`.
+Rescheduling emits `appointment.update`, same shape, **same extracted attempt loop**; cancellation
+emits `appointment.cancel` with `appointment.id`.
 
 ### Metrics
 
 | Metric | Type | Labels | Notes |
 |---|---|---|---|
-| `booking_conflicts_total` | counter | `resource` ∈ {bay, technician}, `outcome` ∈ {absorbed, refused, capped} | **The invariant, made observable.** `absorbed` = retried successfully; `refused` = candidates exhausted; `capped` = ADR-0009's attempt cap hit. ADR-0004 requires the first two to be distinguishable — conflating them makes the metric unreadable at the moment it matters. **A non-zero `capped` is expected today rather than a signal the cap is wrong** — D-04-1, §11.2 R-4 |
+| `booking_conflicts_total` | counter | `resource` ∈ {bay, technician}, `outcome` ∈ {absorbed, refused, capped} | **The invariant, made observable.** `absorbed` = retried successfully, `refused` = candidates exhausted, `capped` = ADR-0009's cap hit; ADR-0004 requires the first two distinguishable, conflating them making the metric unreadable when it matters. **A non-zero `capped` is expected today rather than a signal the cap is wrong** — D-04-1, §11.2 R-4 |
 | `appointments_booked_total` | counter | `dealership` | |
-| `appointments_rescheduled_total` | counter | `outcome` ∈ {moved, refused} | ADR-0003's second act |
+| `appointments_rescheduled_total` | counter | `outcome` ∈ {moved, refused} | ADR-0003's second act; a move refused for *state* increments neither — §8.6's two `409`s |
 | `appointments_cancelled_total` | counter | | |
-| `booking_attempts` | histogram | | Attempts per request. Its tail is ADR-0009's ordering policy working or not |
-| `availability_query_duration_seconds` | histogram | | Goal 5's budget (QS-14) |
+| `booking_attempts` | histogram | | Attempts per request, recorded unlabelled at the loop's exit whatever the outcome. Its tail is ADR-0009's ordering working or not |
 
 **`booking_conflicts_total` is incremented on SQLSTATE `23P01` and on nothing else** — never on an
 HTTP status code. That is the same discipline ADR-0001 applied when it made an out-of-hours request a
 `400`: the metric measures contention, and a taxonomy change must not be able to move it.
+**And from exactly one module**, `src/application/attemptLoop.ts`, at most once per attempt loop.
+That fixes *where*, which the sentence above does not: `pg` auto-instrumentation, a repository span
+and a use-case span otherwise count one conflict three times. A QS-12 marker holds the file set by
+equality (§10.2). The availability query has no latency instrument — QS-14 measures it, §11 records
+the figure (§4).
 
 ### Logs
 
-`pino` JSON to stdout, one line per request plus one per attempt, each carrying `trace_id` and
-`span_id` from the active context so Loki and Tempo join without a correlation id of their own.
-**Identifiers only, never names** — a log line names `customer.id`, not the customer (§3.3 excludes
-GDPR-grade handling, so the cheapest mitigation is to log nothing that would need it).
-
-Telemetry export failures are logged and dropped. A collector outage must not fail a booking (§7.1).
+`pino` JSON to stdout, one line per request plus one per attempt, **every** line carrying `trace_id`
+and `span_id` from a `mixin` over the active context — the server span opens before Fastify writes
+its first — so Loki and Tempo join without a correlation id of their own. **Identifiers only, never
+names**: a line names `customer.id`, not the customer (§3.3 excludes GDPR-grade handling, so the
+cheapest mitigation is to log nothing that would need it). Telemetry export failures are logged and
+dropped; a collector outage must not fail a booking (§7.1).
 
 ## 8.5 Testability
 
@@ -355,9 +358,9 @@ say.
 
 Two structural supports rather than conventions: **`outside-in-tests-do-not-import-src`** (§5.3) makes
 OC-5 structural — tests that define *done* reach the system the way a client does, and the path hook
-cannot catch a violation because the file is one the test-engineer legitimately owns; and **isolation
-is by data, not by truncation** (§7.2), each test seeding its own dealership, so the suite parallelises
-and every test implicitly asserts A-9's scoping.
+cannot catch it, the file being one the test-engineer legitimately owns; and **isolation is by data,
+not truncation** (§7.2), each test seeding its own dealership, so the suite parallelises and every
+test implicitly asserts A-9's scoping.
 
 ### How an outside-in test reaches a module with no boundary
 
@@ -366,17 +369,15 @@ no HTTP route and no SQL. Three clauses resolve it, all in force
 ([slice 01's design](../slices/01-design.md) has the alternatives):
 
 1. **An outside-in test reaches a pure module through the built artifact.** It loads `dist/domain/*.js`
-   — the output of `npm run build`, which `pretest` guarantees is current — never `src/`. The
-   dependency rule stands unwidened, and the test exercises what ships rather than what compiles. It
-   costs a dynamic `import()` and an `await` per file.
-2. **`tests/property/` splits by whether the property needs a database.** A property test that talks to
-   PostgreSQL is named `*.db.test.ts` and runs in the `db` project behind
-   `globalSetup: tests/setup/postgres.ts`; everything else runs in `nodb` with no container, so a
-   Docker failure cannot turn QS-9's red evidence into a `globalSetup` crash instead of an assertion
-   failure.
-3. **`npm test` runs the two projects as separate invocations, and a project that did not run is a loud
-   failure.** It is `tools/ci/run-tests.mjs`, not `vitest run`; a missing or empty project report exits
-   `EXIT_DID_NOT_RUN = 2` rather than merging as zero failures. §7.2 carries the failure mode.
+   — `npm run build`'s output, which `pretest` keeps current — never `src/`. The dependency rule
+   stands unwidened and the test exercises what ships, at a dynamic `import()` per file.
+2. **`tests/property/` splits by whether the property needs a database** — `*.db.test.ts` in the `db`
+   project behind `globalSetup: tests/setup/postgres.ts`, the rest in `nodb` with no container, so a
+   Docker failure cannot turn QS-9's red evidence into a `globalSetup` crash.
+3. **`npm test` runs the projects as separate invocations, and one that did not run is a loud
+   failure**: `tools/ci/run-tests.mjs` exits `EXIT_DID_NOT_RUN = 2` rather than merging a missing
+   report as zero failures. Slice 09 adds a third, `perf`, with its own container — *uncontended* is
+   a property of the runner too. §7.2 carries the failure mode.
 
 The residue those mechanisms leave — computed paths to `src/`, which no text scan can separate from
 imports — is review, and §11 records it.
@@ -399,26 +400,24 @@ So the unit-testable surface is not `src/domain` alone: `checkHealth` is a use c
 
 ### Mutation testing runs through Stryker's command runner, not its Vitest runner
 
-`CLAUDE.md` §10 makes a mutation score part of Definition of Done and `tools/slice/check.mjs` gates on
-**0.75**. It is run by the **reviewer** at step 5 and deliberately not in CI: survivors are findings for
+The score is run by the **reviewer** at step 5 and deliberately not in CI: survivors are findings for
 a role that wrote neither the tests nor the code, and a number in a pipeline answers that by ignoring
-it. Scope is `src/**` less `main.ts`.
+it. Scope is `src/**` less `main.ts`; the 0.75 per-file bar is `CLAUDE.md` §10's.
 
 **The `command` runner, over a separate `vitest.mutation.config.ts`, is a workaround for a measured
 defect rather than a preference.** `@stryker-mutator/vitest-runner@10.0.0` **does not activate mutants**
-under `vitest@5.0.0` — 118 of 130 survivors on the blocking run had `testsCompleted: 0`, and every
-mutant of a file with six dedicated tests survived, including the one emptying its body — while its
-peer range `vitest: ">=2.0.0"` means npm warns about nothing. The command runner has no framework
-integration to break: Stryker sets `__STRYKER_ACTIVE_MUTANT__`, runs the command, reads the exit code.
-Its one consequence is `coverageAnalysis: 'off'` — with no per-test attribution every mutant runs the
-whole suite, the conservative direction.
+under `vitest@5.0.0` — 118 of 130 survivors on the blocking run had `testsCompleted: 0`, every mutant
+of a file with six dedicated tests surviving, the one emptying its body included — while its peer
+range `vitest: ">=2.0.0"` means npm warns about nothing. The command runner has no framework
+integration to break: Stryker sets `__STRYKER_ACTIVE_MUTANT__`, runs the command, reads the exit
+code. Its one consequence is `coverageAnalysis: 'off'`, so every mutant runs the whole suite — the
+conservative direction.
 
 **What would make removing the workaround safe.** The broken runner's tell is unrun tests, not a low
-score, so a plausible score after an upgrade proves nothing. Set `testRunner: 'vitest'`, drop
-`commandRunner`, run `npx stryker run`, then **count mutants with `testsCompleted: 0` in
-`reports/mutation/mutation.json` — over files that have unit tests this must be zero**, whatever the
-score says; and confirm with a positive control, activating by hand one mutant a test should kill. Only
-with both clean is `coverageAnalysis` worth revisiting. §11.2 R-12 carries the standing risk.
+score, so a plausible score after an upgrade proves nothing. Restore `testRunner: 'vitest'`, then
+**count mutants with `testsCompleted: 0` in `reports/mutation/mutation.json` — over files with unit
+tests this must be zero** — and confirm with a positive control. §11.2 R-12 carries the risk and what
+slice 09 built against it.
 
 ### The response-schema seam is a serialiser, not an assertion
 
@@ -434,33 +433,32 @@ out**, through `fast-json-stringify`. Six behaviours, measured on this repositor
 | a wrong value for a `Type.Union` of literals | `500` | **enforced**, and never substituted |
 | a wrong value for `Type.String({ enum })` | the wrong value | **passed through**, unvalidated |
 
-Substitution is the dangerous one, and it is a property of every route this system will have: a
-handler emitting `{status:'', checks:{database:''}}` produces a byte-identical
+Substitution is the dangerous one, and a property of every route: a handler emitting
+`{status:'', checks:{database:''}}` produces a byte-identical
 `200 {"status":"ok","checks":{"database":"up"}}`, which is why four mutants of the health route
-survived a suite that looked thorough. **Nothing proves substitution, and nothing can, from the wire.**
-Three consequences bind every later slice:
+survived a thorough-looking suite. **Nothing proves substitution from the wire.** Three consequences
+bind every later slice:
 
 1. **Pin a computed enum-valued field as a `Type.Union` of literals.** It is the only one of the three
-   pinning forms that both enforces and does not substitute. Under `Type.Literal` a handler's computed
-   value is silently rewritten to the constant and a contract test asserting on the body reads that
-   constant back and passes — **QS-11's own test unable to fail for the reason it names**; under
-   `Type.String({ enum })` the wrong value reaches the client instead. §8.6's `type` URIs and the
-   appointment's `status` are both unions for that reason.
+   pinning forms that both enforces and does not substitute. Under `Type.Literal` a computed value is
+   silently rewritten to the constant and a contract test asserting on the body reads it back and
+   passes — **QS-11's own test unable to fail for the reason it names**; under `Type.String({ enum })`
+   the wrong value reaches the client. §8.6's `type` URIs and the appointment's `status` are unions
+   for that reason.
 2. **The backstop can become the defect, so it is not the only guard.** A body that fails a response
    schema renders `FST_ERR_FAILED_ERROR_SERIALIZATION` as `application/json` — wrong status, no
-   `type`, not `problem+json`. So the taxonomy is also closed at compile time by a single constructor,
-   and the `500` carries no response schema at all (§8.6).
+   `type`, not `problem+json`. §8.6's compile-time closure is the other guard.
 3. **A test through this seam proves the schema, not the handler.** To hold a handler to a computed
-   value, assert on what it passed to `send`. Everything an assertion on the wire body can tell you
-   about a pinned field, it would tell you about an empty handler too.
+   value, assert on what it passed to `send`: everything a wire-body assertion tells you about a
+   pinned field, it would tell you about an empty handler too.
 
 **On the request side the same seam strips rather than rejects.** Fastify's default ajv options set
-`removeAdditional: true`, so a body carrying an undeclared property is accepted with the property
-removed, not refused. `additionalProperties: false` on a request schema is therefore load-bearing for
-**ADR-0005's emitted OpenAPI document** — where it is the published statement of what the operation
-takes — and not a runtime rejection. Where a request must be *refused* for what it carries, something
-other than the schema has to refuse it. AC-6 holds regardless, and by a second, independent route:
-there is no parameter anywhere on the booking path that could receive a client-supplied end.
+`removeAdditional: true`, so a body carrying an undeclared property is accepted with it removed, not
+refused. `additionalProperties: false` is therefore load-bearing for **ADR-0005's emitted OpenAPI
+document**, where it is the published statement of what the operation takes, and is not a runtime
+rejection: where a request must be *refused* for what it carries, something else has to refuse it.
+AC-6 holds regardless, by a second and independent route — no parameter on the booking path could
+receive a client-supplied end.
 
 ## 8.6 Error handling and API semantics
 
@@ -485,7 +483,9 @@ queried** (§6.5).
 ### Status codes
 
 Errors are RFC 9457 `application/problem+json`, with a stable `type` per failure so a client
-distinguishes cases without parsing prose (§3.2 left the media type to Gate B).
+distinguishes cases without parsing prose (§3.2 left the media type to Gate B). **As built the emitted
+document does not say so**: all 25 responses declare `application/json` and the table below carries
+no `type` × operation matrix. §11, slice 10.
 
 | Status | `type` | When | Decided by |
 |---|---|---|---|

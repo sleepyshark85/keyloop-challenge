@@ -53,6 +53,13 @@ export interface Config {
    * program from the shipped one.
    */
   readonly bookingSeed?: number;
+  /**
+   * `R-07-12`/`R-09-10` — the connection pool's ceiling, from `DB_POOL_MAX`. Defaults to
+   * {@link DEFAULT_DB_POOL_MAX}. `src/persistence/db.ts` names the value passed here `poolMax`
+   * on `DbConfig`; this is the ONE place `DB_POOL_MAX` is read, so an operator has one variable
+   * to set and a reader has one file to open.
+   */
+  readonly poolMax: number;
 }
 
 /** Thrown by {@link loadConfig}. Names every problem it found, not just the first. */
@@ -97,6 +104,23 @@ const MAX_ATTEMPT_CAP = 1_000;
 
 /** The largest value `crypto.getRandomValues(new Uint32Array(1))` can produce. */
 const MAX_SEED = 0xffff_ffff;
+
+/**
+ * `R-07-12`'s named ceiling, `R-09-10`'s env var. `pg`'s own default happens to be 10 too — the
+ * whole point of naming it is that matching it by omission was a coincidence a `pg` upgrade could
+ * silently move, and that argument is exactly as true of a hand-picked default as of `pg`'s own.
+ */
+export const DEFAULT_DB_POOL_MAX = 10;
+
+/**
+ * Sanity rails, not measurement: **1** because a pool of zero can serve no request at all —
+ * `pg.Pool`'s own `max: 0` blocks every `connect()` forever rather than answering anything, which
+ * is a hang indistinguishable from a dead database and not a ceiling anyone means to set — and
+ * **100** because a value past it is far more likely a typo (a stray zero) than a deliberate
+ * ceiling for this service's connection budget.
+ */
+const MIN_POOL_MAX = 1;
+const MAX_POOL_MAX = 100;
 
 function isLogLevel(value: string): value is LogLevel {
   return (LOG_LEVELS as readonly string[]).includes(value);
@@ -180,6 +204,27 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     }
   }
 
+  // `R-07-12`/`R-09-10`. Absent means the default, which is `pg`'s own historical ceiling —
+  // `DB_POOL_MAX` exists so an operator can name a different one rather than this file's default
+  // silently being the whole story.
+  const rawPoolMax = (env['DB_POOL_MAX'] ?? '').trim();
+  let poolMax = DEFAULT_DB_POOL_MAX;
+  if (rawPoolMax !== '') {
+    if (!/^\d+$/.test(rawPoolMax)) {
+      problems.push(`DB_POOL_MAX must be an integer, got ${JSON.stringify(rawPoolMax)}`);
+    } else {
+      const parsed = Number(rawPoolMax);
+      if (parsed < MIN_POOL_MAX || parsed > MAX_POOL_MAX) {
+        problems.push(
+          `DB_POOL_MAX must be between ${String(MIN_POOL_MAX)} and ${String(MAX_POOL_MAX)}, ` +
+            `got ${rawPoolMax}`,
+        );
+      } else {
+        poolMax = parsed;
+      }
+    }
+  }
+
   if (problems.length > 0) throw new ConfigError(problems);
 
   // Spread rather than `bookingSeed: undefined`, so "unset" is genuinely an absent property and
@@ -189,6 +234,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     port,
     logLevel,
     attemptCap,
+    poolMax,
     ...(bookingSeed === undefined ? {} : { bookingSeed }),
   };
 }

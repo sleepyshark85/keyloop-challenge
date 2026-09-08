@@ -7,32 +7,36 @@ this section is the text it will illustrate.*
 
 ## 3.1 Business context
 
-The system sits alone: human actors, one persistent store, and **no neighbouring systems** — the single
-most consequential fact about the context, justified in §3.1.2 rather than left as an omission.
+The system sits alone: human actors, one persistent store, and **no neighbouring systems** — the most
+consequential fact about the context, justified in §3.1.2 rather than left as an omission.
 
 ### 3.1.1 Actors
 
 | Actor | Relationship | What crosses the boundary, in domain terms |
 |---|---|---|
-| **A user** *(primary; the brief's word, and the system names no role — ADR-0034, A-6)* | Books for a customer, named in the request rather than derived from an identity | **In:** a booking request — customer, vehicle, service type, dealership, desired start. **Out:** either a confirmed appointment naming the allocated bay, technician and interval; or a refusal stating which resource was unavailable, once every candidate has been tried (ADR-0004); or a rejection, if the request is invalid — an unknown or mismatched reference (A-6), or a time outside the dealership's opening hours (ADR-0001) |
-| **The same user** *(changing a booking)* | Plans change: the car is not ready to come in, or Tuesday no longer works | **In:** a cancellation, or a reschedule naming an existing appointment and a new desired start (ADR-0003). **Out:** the cancelled or moved appointment — the id is unchanged by a move — or a refusal. A refused move is the interesting outcome and the contract states it: **the original appointment is still confirmed, at its original time** |
+| **A user** *(primary; the brief's word, and the system names no role — ADR-0034, A-6)* | Books for a customer, named in the request rather than derived from an identity | **In:** a booking request — customer, vehicle, service type, dealership, desired start. **Out:** a confirmed appointment naming the allocated bay, technician and interval; or a refusal stating which resource was unavailable, once every candidate has been tried (ADR-0004); or a rejection if the request is invalid — an unknown or mismatched reference (A-6), or a time outside opening hours (ADR-0001) |
+| **The same user** *(changing a booking)* | Plans change: the car is not ready, or Tuesday no longer works | **In:** a cancellation, or a reschedule naming an existing appointment and a new desired start (ADR-0003). **Out:** the cancelled or moved appointment — a move leaves the id unchanged — or a refusal. A refused move is the interesting outcome and the contract states it: **the original appointment is still confirmed, at its original time** |
 | **The same user** *(browsing)* | Looks for a workable slot before committing | **In:** an availability enquiry — dealership, service type, time window. **Out:** candidate intervals and resources, **explicitly advisory**: a slot returned as free may be taken by the time it is booked, and the boundary contract says so. This is the direct consequence of `CLAUDE.md` §2.1 and a property of the *domain* interface, not an implementation detail |
-| **Customer / vehicle owner** | The party the appointment is for | No customer *identity* crosses. The customer is named by `customer_id` **inside** the request, so whether the caller is the customer is not something the system observes (ADR-0034). Listed because the alternative reading would carry identity *with* the request instead, changing the boundary's shape |
-| **Service manager** | Owns the reference data — bays, technicians, qualifications, service types, and the dealership's opening hours and time zone (ADR-0001) — and reads the day's schedule | **In:** reference data, as seed and migration rather than across the API (A-7). **Out:** the schedule, by reading appointments |
-| **Technician** | **A resource, not a user.** Consumed by an appointment, exclusively, for its whole duration (A-2) | Nothing crosses. Recorded because the temptation to model a technician as a user is strong and would expand the scope considerably |
+| **Customer / vehicle owner** | The party the appointment is for | No customer *identity* crosses. The customer is named by `customer_id` **inside** the request, so whether the caller is the customer is not something the system observes (ADR-0034). Listed because the alternative reading carries identity *with* the request instead, changing the boundary's shape |
+| **Service manager** | Owns the reference data — bays, technicians, qualifications, service types, the dealership's opening hours and time zone (ADR-0001) — and reads the day's schedule | **In:** reference data, as seed and migration rather than across the API (A-7). **Out:** the schedule, by reading appointments |
+| **Technician** | **A resource, not a user.** Consumed by an appointment, exclusively, for its whole duration (A-2) | Nothing crosses. Recorded because modelling a technician as a user is a strong temptation and would expand the scope considerably |
 | **Operator** | Runs and watches the service | **Out:** health and readiness, traces, metrics, structured logs. Notably `booking_conflicts_total{resource}` — the invariant made observable |
+
+**The client layer is stubbed at the boundary** (`CLAUDE.md` §1): `docs/api/openapi.json`, emitted
+from the route schemas, is the contract every actor above reaches through; `harness/` is a cURL
+client for the five operations and the contention demo.
 
 ### 3.1.2 Why there are no neighbouring systems
 
 The scenario is titled *"The Unified Service Scheduler"*, which reads as though it might federate
 existing booking systems. The task text does not support that: *"Build an Appointment Scheduler
-application to replace manual booking systems."* What is being replaced is a **manual** process — a
-paper diary, a whiteboard, a phone call — so "unified" is read as *one scheduler across a dealership
-group* (A-9), not *one view over several schedulers*. Scenario D is the integration scenario.
+application to replace manual booking systems."* What is replaced is a **manual** process — a paper
+diary, a whiteboard, a phone call — so "unified" reads as *one scheduler across a dealership group*
+(A-9), not *one view over several schedulers*. Scenario D is the integration scenario.
 
 A production deployment would still have neighbours — a DMS owning customers and vehicles, an identity
-provider, a notification service, a parts system. Each is excluded in §3.3 and carried in §11 rather
-than quietly ignored: "no integrations" is a decision with a shelf life.
+provider, a notification service, a parts system. Each is excluded in §3.3 and carried in §11: "no
+integrations" is a decision with a shelf life.
 
 ## 3.2 Technical context
 

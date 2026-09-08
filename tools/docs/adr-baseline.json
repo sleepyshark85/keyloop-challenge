@@ -222,5 +222,16 @@
    "Option D \u2014 Option C, plus a shared API key on the boundary."
   ],
   "decision": "Chosen option: C."
+ },
+ "0035-one-conflict-counted-per-exclusion-violation.md": {
+  "options": [
+   "Option A",
+   "Option A \u2014 one increment per request, labelled by the last conflict before the terminal st",
+   "Option B",
+   "Option B \u2014 one increment per 23P01, each labelled with that violation's own resource, all",
+   "Option C",
+   "Option C \u2014 increment at the moment of each conflict, deferring outcome to a second metric."
+  ],
+  "decision": "Chosen option: Option B, because it is the only reading under which the counter's own name is"
  }
 }

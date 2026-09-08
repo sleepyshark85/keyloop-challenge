@@ -23,8 +23,16 @@ import { pingDatabase } from '../../../src/persistence/health.js';
  *
  * The URL below is well-formed and certain not to answer: port 1 is reserved. Nothing in
  * this file talks to a database, which is why it lives in the `nodb` Vitest project.
+ *
+ * `poolMax` is a plain field of the fixture, not a default `createPool` supplies (`R-09-10`):
+ * `DbConfig.poolMax` is REQUIRED precisely so no second default can drift from `config.ts`'s
+ * `DEFAULT_DB_POOL_MAX`, so every fixture here states the value under test explicitly.
  */
-const UNREACHABLE = { databaseUrl: 'postgresql://keyloop:keyloop@127.0.0.1:1/keyloop' };
+const POOL_MAX = 10;
+const UNREACHABLE = {
+  databaseUrl: 'postgresql://keyloop:keyloop@127.0.0.1:1/keyloop',
+  poolMax: POOL_MAX,
+};
 
 const pools: Array<{ end(): Promise<void>; ended: boolean }> = [];
 function track<T extends { end(): Promise<void>; ended: boolean }>(pool: T): T {
@@ -69,6 +77,25 @@ describe('createPool', () => {
 
     expect(CONNECTION_TIMEOUT_MS).toBe(1_000);
     expect(pool.options.connectionTimeoutMillis).toBe(CONNECTION_TIMEOUT_MS);
+  });
+
+  it('names the pool ceiling explicitly rather than relying on pg\'s default (R-07-12)', () => {
+    // `pg`'s own default happens to be 10 too — the whole point of `R-07-12` is that
+    // matching it by omission is a coincidence a future `pg` upgrade could silently move.
+    // Asserting the CONFIGURED value, not merely the observed one, is what makes this a
+    // named ceiling rather than a rediscovery of `pg`'s default.
+    const pool = track(createPool(UNREACHABLE));
+
+    expect(pool.options.max).toBe(POOL_MAX);
+  });
+
+  it('passes `poolMax` THROUGH rather than reading a constant of its own (R-09-10)', () => {
+    // A ceiling of 3 is nothing `pg` or this file would pick by coincidence — the only way
+    // `pool.options.max` can be 3 is that `createPool` read it off `DbConfig` rather than off a
+    // constant it no longer has, which is `DB_POOL_MAX`'s whole point: `config.ts` is the one
+    // place the ceiling is decided, and this file just carries the number through.
+    const pool = track(createPool({ ...UNREACHABLE, poolMax: 3 }));
+    expect(pool.options.max).toBe(3);
   });
 
   it('swallows an idle-client error instead of letting it terminate the process', () => {

@@ -50,7 +50,29 @@ export const EXIT_OK = 0;
 export const EXIT_TESTS_FAILED = 1;
 export const EXIT_DID_NOT_RUN = 2;
 
-const PROJECTS = ['nodb', 'db'];
+/**
+ * THE PROJECT LIST IS EXPLICIT ON PURPOSE, AND `perf` IS THE THIRD — T-09-3.
+ *
+ * Deriving these names from `vitest.config.ts` would let a project VANISH SILENTLY, which
+ * is the failure T-01-2 built this file to prevent: a project that did not run must be a
+ * loud, distinct exit code rather than zero failures. So the list is written here, and
+ * adding a project is a deliberate edit in two files.
+ *
+ * `perf` exists because the QS-14 budget could not fail honestly beside the rest. The
+ * test-engineer measured it: `tests/setup/postgres.ts` starts ONE container per run shared
+ * across every file, this runner spawns each project as one `vitest run`, and
+ * `vitest.config.ts` sets no `fileParallelism` or worker cap — so the budget file could
+ * execute at the same wall-clock moment as the twenty-racer concurrency suite, against the
+ * same PostgreSQL. Its argument for BLOCKING was that this is O-70's failure class but
+ * WORSE IN KIND: O-70 produced a loud wrong signal that got investigated, while a contended
+ * budget run produces a PLAUSIBLE number with no signal anything happened.
+ *
+ * The architect refused `fileParallelism: false` on `db` — that serialises twenty-one files
+ * to isolate one, forever — and took exclusivity at the CONTAINER instead: projects here run
+ * STRICTLY SEQUENTIALLY, and per-project `globalSetup` hands `perf` its own container. The
+ * "did not run" classification below then covers the budget for free.
+ */
+const PROJECTS = ['nodb', 'db', 'perf'];
 
 /**
  * Merge per-project Vitest JSON into one result, and classify each project.

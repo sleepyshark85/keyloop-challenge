@@ -153,6 +153,32 @@ export async function startService(options: {
    * call site, and the harness's job is to make the spawned artifact the shipped one.
    */
   bookingSeed?: number;
+  /**
+   * `OTEL_EXPORTER_OTLP_ENDPOINT` — slice 09, `tests/support/otelCollector.ts`.
+   *
+   * Unset is the default and the production case where the collector is
+   * `docker-compose.yml`'s `otel-lgtm` on `:4318`. Set, it points the child's OTel SDK at a
+   * receiver this process owns for the life of one test, which is the only way an
+   * outside-in test can read what a SEPARATE process emitted without importing `src/` to run
+   * the server in-process (§8.5, C1). See `otelCollector.ts`'s header for the wire contract
+   * this rests on, measured rather than assumed.
+   */
+  otelExporterEndpoint?: string;
+  /**
+   * `DB_POOL_MAX` — slice 09, `docs/slices/09-design.md` step-5 finding 10 (`R-09-10`,
+   * `R-07-12`).
+   *
+   * `tests/concurrency/refused-move-leaves-original.test.ts`'s own `POOL_MAX` is a ceiling a
+   * concurrency test needs in order to keep an in-flight batch from ever exceeding the
+   * service's real pool (R-07-4) — and `outside-in-tests-do-not-import-src` (ADR-0013) means
+   * that test cannot read `src/persistence/config.ts`'s own constant to get it. Unset, the
+   * child runs at the artifact's own default (10, unchanged from `D-07-1`) — the production
+   * case. Set, it DICTATES the child's ceiling instead of assuming a default matches a test's
+   * local literal, which is the direction §6's ruling on `R-09-10` requires: raising the
+   * artifact's default in `config.ts` cannot silently make a test's comment lie, because the
+   * test that cares now sets the value it depends on rather than reading it off a coincidence.
+   */
+  dbPoolMax?: number;
 }): Promise<StartAttempt> {
   const cwd = process.cwd();
   const entrypoint = resolve(cwd, ENTRYPOINT);
@@ -166,6 +192,8 @@ export async function startService(options: {
     `  DATABASE_URL ${options.databaseUrl}`,
     `  LOG_LEVEL    ${options.logLevel === null ? "(unset — the artifact's own default)" : (options.logLevel ?? 'silent')}`,
     `  BOOKING_SEED ${options.bookingSeed === undefined ? '(unset — a seed per request)' : String(options.bookingSeed)}`,
+    `  OTEL_EXPORTER_OTLP_ENDPOINT ${options.otelExporterEndpoint ?? '(unset — production default)'}`,
+    `  DB_POOL_MAX  ${options.dbPoolMax === undefined ? "(unset — the artifact's own default)" : String(options.dbPoolMax)}`,
     `  entrypoint   ${entrypoint} (${existsSync(entrypoint) ? 'exists' : 'DOES NOT EXIST'})`,
   ].join('\n');
 
@@ -193,6 +221,10 @@ export async function startService(options: {
         ...(options.bookingSeed === undefined
           ? {}
           : { BOOKING_SEED: String(options.bookingSeed) }),
+        ...(options.otelExporterEndpoint === undefined
+          ? {}
+          : { OTEL_EXPORTER_OTLP_ENDPOINT: options.otelExporterEndpoint }),
+        ...(options.dbPoolMax === undefined ? {} : { DB_POOL_MAX: String(options.dbPoolMax) }),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

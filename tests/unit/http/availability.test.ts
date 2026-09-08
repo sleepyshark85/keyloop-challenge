@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { buildServer } from '../../../src/http/server.js';
+import { buildOpenApiDocument, buildServer } from '../../../src/http/server.js';
 import type { AvailabilityOutcome } from '../../../src/application/queryAvailability.js';
 import type { HealthOutcome } from '../../../src/application/checkHealth.js';
 import { createLogger } from '../../../src/platform/logger.js';
@@ -264,4 +264,83 @@ describe('GET /availability — the whole problem document on both error arms (R
       expect(body['detail']).toBe(`no ${reference} matches the id in this request`);
     },
   );
+});
+
+/**
+ * AC-5b, D-08-1, `docs/slices/09-design.md` "AC-7 does not kill the seven description mutants" —
+ * decision 4's WHOLE REASON: `vitest.mutation.config.ts` scores `tests/unit/**` only, so a
+ * byte-for-byte diff in `tests/contract/openapi-document.test.ts` (the test-engineer's, over the
+ * COMMITTED document) cannot kill a mutant in `routes/availability.ts`'s source. This file calls
+ * `buildOpenApiDocument()` directly — no database, no subprocess — which is the one path that
+ * reaches those seven `description` string literals from a suite Stryker actually scores.
+ */
+describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachable from a unit test (D-08-1)', () => {
+  interface OpenApiOperation {
+    readonly description?: string;
+    readonly responses?: Record<string, { readonly content?: Record<string, { readonly schema?: { readonly description?: string } }> }>;
+  }
+  interface OpenApiInfo {
+    readonly title?: string;
+    readonly description?: string;
+    readonly version?: string;
+  }
+  interface OpenApiDoc {
+    readonly openapi?: string;
+    readonly info?: OpenApiInfo;
+    readonly paths?: Record<string, Record<string, OpenApiOperation>>;
+  }
+
+  it('the operation-level description carries the querystring rule that Fastify drops when exploding it into query parameters', async () => {
+    const doc = (await buildOpenApiDocument()) as OpenApiDoc;
+    const operation = doc.paths?.['/availability']?.['get'];
+
+    expect(operation, 'no GET /availability operation in the generated document').toBeDefined();
+    expect(operation?.description).toContain('What is free for this dealership and service type');
+    expect(operation?.description).toContain('to <= from is rejected by the route (400)');
+    expect(operation?.description).toContain(
+      'because a schema cannot compare two of its own properties',
+    );
+  });
+
+  it("the 200 response schema's own description carries AC-5's two facts", async () => {
+    const doc = (await buildOpenApiDocument()) as OpenApiDoc;
+    const responseSchema =
+      doc.paths?.['/availability']?.['get']?.responses?.['200']?.content?.['application/json']?.schema;
+
+    expect(responseSchema?.description).toContain('Advisory only');
+    expect(responseSchema?.description).toContain('not a reservation');
+    expect(responseSchema?.description).toContain('true only of the interval queried');
+    // The two remaining concatenated literals in this same description — asserted so a
+    // mutation to either is not free of the score's reach either (measured: without these,
+    // AvailabilityBody's own first and last literal pieces survive Stryker unkilled).
+    expect(responseSchema?.description).toContain('bays and technicians free over the queried interval');
+    expect(responseSchema?.description).toContain('adjudicated, database-verified booking');
+  });
+
+  /**
+   * `docs/slices/09-design.md` step 5 finding 3 — `server.ts`'s `OPENAPI_INFO`/`openapi` string
+   * literals, read byte for byte via the SAME `buildOpenApiDocument()` call this describe block
+   * already makes, rather than a second path into `server.ts`. `R-09-3`: "seven `OPENAPI_INFO`/
+   * `openapi` literals byte for byte outside Stryker's scope … asserting `doc.info`/`doc.openapi`
+   * here gives 57/72".
+   */
+  it("ADR-0005's OPENAPI_INFO reaches the emitted document — title, description and version", async () => {
+    const doc = (await buildOpenApiDocument()) as OpenApiDoc;
+
+    expect(doc.info?.title).toBe('Keyloop Unified Service Scheduler');
+    expect(doc.info?.description).toContain(
+      'Service-appointment scheduling for automotive dealerships',
+    );
+    expect(doc.info?.description).toContain('No authentication (ADR-0002)');
+    expect(doc.info?.description).toContain('a candidate list is advisory only');
+    expect(doc.info?.description).toContain(
+      'every write is adjudicated by PostgreSQL (CLAUDE.md §2.1)',
+    );
+    expect(doc.info?.version).toBe('1.0.0');
+  });
+
+  it('the document declares OpenAPI 3.1.0 — the version `buildServer` registers `@fastify/swagger` with', async () => {
+    const doc = (await buildOpenApiDocument()) as OpenApiDoc;
+    expect(doc.openapi).toBe('3.1.0');
+  });
 });

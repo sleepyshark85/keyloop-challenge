@@ -128,9 +128,10 @@ ok('DONE reports whether they were discharged',
 // --------------------------------------------- inherited scope traceable (O-41) --
 console.log('\ninherited scope — the subset guard becomes bidirectional');
 {
-  const world = (inherits, body) => {
+  const world = (inherits, body, design) => {
     const dir = mkdtempSync(join(tmpdir(), 'trace-'));
     mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    if (design) writeFileSync(join(dir, 'docs', 'slices', '05-design.md'), design);
     writeFileSync(join(dir, 'docs', 'slices', '06-x.md'),
       `---\nid: "06"\nstatus: ready\narc42: ["§6.3"]\nquality_scenarios: [QS-6]\n`
       + `inherits: [${inherits.map((r) => `"${r}"`).join(', ')}]\n---\n\n`
@@ -167,6 +168,23 @@ console.log('\ninherited scope — the subset guard becomes bidirectional');
     /FAIL/.test(line(world(['F-02-9'], '- **AC-1 and QS-6 are cited here.** Body.'))));
   ok('an invented ref the log has never seen is not a ref',
     /FAIL/.test(line(world(['F-02-9'], '- **F-06-99 — invented.** Body.'))));
+
+  // OQ-09-1. `D-` identifiers belong to the DEBT REGISTER, not the log — which is exactly
+  // why O-39's ownership check excludes them. Reading only the log made a real obligation
+  // uncitable: `D-07-1` is slice 09's, booked at slice 07 step 7, and a bullet naming it
+  // failed while the honest escape `(no ref — …)` would have been a lie.
+  const DESIGN = '## Debt\n\n**`D-05-1` — a saturated pool answers 500.** Booked at step 7.\n';
+  ok('a `D-` ref DEFINED in a slice design is a ref, though the log never saw it',
+    /PASS/.test(line(world(['F-02-9'],
+      '- **F-02-9 — ok.** x\n\n- **`D-05-1` — the pool ceiling.** y', DESIGN))));
+
+  // refs.mjs draws this line and slice:check must not redraw it: "appears in a design" and
+  // "is defined in a design" are different facts, and collapsing them survives the mutant
+  // that renames a definition.
+  ok('...but a `D-` ref merely MENTIONED in a design is still not a ref',
+    /FAIL/.test(line(world(['F-02-9'],
+      '- **F-02-9 — ok.** x\n\n- **`D-05-9` — never defined anywhere.** y',
+      DESIGN + '\nProse citing `D-05-9` in passing.\n'))));
 
   ok('a slice with no Inherited scope section is N/A, not a failure',
     /N\/A/.test((() => {

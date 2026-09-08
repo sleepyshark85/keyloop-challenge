@@ -154,6 +154,42 @@ function main() {
   const checks = toChecks(JSON.parse(readFileSync(reportPath, 'utf8')), changed, {
     tool: `stryker@${strykerVersion()}`,
   });
+
+  /**
+   * A PARTIAL REPORT MUST NOT PRODUCE AN EMPTY `below_threshold` — O-73.
+   *
+   * Stryker can be run file-scoped, and every run OVERWRITES this report. After the slice 09
+   * remediation the implementer measured three files individually, correctly, as instructed;
+   * the last run left a report containing ONE file. The collector then intersected it with
+   * eleven changed files, found one, scored it 85.57, and recorded `below_threshold: []`.
+   *
+   * That empty array was TRUE OF THE REPORT AND FALSE OF THE SLICE, and it would have
+   * satisfied the per-file criterion built days earlier under O-64 to stop this exact class
+   * of error — while two remediated files went unmeasured.
+   *
+   * THE EVIDENCE WAS ALREADY IN THE RECORD AND NOTHING READ IT: `mutation_files_measured`
+   * said 1 against 11 changed files. That is the third consecutive instance of this shape —
+   * O-6, the vacuous SQL-only score, O-64's aggregate — and the first the orchestrator wrote
+   * itself, having built the guard. So the check is no longer a field a reader must open.
+   *
+   * `--allow-partial` exists because measuring one file deliberately is legitimate; it
+   * records the fact in the log so the gate sees a partial reading rather than inferring a
+   * complete one.
+   */
+  const unmeasured = changed.filter((f) => checks.mutation_per_file[f] === undefined);
+  if (unmeasured.length && !process.argv.includes('--allow-partial')) {
+    console.error(`the report covers ${checks.mutation_files_measured} of ${changed.length} changed file(s).`);
+    console.error(`unmeasured: ${unmeasured.join(', ')}`);
+    console.error('A partial report cannot say a slice has no file below threshold — it can only');
+    console.error('say the files it contains do not. Re-run `npm run mutation` over the whole');
+    console.error('project, or pass --allow-partial to record this as a partial reading (O-73).');
+    console.error('nothing was appended.');
+    process.exit(2);
+  }
+  if (unmeasured.length) {
+    checks.mutation_report_partial = true;
+    checks.mutation_unmeasured = unmeasured;
+  }
   const record = {
     slice,
     event: 'check.run',

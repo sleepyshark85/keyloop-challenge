@@ -15,18 +15,18 @@
 
 | | |
 |---|---|
-| Last commit | `72d5ca9 fix(docs): a superseded ADR says so in its own row — A-R-4` |
+| Last commit | `b4c5626 test(09): AC-15's matcher pinned a hyphen, not the concept` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E |
-| Agent runs recorded | 194 |
+| Agent runs recorded | 216 |
 | ADRs accepted | 15 |
-| Slices defined | 10 |
+| Slices defined | 11 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Slice [`08`](slices/08-availability-query.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
+- **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
 - **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
-- 2 slice(s) remain of 10 defined; Gate D folded 5 (03, 12, 13, 10, 11) into their successors.
+- 3 slice(s) remain of 11 defined; Gate D folded 4 (03, 12, 13, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
 ## Gate decisions
@@ -140,6 +140,7 @@
 | [0025](adr/0025-existence-is-the-reads-legality-is-the-statements.md) | Existence is the read's, legality is the statement's — a move is adjudicated by one guarded UPDATE | accepted | — |
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
 | [0034](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) | The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed | accepted | — |
+| [0035](adr/0035-one-conflict-counted-per-exclusion-violation.md) | Count one conflict per exclusion violation, not one per contended request | proposed | — |
 
 ## Agent runs
 
@@ -339,7 +340,29 @@
 | 2026-09-07 14:05 | architect | 9m24 | 150 / 5,275 / 6,292,327 | `derived` |
 | 2026-09-07 14:08 | test-engineer | 1m22 | 44 / 1,404 / 794,855 | `derived` |
 | 2026-09-07 14:09 | implementer | 2m13 | 80 / 1,262 / 1,650,514 | `derived` |
-| | **total** | **7111m33** | **46,536 / 3,294,522 / 3,799,139,076** | |
+| 2026-09-07 17:16 | architect | 12m12 | 170 / 12,671 / 9,216,786 | `derived` |
+| 2026-09-07 17:32 | test-engineer | 8m07 | 102 / 10,788 / 3,472,276 | `derived` |
+| 2026-09-07 17:32 | implementer | 7m59 | 122 / 13,921 / 4,000,936 | `derived` |
+| 2026-09-07 17:33 | test-engineer | 8m59 | 106 / 10,804 / 3,731,744 | `derived` |
+| 2026-09-07 17:43 | architect | 8m32 | 96 / 891 / 3,444,062 | `derived` |
+| 2026-09-07 19:15 | test-engineer | 58m34 | 744 / 57,809 / 111,091,312 | `derived` |
+| 2026-09-07 19:24 | architect | 6m15 | 84 / 10,536 / 2,596,387 | `derived` |
+| 2026-09-07 20:19 | architect | 12m09 | 174 / 17,171 / 7,948,987 | `derived` |
+| 2026-09-07 20:20 | architect | 12m57 | 180 / 17,176 / 8,365,175 | `derived` |
+| 2026-09-07 20:27 | test-engineer | 11m59 | 130 / 13,112 / 4,664,632 | `derived` |
+| 2026-09-07 20:30 | test-engineer | 14m50 | 154 / 13,528 / 6,021,468 | `derived` |
+| 2026-09-07 20:32 | implementer | 74m19 | 1,132 / 74,381 / 229,096,979 | `derived` |
+| 2026-09-07 21:18 | reviewer | 43m39 | 238 / 19,676 / 12,042,394 | `derived` |
+| 2026-09-07 21:38 | architect | 18m11 | 230 / 27,947 / 12,913,720 | `derived` |
+| 2026-09-07 22:05 | test-engineer | 23m33 | 432 / 31,075 / 33,190,860 | `derived` |
+| 2026-09-07 22:05 | test-engineer | 23m42 | 434 / 31,076 / 33,211,598 | `derived` |
+| 2026-09-07 22:05 | test-engineer | 23m51 | 436 / 31,078 / 33,450,317 | `derived` |
+| 2026-09-07 22:06 | test-engineer | 24m13 | 444 / 31,150 / 34,408,186 | `derived` |
+| 2026-09-07 23:17 | implementer | 95m58 | 1,938 / 92,540 / 397,096,062 | `derived` |
+| 2026-09-08 00:04 | test-engineer | 142m36 | 482 / 35,047 / 38,590,404 | `derived` |
+| 2026-09-08 02:52 | architect | 51m15 | 674 / 16,188 / 79,966,708 | `derived` |
+| 2026-09-08 03:10 | test-engineer | 7m51 | 92 / 1,301 / 2,318,129 | `derived` |
+| | **total** | **7803m14** | **55,130 / 3,864,388 / 4,869,978,198** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a

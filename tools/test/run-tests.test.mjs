@@ -65,6 +65,24 @@ const noFile = (project, exitCode = 1) => ({ project, exitCode, json: null });
   ok('...and exits DID_NOT_RUN, not OK', exitCodeFor(r) === EXIT_DID_NOT_RUN, String(exitCodeFor(r)));
 }
 
+// T-09-3. `perf` is a third project, and the classification must treat it like any other:
+// a budget that did not run is not a budget that passed. The point of the third project is
+// exclusivity — projects run strictly sequentially, and `perf` gets its own container — so
+// the case that matters is `perf` alone dying while the other two are green.
+{
+  const r = merge([report('nodb', ['a.test.ts']), report('db', ['b.test.ts']), ranNothing('perf')]);
+  ok('a `perf` project that did not run is DID NOT RUN, not zero failures',
+    r.didNotRun.includes('perf'), JSON.stringify(r.didNotRun));
+  ok('...and the other two projects still report their results',
+    r.merged.projectReport.filter((p) => p.ran).length === 2,
+    JSON.stringify(r.merged.projectReport.map((p) => [p.project, p.ran])));
+
+  const all3 = merge([report('nodb', ['a.test.ts']), report('db', ['b.test.ts']), report('perf', ['c.test.ts'])]);
+  ok('three projects merge into one result — the property red-proof rests on',
+    all3.didNotRun.length === 0 && all3.merged.projectReport.length === 3,
+    JSON.stringify(all3.merged.projectReport.map((p) => p.project)));
+}
+
 // --- and the reverse direction: nodb dying must not hide db ------------------
 {
   const r = merge([ranNothing('nodb'), report('db', ['c.test.ts'])]);

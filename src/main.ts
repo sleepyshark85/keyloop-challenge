@@ -16,6 +16,14 @@
  * SIGTERM AND SIGINT CLOSE THE POOL. The acceptance harness spawns and kills this process
  * repeatedly, and a process that leaks a pool on signal turns one unrelated test failure
  * into a hung suite.
+ *
+ * THE SDK STARTS BEFORE ANYTHING THAT COULD EMIT A SPAN, AND STOPS ON THE SAME SIGNALS THE POOL
+ * DOES. `docs/slices/09-design.md` decision 1: `src/main.ts` is the only module besides
+ * `src/platform` the `otel-sdk-only-in-platform` rule permits to see `NodeSDK` — the composition
+ * root starts it and shuts it down, never anything in between. `NodeSDK#shutdown()` flushes the
+ * batch span processor and the periodic metric reader before it resolves
+ * (`tests/support/otelCollector.ts`'s own measured header), which is why it runs ALONGSIDE
+ * `closeDb`, on the same signals, rather than being left to the process's exit.
  */
 import { bookAppointment } from './application/bookAppointment.js';
 import { cancelAppointment } from './application/cancelAppointment.js';
@@ -27,6 +35,7 @@ import { buildServer } from './http/server.js';
 import { closeDb, createDb } from './persistence/db.js';
 import { ConfigError, configWarnings, loadConfig } from './platform/config.js';
 import { createLogger } from './platform/logger.js';
+import { startTelemetry } from './platform/telemetry.js';
 
 function loadConfigOrExit(): ReturnType<typeof loadConfig> {
   try {
@@ -43,6 +52,10 @@ function loadConfigOrExit(): ReturnType<typeof loadConfig> {
 }
 
 const config = loadConfigOrExit();
+// Before the logger and before the db handle: both can emit a span (the logger reads the active
+// one; the first query the pool ever runs is inside one), and starting the SDK after either
+// existed would risk a span or a log line the SDK's global providers were not yet registered for.
+const telemetry = startTelemetry();
 const logger = createLogger(config);
 // ADR-0021's announcement, at the first moment there is anything to announce it with. The
 // wording lives beside the field in `config.ts`; emitting it is the composition root's job.
@@ -93,6 +106,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   try {
     await app.close();
     await closeDb(db);
+    await telemetry.shutdown();
   } catch (error) {
     logger.error({ err: error }, 'shutdown did not complete cleanly');
     process.exit(1);
@@ -108,5 +122,6 @@ try {
 } catch (error) {
   logger.error({ err: error }, 'the server could not listen');
   await closeDb(db);
+  await telemetry.shutdown();
   process.exit(1);
 }

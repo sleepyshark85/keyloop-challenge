@@ -17,20 +17,42 @@
  *
  * `not-found` is unambiguous only because the statement is unguarded: zero rows means no such id
  * and cannot also mean "already cancelled" (arc42 §6.6).
+ *
+ * ── `appointment.cancel`, arc42 §8.4 (`R-09-9`) ────────────────────────────────────────────────
+ *
+ * One span, the whole use case wide — there is no attempt loop here for a span-per-attempt shape
+ * to matter, so it wraps the one repository call rather than a per-attempt slice of it. Errors
+ * are marked and rethrown, never swallowed: "does not catch" (below) stays true of the whole
+ * function, not just of what is inside the span.
  */
+import { SpanStatusCode } from '@opentelemetry/api';
 import { toAppointmentView } from './bookAppointment.js';
 import type { AppointmentView } from './bookAppointment.js';
 import { cancelAppointmentById } from '../persistence/appointmentRepository.js';
 import type { Db } from '../persistence/db.js';
+import { appointmentsCancelledTotal, tracer } from '../platform/telemetry.js';
 
 export type CancelOutcome =
   | { readonly kind: 'cancelled'; readonly appointment: AppointmentView }
   | { readonly kind: 'not-found' };
 
 export async function cancelAppointment(db: Db, id: string): Promise<CancelOutcome> {
-  const row = await cancelAppointmentById(db, id);
+  return await tracer.startActiveSpan('appointment.cancel', async (span): Promise<CancelOutcome> => {
+    span.setAttribute('appointment.id', id);
+    try {
+      const row = await cancelAppointmentById(db, id);
 
-  return row === null
-    ? { kind: 'not-found' }
-    : { kind: 'cancelled', appointment: toAppointmentView(row) };
+      if (row === null) return { kind: 'not-found' };
+
+      // arc42 §8.4's metrics table. `not-found` counts nothing — a replay of an id that never
+      // existed is not a cancellation.
+      appointmentsCancelledTotal.add(1);
+      return { kind: 'cancelled', appointment: toAppointmentView(row) };
+    } catch (error) {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
 }

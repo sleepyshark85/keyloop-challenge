@@ -23,6 +23,7 @@
  *          +---------------------------------+  (types only, in practice)
  *
  *     src/platform/     config · logger · telemetry — a leaf: imports nothing from src/
+ *                       — and the ONLY src/ home (besides src/main.ts) for the OTel SDK itself
  *     src/main.ts       composition root — the only module allowed to see every layer
  *
  * Full reasoning: docs/adr/0008-module-decomposition.md.
@@ -139,6 +140,26 @@ export default {
         'exempt: it is the composition root and it holds the server handle it listens on.',
       from: { path: '^src/', pathNot: '^src/(http/|main\\.ts$)' },
       to: { path: '^node_modules/(fastify|@fastify/[^/]+|@sinclair/typebox)(/|$)' },
+    },
+
+    // ─────────────────────────────────────────────────── slice 09 — telemetry confinement ──
+    {
+      name: 'otel-sdk-only-in-platform',
+      severity: 'error',
+      comment:
+        'docs/slices/09-design.md decision 1: spans are emitted where the work happens, so ' +
+        '@opentelemetry/api is importable from src/application and src/persistence — only the ' +
+        'SDK, its exporters and its instruments (@opentelemetry/sdk-*, @opentelemetry/exporter-*, ' +
+        '@opentelemetry/context-*, @opentelemetry/resources) are confined to src/platform, on the ' +
+        'shape http-framework-only-in-the-edge already uses for Fastify. src/main.ts is exempt: ' +
+        'it is the composition root that starts and shuts the SDK down (arc42 §5.3). A new ' +
+        'forbidden rule arrives with its plant (tests/architecture/layering.test.ts) or it does ' +
+        'not arrive — QS-10\'s claim is that the rules fire, not merely exist.',
+      from: { path: '^src/', pathNot: '^src/(platform/|main\\.ts$)' },
+      to: {
+        path:
+          '^node_modules/@opentelemetry/(sdk-[^/]+|exporter-[^/]+|context-[^/]+|resources|instrumentation[^/]*)(/|$)',
+      },
     },
 
     // ───────────────────────────────────────────────── test independence (OC-5, P4) ──

@@ -39,6 +39,8 @@
     "docs:budget": "node tools/docs/budget.mjs",
     "docs:budget:check": "node tools/docs/budget.mjs --check --ratchet",
     "docs:refs": "node tools/docs/refs.mjs",
+    "predocs:openapi": "npm run build",
+    "docs:openapi": "node tools/docs/openapi.mjs",
     "docs:adr-check": "node tools/docs/adr-invariants.mjs",
     "defects:check": "node tools/defects/generate.mjs --check",
     "mutation": "stryker run",
@@ -46,6 +48,7 @@
     "slice:close": "node tools/slice/close.mjs"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "13.0.0",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@testcontainers/postgresql": "12.1.0",
@@ -59,6 +62,13 @@
     "vitest": "5.0.0"
   },
   "dependencies": {
+    "@fastify/swagger": "9.8.1",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/context-async-hooks": "2.11.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.222.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
+    "@opentelemetry/sdk-metrics": "2.11.0",
+    "@opentelemetry/sdk-node": "0.222.0",
     "@sinclair/typebox": "0.34.52",
     "fastify": "5.12.1",
     "kysely": "0.29.5",

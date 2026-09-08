@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
+import { tracing } from '@opentelemetry/sdk-node';
 import { cancelAppointment } from '../../../src/application/cancelAppointment.js';
 import { scriptedDb } from '../helpers/stub-db.js';
 
@@ -86,5 +88,64 @@ describe('cancelAppointment — AC-3, AC-4', () => {
     const failure = Object.assign(new Error('connection terminated'), { code: '57P01' });
     const { db } = scriptedDb([{ error: failure }]);
     await expect(cancelAppointment(db, APPOINTMENT)).rejects.toBe(failure);
+  });
+});
+
+/**
+ * §8.4's `appointment.cancel` span (`R-09-9`, step 5 finding 9): a real, in-memory
+ * `TracerProvider` registered so `tracer.startActiveSpan` in `cancelAppointment.ts` reaches an
+ * exporter this file can read back, the same shape `attemptLoop.test.ts` and `telemetry.test.ts`
+ * use for the same reason (`src/platform/telemetry.ts`'s docblock: a span started through the
+ * exported `tracer` defers to whatever provider is registered at CALL time, `ProxyTracer`'s own
+ * behaviour, not the meter's).
+ */
+describe('cancelAppointment — appointment.cancel span (arc42 §8.4)', () => {
+  const spanExporter = new tracing.InMemorySpanExporter();
+  const tracerProvider = new tracing.BasicTracerProvider({
+    spanProcessors: [new tracing.SimpleSpanProcessor(spanExporter)],
+  });
+
+  beforeAll(() => {
+    trace.setGlobalTracerProvider(tracerProvider);
+  });
+
+  afterEach(() => {
+    spanExporter.reset();
+  });
+
+  afterAll(() => {
+    trace.disable();
+  });
+
+  function cancelSpans(): readonly ReturnType<typeof spanExporter.getFinishedSpans>[number][] {
+    return spanExporter.getFinishedSpans().filter((s) => s.name === 'appointment.cancel');
+  }
+
+  it('a cancellation opens exactly one span, carrying the id, with no ERROR status', async () => {
+    const { db } = scriptedDb([{ rows: [CANCELLED_ROW] }]);
+    await cancelAppointment(db, APPOINTMENT);
+
+    const spans = cancelSpans();
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.attributes['appointment.id']).toBe(APPOINTMENT);
+    expect(spans[0]?.status.code).toBe(SpanStatusCode.UNSET);
+  });
+
+  it('a not-found replay ALSO opens and ends its span — the span wraps the use case, not just the write', async () => {
+    const { db } = scriptedDb([{ rows: [] }]);
+    await cancelAppointment(db, APPOINTMENT);
+
+    expect(cancelSpans()).toHaveLength(1);
+  });
+
+  it('a driver failure marks the span ERROR, ends it, and still rethrows the SAME error', async () => {
+    const failure = Object.assign(new Error('connection terminated'), { code: '57P01' });
+    const { db } = scriptedDb([{ error: failure }]);
+
+    await expect(cancelAppointment(db, APPOINTMENT)).rejects.toBe(failure);
+
+    const spans = cancelSpans();
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.status.code).toBe(SpanStatusCode.ERROR);
   });
 });

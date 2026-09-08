@@ -65,10 +65,16 @@ const RESOURCE_BY_CONSTRAINT = new Map<string, 'bay' | 'technician'>([
   ['no_technician_overlap', 'technician'],
 ]);
 
-/** SQLSTATEs this classifier recognises. Only those MEASURED to reach this path (design §5.1). */
-const EXCLUSION_VIOLATION = '23P01';
-const FOREIGN_KEY_VIOLATION = '23503';
-const DEADLOCK_DETECTED = '40P01';
+/**
+ * SQLSTATEs this classifier recognises. Only those MEASURED to reach this path (design §5.1).
+ *
+ * Exported for `src/application/attemptLoop.ts`'s span attributes (`db.sqlstate`, arc42 §8.4) —
+ * a span attribute restating a code this file already classified is not a second translation
+ * site; it is a label on a `PgOutcome` this function already produced.
+ */
+export const EXCLUSION_VIOLATION = '23P01';
+export const FOREIGN_KEY_VIOLATION = '23503';
+export const DEADLOCK_DETECTED = '40P01';
 
 /**
  * The shape read off a `pg` error, structurally rather than by importing `DatabaseError`.

@@ -107,8 +107,9 @@ import type { Scenario } from '../support/booking.js';
  * ── R-07-4: THE IN-FLIGHT BOUND, AND WHY IT IS NOT A FLAKE DODGE ────────────────────────
  *
  * At the red commit this file released `RACE_COUNT = 20` pairs — 40 movers — from ONE barrier
- * per trial, against a service whose `createPool` sets no `max` and so runs at pg's
- * unconfigured default of 10 (D-07-1). The reviewer named two effects of that, and the second
+ * per trial, against a service whose pool ran at whatever `createPool` defaulted to (10,
+ * D-07-1) — a ceiling this file only ASSUMED rather than set. The reviewer named two effects
+ * of that mismatch, and the second
  * is the one that matters: 40-in-flight-against-10 **manufactures a codeless `500`** the
  * assertion below then blamed on a deadlock without having measured one, **and** it
  * **serialises the very simultaneity this criterion is about** — the pool can queue a pair's
@@ -157,7 +158,12 @@ import type { Scenario } from '../support/booking.js';
  */
 
 const RACE_COUNT = 5;
-/** pg's unconfigured pool default (D-07-1) — `RACE_COUNT * 2` must never exceed this. */
+/**
+ * The ceiling this file DICTATES to the spawned service via `DB_POOL_MAX` (`R-09-10`), rather
+ * than assuming it matches whatever `src/persistence/config.ts` defaults to — a test in
+ * `tests/` cannot read that constant (`outside-in-tests-do-not-import-src`, ADR-0013), so it
+ * cannot derive the ceiling; it sets it instead. `RACE_COUNT * 2` must never exceed this.
+ */
 const POOL_MAX = 10;
 /**
  * `RACE_COUNT * TRIAL_COUNT * 2 = 1000` — the AC's own floor, and ADR-0030's own measurement
@@ -209,6 +215,8 @@ async function withService<T>(
     databaseUrl: inject('databaseUrl'),
     // trace: AC-4's positive witness is read off `booking.conflict` lines (I-02-6's observer).
     logLevel: 'trace',
+    // R-09-10: DICTATED, not assumed — see POOL_MAX's own comment above.
+    dbPoolMax: POOL_MAX,
   });
   expect(attempt.failure ?? 'started', `the service did not start.\n${attempt.failure}`).toBe(
     'started',

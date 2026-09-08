@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ConfigError,
   DEFAULT_ATTEMPT_CAP,
+  DEFAULT_DB_POOL_MAX,
   LOG_LEVELS,
   configWarnings,
   loadConfig,
@@ -28,6 +29,7 @@ describe('loadConfig', () => {
       port: 3000,
       logLevel: 'warn',
       attemptCap: 16,
+      poolMax: 10,
     });
   });
 
@@ -189,6 +191,40 @@ describe('BOOKING_ATTEMPT_CAP — ADR-0009\'s cap, ADR-0022\'s name', () => {
     // different regressions. A cap that quietly became 32 would still pass a test that read the
     // constant to compute its expectation.
     expect(DEFAULT_ATTEMPT_CAP).toBe(16);
+  });
+});
+
+describe('DB_POOL_MAX — the pool ceiling, R-07-12/R-09-10', () => {
+  it('defaults to the named ceiling when it is unset', () => {
+    expect(loadConfig(VALID).poolMax).toBe(DEFAULT_DB_POOL_MAX);
+    expect(loadConfig({ ...VALID, DB_POOL_MAX: '' }).poolMax).toBe(DEFAULT_DB_POOL_MAX);
+  });
+
+  it('reads an integer in range', () => {
+    expect(loadConfig({ ...VALID, DB_POOL_MAX: '25' }).poolMax).toBe(25);
+    expect(loadConfig({ ...VALID, DB_POOL_MAX: ' 1 ' }).poolMax).toBe(1);
+    expect(loadConfig({ ...VALID, DB_POOL_MAX: '100' }).poolMax).toBe(100);
+  });
+
+  it('refuses a value outside 1..100, and a malformed one', () => {
+    expect(() => loadConfig({ ...VALID, DB_POOL_MAX: '0' })).toThrowError(
+      /DB_POOL_MAX must be between 1 and 100/,
+    );
+    expect(() => loadConfig({ ...VALID, DB_POOL_MAX: '101' })).toThrowError(
+      /DB_POOL_MAX must be between 1 and 100/,
+    );
+    for (const raw of ['ten', '-1', '1.5', '10 connections']) {
+      expect(() => loadConfig({ ...VALID, DB_POOL_MAX: raw }), raw).toThrowError(
+        /DB_POOL_MAX must be an integer/,
+      );
+    }
+  });
+
+  it('is 10 by default — the CONSTANT, asserted unconditionally', () => {
+    // Duplicated with the behavioural assertion above for the same reason `DEFAULT_ATTEMPT_CAP`
+    // is: a ceiling that quietly became 20 would still pass a test that read the constant to
+    // compute its own expectation.
+    expect(DEFAULT_DB_POOL_MAX).toBe(10);
   });
 });
 
