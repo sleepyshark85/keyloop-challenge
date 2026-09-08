@@ -11,12 +11,14 @@ loopbacks: 0           # incremented on a (c) ruling; at 2 the architect must es
 
 ## Goal
 
-One paragraph. What this slice makes true that was not true before.
+One paragraph. What this slice makes true that was not true before, said plainly enough that a
+reader who was not here can follow it without opening another file.
 
 ## Acceptance criteria
 
-Given/When/Then. These become the test-engineer's acceptance test names, so write them
-as assertions rather than activities.
+Given/When/Then. These become the test-engineer's acceptance test names, so write them as
+assertions rather than activities. When a criterion is amended, rewrite it to say what it now
+requires; how it moved is in the event log and on the PR.
 
 - **AC-1** — Given …, when …, then ….
 - **AC-2** — Given …, when …, then ….

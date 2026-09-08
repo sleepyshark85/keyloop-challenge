@@ -6,23 +6,25 @@ folded_by: gate-D
 
 # Slice 03 — folded into slice 02
 
-**This is a tombstone.** It carries no `id:`, so nothing counts, schedules or waits on it. Kept
-because the backlog's shape is part of the record: Gate C approved thirteen slices with its reasoning
-stated, and later rulings cut them. Deleting the evidence of the first decision to make the second look
-tidy is the quiet change `CLAUDE.md` §4 exists to prevent.
+**A tombstone: it carries no `id:`, so no tool counts it, schedules it or waits on it.**
 
-**Was:** The error taxonomy — every failure has one status, one type, and a test (QS-11)
+**Was:** the error taxonomy — every failure has one status, one type, and a test.
 
-**Why it was folded.** Gate D, 2026-09-04: criterion C6 ("the budget is real") failed by more than
-an order of magnitude, and C6's own wording says cut slices or reduce agent count. The human ruled the
-first and declined the second — 11 remaining slices to 8, team and loop unchanged. Figures and full
-rationale: `docs/team-log/events.jsonl` (`p-4-gate-d`).
+**Where the work went.** All six acceptance criteria became slice 02's AC-7 to AC-12, unchanged in
+substance, together with the contract test, the `problem+json` serialiser and the mapping from a use
+case's outcome to a status. The quality scenario they carry — every row of the taxonomy is reachable
+and no two rows collide — is slice 02's, and its OpenAPI half is slice 09's.
 
-**Where the work went.** All six acceptance criteria moved into slice 02 as AC-7 to AC-12, unchanged in substance, together with the contract test, the problem+json serialiser and the §8.6 outcome mapping. QS-11 is now claimed by slice 02 and, for the OpenAPI half, by slice 09.
+**Why it was folded.** At the phase-4 gate on 2026-09-04 the measured cost of a slice missed the
+budget by more than an order of magnitude. That criterion's own wording offers two remedies, cut
+slices or cut agents; the human cut slices — eleven remaining down to eight — and left the team and
+the loop alone. The figures are in the event log, span `p-4-gate-d`.
 
-**What was NOT cut, and why it matters.** The orchestrator's first proposed cut also folded slice 07
-into slice 06. That was withdrawn: Gate C defended the 06/07 seam by name — *"so the atomic move is
-separated from the two concurrency scenarios that catch a cancel-then-insert"* — and a cut that
-reverses a recorded ruling has to say so rather than arrive inside a list of three. The seam stands.
+The same gate proposed folding slice 07 into slice 06 and withdrew it, an earlier gate having
+defended that seam by name. A cut that reverses a recorded ruling has to say so rather than arrive
+inside a list of three.
 
-See `docs/team-log/events.jsonl`, span `p-4-gate-d`, for the ruling as recorded.
+**Kept rather than deleted**, because the backlog's shape is part of the record: thirteen slices were
+approved with their reasoning stated, and later rulings cut them. Deleting the evidence of the first
+decision to make the second look tidy is the quiet change the rules on source of truth exist to
+prevent.
