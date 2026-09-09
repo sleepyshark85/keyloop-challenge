@@ -1,7 +1,7 @@
 ---
 id: "14"
 title: The service names itself, and its logs reach the collector
-status: ready
+status: done
 depends_on: ["09"]
 arc42: ["§7.3", "§8.4", "§10.2", "§11.1"]
 adr: [37]
