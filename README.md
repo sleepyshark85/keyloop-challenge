@@ -44,9 +44,10 @@ DATABASE_URL=postgresql://keyloop:keyloop@127.0.0.1:5432/keyloop PORT=3000 npm s
 curl -i localhost:3000/health
 ```
 
-`DATABASE_URL` and `PORT` are required; `LOG_LEVEL` is optional (`src/platform/config.ts`). Config
-fails fast and names the variable; connectivity is probed only by `GET /health`, so the service
-still starts against a dead database and answers `503`.
+`DATABASE_URL` and `PORT` are required; `LOG_LEVEL` and `OTEL_SERVICE_NAME` are optional, the
+latter defaulting to `keyloop-service-scheduler` (`src/platform/config.ts`; arc42 §7.3's table).
+Config fails fast and names the variable; connectivity is probed only by `GET /health`, so the
+service still starts against a dead database and answers `503`.
 
 | Route | Purpose |
 |---|---|
