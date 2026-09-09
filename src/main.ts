@@ -55,7 +55,7 @@ const config = loadConfigOrExit();
 // Before the logger and before the db handle: both can emit a span (the logger reads the active
 // one; the first query the pool ever runs is inside one), and starting the SDK after either
 // existed would risk a span or a log line the SDK's global providers were not yet registered for.
-const telemetry = startTelemetry();
+const telemetry = startTelemetry(config);
 const logger = createLogger(config);
 // ADR-0021's announcement, at the first moment there is anything to announce it with. The
 // wording lives beside the field in `config.ts`; emitting it is the composition root's job.
