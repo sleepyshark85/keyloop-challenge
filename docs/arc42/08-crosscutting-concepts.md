@@ -4,19 +4,23 @@
 
 ## 8.1 Domain model
 
-Nine tables. Seven are seeded reference data (A-6, A-7); `appointment` is the only one the API writes.
+Nine relations. Eight arrive by migration and fixture (A-6, A-7); `appointment` is the only one the API
+writes. The `CREATE TABLE` text lives once, in `src/persistence/migrations/0002`–`0003`, which is the copy
+that executes; arc42 carries the model and the reasoning.
 
-```
- customer 1─┬─* vehicle                    dealership 1─┬─* opening_hours   (GC-1)
-            │                                           ├─* service_bay     (A-9)
-            │                                           └─* technician      (A-3)
-            │                                                  │
- service_type *─┴─────────────────── technician_qualification ─┘            (A-3)
-      │
-      └────────────────────────── appointment ─────────────────────────────
-                                  customer · vehicle · service_type ·
-                                  technician · bay · [starts_at, ends_at) · status
-```
+![Nine relations, and what each edge asserts](../diagrams/domain-model.svg)
+
+*Source: [`domain-model.html`](../diagrams/domain-model.html) · regenerate with `npm run diagram:export`*
+
+| Relation | The line worth writing down |
+|---|---|
+| `dealership` | A site and its IANA `time_zone`. That zone validates opening hours and does nothing else (§8.3) |
+| `opening_hours` | `(dealership_id, day_of_week)` with local `time` bounds. **A day with no row is a day the site is closed** — the absence is the datum. Read by the domain, never joined to a booking |
+| `service_type` | The catalogue, carrying `duration_minutes` (A-1). **Not dealership-scoped**: one catalogue, every site |
+| `service_bay` · `technician` | The two contended resources, each scoped by `dealership_id` (A-3, A-9). The `UNIQUE (id, dealership_id)` on each looks redundant beside the primary key and is not — it is the *target* a composite foreign key needs |
+| `technician_qualification` | The join that turns *"a qualified technician"* into a key rather than a check |
+| `customer` · `vehicle` | `vehicle` carries its owner and a `UNIQUE (id, customer_id)` for the same reason. **Neither is dealership-scoped**: a customer is not a site's property |
+| `appointment` | The booking and its interval. Seven named constraints, and exactly seven |
 
 **The brief's requirement 2 has two halves, and neither is left to application care.** *"A qualified
 Technician"* is a composite foreign key from `appointment (technician_id, service_type_id)` to
@@ -25,92 +29,6 @@ The same trick carries A-9 and A-6: composite foreign keys make *"a bay and a te
 appointment's dealership"* and *"the vehicle belongs to the named customer"* structural rather than
 procedural, so booking stays the **single `INSERT`** A-6 depends on, with no validating pre-reads to go
 stale.
-
-```sql
--- 0001_extensions.sql
-CREATE EXTENSION IF NOT EXISTS btree_gist;      -- TC-3: gist over (uuid =, tstzrange &&)
-
--- 0002_reference_data.sql
-CREATE TABLE dealership (
-  id uuid PRIMARY KEY, name text NOT NULL,
-  time_zone text NOT NULL                -- IANA, e.g. 'Europe/London'  (GC-1, A-8)
-);
-
-CREATE TABLE opening_hours (             -- a day with no row is a day the dealership is closed
-  dealership_id uuid     NOT NULL REFERENCES dealership (id),
-  day_of_week   smallint NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),   -- 0 = Sunday
-  opens_at      time     NOT NULL,
-  closes_at     time     NOT NULL,
-  PRIMARY KEY (dealership_id, day_of_week),
-  CHECK (closes_at > opens_at)
-);
-
-CREATE TABLE service_type (
-  id uuid PRIMARY KEY, name text NOT NULL,
-  duration_minutes integer NOT NULL CHECK (duration_minutes > 0)         -- A-1
-);
-
-CREATE TABLE service_bay (
-  id uuid PRIMARY KEY, name text NOT NULL,
-  dealership_id uuid NOT NULL REFERENCES dealership (id),
-  UNIQUE (id, dealership_id)             -- target for appointment's composite FK  (A-9)
-);
-
-CREATE TABLE technician (
-  id uuid PRIMARY KEY, name text NOT NULL,
-  dealership_id uuid NOT NULL REFERENCES dealership (id),                -- A-3
-  UNIQUE (id, dealership_id)
-);
-
-CREATE TABLE technician_qualification (
-  technician_id   uuid NOT NULL REFERENCES technician (id),
-  service_type_id uuid NOT NULL REFERENCES service_type (id),
-  PRIMARY KEY (technician_id, service_type_id)
-);
-
-CREATE TABLE customer (id uuid PRIMARY KEY, name text NOT NULL);
-
-CREATE TABLE vehicle (
-  id uuid PRIMARY KEY, vin text NOT NULL UNIQUE, description text NOT NULL,
-  customer_id uuid NOT NULL REFERENCES customer (id),                    -- A-6: one owner
-  UNIQUE (id, customer_id)
-);
-
--- 0003_appointment.sql
-CREATE TYPE appointment_status AS ENUM ('confirmed', 'cancelled');
-
-CREATE TABLE appointment (
-  id              uuid PRIMARY KEY,
-  dealership_id   uuid NOT NULL,
-  customer_id     uuid NOT NULL,
-  vehicle_id      uuid NOT NULL,
-  service_type_id uuid NOT NULL,
-  technician_id   uuid NOT NULL,
-  bay_id          uuid NOT NULL,
-  starts_at       timestamptz NOT NULL,
-  ends_at         timestamptz NOT NULL,
-  status          appointment_status NOT NULL DEFAULT 'confirmed',
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now(),
-
-  CONSTRAINT appointment_interval_ordered CHECK (ends_at > starts_at),
-
-  -- Requirement 2, first half: the technician is QUALIFIED for this service type.
-  CONSTRAINT appointment_technician_qualified
-    FOREIGN KEY (technician_id, service_type_id)
-    REFERENCES technician_qualification (technician_id, service_type_id),
-
-  -- A-9: resources belong to the appointment's dealership. Never spans dealerships.
-  CONSTRAINT appointment_bay_in_dealership
-    FOREIGN KEY (bay_id, dealership_id)        REFERENCES service_bay (id, dealership_id),
-  CONSTRAINT appointment_technician_in_dealership
-    FOREIGN KEY (technician_id, dealership_id) REFERENCES technician  (id, dealership_id),
-
-  -- A-6 / GC-2: the vehicle belongs to the named customer. Validation, not authorisation.
-  CONSTRAINT appointment_vehicle_owned_by_customer
-    FOREIGN KEY (vehicle_id, customer_id)      REFERENCES vehicle     (id, customer_id)
-);
-```
 
 Four things a reader will wonder about. **`dealership_id`, `service_type_id` and `customer_id` carry no
 foreign key of their own, and that is complete rather than missing** — they are covered *transitively*,
@@ -215,6 +133,10 @@ reader can see nothing depends on it. `appointment.insert` carries `booking.atte
 retried booking's waterfall shows the retries rather than one long bar. Rescheduling emits
 `appointment.update`, same shape and the same attempt loop; cancellation emits `appointment.cancel`.
 
+![One contended booking, span by span](../diagrams/booking-trace.svg)
+
+*Source: [`booking-trace.html`](../diagrams/booking-trace.html) · regenerate with `npm run diagram:export`*
+
 **Metrics.**
 
 | Metric | Type | Labels | Notes |
@@ -236,6 +158,17 @@ times. A QS-12 marker holds the file set by equality.
 correlation id of their own. **Identifiers only, never names**: a line names `customer.id`, not the
 customer, so nothing is logged that GDPR-grade handling would have to cover. Export failures are logged
 and dropped; a collector outage must not fail a booking.
+
+**What an operator does with this.** §1.2 asks for health, conflicts and latency without a debugger —
+three questions, and the signal each is answered from. *Is it up?* `/health`, and the root span's
+`http.status_code`. *Is contention rising, or is something broken?* `booking_conflicts_total` by
+`outcome`: `absorbed` climbing alongside `appointments_booked_total` is a busy Saturday and needs nobody;
+`refused` or `capped` climbing is **capacity**, answerable by adding a bay rather than by reading code;
+and a `5xx` rate climbing against a **flat** conflict counter is a fault — the flatness is itself the
+evidence, the counter seeing `23P01` and nothing else. *Why did this one fail?* The response's log line
+carries `trace_id`; it opens the waterfall above, where each refused attempt names in `db.constraint`
+which resource refused it. No reproduction, no debugger. **Latency** is the root span's duration, and
+`booking_attempts` beside it separates a request that was slow from one that was merely contended.
 
 ## 8.5 Testability
 
