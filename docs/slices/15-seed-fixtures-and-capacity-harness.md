@@ -43,11 +43,13 @@ Verbatim from [`15-design.md`](15-design.md); that file's reasoning is the desig
   `qualifiedFor` naming an undeclared service type; a `vehicles[].owner` naming an undeclared
   customer; **a duplicate key within a collection**; no subtree with an empty `exportPrefix`; a
   duplicate prefix — the seed exits non-zero, names the offending JSON path on **stderr**, prints
-  **nothing** on stdout, and **inserts no row**. *Six of the validator's ten rules, chosen by a stated
+  **nothing** on stdout, and **inserts no row attributable to that run** — asserted against a
+  discriminator the run itself would have written (DCR-15-1; an unscoped table-wide count races the
+  `db` project's shared, un-truncated container). *Six of the validator's ten rules, chosen by a stated
   test — a rule earns a case when its breach is **silent**. `days ⊆ 0..6`, `opensAt < closesAt` and
-  `durationMinutes > 0` are refused loudly by CHECK constraints at
-  `src/persistence/migrations/0002_reference_data.sql:21,25,31`, so a case for each buys no
-  discrimination; `purpose` and the ≥ 1-per-collection minimums fail at AC-1/AC-2's own exports.*
+  `durationMinutes > 0` are refused loudly by the reference-table CHECK constraints arc42 §11.1 `R-11`
+  names, so a case for each buys no discrimination; `purpose` and the ≥ 1-per-collection minimums fail
+  at AC-1/AC-2's own exports.*
 - **AC-4** — `harness/spurious-refusal.sh` with `REQUEST_COUNT=10` against the capacity subtree exits
   0, prints one line per racer, and sees exactly `min(N, M)` confirmations and `N - min(N, M)`
   refusals, with *M* taken from the exported counts.
