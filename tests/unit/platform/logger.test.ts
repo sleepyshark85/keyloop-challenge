@@ -128,6 +128,57 @@ describe('createLogger — the default path reaches the OTel bridge, not only st
       'the default stream composition must include the OTel bridge alongside stdout',
     ).toBe('reaches the default-composed OTel bridge');
   });
+
+  it.each(['debug', 'trace'] as const)(
+    'a LOG_LEVEL=%s line still reaches the OTel bridge (step 5 finding, MAJOR)',
+    (logLevel) => {
+      const logger = createLogger({ logLevel });
+
+      logger[logLevel](`a ${logLevel} line`);
+
+      const records = logExporter.getFinishedLogRecords();
+      expect(
+        records.map((r) => r.body),
+        `LOG_LEVEL=${logLevel} must still reach the OTel bridge through the default composition, ` +
+          `not only stdout — arc42 §7.3 calls the LOG_LEVEL table "the contract".`,
+      ).toContain(`a ${logLevel} line`);
+    },
+  );
+});
+
+/**
+ * The regression itself, reproduced directly against the stdout side: `pino.multistream`'s own
+ * per-`StreamEntry` `level` defaults to `DEFAULT_INFO_LEVEL`
+ * (`node_modules/pino/lib/multistream.js:123`) when omitted — a SECOND gate below the parent
+ * `pino` instance's own `options.level`, which silently dropped every `debug`/`trace` line for
+ * BOTH streams even though the parent had already decided to emit them. `pino.destination` is
+ * spied and made to return a plain capturing object, the same technique the construction-args
+ * test above uses, so "reached stdout" is observable without touching the real fd.
+ */
+describe('createLogger — a LOG_LEVEL below info still reaches stdout (step 5 finding, MAJOR)', () => {
+  it.each(['debug', 'trace'] as const)('LOG_LEVEL=%s reaches the stdout destination', (logLevel) => {
+    const written: string[] = [];
+    const spy = vi.spyOn(pino, 'destination').mockReturnValue({
+      write: (line: string): boolean => {
+        written.push(line);
+        return true;
+      },
+    } as ReturnType<typeof pino.destination>);
+    try {
+      const logger = createLogger({ logLevel });
+      logger[logLevel](`a ${logLevel} line`);
+
+      expect(
+        written,
+        `LOG_LEVEL=${logLevel} must still reach stdout through the default stream composition — ` +
+          `plain pino(options), the pre-slice behaviour, wrote it; multistream must not filter ` +
+          `it out a second time.`,
+      ).toHaveLength(1);
+      expect(JSON.parse(written[0] as string)).toMatchObject({ msg: `a ${logLevel} line` });
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 /**
