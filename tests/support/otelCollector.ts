@@ -41,6 +41,23 @@ import type { Server } from 'node:http';
  * `describe()`), never a crash — which is the correct red-for-the-right-reason outcome for a
  * seam whose other side does not exist yet.
  *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * SLICE 14 EXTENSION — `/v1/logs`, and `resource` on all three signals.
+ *
+ * `docs/slices/14-design.md` §4 names this file's gap exactly: spans and metric points were
+ * decoded per-item, but `resourceSpans[].resource` / `resourceMetrics[].resource` were never
+ * read, so `service.name` was invisible from outside the process even though the SDK always
+ * sends one. Both interfaces below gain `resourceAttributes`, decoded with the same
+ * `flattenAttributes` used for per-item attributes — additive, so nothing that already reads
+ * `.attributes` off a `CollectedSpan`/`CollectedMetricPoint` changes shape.
+ *
+ * `/v1/logs` decodes the OTLP `resourceLogs -> scopeLogs -> logRecords` shape, on the SAME
+ * measured wire contract as traces/metrics: `@opentelemetry/exporter-logs-otlp-http` is the
+ * sibling of the trace/metric exporters already pinned, JSON body, protocol-suffixed path.
+ * `traceId`/`spanId` on a `CollectedLogRecord` are read verbatim off the decoded JSON, the
+ * same way `decodeTraces` already does for spans — measured there (slice 09) to arrive as
+ * plain lower-case hex, never base64, on this exporter family's JSON serialiser.
+ *
  * No import from `src/` — `outside-in-tests-do-not-import-src` covers `tests/support/`.
  */
 
@@ -52,13 +69,30 @@ export interface CollectedSpan {
   readonly startTimeUnixNano: bigint;
   readonly endTimeUnixNano: bigint;
   readonly attributes: Readonly<Record<string, unknown>>;
+  /** `resourceSpans[].resource.attributes`, flattened — e.g. `service.name`. Slice 14. */
+  readonly resourceAttributes: Readonly<Record<string, unknown>>;
   readonly statusCode?: number;
 }
 
 export interface CollectedMetricPoint {
   readonly metric: string;
   readonly attributes: Readonly<Record<string, unknown>>;
+  /** `resourceMetrics[].resource.attributes`, flattened — e.g. `service.name`. Slice 14. */
+  readonly resourceAttributes: Readonly<Record<string, unknown>>;
   readonly value: number;
+}
+
+/** A decoded OTLP log record — slice 14, AC-1 through AC-6. */
+export interface CollectedLogRecord {
+  /** Empty string if the record carried none — never `undefined`, so equality checks are direct. */
+  readonly traceId: string;
+  readonly spanId: string;
+  readonly severityNumber?: number;
+  readonly severityText?: string;
+  readonly body?: string;
+  readonly attributes: Readonly<Record<string, unknown>>;
+  /** `resourceLogs[].resource.attributes`, flattened — e.g. `service.name`. */
+  readonly resourceAttributes: Readonly<Record<string, unknown>>;
 }
 
 export interface OtelCollector {
@@ -66,6 +100,7 @@ export interface OtelCollector {
   readonly endpoint: string;
   spans(): readonly CollectedSpan[];
   metricPoints(): readonly CollectedMetricPoint[];
+  logRecords(): readonly CollectedLogRecord[];
   /** Every raw request this receiver could NOT decode as OTLP/JSON, for a failure message. */
   unrecognised(): readonly { readonly url: string; readonly contentType: string; readonly length: number }[];
   awaitSpans(
@@ -76,6 +111,10 @@ export interface OtelCollector {
     predicate: (points: readonly CollectedMetricPoint[]) => boolean,
     timeoutMs?: number,
   ): Promise<readonly CollectedMetricPoint[]>;
+  awaitLogRecords(
+    predicate: (records: readonly CollectedLogRecord[]) => boolean,
+    timeoutMs?: number,
+  ): Promise<readonly CollectedLogRecord[]>;
   /** A one-line summary of everything collected, for a failure message. */
   describe(): string;
   stop(): Promise<void>;
@@ -105,6 +144,14 @@ function flattenAttributes(attrs: readonly OtlpKeyValue[] | undefined): Record<s
   return out;
 }
 
+interface OtlpResource {
+  readonly attributes?: readonly OtlpKeyValue[];
+}
+
+function decodeResource(resource: OtlpResource | undefined): Record<string, unknown> {
+  return flattenAttributes(resource?.attributes);
+}
+
 interface OtlpSpan {
   readonly traceId: string;
   readonly spanId: string;
@@ -117,6 +164,7 @@ interface OtlpSpan {
 }
 interface OtlpTraceExportRequest {
   readonly resourceSpans?: ReadonlyArray<{
+    readonly resource?: OtlpResource;
     readonly scopeSpans?: ReadonlyArray<{ readonly spans?: readonly OtlpSpan[] }>;
   }>;
 }
@@ -133,13 +181,30 @@ interface OtlpMetric {
 }
 interface OtlpMetricsExportRequest {
   readonly resourceMetrics?: ReadonlyArray<{
+    readonly resource?: OtlpResource;
     readonly scopeMetrics?: ReadonlyArray<{ readonly metrics?: readonly OtlpMetric[] }>;
+  }>;
+}
+
+interface OtlpLogRecord {
+  readonly traceId?: string;
+  readonly spanId?: string;
+  readonly severityNumber?: number;
+  readonly severityText?: string;
+  readonly body?: OtlpAnyValue;
+  readonly attributes?: readonly OtlpKeyValue[];
+}
+interface OtlpLogsExportRequest {
+  readonly resourceLogs?: ReadonlyArray<{
+    readonly resource?: OtlpResource;
+    readonly scopeLogs?: ReadonlyArray<{ readonly logRecords?: readonly OtlpLogRecord[] }>;
   }>;
 }
 
 function decodeTraces(body: OtlpTraceExportRequest): CollectedSpan[] {
   const out: CollectedSpan[] = [];
   for (const rs of body.resourceSpans ?? []) {
+    const resourceAttributes = decodeResource(rs.resource);
     for (const ss of rs.scopeSpans ?? []) {
       for (const span of ss.spans ?? []) {
         out.push({
@@ -150,6 +215,7 @@ function decodeTraces(body: OtlpTraceExportRequest): CollectedSpan[] {
           startTimeUnixNano: BigInt(span.startTimeUnixNano),
           endTimeUnixNano: BigInt(span.endTimeUnixNano),
           attributes: flattenAttributes(span.attributes),
+          resourceAttributes,
           statusCode: span.status?.code,
         });
       }
@@ -161,14 +227,41 @@ function decodeTraces(body: OtlpTraceExportRequest): CollectedSpan[] {
 function decodeMetrics(body: OtlpMetricsExportRequest): CollectedMetricPoint[] {
   const out: CollectedMetricPoint[] = [];
   for (const rm of body.resourceMetrics ?? []) {
+    const resourceAttributes = decodeResource(rm.resource);
     for (const sm of rm.scopeMetrics ?? []) {
       for (const metric of sm.metrics ?? []) {
         const points = metric.sum?.dataPoints ?? metric.gauge?.dataPoints ?? [];
         for (const point of points) {
           const value = point.asDouble ?? (point.asInt === undefined ? undefined : Number(point.asInt));
           if (value === undefined) continue;
-          out.push({ metric: metric.name, attributes: flattenAttributes(point.attributes), value });
+          out.push({
+            metric: metric.name,
+            attributes: flattenAttributes(point.attributes),
+            resourceAttributes,
+            value,
+          });
         }
+      }
+    }
+  }
+  return out;
+}
+
+function decodeLogs(body: OtlpLogsExportRequest): CollectedLogRecord[] {
+  const out: CollectedLogRecord[] = [];
+  for (const rl of body.resourceLogs ?? []) {
+    const resourceAttributes = decodeResource(rl.resource);
+    for (const sl of rl.scopeLogs ?? []) {
+      for (const record of sl.logRecords ?? []) {
+        out.push({
+          traceId: record.traceId ?? '',
+          spanId: record.spanId ?? '',
+          severityNumber: record.severityNumber,
+          severityText: record.severityText,
+          body: record.body?.stringValue,
+          attributes: flattenAttributes(record.attributes),
+          resourceAttributes,
+        });
       }
     }
   }
@@ -193,6 +286,7 @@ async function listenOnFreePort(server: Server): Promise<number> {
 export async function startOtelCollector(): Promise<OtelCollector> {
   const spans: CollectedSpan[] = [];
   const metricPoints: CollectedMetricPoint[] = [];
+  const logRecords: CollectedLogRecord[] = [];
   const unrecognised: { url: string; contentType: string; length: number }[] = [];
 
   const server = createServer((req, res) => {
@@ -207,6 +301,7 @@ export async function startOtelCollector(): Promise<OtelCollector> {
           const parsed: unknown = JSON.parse(raw.toString('utf8'));
           if (url.includes('/v1/traces')) spans.push(...decodeTraces(parsed as OtlpTraceExportRequest));
           else if (url.includes('/v1/metrics')) metricPoints.push(...decodeMetrics(parsed as OtlpMetricsExportRequest));
+          else if (url.includes('/v1/logs')) logRecords.push(...decodeLogs(parsed as OtlpLogsExportRequest));
           else unrecognised.push({ url, contentType, length: raw.length });
         } catch {
           unrecognised.push({ url, contentType, length: raw.length });
@@ -239,17 +334,32 @@ export async function startOtelCollector(): Promise<OtelCollector> {
     endpoint,
     spans: () => spans.slice(),
     metricPoints: () => metricPoints.slice(),
+    logRecords: () => logRecords.slice(),
     unrecognised: () => unrecognised.slice(),
     awaitSpans: async (predicate, timeoutMs = 10_000) =>
       await pollUntil(() => spans.slice(), predicate, timeoutMs),
     awaitMetricPoints: async (predicate, timeoutMs = 10_000) =>
       await pollUntil(() => metricPoints.slice(), predicate, timeoutMs),
+    awaitLogRecords: async (predicate, timeoutMs = 10_000) =>
+      await pollUntil(() => logRecords.slice(), predicate, timeoutMs),
     describe: () =>
       [
         `  spans (${String(spans.length)})`,
-        ...spans.map((s) => `      ${s.name} trace=${s.traceId} attrs=${JSON.stringify(s.attributes)}`),
+        ...spans.map(
+          (s) =>
+            `      ${s.name} trace=${s.traceId} resource=${JSON.stringify(s.resourceAttributes)} attrs=${JSON.stringify(s.attributes)}`,
+        ),
         `  metric points (${String(metricPoints.length)})`,
-        ...metricPoints.map((m) => `      ${m.metric} ${JSON.stringify(m.attributes)} = ${String(m.value)}`),
+        ...metricPoints.map(
+          (m) =>
+            `      ${m.metric} resource=${JSON.stringify(m.resourceAttributes)} ${JSON.stringify(m.attributes)} = ${String(m.value)}`,
+        ),
+        `  log records (${String(logRecords.length)})`,
+        ...logRecords.map(
+          (r) =>
+            `      severity=${String(r.severityText)}(${String(r.severityNumber)}) trace=${r.traceId} span=${r.spanId} ` +
+            `resource=${JSON.stringify(r.resourceAttributes)} attrs=${JSON.stringify(r.attributes)} body=${String(r.body)}`,
+        ),
         `  unrecognised requests (${String(unrecognised.length)}) — a protocol or endpoint mismatch, not absence`,
         ...unrecognised.map((u) => `      ${u.url} content-type=${u.contentType} bytes=${String(u.length)}`),
       ].join('\n'),
