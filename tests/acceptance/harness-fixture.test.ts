@@ -139,10 +139,18 @@ async function serviceTypeCount(client: Client, name: string): Promise<number> {
 
 const tmpDirs: string[] = [];
 
+/**
+ * Named `case.json`, deliberately not `fixture.json`: AC-3's stderr check below matches on the
+ * literal text `fixture.` to confirm the VALIDATOR's own JSON-path message is present (every
+ * `validateFixture` error string starts with `fixture` — design §3). A file named `fixture.json`
+ * would let that check pass on the PATH alone, printed by `seed.mjs`'s `fail()` regardless of
+ * whether the message it wraps ever names a path — the exact vacuity this discriminator exists
+ * to rule out.
+ */
 function writeFixture(fixture: unknown): string {
   const dir = mkdtempSync(join(tmpdir(), 'harness-fixture-'));
   tmpDirs.push(dir);
-  const path = join(dir, 'fixture.json');
+  const path = join(dir, 'case.json');
   writeFileSync(path, JSON.stringify(fixture, null, 2));
   return path;
 }
@@ -378,9 +386,17 @@ describe('AC-3 — an invalid fixture fails loudly and atomically', () => {
         text(run.stdout).trim(),
         `AC-3 requires nothing printed on stdout for an invalid fixture.\n${outputOf(run)}`,
       ).toBe('');
+      // Not merely "stderr is non-empty" (reviewer's finding, step 5): a fixture reaching the
+      // database and failing on a Postgres NOT NULL — e.g. `qualifiedFor`'s or `owner`'s
+      // cross-reference rule deleted from the validator — ALSO exits non-zero with empty
+      // stdout and non-empty stderr, via the generic `seeding failed: ${error}` catch, which
+      // never names a JSON path. AC-3 says "names the offending JSON path", so the assertion
+      // checks for one: every `validateFixture` message starts with the literal text
+      // `fixture` (design §3), and `case.json` (not `fixture.json`, above) keeps that text out
+      // of the discriminator by any route but the validator's own message.
       expect(
-        text(run.stderr).trim().length > 0,
-        `AC-3 requires the offending JSON path named on stderr.\n${outputOf(run)}`,
+        /fixture\./.test(text(run.stderr)),
+        `AC-3 requires the offending JSON path named on stderr — "fixture." must appear, naming the validator's own path, not merely a non-empty stderr a downstream database error could also produce.\n${outputOf(run)}`,
       ).toBe(true);
 
       const invalidCount = await serviceTypeCount(client, marker);
@@ -487,7 +503,12 @@ describe('AC-6 — negative control: CAPACITY overridden to a wrong value exits 
     expect(seed.status, `npm run --silent harness:seed must exit 0.\n${outputOf(seed)}`).toBe(0);
     const env = parseExportedEnv(seed.stdout);
     const trueCapacity = Number(env['CAPACITY_BAY_COUNT']);
-    if (!Number.isInteger(trueCapacity) || trueCapacity < 2) return; // AC-2 already reports this
+    const capacityUsable = Number.isInteger(trueCapacity) && trueCapacity >= 2;
+    expect(
+      capacityUsable,
+      `AC-6 needs a usable CAPACITY_BAY_COUNT (>= 2) to override away from; got ${String(env['CAPACITY_BAY_COUNT'])}. AC-2 already reports this on its own, but AC-6 must say so too rather than return quietly.\n${outputOf(seed)}`,
+    ).toBe(true);
+    if (!capacityUsable) return;
 
     const attempt = await startService({ databaseUrl: inject('databaseUrl'), logLevel: 'silent' });
     expect(attempt.service !== undefined, `the service did not start.\n${attempt.failure ?? ''}`).toBe(true);
@@ -525,7 +546,13 @@ describe('AC-7 — negative control: the interval already fully taken yields zer
     expect(seed.status, `npm run --silent harness:seed must exit 0.\n${outputOf(seed)}`).toBe(0);
     const env = parseExportedEnv(seed.stdout);
     const m = Number(env['CAPACITY_BAY_COUNT']);
-    if (!Number.isInteger(m) || m < 2 || env['CAPACITY_DEALERSHIP_ID'] === undefined) return;
+    const capacityUsable =
+      Number.isInteger(m) && m >= 2 && env['CAPACITY_DEALERSHIP_ID'] !== undefined;
+    expect(
+      capacityUsable,
+      `AC-7 needs a usable CAPACITY_BAY_COUNT (>= 2) and CAPACITY_DEALERSHIP_ID to fill; got CAPACITY_BAY_COUNT=${String(env['CAPACITY_BAY_COUNT'])}. AC-2 already reports this on its own, but AC-7 must say so too rather than return quietly.\n${outputOf(seed)}`,
+    ).toBe(true);
+    if (!capacityUsable) return;
 
     const attempt = await startService({ databaseUrl: inject('databaseUrl'), logLevel: 'silent' });
     expect(attempt.service !== undefined, `the service did not start.\n${attempt.failure ?? ''}`).toBe(true);
