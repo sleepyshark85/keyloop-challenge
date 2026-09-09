@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **377** |
-| Severity | 14 blocking · 182 major · 181 minor |
-| Verdicts | 20 narrowed · 130 accepted · 3 escalated · 30 deferred · 3 rejected |
-| Raised by | architect 82 · test-engineer 76 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
-| Awaiting a ruling | **191** |
+| Findings recorded | **378** |
+| Severity | 14 blocking · 182 major · 182 minor |
+| Verdicts | 20 narrowed · 132 accepted · 3 escalated · 30 deferred · 3 rejected |
+| Raised by | architect 83 · test-engineer 76 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
+| Awaiting a ruling | **190** |
 | Mean escape distance | 1.45 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2594,7 +2594,8 @@ rather than narrated.*
 
 | ref | sev | step | raised by | claim | verdict |
 |---|---|---|---|---|---|
-| **T-15-1** | MAJOR | 3 *(+0)* | test-engineer | THE TEST-ENGINEER READ src/ WHILE WRITING THE RED COMMIT, WHICH ITS ROLE FORBIDS -- SELF-DISCLOSED, UNPROMPTED | **open** |
+| **T-15-1** | MAJOR | 3 *(+0)* | test-engineer | THE TEST-ENGINEER READ src/ WHILE WRITING THE RED COMMIT, WHICH ITS ROLE FORBIDS -- SELF-DISCLOSED, UNPROMPTED | accepted |
+| **A-15-1** | MINOR | 1 *(+0)* | architect | THE DEMO ASSUMES N CONCURRENT curl PROCESSES CONTEND RATHER THAN SERIALISING | accepted |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2602,6 +2603,13 @@ rather than narrated.*
 
 - *scenario:* While gathering schema facts for the red commit it opened src/persistence/migrations/0002_reference_data.sql and 0003_appointment.sql. THE ROLE BARS READING src/ AT ALL: the outside-in directories define done and must be written by someone who has not seen the implementation (CLAUDE.md section 5). The 0002 fact was already disclosed to it verbatim in the architect's own step-2 ruling text, which cited that file's three CHECK constraints by line; 0003 WAS NOT, and it had no license to open it. IT STOPPED, did not use anything from 0003 it could not otherwise source, and rebuilt the appointment-table knowledge from tests/support/booking.ts (SELECT_APPOINTMENT, already committed by its own role) and arc42 section 8.2, both legitimate. IT THEN REPORTED THE BREACH ITSELF, unprompted, in the same report that delivered the red commit. THE MATERIAL RISK IS LOW AND THE BOUNDARY IS STILL THE BOUNDARY: the reads were schema DDL, which arc42 section 8.2 publishes verbatim, not application code -- but a self-assessment that the work is uncontaminated is exactly the assessment the rule exists so nobody has to make. NOT RULED HERE. The claim that the committed tests rest only on the slice file, the design, arc42 and existing tests/support is CHECKABLE, and the reviewer is asked to verify it at step 5 rather than accept it; the human sees it at the gate either way.
 - *file:* `tests/acceptance/harness-fixture.test.ts`
+- *accepted* by human — HUMAN RULING AT GATE E, 2026-09-10: RECORDED, NO CONSEQUENCE, AND NO NEW WORK. The breach is real and not in dispute -- the test-engineer read src/persistence/migrations/0002_reference_data.sql and 0003_appointment.sql while writing the red commit, which its role forbids outright. THREE FACTS DECIDED IT. First, IT DISCLOSED THE BREACH ITSELF, UNPROMPTED, in the same message that delivered the work, when nothing would have surfaced it otherwise. Second, THE CONTAMINATION IS MEASURED AT NIL RATHER THAN ASSERTED: the reviewer enumerated every SQL identifier in the committed test file and traced each to tests/support/booking.ts (the test-engineer's own already-committed file) or to harness/seed.mjs AT MAIN, finding nothing unique to 0002 or 0003 anywhere -- no constraint name, no ends_at, tstzrange, appointment_status or created_at, no CHECK clause. There is no artifact to revise. Third, ONE HALF OF THE CAUSE WAS THE ARCHITECT'S OWN AND IT SAID SO: its step-2 ruling cited 0002 by line, and the durable remedy for that -- D-15-4, cite a fact where the reader is permitted to find it, preferring arc42 to a migration -- is already booked and already applied, AC-3 now citing R-11 instead. THE HUMAN DECLINED TO BUILD A TOOLING GUARD and declined to block the merge: guard-paths already blocks this role's WRITES into src/ and harness/, a read-guard was judged not worth its cost against a role that reports its own breaches, and re-authoring a red commit whose contamination is measured at nil would spend a full loopback to change nothing. THE RECORD IS THE CONSEQUENCE, which is what the register is for.
+
+**A-15-1** — THE DEMO ASSUMES N CONCURRENT curl PROCESSES CONTEND RATHER THAN SERIALISING
+
+- *scenario:* harness/spurious-refusal.sh fires N background curl processes and asserts min(N,M) confirmations. If the processes serialise -- spawn cost, connection setup, the shell's own scheduling -- the assertion still passes while demonstrating no contention at all. The step-1 rationale claimed AC-5's distinctness assertion would notice.
+- *file:* `docs/slices/15-design.md`
+- *accepted* by architect — CLOSED AT STEP 2, AND THE STEP-1 RATIONALE WAS WRONG. The test-engineer objected that AC-5's distinctness cannot notice: ADR-0009's prune-and-retry allocator makes final state timing-independent, so a serialised run yields the same count AND the same distinct assignment. THE ARCHITECT AGREED AND SUPPLIED A STRONGER REASON THAN THE OBJECTION'S OWN -- distinctness is IMPLIED BY THE EXCLUSION CONSTRAINTS, since two live rows cannot share a bay or a technician over one interval under ANY interleaving, so it is a consequence of the invariant and can never witness contention. The underlying fact recorded: THIS DEMO'S CONTENTION IS OVER PERSISTED ROWS, NOT INSTANTS, which also subsumes the separately-listed ADR-0004 global-mutex limit -- the two bullets were one fact said twice and are now one. A-15-1 rests on the captured double-booking.sh transcript, where racer 4 rather than racer 1 wins, and on nothing this slice's own criteria newly prove.
 
 </details>
 
