@@ -41,8 +41,13 @@ Verbatim from [`15-design.md`](15-design.md); that file's reasoning is the desig
   the exported service type. *A count asserted from stdout alone is a claim about a `console.log`.*
 - **AC-3** — an invalid fixture fails **loudly and atomically**. For each of: an unknown key; a
   `qualifiedFor` naming an undeclared service type; a `vehicles[].owner` naming an undeclared
-  customer; no subtree with an empty `exportPrefix`; a duplicate prefix — the seed exits non-zero,
-  names the offending JSON path on **stderr**, prints **nothing** on stdout, and **inserts no row**.
+  customer; **a duplicate key within a collection**; no subtree with an empty `exportPrefix`; a
+  duplicate prefix — the seed exits non-zero, names the offending JSON path on **stderr**, prints
+  **nothing** on stdout, and **inserts no row**. *Six of the validator's ten rules, chosen by a stated
+  test — a rule earns a case when its breach is **silent**. `days ⊆ 0..6`, `opensAt < closesAt` and
+  `durationMinutes > 0` are refused loudly by CHECK constraints at
+  `src/persistence/migrations/0002_reference_data.sql:21,25,31`, so a case for each buys no
+  discrimination; `purpose` and the ≥ 1-per-collection minimums fail at AC-1/AC-2's own exports.*
 - **AC-4** — `harness/spurious-refusal.sh` with `REQUEST_COUNT=10` against the capacity subtree exits
   0, prints one line per racer, and sees exactly `min(N, M)` confirmations and `N - min(N, M)`
   refusals, with *M* taken from the exported counts.
@@ -103,8 +108,19 @@ Beyond the standing DoD in `CLAUDE.md` §10:
   `no-spurious-refusal.test.ts` needs its conflict lines and `max(attempt) ≥ 2` precisely because a
   per-dealership mutex would also confirm `min(N, M)`. A script sees responses, not the log stream.
   QS-3's test remains the evidence; this slice is a demonstration of it.
-- **A-15-1** — that *N* concurrent `curl` processes contend at all rather than serialising. If they
-  serialise, AC-4 still passes while demonstrating nothing, and only AC-5's distinctness would notice.
-  To be confirmed at step 2.
+- **A-15-1** — that *N* concurrent `curl` processes contend at all rather than serialising.
+  **Closed at step 2, and its step-1 rationale was wrong.** No response-only assertion discriminates a
+  serialised run, AC-5's distinctness included; A-15-1 rests on the captured `double-booking.sh`
+  transcript, where racer 4 wins. Distinctness is *implied by the exclusion constraints* — two live
+  rows cannot share a bay or a technician over one interval, under any interleaving — so it is a
+  consequence of the invariant rather than a witness of contention. This demo's contention is over
+  **persisted rows, not instants**, which is the one fact behind both this limit and ADR-0004's
+  global-mutex limit above.
 - **D-15-1** — ADR-0009's cap of 16 is not encoded in the harness (one home for the constant), so a
   fixture author setting *M* = 9 gets an unwarned flaky demo.
+- **D-15-3** — the `ROLLBACK` path has no acceptance criterion. An AC for it would need a fixture that
+  passes validation and fails at insert; any such fixture can later be moved *into* the validator, at
+  which point the control passes for the wrong reason — no rows because nothing was attempted, which is
+  `R-10-5`'s vacuity pattern and has already cost this project a cycle. The test-engineer **may** add a
+  case at step 3 if it makes the failure's *cause* assertable — stderr naming a SQLSTATE rather than a
+  JSON path. Its call, not an obligation.
