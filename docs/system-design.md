@@ -95,6 +95,7 @@ without taking anyone's word for it.
 - [**ADR-0034**](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) — The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed *(accepted)*
 - [**ADR-0035**](adr/0035-one-conflict-counted-per-exclusion-violation.md) — Count one conflict per exclusion violation, not one per contended request *(proposed)*
 - [**ADR-0036**](adr/0036-overlap-is-unrepresentable-the-database-adjudicates.md) — Make overlap unrepresentable — every booking is adjudicated by the database, never by application code *(accepted)*
+- [**ADR-0037**](adr/0037-bridge-pino-to-opentelemetry-in-process.md) — Bridge pino to OpenTelemetry in-process, on the thread that emitted the line *(accepted)*
 
 ---
 

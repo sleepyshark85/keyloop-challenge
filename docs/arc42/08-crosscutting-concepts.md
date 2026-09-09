@@ -152,13 +152,20 @@ Two rules keep the conflict counter trustworthy, and both are asserted rather th
 
 ### Logs
 
-`pino` JSON to stdout: one line per request, plus one per attempt.
+`pino` JSON to stdout **and, on the same call, to the collector over OTLP**: one line per request, plus
+one per attempt. `pino.multistream` composes the two, so the bridge is added alongside stdout, never
+instead of it.
 
-- **Every line carries `trace_id` and `span_id`**, injected by a `mixin` over the active context, so Loki
-  and Tempo join without a correlation id of their own.
-- **Identifiers only, never names.** A line names `customer.id`, not the customer, so nothing is logged
-  that GDPR-grade handling would have to cover.
-- **Export failures are logged and dropped.** A collector outage must not fail a booking.
+- **The record carries the real trace context**, read from the span active on the emitting stack as the
+  record is built — not parsed back out of the line's text, which would be a correlation id of its own.
+  That is why Loki and Tempo join, and why the bridge is in-process rather than an auto-instrumentation
+  or a worker-thread transport ([ADR-0037](../adr/0037-bridge-pino-to-opentelemetry-in-process.md); the
+  measurement is §11.1 `D-09-3`). The line's own `trace_id`/`span_id` fields remain, for a reader of
+  stdout.
+- **Identifiers only, never names**, on the record's attributes as on the line. A line names
+  `customer.id`, not the customer, so nothing is logged that GDPR-grade handling would have to cover.
+- **An export failure is dropped, never raised.** A collector outage must not fail a booking: the
+  bridge's `write()` swallows its own failures and a batch processor queues rather than blocks.
 
 ### What an operator does with this
 

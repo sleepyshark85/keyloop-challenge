@@ -58,8 +58,10 @@ loud, distinct failure, never an empty contribution** — `EXIT_DID_NOT_RUN = 2`
 ## 7.3 Configuration
 
 Environment variables only, validated at startup — a missing or malformed value fails the process rather
-than surfacing as a request error at 03:00. `src/platform/config.ts` is the only reader, except
-`OTEL_EXPORTER_OTLP_ENDPOINT`, which the OpenTelemetry SDK auto-configures.
+than surfacing as a request error at 03:00. `src/platform/config.ts` is the only reader — including
+`OTEL_SERVICE_NAME`, deliberately, since the SDK's own `envDetector` would leave an operator who forgets
+it on `unknown_service:node` — leaving `OTEL_EXPORTER_OTLP_ENDPOINT` as the sole name the OpenTelemetry
+SDK auto-configures.
 
 | Variable | Purpose |
 |---|---|
@@ -67,6 +69,7 @@ than surfacing as a request error at 03:00. `src/platform/config.ts` is the only
 | `PORT` | HTTP listener |
 | `LOG_LEVEL` | `pino` level |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector; unset disables export without disabling instrumentation |
+| `OTEL_SERVICE_NAME` | Resource `service.name` on all three signals; optional, default `keyloop-service-scheduler` — the artifact names itself, so the variable is a rename rather than a prerequisite |
 | `BOOKING_ATTEMPT_CAP` | ADR-0009's cap, default 16 |
 | `BOOKING_SEED` | ADR-0009's ordering seed, overridable so a failing interleaving is re-runnable; unset in production, and set it warns at the default `LOG_LEVEL` |
 | `DB_POOL_MAX` | Pool ceiling, default 10 — dictated by the concurrency test rather than copied from `pg`'s default |

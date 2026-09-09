@@ -29,7 +29,8 @@ span's context on the record rather than only in the line's text.
 
 ## Acceptance criteria
 
-Verbatim from [`14-design.md`](14-design.md) §5; that file's reasoning is the design of record.
+Verbatim from the step-1 design's §5 ([`14-design.md`](14-design.md) at `78be828`; that file was
+condensed to its as-built record at step 7, and the reasoning is in git and on PR #22).
 
 - **AC-1** — Given the service spawned with **no** `OTEL_SERVICE_NAME`, when the collector's exports are
   read, then the resource of the trace, metric **and** log exports each carries

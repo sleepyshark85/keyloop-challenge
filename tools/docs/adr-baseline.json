@@ -243,5 +243,14 @@
    "Option G \u2014 External coordination: a distributed lock (Redlock), a single-writer log keyed "
   ],
   "decision": "Chosen option: E \u2014 two EXCLUDE USING gist constraints, on bay and on technician, make an overlapping"
+ },
+ "0037-bridge-pino-to-opentelemetry-in-process.md": {
+  "options": [
+   "Option A \u2014 @opentelemetry/instrumentation-pino",
+   "Option B \u2014 A pino worker-thread transport (pino-opentelemetry-transport)",
+   "Option C \u2014 Drop pino; emit through the OTel Logs API directly",
+   "Option D \u2014 An in-process pino destination emitting through @opentelemetry/api-logs, compos"
+  ],
+  "decision": "Chosen option: D \u2014 a DestinationStream that emits an OTel LogRecord on the same call, added"
  }
 }

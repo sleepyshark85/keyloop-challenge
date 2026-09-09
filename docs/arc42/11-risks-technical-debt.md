@@ -29,12 +29,31 @@ forged**: a hand-written `__brand` compiles clean. **D-07-1** — a **saturated*
 `status <> 'cancelled'` is **unassertable**, extensionally equal to `status = 'confirmed'` over a
 two-value enum. **D-09-2** — `ResourceLock` does not carry the `Db` it was taken on; declined.
 **D-09-3** — `@opentelemetry/instrumentation-http` does not patch a native ESM entry point, measured, so
-a hand-written span ships. **D-09-4** — twenty racers occasionally answered `500` on a connection
+a hand-written span ships — and the same finding disqualified `@opentelemetry/instrumentation-pino` at
+slice 14 ([ADR-0037](../adr/0037-bridge-pino-to-opentelemetry-in-process.md) option A), so **two** of the
+three signals are carried by code this project wrote rather than by an instrumentation it installed.
+**D-09-4** — twenty racers occasionally answered `500` on a connection
 timeout, never in isolation, never in CI: **resolved on evidence, not disproved**. **D-09-5** — ADR-0035
 exits `proposed` permanently, its remedy being a backlog slice a final slice cannot cut. **D-09-6** —
 **QS-14's headroom is the regression baseline**, ≈9 ms against a 200 ms ceiling, so a regression halving
 throughput passes in silence. **D-10-1** — §8.6's operations column and the contract test's matrix are
 two transcriptions tied by nothing.
+
+**D-14-1** — the log seam's `StreamEntry` carries a `level` **nothing asserts**: delete it and the suite
+stays green, because the one seam test runs at `info`, where the omitted-level default is
+indistinguishable. Stryker cannot show it either — its `ObjectLiteral` mutator replaces the whole entry
+rather than dropping a key. It is the same blind spot that hid the `LOG_LEVEL` regression until step 5.
+**D-14-2** — `OQ-14-1`: the bridge carries **no `exception.*` attributes** from `pino`'s `err`
+serialisation, so an error's stack reaches stdout and Loki as body text and Tempo not at all; deferred,
+and the first thing an operator will ask for. **D-14-3** — `src/platform/telemetry.ts` sits at 77.78 %
+with eight survivors **only the Testcontainers suite kills**, which Stryker's command runner does not
+run: that file's evidence is AC-1 and AC-3 to AC-6, not its score — R-12's shape in a second file.
+**D-14-4** — **`npm run slice:check` cannot fail usefully on undeclared arc42 edits.** It baselines that
+criterion on `merge-base(main, HEAD)` rather than on the slice's own first commit, so slice 14 was told
+it had hand-edited nine arc42 files its diff never touches — fourteen pre-slice phase-6 commits
+attributed forward. The cost is not noise: a genuinely undeclared edit in the next slice is now
+indistinguishable from the baseline's own. Remedy: baseline on the slice's first commit. Booked rather
+than fixed — it is the orchestrator's tool, and the next slice inherits it.
 
 ## 11.2 Known risks
 
