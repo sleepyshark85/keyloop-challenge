@@ -25,8 +25,28 @@ ai-input: >
   ONE WEAKNESS, stated because a retrospective record can otherwise flatter itself: the
   option set below is RECONSTRUCTED, from §2.1, §4.1 and the satellites, rather than
   minuted while the options were live. A, B and E were argued at the time and are quoted
-  from those sources; C and D are rejected here on reasoning rather than on a
+  from those sources; the rest are rejected here on reasoning rather than on a
   contemporaneous deliberation. The Decision is unchanged and is not reopened.
+
+  A SECOND WEAKNESS, and it is the reason this paragraph exists: THE OPTION SET WAS
+  AMENDED AFTER DRAFTING, hours later, on the human's instruction of the same day. F (slot
+  materialisation) and G (external coordination — Redlock, a single-writer log, Temporal,
+  CRDTs, Spanner, grouped because one ground rejects them all) were ADDED because the first
+  draft never weighed them. Neither was recalled: both are REASONED HERE, by the agent,
+  after the fact, so they are weaker evidence than A, B and E and should be read that way.
+  The same instruction permitted deleting options judged trivial, and TWO WERE DELETED to
+  pay for the additions inside a 700-word budget: the old C (a `UNIQUE` index) survives as
+  a clause in F, which is the only construction that makes a `UNIQUE` index apply at all,
+  and the old D (an overlap trigger) survives as a clause in A, whose defect it shares. No
+  rejection ground was dropped, but two options stopped being options, which is exactly
+  what `docs:adr-check` exists to catch — it did catch both, and the baseline was re-pinned
+  with `--pin` so the growth and the two deletions appear in a diff instead of in silence.
+  Letters were not reused, so the table now reads A, B, F, G, E: an option set that both
+  grows and shrinks after the fact can make a deliberation look more thorough than it was,
+  and a renumbering would have hidden the shrinking half from the guard.
+
+  The Decision, its verdict and its consequences did not move. One cross-reference in the
+  Decision's last sentence was corrected to name the options that now exist.
 ---
 
 ## Context and problem statement
@@ -40,22 +60,19 @@ const free = await checkAvailability(bayId, interval);
 if (free) await createAppointment(bayId, interval);   // ← another request booked it here
 ```
 
-Two requests arriving at 09:00:00.000 both read *free*, both insert, and both customers are told bay 3
-is theirs. That window is not a small one to be narrowed. It cannot be closed by any amount of care in
-application code, because the read's result stops being true the instant it is returned.
-
-A double booking is also not a blemish to be reconciled overnight: it is one ramp and two cars. So the
-question is not how to make the race rare. It is **where correctness is permitted to live** — in a code
-path that every future caller must repeat, or in the data itself.
+Two requests arriving at 09:00:00.000 both read *free*, both insert, and both get bay 3. No
+care in application code narrows that window shut: the read stops being true as it returns.
+A double booking is one ramp and two cars. So the question is not how to make the race rare, but
+**where correctness lives** — in code every caller repeats, or in the data.
 
 ## Considered options
 
 | | Option | Good, because | Rejected, because |
 |---|---|---|---|
-| **A** | **Check-then-act**, as the brief words it | It is the obvious reading of the requirement, and one round trip | Every variant keeps the shape: a shorter window, a re-check, a version column, a `SELECT … FOR UPDATE` over a row that does not yet exist. Each fails under some interleaving or is option B in disguise |
-| **B** | **A per-dealership advisory lock, or `SERIALIZABLE` isolation** | Honestly correct: under either, check-then-act genuinely works, and it also removes spurious refusals | Correctness becomes a *discipline*. Every present and future write path — a repair script, a new endpoint, a well-meant refactor — must remember to take it, and nothing fails when one forgets until two cars arrive for the same ramp (ADR-0004 Option D) |
-| **C** | **A `UNIQUE` index** on the resource and the slot | Declarative, and in the data where it belongs | It cannot express the property. Uniqueness rejects rows that are *equal* on a key; overlap is not an equivalence relation, and no key exists whose equality means "these two intervals intersect" |
-| **D** | **A trigger that computes overlap** before the write | Declarative-looking, and it catches every write path | It is check-then-act with the check moved inside the database: the trigger *reads other rows*, and under `READ COMMITTED` two concurrent triggers both read "free" (§8.2 makes the same argument for the `UPDATE` path) |
+| **A** | **Check-then-act**, as the brief words it | The obvious reading | Every variant keeps the shape — a shorter window, a re-check, a version column, or a trigger, which moves the read inside the database, where two concurrent triggers both see "free" (§8.2). Each fails under some interleaving, or is B in disguise |
+| **B** | **A per-dealership advisory lock, or `SERIALIZABLE`** | Honestly correct, and spurious refusals go too | Correctness becomes a *discipline*. Every write path — a repair script, a new endpoint, a well-meant refactor — must remember to take it, and nothing fails when one forgets until two cars arrive for the same ramp (ADR-0004 Option D) |
+| **F** | **Slot materialisation**: pre-create `(bay_id, slot_start)` rows; claim N consecutive under `UNIQUE` | It **converts overlap into equality**, which every database enforces — the only way a `UNIQUE` index can apply, since uniqueness rejects rows *equal* on a key. No `btree_gist`, portable, a plain `23505`, and it matches the fixed-slot board dealerships think in | Every booking must align to the grid: a 50-minute service on a 15-minute grid wastes ten minutes of a bay, and A-1's durations become multiples of the slot. Claiming N rows is all-or-nothing, restoring the partial-failure handling one `INSERT` removes. But TC-3 commits to PostgreSQL, where E gives arbitrary starts and exact durations free |
+| **G** | **External coordination**: a distributed lock (Redlock), a single-writer log keyed by `bay_id`, Temporal, CRDTs, or Spanner | Real mechanisms, seriously used | Each moves correctness **out of the data and back into code**, so a `psql` session or a second writer double-books anyway. Redlock is worse still: after a pause a holder believes it holds what it lost. The log costs the synchronous `201`. Temporal solves sagas, CRDTs have no merge for mutual exclusion, and Spanner expresses overlap in code anyway, at greater cost |
 | **E** | **PostgreSQL exclusion constraints** | Below | **Chosen** |
 
 ## Decision
@@ -66,7 +83,7 @@ row an object the database will not store** (DDL verbatim in §8.2; runtime sequ
 **The system does not check whether a resource is free before booking it. It attempts the booking and
 lets PostgreSQL refuse.** The constraint is not a faster check; it is a different kind of thing. It is
 evaluated by the index machinery as part of the write, against committed rows, for every writer, with no
-call site to omit — which is precisely what A, B and D each fail to be.
+call site to omit — which is precisely what A, B and G each fail to be.
 
 ## Consequences
 

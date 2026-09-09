@@ -237,10 +237,10 @@
  "0036-overlap-is-unrepresentable-the-database-adjudicates.md": {
   "options": [
    "Option A \u2014 Check-then-act, as the brief words it",
-   "Option B \u2014 A per-dealership advisory lock, or SERIALIZABLE isolation",
-   "Option C \u2014 A UNIQUE index on the resource and the slot",
-   "Option D \u2014 A trigger that computes overlap before the write",
-   "Option E \u2014 PostgreSQL exclusion constraints"
+   "Option B \u2014 A per-dealership advisory lock, or SERIALIZABLE",
+   "Option E \u2014 PostgreSQL exclusion constraints",
+   "Option F \u2014 Slot materialisation: pre-create (bayid, slotstart) rows; claim N consecutive u",
+   "Option G \u2014 External coordination: a distributed lock (Redlock), a single-writer log keyed "
   ],
   "decision": "Chosen option: E \u2014 two EXCLUDE USING gist constraints, on bay and on technician, make an overlapping"
  }
