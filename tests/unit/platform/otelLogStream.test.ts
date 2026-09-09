@@ -90,7 +90,15 @@ describe('createOtelLogStream — severity mapping (AC-5)', () => {
   it('a non-numeric or absent level leaves severity unset rather than a hardcoded default', () => {
     writeLine({ time: 1, msg: 'm', pid: 1, hostname: 'h' });
 
-    const [record] = exported();
+    // Guarded first (step 5 finding 2): `severity?.number`/`severity?.text` mutated to
+    // `severity.number`/`severity.text` throws inside the bridge's own try/catch when
+    // `severity` is `undefined`, which is swallowed and exports NO record at all — leaving
+    // this test's two `toBeUndefined()` checks true VACUOUSLY, over an empty export, exactly
+    // the absence-vacuity shape DCR-14-1 was raised about. A record must exist before its
+    // fields are asserted absent.
+    const records = exported();
+    expect(records, 'expected exactly one exported record to examine — this assertion would be vacuous over zero').toHaveLength(1);
+    const [record] = records;
     expect(record?.severityNumber).toBeUndefined();
     expect(record?.severityText).toBeUndefined();
   });
@@ -107,8 +115,20 @@ describe('createOtelLogStream — body (AC-3)', () => {
   it('leaves body undefined when msg is absent, rather than throwing', () => {
     expect(() => writeLine({ level: 30, time: 1, pid: 1, hostname: 'h' })).not.toThrow();
 
-    const [record] = exported();
-    expect(record?.body).toBeUndefined();
+    const records = exported();
+    expect(records, 'expected exactly one exported record — this assertion would be vacuous over zero').toHaveLength(1);
+    expect(records[0]?.body).toBeUndefined();
+  });
+
+  it('leaves body undefined — not the raw value — when msg is present but not a string', () => {
+    // step 5 finding 3: `typeof msg === 'string' ? msg : undefined` mutated to `true ? msg :
+    // undefined` exports `body: 42` instead of `body: undefined`; only a non-string msg
+    // distinguishes the two, since `msg` absent (above) is `undefined` either way.
+    writeLine({ level: 30, time: 1, msg: 42, pid: 1, hostname: 'h' });
+
+    const records = exported();
+    expect(records, 'expected exactly one exported record — this assertion would be vacuous over zero').toHaveLength(1);
+    expect(records[0]?.body).toBeUndefined();
   });
 });
 
