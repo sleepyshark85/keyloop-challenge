@@ -50,9 +50,10 @@ a contended move — but only one succeeds, so what it caps is how fast losers h
 costlier than a btree: low thousands per second.
 
 **Binding scale.** Against §1.1's *tens of appointments a day*, the contended figure binds at roughly
-two hundred simultaneous bookers on one slot — a campaign funnelling many at one advertised slot, not
-organic traffic — and the aggregate limit binds first. **The first move is partitioning by
-`dealership_id`**, which A-9 permits: an exclusion constraint cannot span partitions and need not.
+two hundred simultaneous bookers on one slot — which no dealership generates organically; it arrives as
+a campaign funnelling many at one advertised slot — and the aggregate limit above binds first.
+**The first move is partitioning by `dealership_id`**, which A-9 permits: an exclusion constraint
+cannot span partitions and need not.
 
 ### R-2 · A capacity-*n* resource needs a different mechanism (A-2)
 
