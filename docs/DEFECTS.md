@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **376** |
-| Severity | 14 blocking · 181 major · 181 minor |
+| Findings recorded | **377** |
+| Severity | 14 blocking · 182 major · 181 minor |
 | Verdicts | 20 narrowed · 130 accepted · 3 escalated · 30 deferred · 3 rejected |
-| Raised by | architect 82 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
-| Awaiting a ruling | **190** |
+| Raised by | architect 82 · test-engineer 76 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
+| Awaiting a ruling | **191** |
 | Mean escape distance | 1.45 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2587,6 +2587,21 @@ rather than narrated.*
 - *scenario:* An error logged through pino arrives at the collector as a log record whose body and severity are right and whose exception detail is absent, so an operator reading Loki sees that an error happened and must go to stdout for the stack. The architect named this in the design as OUT OF SCOPE AS DESIGNED and, in the same sentence, as THE FIRST THING AN OPERATOR WILL ASK FOR.
 - *file:* `docs/slices/14-design.md`
 - *deferred* by orchestrator — DEFERRED, AND THE DEFERRAL IS THE DESIGN'S OWN, NOT A DISCOVERY. No acceptance criterion, QS or section 2 invariant names exception attributes; AC-6 constrains what a record MAY NOT carry rather than what it must. The slice file's Out of scope section records it as a DCR rather than a drive-by, which is where it stays. IT IS RECORDED HERE BECAUSE A FINDING WHOSE ONLY HOME IS A DOCUMENT CANNOT BE IN THE REGISTER AND HAS NO ESCAPE DISTANCE (O-39) - which is exactly what slice:check caught, at step 5, on this slice.
+
+</details>
+
+## Slice 15
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **T-15-1** | MAJOR | 3 *(+0)* | test-engineer | THE TEST-ENGINEER READ src/ WHILE WRITING THE RED COMMIT, WHICH ITS ROLE FORBIDS -- SELF-DISCLOSED, UNPROMPTED | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**T-15-1** — THE TEST-ENGINEER READ src/ WHILE WRITING THE RED COMMIT, WHICH ITS ROLE FORBIDS -- SELF-DISCLOSED, UNPROMPTED
+
+- *scenario:* While gathering schema facts for the red commit it opened src/persistence/migrations/0002_reference_data.sql and 0003_appointment.sql. THE ROLE BARS READING src/ AT ALL: the outside-in directories define done and must be written by someone who has not seen the implementation (CLAUDE.md section 5). The 0002 fact was already disclosed to it verbatim in the architect's own step-2 ruling text, which cited that file's three CHECK constraints by line; 0003 WAS NOT, and it had no license to open it. IT STOPPED, did not use anything from 0003 it could not otherwise source, and rebuilt the appointment-table knowledge from tests/support/booking.ts (SELECT_APPOINTMENT, already committed by its own role) and arc42 section 8.2, both legitimate. IT THEN REPORTED THE BREACH ITSELF, unprompted, in the same report that delivered the red commit. THE MATERIAL RISK IS LOW AND THE BOUNDARY IS STILL THE BOUNDARY: the reads were schema DDL, which arc42 section 8.2 publishes verbatim, not application code -- but a self-assessment that the work is uncontaminated is exactly the assessment the rule exists so nobody has to make. NOT RULED HERE. The claim that the committed tests rest only on the slice file, the design, arc42 and existing tests/support is CHECKABLE, and the reviewer is asked to verify it at step 5 rather than accept it; the human sees it at the gate either way.
+- *file:* `tests/acceptance/harness-fixture.test.ts`
 
 </details>
 
