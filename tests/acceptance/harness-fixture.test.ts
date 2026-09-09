@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { startService } from '../support/service.js';
 import { postBooking, describeAnswer, member } from '../support/booking.js';
 
@@ -18,18 +19,25 @@ import { postBooking, describeAnswer, member } from '../support/booking.js';
  * diff `harness.test.ts` could have taken.
  *
  * Schema knowledge below (`service_bay`, `technician`, `technician_qualification`,
- * `dealership`) comes from `harness/seed.mjs` (a harness file, not `src/`) and arc42 §8.1; the
- * `appointment` columns queried in `nonCancelledAt` are copied from the already-committed
- * `SELECT_APPOINTMENT` shape `tests/support/booking.ts` (`findStoredAppointment`,
- * `confirmedOverlapping`) already reads with, not re-derived from `src/`.
+ * `dealership`, `service_type`) comes from `harness/seed.mjs` (a harness file, not `src/`) and
+ * arc42 §8.1; the `appointment` columns queried in `nonCancelledAt` are copied from the
+ * already-committed `SELECT_APPOINTMENT` shape `tests/support/booking.ts`
+ * (`findStoredAppointment`, `confirmedOverlapping`) already reads with, not re-derived from
+ * `src/`.
  *
- * D-15-3 (the seed's `BEGIN`/`COMMIT`/`ROLLBACK` path) has no case here, deliberately. Every
- * fixture-controllable input the validator's ten rules do not already cover — ids, VINs, the
- * seeded instant — is explicitly EXCLUDED from the fixture by design §2 (`seed.mjs` mints them
- * fresh, never from JSON), so no fixture built from this file's schema can be simultaneously
- * valid under all ten rules and certain to fail at `INSERT` with a distinct SQLSTATE. Any
- * fixture that could do that would be targeting an eleventh rule the validator can trivially
- * absorb — `R-10-5`'s vacuity pattern the architect named. Left unasserted, as booked.
+ * DCR-15-1 (ruled (a), `a31027b`): AC-3's "inserts no row" was implemented as an unscoped
+ * `select count(*) from dealership`, which reads every concurrent file's rows in the shared,
+ * un-truncated `db` container (`fileParallelism` is deliberately on — `vitest.config.ts:36`).
+ * `serviceTypeCount` below replaces it: the discriminator is a marker THIS run's own fixture
+ * declares (`serviceTypes[0].name`), never observed from the run's stdout (empty on failure) and
+ * never a table-wide count. Each case pairs its negative check with a positive control on a
+ * sibling marker — a KNOWN-VALID fixture, run first, whose success the same query must read
+ * non-zero for — so the scoped zero cannot pass because the query counts nothing (C2).
+ *
+ * D-15-3 (the seed's `BEGIN`/`COMMIT`/`ROLLBACK` path): still no case here. The architect's
+ * withdrawal of the vacuity argument (`a31027b`) does not change this file — the refusal now
+ * rests on §2.4 (a criterion minted after the code exists is green on arrival) and belongs to
+ * arc42 §11.1's `R-11`, not to this slice's red set.
  */
 
 const REPO_ROOT = process.cwd();
@@ -111,6 +119,22 @@ async function nonCancelledAt(
   return rows.map((r) => ({ bayId: r.bay_id, technicianId: r.technician_id }));
 }
 
+/**
+ * AC-3's discriminator (DCR-15-1, `a31027b`): `service_type.name`, inserted verbatim from
+ * `fixture.serviceTypes[].name` — global (not `dealership_id`-scoped), inserted first in
+ * `seed.mjs`'s transaction, and under no transformation the way `dealership.name` (`harness
+ * ${key}`) or `vehicle.description` (`harness vehicle ${key}`) are. A marker this file mints
+ * fresh per case (`randomUUID()`) collides with nothing another concurrent `db`-project file
+ * could have inserted, and with nothing an earlier case in this same file inserted either.
+ */
+async function serviceTypeCount(client: Client, name: string): Promise<number> {
+  const { rows } = await client.query<{ n: number }>(
+    'select count(*)::int as n from service_type where name = $1',
+    [name],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
 // ─────────────────────────────────────────────────────────────────── temp fixture files ──
 
 const tmpDirs: string[] = [];
@@ -149,7 +173,14 @@ function baselineSubtree(): Record<string, unknown> {
   };
 }
 
-const SERVICE_TYPES = [{ key: 'svc-1', name: 'ac3 service', durationMinutes: 60 }];
+/**
+ * A single-entry global catalogue whose `name` IS the AC-3 discriminator (`serviceTypeCount`).
+ * `key` stays fixed (`baselineSubtree()`'s `serviceTypes`/`qualifiedFor` name it as `'svc-1'`);
+ * only `name` — the column actually queried — varies per case.
+ */
+function serviceTypesWithMarker(marker: string): { key: string; name: string; durationMinutes: number }[] {
+  return [{ key: 'svc-1', name: marker, durationMinutes: 60 }];
+}
 
 // ══════════════════════════════════════════════════ AC-1 — the scarce, unprefixed subtree ══
 
@@ -244,55 +275,56 @@ describe('AC-2 — the same run exports the abundant CAPACITY_ subtree, and the 
 
 interface InvalidCase {
   readonly name: string;
-  readonly build: () => Record<string, unknown>;
+  /** `marker` becomes `serviceTypes[0].name` — AC-3's discriminator (DCR-15-1). */
+  readonly build: (marker: string) => Record<string, unknown>;
 }
 
 const INVALID_CASES: readonly InvalidCase[] = [
   {
     name: 'an unknown key',
-    build: () => ({
-      serviceTypes: SERVICE_TYPES,
+    build: (marker) => ({
+      serviceTypes: serviceTypesWithMarker(marker),
       subtrees: [{ ...baselineSubtree(), notARealField: true }],
     }),
   },
   {
     name: 'qualifiedFor naming an undeclared service type',
-    build: () => {
+    build: (marker) => {
       const subtree = baselineSubtree();
       subtree['technicians'] = [{ key: 'tech-1', qualifiedFor: ['svc-does-not-exist'] }];
-      return { serviceTypes: SERVICE_TYPES, subtrees: [subtree] };
+      return { serviceTypes: serviceTypesWithMarker(marker), subtrees: [subtree] };
     },
   },
   {
     name: 'vehicles[].owner naming an undeclared customer',
-    build: () => {
+    build: (marker) => {
       const subtree = baselineSubtree();
       subtree['vehicles'] = [{ key: 'veh-1', owner: 'cust-does-not-exist' }];
-      return { serviceTypes: SERVICE_TYPES, subtrees: [subtree] };
+      return { serviceTypes: serviceTypesWithMarker(marker), subtrees: [subtree] };
     },
   },
   {
     name: 'a duplicate key within a collection',
-    build: () => {
+    build: (marker) => {
       const subtree = baselineSubtree();
       subtree['bays'] = ['bay-1', 'bay-1'];
-      return { serviceTypes: SERVICE_TYPES, subtrees: [subtree] };
+      return { serviceTypes: serviceTypesWithMarker(marker), subtrees: [subtree] };
     },
   },
   {
     name: 'no subtree with an empty exportPrefix',
-    build: () => {
+    build: (marker) => {
       const subtree = { ...baselineSubtree(), exportPrefix: 'ONLY_' };
-      return { serviceTypes: SERVICE_TYPES, subtrees: [subtree] };
+      return { serviceTypes: serviceTypesWithMarker(marker), subtrees: [subtree] };
     },
   },
   {
     name: 'a duplicate prefix',
-    build: () => {
+    build: (marker) => {
       const empty = baselineSubtree();
       const dupA = { ...baselineSubtree(), key: 'dup-a', exportPrefix: 'DUP_' };
       const dupB = { ...baselineSubtree(), key: 'dup-b', exportPrefix: 'DUP_' };
-      return { serviceTypes: SERVICE_TYPES, subtrees: [empty, dupA, dupB] };
+      return { serviceTypes: serviceTypesWithMarker(marker), subtrees: [empty, dupA, dupB] };
     },
   },
 ];
@@ -310,11 +342,32 @@ describe('AC-3 — an invalid fixture fails loudly and atomically', () => {
   });
 
   it.each(INVALID_CASES)(
-    '$name: exits non-zero, prints nothing on stdout, names the path on stderr, inserts no row',
+    '$name: exits non-zero, prints nothing on stdout, names the path on stderr, inserts no row attributable to this run',
     async ({ build }) => {
-      const fixturePath = writeFixture(build());
-      const before = await client.query<{ n: number }>('select count(*)::int as n from dealership');
+      const marker = `ac3-${randomUUID()}`;
+      const controlMarker = `${marker}-control`;
 
+      // C2 — the positive control, run FIRST: a fixture identical to the invalid one except
+      // for the one flaw under test, sharing the SAME discriminator query on a SIBLING marker.
+      // It must seed successfully and the query must then read exactly 1 — proving the query
+      // detects an insert at all, so the negative check below cannot pass by counting nothing.
+      const controlFixturePath = writeFixture({
+        serviceTypes: serviceTypesWithMarker(controlMarker),
+        subtrees: [baselineSubtree()],
+      });
+      const controlRun = runHarnessSeed(inject('databaseUrl'), controlFixturePath);
+      expect(
+        controlRun.status,
+        `C2's positive control (a VALID fixture) must itself seed successfully.\n${outputOf(controlRun)}`,
+      ).toBe(0);
+      const controlCount = await serviceTypeCount(client, controlMarker);
+      expect(
+        controlCount,
+        `C2: the AC-3 discriminator query must read non-zero for a marker the seed DID insert — otherwise the negative check below proves nothing.\n${outputOf(controlRun)}`,
+      ).toBe(1);
+
+      // C1 — the case itself: an invalid fixture, its own fresh marker.
+      const fixturePath = writeFixture(build(marker));
       const run = runHarnessSeed(inject('databaseUrl'), fixturePath);
 
       expect(
@@ -330,11 +383,11 @@ describe('AC-3 — an invalid fixture fails loudly and atomically', () => {
         `AC-3 requires the offending JSON path named on stderr.\n${outputOf(run)}`,
       ).toBe(true);
 
-      const after = await client.query<{ n: number }>('select count(*)::int as n from dealership');
+      const invalidCount = await serviceTypeCount(client, marker);
       expect(
-        Number(after.rows[0]?.n),
-        `AC-3 requires an invalid fixture to insert no row (dealership count must not change).\n${outputOf(run)}`,
-      ).toBe(Number(before.rows[0]?.n));
+        invalidCount,
+        `AC-3 requires an invalid fixture to insert no row attributable to THIS run (service_type.name = ${marker}), scoped so a concurrent file's own seed cannot mask a real defect or manufacture a false one.\n${outputOf(run)}`,
+      ).toBe(0);
     },
   );
 });
