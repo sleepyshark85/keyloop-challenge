@@ -2,35 +2,29 @@
 
 > Owner: architect · Written: phase 2
 
-**Deliberately minimal.** Three containers on one machine and one pipeline; what production would
-additionally require is §11.3, named there rather than invented here.
+**Deliberately minimal.** Two containers and a host process on one machine, plus one pipeline; §11.3
+names what production would additionally require, rather than inventing it.
 
 ## 7.1 The runtime environment
 
-```
-docker compose up -d                       # postgres and otel-lgtm ONLY
-  ├── postgres       postgres:16 · btree_gist enabled by migration 0001 (TC-3)
-  └── otel-lgtm      grafana/otel-lgtm · OTLP :4317 · Grafana :3001
+![Three pieces on one machine, and the one that is not in compose](../diagrams/deployment.svg)
 
-npm start                                  # the scheduler, on the HOST
-  └── scheduler      Node 22 LTS · the compiled dist/main.js · :3000
-```
+*Source: [`deployment.html`](../diagrams/deployment.html) · regenerate with `npm run diagram:export`*
 
-The **scheduler** is one stateless Node process, no clustering: everything holding across requests holds
-in PostgreSQL, so a second instance would need no coordination and there is no reason to run one.
-**postgres** is the correctness boundary rather than a storage detail, and its `btree_gist` requirement
-(TC-3) rules out any managed offering restricting extensions. **otel-lgtm** carries Grafana, Tempo, Loki
-and Prometheus in one container over OTLP/gRPC, and **its absence must not break the service**: export
-failures are logged and dropped. The service is deliberately **not** in compose — compose provides the
-*dependencies*, and `docker-compose.yml` says so in its own header so the two cannot drift.
+The **scheduler** is one stateless process: everything holding across requests holds in PostgreSQL, so a
+second instance would need no coordination — and no reason to exist. **postgres** is the correctness
+boundary rather than a storage detail: its `btree_gist` requirement (TC-3) rules out any managed offering
+that restricts extensions. **otel-lgtm** carries Grafana, Tempo, Loki and Prometheus in one container
+over OTLP/gRPC, and **its absence must not break the service**. The service is deliberately **not** in
+compose, as `docker-compose.yml`'s own header says, so the two cannot drift.
 
 Versions are pinned because TC-10 left them open: **PostgreSQL 16** in compose *and* in the
 Testcontainers image tag, and `"node": ">=22.22.0 <23 || >=24.0.0 <25"` in `package.json` `engines` —
 the disjunction being load-bearing, since a naive `>=22.11 <25` admits both 22.11–22.21, which fails
 `npm ci --engine-strict`, and 23.x, which `vitest` and `dependency-cruiser` exclude.
 
-**No gateway, no TLS, no load balancer, and the service is unsafe to expose on any reachable network**,
-GC-2 having removed authentication — acceptable *only* because of this deployment, which is why the two
+**No gateway, no TLS, no load balancer, and unsafe to expose on any reachable network**, GC-2 having
+removed authentication — acceptable *only* because of this deployment, which is why the two
 are stated together. §11.3 carries the retrofit.
 
 ## 7.2 Under test — Testcontainers stands in for PostgreSQL

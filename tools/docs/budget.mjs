@@ -74,7 +74,17 @@ export const BUDGETS = {
   //
   // The alternative — splitting §8.1–8.3 into their own section file — is a change to the
   // arc42 structure itself and belongs to the human, not to a budget tool.
-  arc42Overrides: { '08': 4000, '11': 2500 },
+  //
+  // 2026-09-09: §8 was cut 2,735 -> 2,375 on the human's "really minimize the other parts
+  // and focus on observability", eight duplications resolved against §6.5, §6.6, QS-6,
+  // QS-9, CLAUDE.md §5, slice 06's design and the emitted OpenAPI contract. Recording
+  // 2,375 in the baseline did NOT hold it: `ceiling = max(budget, baseline)` (below), so
+  // a 4,000 override dominated and §8 could have grown back with the check green — the
+  // same slack this file's own ratchet comment describes. 4000 -> 2500 is what holds the
+  // reduction. It is the measured size plus working room, and equal to §11's, rather than
+  // the 2,375 exactly: a ceiling with no headroom is what forced three rewrites of one
+  // CLAUDE.md sentence the same day.
+  arc42Overrides: { '08': 2500, '11': 2500 },
 
   // Slice documents, under the human's 2026-09-05 ruling to shorten these AGGRESSIVELY.
   // Measured at that moment: four design files held 54,605 of the 69k words in

@@ -60,7 +60,7 @@ difference is preserved on purpose; §11 and §13 discuss the material deltas.
 | **4** | [Solution strategy](arc42/04-solution-strategy.md) | Five decisions. Everything in §5 to §8 follows from them. |
 | **5** | [Building block view](arc42/05-building-blocks.md) | Why this decomposition beat the alternatives is ADR-0008; this is what it *is*. |
 | **6** | [Runtime view](arc42/06-runtime-view.md) | The data flow, in five scenarios. |
-| **7** | [Deployment view](arc42/07-deployment-view.md) | npm start                                  # the scheduler, on the HOST └── scheduler      Node 22 LTS · the compiled dist/main.js · :3000 ``` |
+| **7** | [Deployment view](arc42/07-deployment-view.md) | !Three pieces on one machine, and the one that is not in compose |
 | **8** | [Cross-cutting concepts](arc42/08-crosscutting-concepts.md) | Nine relations. Eight arrive by migration and fixture (A-6, A-7); `appointment` is the only one the API writes. |
 | **9** | [Architecture decisions](arc42/09-architecture-decisions.md) | Decisions live as individual MADR files under `docs/adr/`. |
 | **10** | [Quality requirements](arc42/10-quality-requirements.md) | The §1.2 ranking, refined into the scenarios below it. |
