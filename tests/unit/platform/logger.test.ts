@@ -1,7 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { context, trace } from '@opentelemetry/api';
 import type { Span } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
+import { logs } from '@opentelemetry/api-logs';
+import { InMemoryLogRecordExporter, LoggerProvider, SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
+import pino from 'pino';
 import { createLogger } from '../../../src/platform/logger.js';
 import { LOG_LEVELS } from '../../../src/platform/config.js';
 
@@ -55,6 +58,75 @@ describe('createLogger', () => {
     // default is `info`, so only a NON-info level can tell the two apart.
     expect(createLogger({ logLevel: 'trace' }).level).not.toBe('info');
     expect(createLogger({ logLevel: 'fatal' }).level).not.toBe('info');
+  });
+});
+
+/**
+ * Slice 14 (design §2/ADR-0037): the DEFAULT path — no `destination` override, `src/main.ts`'s
+ * only caller — composes real stdout with the OTel bridge via `pino.multistream`, "added
+ * alongside stdout, never replacing it". A unit test cannot intercept fd 1 without monkeypatching
+ * the process, so what is asserted here is that the composed stream construction and an actual
+ * write through it do not throw — the exact property `write()` NEVER THROWS rests on (§7.1,
+ * AC-8). `tests/integration/telemetry-logs.test.ts` (test-engineer's) is what proves the
+ * composed stream actually reaches both stdout and the collector end to end.
+ */
+describe('createLogger — the default stream composition (no destination override)', () => {
+  it('constructs and writes through stdout + the OTel bridge without throwing', () => {
+    const logger = createLogger({ logLevel: 'info' });
+    expect(() => logger.info({ probe: 'slice-14-default-stream' }, 'default stream composition')).not.toThrow();
+  });
+
+  it('builds the stdout destination on fd 1, asynchronously — the same shape pino\'s own unspecified-stream default uses', () => {
+    const spy = vi.spyOn(pino, 'destination');
+    try {
+      createLogger({ logLevel: 'silent' });
+      expect(spy).toHaveBeenCalledWith({ dest: 1, sync: false });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+/**
+ * The property `pino.multistream([{ stream: stdoutDestination() }, { stream:
+ * createOtelLogStream() }])` exists for: a line written through the DEFAULT path (no
+ * `destination` override) must reach the OTel bridge, not only stdout. `destination !==
+ * undefined` and `pino.multistream([...])` are both otherwise invisible to a test that only
+ * checks `.info()` does not throw — either could be replaced with `true`/`[]` and the "does
+ * not throw" test above would still pass, because a destination-less `pino(options,
+ * undefined)` throws just as little as the real composition does. A real, in-memory
+ * `LoggerProvider` (the same shape `otelLogStream.test.ts` uses) is what makes "the bridge
+ * actually received this line" an observable fact rather than an assumption.
+ */
+describe('createLogger — the default path reaches the OTel bridge, not only stdout', () => {
+  const logExporter = new InMemoryLogRecordExporter();
+  const loggerProvider = new LoggerProvider({
+    processors: [new SimpleLogRecordProcessor({ exporter: logExporter })],
+  });
+
+  beforeAll(() => {
+    logs.setGlobalLoggerProvider(loggerProvider);
+  });
+
+  afterEach(() => {
+    logExporter.reset();
+  });
+
+  afterAll(async () => {
+    await loggerProvider.shutdown();
+    logs.disable();
+  });
+
+  it('a line written with no destination override is exported through the OTel bridge', () => {
+    const logger = createLogger({ logLevel: 'info' });
+
+    logger.info('reaches the default-composed OTel bridge');
+
+    const [record] = logExporter.getFinishedLogRecords();
+    expect(
+      record?.body,
+      'the default stream composition must include the OTel bridge alongside stdout',
+    ).toBe('reaches the default-composed OTel bridge');
   });
 });
 
