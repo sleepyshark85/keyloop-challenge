@@ -2,28 +2,28 @@
 
 > Owner: architect · Written: phase 2, corrected at each merge
 
-The decomposition and the reasons for it are [ADR-0008](../adr/0008-module-decomposition.md). This section is what the decomposition *is*;
-the ADR is why it beat the alternatives.
+Why this decomposition beat the alternatives is [ADR-0008](../adr/0008-module-decomposition.md); this is
+what it *is*.
 
 ## 5.1 Level 1 — containers
 
 ![Containers and the modules inside the scheduler](../diagrams/building-blocks.svg)
 
-*Source: [`diagrams/building-blocks.html`](../diagrams/building-blocks.html) · regenerate the SVG with `npm run diagram:export`*
+*Source: [`diagrams/building-blocks.html`](../diagrams/building-blocks.html) · regenerate with `npm run diagram:export`*
 
-| Container | Responsibility | Notes |
-|---|---|---|
-| **Stubbed client** | Not built: `docs/api/openapi.json` and `harness/` stand in for it (TC-5) | The contract is *emitted* from the route schemas (ADR-0005), so it cannot drift from the service |
-| **Scheduler service** | The whole system: validate, allocate, persist, report | One Node process, five modules (§5.2) |
-| **PostgreSQL** | The persistent store **and the enforcement point for the central invariant** | Not a generic persistence port: §4.1 says why calling it swappable would be a lie, `CLAUDE.md` §2.2 why no test may substitute it |
-| **Telemetry collector** | Receives OTLP traces and metrics; `pino` writes JSON to stdout | A local `grafana/otel-lgtm` container (§7); its absence must not break the service |
+| Container | Responsibility |
+|---|---|
+| **Stubbed client** | Not built: `docs/api/openapi.json` and `harness/` stand in for it (TC-5). The contract is *emitted* from the route schemas, so it cannot drift from the service |
+| **Scheduler service** | The whole system: validate, allocate, persist, report. One Node process, five modules |
+| **PostgreSQL** | The persistent store **and the enforcement point for the central invariant**. Not a generic persistence port — §4.1 says why calling it swappable would be a lie |
+| **Telemetry collector** | Receives OTLP traces and metrics; `pino` writes JSON to stdout. A local `grafana/otel-lgtm` container, whose absence must not break the service |
 
-No other neighbours (§3.1.2).
+No other neighbours (§3.1).
 
 ## 5.2 Level 2 — components
 
-Whitebox of the scheduler service: five modules, one permitted dependency direction, a composition
-root. The direction is enforced, not described — every forbidden edge below is a rule in
+Five modules, one permitted dependency direction, a composition root. The direction is enforced, not
+described — every forbidden edge is a rule in
 [`.dependency-cruiser.js`](../../.dependency-cruiser.js) and a CI failure (§5.3).
 
 ```
@@ -35,29 +35,28 @@ root. The direction is enforced, not described — every forbidden edge below is
   src/main.ts       composition root: the only module permitted to see every layer
 ```
 
-### `src/domain` — the policy core
+| Module | Role |
+|---|---|
+| **`src/domain`** | The policy core: pure functions and types. **It imports nothing at all** — no other module, no npm package, no `node:` builtin — enforced absolutely by `domain-is-pure` with no allowlist. Its four files have zero imports between them, a ratified ruling whose price is §11.1 D-01-1 to D-01-4 |
+| **`src/application`** | The five use cases plus `checkHealth`. Owns the retry loop and §8.4's span boundaries, and has no business rules of its own: every decision is delegated to `domain` or adjudicated by the database |
+| **`src/persistence`** | Kysely over `pg`, plain `.sql` migrations. The only place SQL is written and the only place SQLSTATE is read |
+| **`src/http`** | Fastify, TypeBox schemas, `application/problem+json`, the OpenAPI emitter. Maps a use-case outcome to a status code and nothing more; **may not import `src/persistence`**. `problem.ts` holds the taxonomy as one closed `as const` set, so a `type` outside §8.6 is a compile error |
+| **`src/platform`** | Config, the `pino` logger, the OpenTelemetry bootstrap and §8.4's instruments. Importable by everyone, imports nothing from `src/` |
+| **`src/main.ts`** | Reads config, starts telemetry, builds the pool and the server, listens, shuts the SDK down. The only place a dependency is *chosen* rather than received |
 
-Pure functions and types. **It imports nothing at all** — no other module, no npm package, no `node:`
-builtin — and `dependency-cruiser`'s `domain-is-pure` rule enforces that absolutely, with no
-allowlist. IANA-zone conversion uses the `Intl` global, which needs no import.
+**One file per ambiguity, inside `src/domain`.** `interval.ts` owns `Instant`, `Interval` and
+**`occupancyInterval` — "the interval the constraint sees"**, the identity today, which *is* the statement
+that there is no buffer (A-4); `instant()` refuses anything outside ±8 640 000 000 000 000 ms, so an
+`Instant` is renderable by construction. `duration.ts` owns `serviceDuration` and `durationMillis`, the
+only place minutes become milliseconds (A-1). `openingHours.ts` owns `withinOpeningHours`, returning a
+verdict union rather than a boolean, and is the only place that reasons in wall-clock time (GC-1, A-8).
+`candidates.ts` owns `orderCandidates` — a seeded Fisher–Yates shuffle, uniform to ±1.7 % over 8 bays and
+100 000 seeds — with `prune` and a total `nextCandidate`, a `CandidateOrder` being non-empty by
+construction (A-10).
 
-| Module | Owns | The §1.4 ambiguity it absorbs |
-|---|---|---|
-| `interval.ts` *(built)* | The `Instant` and `Interval` types, `instant(epochMillis)`, `appointmentInterval(startsAt, durationMillis)`, and **`occupancyInterval(interval)` — "the interval the constraint sees"**. `instant()` refuses anything outside ±8 640 000 000 000 000 ms, so an `Instant` is renderable by construction | **A-4.** `occupancyInterval` is the identity today, which is the statement that there is no buffer. A buffer changes this function and the constraint's range expression, nothing else |
-| `duration.ts` *(built)* | The `DurationMinutes` type, `serviceDuration(serviceType)`, `durationMillis(duration)` — the only place minutes become milliseconds | **A-1.** If duration varies by vehicle this function gains a parameter; the interval arithmetic above it takes a number and does not change |
-| `openingHours.ts` *(built)* | `withinOpeningHours(startsAtMillis, endsAtMillis, ianaZone, weekly)`, returning the `OpeningHoursVerdict` union rather than a boolean. It carries the same epoch bound, applied here too since it may not import `Interval`, and normalises an end rendering as local `00:00:00` on the next date to 86 400 seconds-of-day | **ADR-0001 / GC-1.** The only place that reasons in wall-clock time (A-8). Breaks, holidays and one-off closures land here |
-| `candidates.ts` *(built)* | `orderCandidates(bays, technicians, seed)` and `prune(order, resource, id)` return `CandidateOrder \| null`, `null` *being* a list emptied; `nextCandidate(order)` is total, a `CandidateOrder` being **non-empty by construction** — both lists are `readonly [string, ...string[]]`, since a brand on the object leaves `noUncheckedIndexedAccess` in place and would merely *relocate* the assertion (I-04-3) | **A-10 / ADR-0009.** Seeded Fisher–Yates, pure and importing nothing. `prune` takes the **unbranded** union, to which a `ContendedResource` is assignable: no cast in, none out |
-
-### `src/application` — the use cases
-
-`bookAppointment`, `readAppointment`, `rescheduleAppointment`, `cancelAppointment`,
-`queryAvailability`. It owns the ADR-0004 retry loop and §8.4's span boundaries, and has no business
-rules of its own: every decision is delegated to `domain` or adjudicated by the database.
-`deriveInterval.ts` is §6.2 steps 3–4's composition order as a pure function — no handle, no clock —
-so what literal AC-6 took from the type system (D-01-1) is held by a module Stryker can mutate
-without a container.
-
-Use cases return **discriminated unions, not exceptions**:
+**Use cases return discriminated unions, not exceptions**, declared in `src/application` rather than
+`src/http`, so every route `switch` is exhaustiveness-checked and every use case stays callable without a
+server:
 
 ```ts
 export type BookOutcome =
@@ -72,112 +71,25 @@ export type BookOutcome =
   | { kind: 'reference-data-invalid'; detail: string };
 ```
 
-`resource` is `ContendedResource`, mintable only by `pgError.classify`, so neither refusal can be
-constructed without a value PostgreSQL produced (ADR-0016) — the cap's exit tested inside the `23P01`
-arm, where a minted resource is in scope. The last two are the system's fault rather than the
-client's and render as one §8.6 row, staying apart so the `switch` and the log line name them apart.
+`resource` is a `ContendedResource`, mintable only by `pgError.classify`, so a capacity refusal cannot be
+constructed without a value PostgreSQL produced (ADR-0016). **One attempt is one transaction**: two
+advisory-lock acquisitions, then one write, so `db.transaction()` sits inside the loop body and nowhere
+outside it. Both write paths share one `attemptLoop.ts` — instrumented once, with one site able to
+increment the conflict counter. **There is no repository port**; the dependency on `src/persistence` is
+concrete, a decision rather than an omission.
 
-**One attempt is one transaction: ADR-0018's two advisory-lock acquisitions, then one `INSERT`**, so
-`db.transaction()` sits inside the loop body and nowhere outside it (§6.1). Pruning is **per resource
-value**, bounding the loop at `|bays| + |technicians| − 1` rather than their product.
-
-**No repository port; the dependency on `src/persistence` is concrete** — a decision, not an
-omission: [ADR-0008](../adr/0008-module-decomposition.md) argues it, §8.5 costs it.
-
-### `src/persistence` — SQL, and the only place SQLSTATE is read
-
-Kysely over `pg` (ADR-0006), plain `.sql` migrations (ADR-0007). `pg` and `kysely` are importable
-here and nowhere else, so exactly one translation exists from a PostgreSQL error to a domain
-outcome:
-
-```ts
-// src/persistence/pgError.ts — the single site
-export type PgOutcome =
-  | { kind: 'conflict'; resource: ContendedResource; constraint: string }  // 23P01
-  | { kind: 'bad-reference'; constraint: string }                          // 23503
-  | { kind: 'no-verdict' }                                                 // 40P01, ADR-0018
-  | { kind: 'other'; cause: unknown };
-```
-
-`classify` is **total over `unknown`, and duck-typed** rather than narrowed by `instanceof`: it is
-handed whatever a `catch` caught, and narrowing on a driver class would make classification depend on
-which copy of `pg` built the error. Its constraint-name map has no default arm, so an unrecognised
-`23P01` name is `other` and becomes a `500`. `sql-only-in-persistence` makes a second translation
-site a CI failure; §11 R-3 carries both.
-
-| Module | Owns |
-|---|---|
-| `db.ts` | The Kysely instance and the `pg` pool, `max` from `config.poolMax` |
-| `schema.ts` | The `Database` interface, derived from the migrations |
-| `pgError.ts` | SQLSTATE → `PgOutcome`, and constraint name → resource |
-| `appointmentRepository.ts` | The **only** module permitted to name the table: `lockResources` (`pg_advisory_xact_lock` over **every resource the write is in flight against** — for a move, two pairs; one statement, deduplicated, ordered by `(class, hashtext(key))`: ADR-0018, ADR-0030), `lockAppointmentRow` (that vacated pair, re-read inside the attempt's transaction under the row's lock), the unguarded `INSERT` and read-by-id, the guarded `UPDATE` (ADR-0003), `cancelAppointmentById` — one unconditional status `UPDATE` taking **no lock**, a cancelled row satisfying no constraint's `WHERE` — and `busyResources`, the advisory read. **F-05-1 is closed**: `lockResources` returns a branded `ResourceLock`, both locking writes require one and the exempt write does not ask. §11 carries the residue. Nothing here catches — the error goes up to the one classifier |
-| `candidateRepository.ts` | The **advisory** free-bay and free-technician read (A-3, A-9) |
-| `referenceRepository.ts` | Dealership, its IANA zone and weekly opening hours; service type and its duration |
-| `migrations/*.sql` | The schema, the two exclusion constraints verbatim (§8.2) |
-
-### `src/http` — the edge
-
-Fastify, TypeBox schemas, RFC 9457 `application/problem+json`, the OpenAPI emitter (ADR-0005). It
-maps a use-case outcome to a status code and nothing more, and **may not import `src/persistence`**
-— §5.3's table says what that buys. `problem.ts` holds the taxonomy as one closed `as const` set, so
-a `type` outside §8.6 is a compile error at the call site.
-
-### `src/platform` — the leaf
-
-Config (`BOOKING_ATTEMPT_CAP` 16, `BOOKING_SEED` unset — ADR-0009, §7.3; `DB_POOL_MAX` 10), the
-`pino` logger, the OpenTelemetry bootstrap and §8.4's instruments. Importable by everyone, imports
-nothing from `src/`. Its junk-drawer risk is §11 R-7c's.
-
-**The seed's startup `warn` cannot be emitted by `loadConfig`**: the logger is built *from* its return
-value, so emitting here would be the leaf acquiring the behaviour the rule above keeps out. It ships
-as `configWarnings(config)`, a pure function whose strings `main.ts` emits through `pino` (I-04-11).
-
-### `src/main.ts` — the composition root
-
-Reads config, emits `configWarnings` through the logger it just built, starts telemetry, builds the
-pool and the server, listens, shuts the SDK down. The only module allowed to see every layer, and the
-only place a dependency is chosen rather than received.
-
-### As built
-
-| Module | Contents |
-|---|---|
-| `src/domain` | `interval.ts`, `duration.ts`, `openingHours.ts`, `candidates.ts` — four files, **zero import statements between them**. **`appointment.ts` is retired, not deferred** (ADR-0025 decision 6): transition legality is a database verdict on ADR-0016's ground, so a module holding one allowlist whose only consumer is a SQL predicate relocates a literal. §11 carries the residue. **`candidates.ts` ships with two brand casts where the design predicted three, and no index assertion at all** (I-04-13): destructuring head from tail *is* the emptiness test and *builds* the tuple, so guard and cast collapse into one reachable branch. Its Fisher–Yates shuffle is uniform to ±1.7 % over 8 bays and 100 000 seeds (QS-6) |
-| `src/application` | `bookAppointment.ts` (the loop, `BookOutcome`, and `AppointmentView` — the one body shape the `201` and the `200` share), `deriveInterval.ts`, `readAppointment.ts`, `cancelAppointment.ts`, `rescheduleAppointment.ts`, `checkHealth.ts`, `queryAvailability.ts` (`candidateResources` minus `busyResources`, §6.5). Both write paths share **one** attempt loop, `attemptLoop.ts` (F-06-1), parameterised by the pair it starts on, the span it opens and the deadlock event it logs — instrumented once, with one site able to increment the conflict counter (§8.4). `CancelOutcome` is its own union though structurally identical to `ReadOutcome` today: sharing them would let a member added for one route change the other's exhaustiveness check. Each outcome union is declared *here* and not in `src/http`, so every route `switch` is exhaustiveness-checked and every use case stays callable without a server |
-| `src/persistence` | `db.ts` (the `Db` alias and the pool), `appointmentRepository.ts`, `candidateRepository.ts`, `referenceRepository.ts` (reference reads only), `pgError.ts`, `health.ts` (`pingDatabase`, a boolean rather than a rethrown driver error), `schema.ts`, `migrations/` |
-| `src/http` | `server.ts`, `problem.ts`, `routes/{appointments,availability,health}.ts`. `buildServer` takes already-bound use cases, never a handle, and exports `buildOpenApiDocument()`, so the committed document comes from a function rather than only a script |
-| `src/platform` | `config.ts` (which reads `DB_POOL_MAX`, the service's one pool ceiling), `logger.ts`, `telemetry.ts` — the OTel SDK, its exporters and §8.4's instruments. A leaf; only `main.ts` starts or stops the SDK |
-| `src/main.ts` | Composition root, signals, listen |
-
-**No module outside `appointmentRepository.ts` names the table**, asserted by set equality rather
-than described (§10.2 QS-12): `candidateRepository.ts` answers *which bays and technicians this
-dealership has for this service type* from reference data and cannot consult a booking, the
-availability read included (§6.5).
-
-**The ruleset forecloses every shape that *names* the database handle, and partial application is the
-shape taken rather than the shape left.** `sql-only-in-persistence`,
-`http-must-not-reach-persistence` and `tsPreCompilationDeps: true` all forbid *naming* it, and a
-generic parameter evades all three by declining to: `interface GenericDeps<TDb> { db: TDb }` compiles
-and cruises clean. Partial application costs nothing to prefer, the generic alternative buying the
-edge a value it cannot type, cannot use and must not touch. *"No other shape compiles"* is a claim
-the tooling does not support.
-
-### What literal AC-6 changed in the domain's signatures
-
-*Nothing at all* includes each other, so the built signatures take **primitives, not domain types**:
-`appointmentInterval` takes a bare `durationMillis`, the caller converting first; `withinOpeningHours`
-takes four bare parameters; ordering and finiteness, once guaranteed by the `Interval` type, are
-asserted at runtime as `malformed-interval`; and the composition
-`serviceDuration → durationMillis → appointmentInterval → withinOpeningHours`, once enforced by the
-brands, is written out by a use case in `src/application`. §11 carries the cost as D-01-1 to D-01-4.
-
-`Instant` and `DurationMinutes` are still branded and still catch a bare number **inside** a module.
-**The `Interval` type has not become private** — `src/application` and `src/persistence` may import
-it, the rule being one-directional. What the ruling forecloses is `openingHours.ts` naming it.
-
-**`domain-is-pure` enforces the ruling in its own text**, `to: {}` rather than
-`to: { pathNot: '^src/domain/' }`, which would permit intra-domain imports *by construction* — hence
-QS-10 planting that rule twice (§10.2).
+**Inside `src/persistence`, one file may name the table.** `pgError.ts` is the single translation from a
+PostgreSQL error to a domain outcome — `23P01` → conflict with the resource its constraint names, `23503`
+→ bad reference, `40P01` → no verdict, anything else → a `500` — and it is **total over `unknown` and
+duck-typed** rather than narrowed by `instanceof`, since narrowing on a driver class would make
+classification depend on which copy of `pg` built the error. `appointmentRepository.ts` holds
+`lockResources` (`pg_advisory_xact_lock` over every resource the write is in flight against, one
+statement, deduplicated, ordered by `(class, hashtext(key))`), `lockAppointmentRow`, the unguarded
+`INSERT`, read-by-id, the guarded `UPDATE`, `cancelAppointmentById` — one unconditional status `UPDATE`
+taking **no lock**, a cancelled row satisfying no constraint's `WHERE` — and `busyResources`, the advisory
+read. `lockResources` returns a branded `ResourceLock`: both locking writes require one and the exempt
+write does not ask. Nothing here catches; the error goes up to the one classifier.
+`candidateRepository.ts` reads reference data only and cannot consult `appointment`.
 
 ## 5.3 Module dependency graph
 
@@ -186,57 +98,26 @@ QS-10 planting that rule twice (§10.2).
 ```
 npm run graph:modules      # Mermaid, from the real import graph
 npm run lint:arch          # the same configuration, as a CI gate
+                           # "no layering violations. N module(s) cruised, every root covered: src, tests"
 ```
 
-**The render is not a collapsed five-box picture.** `--output-type mermaid` **ignores
-`reporterOptions.archi.collapsePattern`**, so it emits one node per *file* inside directory subgraphs,
-plus a subgraph per `node_modules` package it reaches. The record is therefore split:
-
-- **the fact** is `npm run lint:arch` — **every root covered, zero violations**, printed and
-  CI-gated; a verdict rather than a number is what QS-10 rests on;
-- **the picture** is the presentation diagram, refreshed **once** in phase 6 rather than redrawn per
-  slice, with `npm run graph:modules` the check against it;
-- **§5.2's direction block is a claim**, checked by the ruleset rather than by the render — if the
-  render disagrees with it, §5.2 is wrong.
-
-**No module count is stated here**: nothing generates one, so a hand-written number goes stale. The
-command prints count, roots and coverage:
-
-```
-npm run lint:arch          # "no layering violations. N module(s) cruised, every root covered: src, tests"
-```
-
-All five modules appear, `src/domain`'s four files sibling nodes with **no edges between them** —
-literal AC-6 made visible.
-
-`.dependency-cruiser.js` carries fourteen rules. Six describe the layering above; the rest do the real
-work:
+`.dependency-cruiser.js` carries fourteen rules. Six describe the layering; these do the real work:
 
 | Rule | Forbids | Why it is not merely hygiene |
 |---|---|---|
-| `domain-is-pure` | `src/domain` → anything: any `src/` module, npm package or `node:` builtin | Makes GC-1 structural: a core that cannot import a database client cannot consult one |
+| `domain-is-pure` | `src/domain` → anything at all | A core that cannot import a database client cannot consult one |
 | `sql-only-in-persistence` | `pg`, `kysely` outside `src/persistence` | SQLSTATE translation stays at one site |
 | `http-must-not-reach-persistence` | `src/http` → `src/persistence` | No route issues SQL: every database access carries a span and the retry policy |
-| `http-framework-only-in-the-edge` | `fastify`, `@fastify/*`, `@sinclair/typebox` outside `src/http` (and `main.ts`) | A use case stays callable without a server |
-| `otel-sdk-only-in-platform` | `@opentelemetry/sdk-*` and its exporters outside `src/platform` and `main.ts` | The same shape for observability. `@opentelemetry/api` stays importable anywhere, because §8.4's window *is* the gap between two span boundaries and a wrapper would place them at one remove; the SDK is a composition-root concern |
-| `outside-in-tests-do-not-import-src` | `tests/{acceptance,contract,property,concurrency,architecture,performance,setup,support}` → `src/` | OC-5 made structural: the path hook cannot catch this, the file being one the test-engineer legitimately owns. `setup` and `support` close the indirect route — a `globalSetup` or spawn helper importing `src/` and handing it to a test that may not. `tests/unit/` and `tests/integration/` stay out, both legitimately importing `src/` |
-| `no-circular`, `platform-is-a-leaf`, `persistence-must-not-look-upward`, `application-must-not-reach-http`, `not-to-unresolvable`, `no-dev-dep-in-src`, and two hygiene rules | the remaining edges | A cycle means two modules are one with a false boundary, making every rule above unenforceable in principle |
+| `http-framework-only-in-the-edge` | `fastify`, `@fastify/*`, `@sinclair/typebox` outside `src/http` and `main.ts` | A use case stays callable without a server |
+| `otel-sdk-only-in-platform` | `@opentelemetry/sdk-*` and its exporters outside `src/platform` and `main.ts` | The SDK is a composition-root concern. `@opentelemetry/api` stays importable anywhere, because §8.4's window *is* the gap between two span boundaries and a wrapper would place them at one remove |
+| `outside-in-tests-do-not-import-src` | the seven outside-in test directories, plus `setup` and `support`, → `src/` | OC-5 made structural — the path hook cannot catch a file the test-engineer legitimately owns |
+| `no-circular` and six others | the remaining edges | A cycle means two modules are one with a false boundary, making every rule above unenforceable in principle |
 
-**The ruleset is verified to *fire*, not merely to parse** (QS-10). Two guards precede every assertion
-about violations, the pair having been measured passing over nothing:
-
-- `summary.environment.issues` must be empty. Without a resolvable `typescript`, `dependency-cruiser`
-  detects a TypeScript project, silently skips every source and exits 0, planted violations
-  unreported;
-- **every planted file must appear in `modules[]`** — per file in the fixture, per *root* in
-  `lint:arch`. A count over the whole cruise is satisfied by `tests/` alone while `src/` goes
-  unexamined behind a green gate: the same hole one level down.
-
-**A new forbidden rule arrives with its plant or it does not arrive**, so QS-10 plants five rules
-rather than four: `otel-sdk-only-in-platform` fires on the SDK imported from `src/application` and
-`src/persistence`, with a negative control confirming it does **not** fire on `@opentelemetry/api`.
-A confinement asserted by nothing weakens the four that are.
-
-`npm run lint:arch` is therefore `node tools/ci/lint-arch.mjs src tests`, not the bare CLI: the guard
-must live inside whatever produces the `pass`. **A cruise that exits 0 says nothing about what it
-examined**, and that is not specific to `dependency-cruiser`.
+**The ruleset is verified to *fire*, not merely to parse** (QS-10), because a cruise that exits 0 says
+nothing about what it examined: without a resolvable `typescript`, `dependency-cruiser` silently skips
+every source and exits 0 with planted violations unreported, and a module count over the whole cruise is
+satisfied by `tests/` alone while `src/` goes unexamined. So two guards precede every assertion about
+violations — `summary.environment.issues` must be empty, and every planted file must appear in
+`modules[]`, per *root* — and **a new forbidden rule arrives with its plant or it does not arrive**. That
+is why `npm run lint:arch` is `node tools/ci/lint-arch.mjs src tests` rather than the bare CLI: the guard
+must live inside whatever produces the `pass`.

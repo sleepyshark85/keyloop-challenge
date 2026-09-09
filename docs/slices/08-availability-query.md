@@ -13,12 +13,11 @@ gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/B
 
 ## Goal
 
-`GET /availability` answers *"what is free?"* for the booking screen. It exists for user experience
-and never for correctness, and it says so in its own response and in its published description:
-staleness is a property of this interface, not an implementation detail.
-
-What can honestly be proven about it is agreement under quiescence — with no concurrent writer, what
-it reports free is exactly what the constraint accepts.
+`GET /availability` answers *"what is free?"* for the booking screen. It exists for user experience and
+never for correctness, and it says so in its own response and in its published description: staleness is a
+property of this interface, not an implementation detail. What can honestly be proven about it is
+agreement under quiescence — with no concurrent writer, what it reports free is exactly what the
+constraint accepts.
 
 ## Acceptance criteria
 
@@ -72,33 +71,25 @@ it reports free is exactly what the constraint accepts.
 
 ## Inherited scope — from the cancellation slice, ruled at its step 5
 
-- **The cancellation slice's AC-1 rests on a fact this slice deletes** *(no ref — recorded in the
-  ruling's prose rather than as a finding of its own; today's rules would require one)*.
-  **Discharged by citation rather than by a new criterion.** That attribution rests on the marker for
-  *reads of the appointment table* resolving to exactly `src/persistence/appointmentRepository.ts`,
-  and the ambiguity-containment test already asserts that against the **real `src/` tree by exact
-  file equality, in CI, on every commit** — the candidate repository is absent from the permitted
-  list. **Composing two reads in the use case is the only option considered that leaves that list
-  unchanged**, so this slice need only avoid breaking a guarantee that already holds. A criterion
-  minted at step 1 to assert it was **withdrawn at step 2**: one satisfied before the slice opens
-  cannot fail it, and a criterion that cannot fail is not evidence.
-- **`I-04-5` — the advisory pre-filter, and why it waits for this slice.** Ruled a deferred
-  improvement at the allocation slice with both halves upheld, and the surviving argument was the
-  implementer's: *the pre-filter is trustworthy only because of QS-8, and shipping it before the
-  property that validates it is backwards.* So the ordering is the point — QS-8 is this slice's, and
-  the pre-filter arrives behind it rather than in front of it. That ruling also distinguished an
-  **authoritative allocator**, correctly excluded, from an **advisory pre-filter**, in scope once
-  QS-8 holds. Whether to filter or to raise the attempt cap the architect **declined to rule**; it is
-  not this slice's to settle.
-- **`A-06-4` — whether the close-out slice has become the place work goes, which this slice's gate
-  must rule.** Raised by the architect at the reschedule slice *against its own pattern of rulings*:
-  the deferral criterion is per-item and has no aggregate, and the close-out slice now holds four
-  deferred obligations — three of them ruled in one slice, every one individually correct — on top of
-  fifteen acceptance criteria and two folded slices. The architect refused to rule it because it owns
-  that criterion; the orchestrator declined to re-cut the backlog on a merge delegation. **This
-  slice's gate is the last moment the decision is free.** Split the close-out slice, exempt a slice
-  that absorbed two folded slices from receiving deferrals, or accept that it is the close-out and
-  will be large. The aggregate question goes to the retro either way.
+- **The cancellation slice's AC-1 rests on a fact this slice deletes** *(no ref — recorded in the ruling's
+  prose rather than as a finding of its own; today's rules would require one)*. **Discharged by citation
+  rather than by a new criterion**: the attribution rests on the marker for *reads of the appointment
+  table* resolving to exactly `src/persistence/appointmentRepository.ts`, which the ambiguity-containment
+  test already asserts against the real tree by exact file equality, in CI, on every commit. **Composing
+  two reads in the use case is the only option considered that leaves that list unchanged.** A criterion
+  minted at step 1 to assert it was **withdrawn at step 2**: one satisfied before the slice opens cannot
+  fail it.
+- **`I-04-5` — the advisory pre-filter, and why it waits for this slice.** Ruled a deferred improvement at
+  the allocation slice on the implementer's argument: *the pre-filter is trustworthy only because of QS-8,
+  and shipping it before the property that validates it is backwards.* That ruling also distinguished an
+  **authoritative allocator**, correctly excluded, from an **advisory pre-filter**, in scope once QS-8
+  holds. Whether to filter or to raise the attempt cap the architect **declined to rule**.
+- **`A-06-4` — whether the close-out slice has become the place work goes, which this slice's gate must
+  rule.** Raised by the architect *against its own pattern of rulings*: the deferral criterion is per-item
+  and has no aggregate, and the close-out slice now holds four deferred obligations — each individually
+  correct — on top of fifteen criteria and two folded slices. The architect refused to rule it because it
+  owns that criterion. **This slice's gate is the last moment the decision is free**: split the close-out
+  slice, exempt it from receiving deferrals, or accept that it will be large.
 
 ## In scope
 
@@ -106,20 +97,15 @@ it reports free is exactly what the constraint accepts.
 
 ## Out of scope
 
-- **Any freshness guarantee.** arc42 §10 deliberately has no scenario for it: asserting freshness
-  would be asserting the property the whole design gives up on purpose.
-- Using the query as an **authoritative** allocator — deciding from the read whether a booking may
-  proceed. Booking is fixed as *"can I have 09:00?"*, not *"find me something Tuesday"*, and making
-  availability authoritative would reintroduce check-then-act. **An advisory pre-filter on the
-  booking path's candidate list is in scope and is not that**: it changes only which candidate is
-  attempted first, every attempt is still adjudicated by the `INSERT`, and a refusal still requires a
-  database verdict.
-- Deleting the synthetic board fixture under `docs/slices/` — that happens at phase 6.
+- **Any freshness guarantee.** arc42 §10 deliberately has no scenario for it: asserting freshness would be
+  asserting the property the whole design gives up on purpose.
+- Using the query as an **authoritative** allocator, which would reintroduce check-then-act. **An advisory
+  pre-filter on the booking path's candidate list is in scope and is not that**: it changes only which
+  candidate is attempted first, every attempt is still adjudicated by the `INSERT`, and a refusal still
+  requires a database verdict.
 
 ## Definition of done
 
-Beyond `CLAUDE.md` §10:
-
-- The property test holds the constraint's range expression and the query's in agreement. The design
-  explains why a shared SQL function cannot do that job; the reviewer checks the reasoning still
-  applies to what was built.
+Beyond `CLAUDE.md` §10: the property test holds the constraint's range expression and the query's in
+agreement. The design explains why a shared SQL function cannot do that job; the reviewer checks the
+reasoning still applies to what was built.

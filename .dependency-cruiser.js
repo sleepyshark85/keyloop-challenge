@@ -162,6 +162,23 @@ export default {
       },
     },
 
+    // ───────────────────────────────────────────── slice 14 — log-bridge confinement ──
+    {
+      name: 'otel-logs-api-only-in-platform',
+      severity: 'error',
+      comment:
+        'docs/slices/14-design.md decision 3: @opentelemetry/api-logs is a facade and would ' +
+        'inherit @opentelemetry/api\'s freedom by default (otel-sdk-only-in-platform\'s own ' +
+        'precedent) — ruled otherwise. §8.4 wants a log line created exactly ONE way, in the ' +
+        'bridge (src/platform/otelLogStream.ts), so a module emitting a LogRecord directly ' +
+        'would put a line in Loki with no stdout twin. Confined to src/platform ONLY — unlike ' +
+        'otel-sdk-only-in-platform, src/main.ts is NOT a second permitted home: it starts and ' +
+        'shuts the SDK down, it does not emit a line. A new forbidden rule arrives with its ' +
+        'plant (tests/architecture/layering.test.ts) or it does not arrive.',
+      from: { path: '^src/', pathNot: '^src/platform/' },
+      to: { path: '^node_modules/@opentelemetry/api-logs(/|$)' },
+    },
+
     // ───────────────────────────────────────────────── test independence (OC-5, P4) ──
     {
       name: 'outside-in-tests-do-not-import-src',

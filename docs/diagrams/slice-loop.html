@@ -13,24 +13,24 @@
       --font-mono:'Geist Mono',ui-monospace,monospace}
     body{font-family:var(--font-sans);background:var(--color-paper);color:var(--color-ink);
       min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3rem 2rem}
-    .frame{max-width:1000px;width:100%}
+    .frame{max-width:1280px;width:100%}
     .eyebrow{font-family:var(--font-mono);font-size:.66rem;font-weight:500;letter-spacing:.18em;
       text-transform:uppercase;color:var(--color-muted);margin-bottom:.5rem}
     h1{font-family:var(--font-serif);font-size:clamp(1.5rem,2.4vw + .75rem,2rem);font-weight:400;
       letter-spacing:-.02em;line-height:1.15;margin-bottom:.375rem}
     .subtitle{font-size:.8125rem;color:var(--color-muted);margin-bottom:1.5rem}
-    svg{width:100%;min-width:820px;display:block}
+    svg{width:100%;min-width:1180px;display:block}
   </style>
 </head>
 <body>
   <div class="frame">
     <p class="eyebrow">Flowchart · Process</p>
     <h1>The slice loop</h1>
-    <p class="subtitle">Architecture governs, downstream roles get a voice before working, and a design defect rewinds rather than being patched around.</p>
+    <p class="subtitle">Architecture governs. An objection at step 2 is adjudicated in one bounded exchange rather than debated; a design change request may be raised at any step, and of its four outcomes only a named design defect rewinds the slice.</p>
 
-    <svg viewBox="0 0 1000 780" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="slice-loop-title slice-loop-desc">
+    <svg viewBox="0 0 1280 780" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="slice-loop-title slice-loop-desc">
       <title id="slice-loop-title">The slice loop</title>
-      <desc id="slice-loop-desc">Flowchart of seven sequential steps for one unit of work — design, agree, red, green, review, human gate, as-built reconciliation — with a return path from review back to design taken only when the architect rules a design defect.</desc>
+      <desc id="slice-loop-desc">Flowchart of seven sequential steps for one unit of work — design, agree, red, green, review, human gate, as-built reconciliation. An objection at step 2 opens a bounded adjudication exchange, shown as a five-rung ladder that ends rather than cycling: the adjudicator replies before it edits with one verdict per objection, AGREE or DISAGREE, stating any change it would make without making it; the finding and the proposed remedy are judged separately, so accepting a real problem while rejecting or narrowing its fix is a legitimate outcome; the objector may answer once; if the two still disagree the architect may call a vote from a third role that owns neither side, whose reasoned verdict is advisory to the architect on architecture and to the human on scope and is recorded either way; and only then is the design amended, in one pass, with the rulings attached. Separately, any role at any step — 2, 3 and 4 as well as 5 — may raise a design change request, which blocks the slice for one round of discussion with four possible outcomes: a clarification resumes from the raising step, a deferred improvement merges as-is and spawns a backlog slice plus a proposed ADR, defer-to-the-gate is ruled now and reviewed by the human at step 6, and a design defect returns to step 1 — the only outcome drawn as a return path, and one the architect may rule only by naming the acceptance criterion, quality scenario or standing invariant that would fail, at most twice per slice before the slice auto-escalates.</desc>
 
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
@@ -45,108 +45,225 @@
 
       <!-- ============ ARROWS FIRST (z-order puts them behind boxes) ============ -->
       <!-- sequential: straight verticals, endpoints share x -->
-      <line x1="500" y1="128" x2="500" y2="156" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <line x1="500" y1="216" x2="500" y2="244" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <line x1="500" y1="304" x2="500" y2="332" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <line x1="500" y1="392" x2="500" y2="420" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <line x1="500" y1="480" x2="500" y2="508" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <line x1="500" y1="568" x2="500" y2="596" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="620" y1="128" x2="620" y2="156" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="620" y1="216" x2="620" y2="244" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="620" y1="304" x2="620" y2="332" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="620" y1="392" x2="620" y2="420" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="620" y1="480" x2="620" y2="508" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="620" y1="568" x2="620" y2="596" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
 
-      <!-- LOOPBACK · coral · rounded right-angle elbows, r=8 -->
-      <path d="M 340 452 L 208 452 A 8 8 0 0 1 200 444 L 200 108 A 8 8 0 0 1 208 100 L 340 100"
+      <!-- step 2 → adjudication panel · dashed, shares y with its endpoints -->
+      <line x1="780" y1="170" x2="896" y2="170" stroke="#4f5d75" stroke-width="1.2"
+            stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <rect x="804" y="150" width="68" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="838" y="159" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace"
+            text-anchor="middle" letter-spacing="0.06em">ON OBJECTION</text>
+
+      <!-- DCR SPAN BRACKET · coral · covers steps 2 through 5, ticks toward the spine -->
+      <path d="M 440 160 L 428 160 A 8 8 0 0 0 420 168 L 420 472 A 8 8 0 0 0 428 480 L 440 480"
+            fill="none" stroke="#eb6c36" stroke-width="1.4"/>
+      <rect x="276" y="200" width="138" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="410" y="209" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace"
+            text-anchor="end" letter-spacing="0.08em">ANY ROLE MAY RAISE A DCR</text>
+
+      <!-- bracket → DCR panel · straight, shares y -->
+      <line x1="420" y1="360" x2="384" y2="360" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+
+      <!-- LOOPBACK · coral · the ONLY outcome that returns to step 1 -->
+      <path d="M 64 332 L 64 108 A 8 8 0 0 1 72 100 L 456 100"
             fill="none" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
-
-      <!-- loopback label: beside the vertical segment, 8px clear of the stroke -->
-      <rect x="208" y="264" width="112" height="12" rx="2" fill="#f5f5f5"/>
-      <text x="264" y="273" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace"
-            text-anchor="middle" letter-spacing="0.08em">(C) DESIGN DEFECT</text>
+      <rect x="74" y="160" width="102" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="78" y="169" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace"
+            letter-spacing="0.08em">(c) DESIGN DEFECT</text>
 
       <!-- ============ STEP BOXES ============ -->
       <!-- 1 DESIGN -->
-      <rect x="340" y="72" width="320" height="56" rx="6" fill="#f5f5f5"/>
-      <rect x="340" y="72" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-      <rect x="352" y="80" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
-      <text x="362" y="89" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">1</text>
-      <text x="500" y="106" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Design</text>
-      <text x="500" y="120" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">arc42 delta · ADR draft · QS-*</text>
-      <text x="680" y="104" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">architect</text>
+      <rect x="460" y="72" width="320" height="56" rx="6" fill="#f5f5f5"/>
+      <rect x="460" y="72" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="472" y="80" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="482" y="89" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">1</text>
+      <text x="620" y="106" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Design</text>
+      <text x="620" y="120" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">arc42 delta · ADR draft · QS-*</text>
+      <text x="796" y="104" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">architect</text>
 
       <!-- 2 AGREE -->
-      <rect x="340" y="160" width="320" height="56" rx="6" fill="#f5f5f5"/>
-      <rect x="340" y="160" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-      <rect x="352" y="168" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
-      <text x="362" y="177" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">2</text>
-      <text x="500" y="194" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Agree</text>
-      <text x="500" y="208" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">agreed, or objections</text>
-      <text x="680" y="186" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">test-engineer</text>
-      <text x="680" y="200" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">+ implementer</text>
+      <rect x="460" y="160" width="320" height="56" rx="6" fill="#f5f5f5"/>
+      <rect x="460" y="160" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="472" y="168" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="482" y="177" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">2</text>
+      <text x="620" y="194" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Agree</text>
+      <text x="620" y="208" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">agreed, or objections</text>
+      <text x="796" y="192" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">test-engineer</text>
+      <text x="796" y="206" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">+ implementer</text>
 
       <!-- 3 RED -->
-      <rect x="340" y="248" width="320" height="56" rx="6" fill="#f5f5f5"/>
-      <rect x="340" y="248" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-      <rect x="352" y="256" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
-      <text x="362" y="265" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">3</text>
-      <text x="500" y="282" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Red</text>
-      <text x="500" y="296" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">acceptance test committed failing</text>
-      <text x="680" y="274" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">test-engineer</text>
+      <rect x="460" y="248" width="320" height="56" rx="6" fill="#f5f5f5"/>
+      <rect x="460" y="248" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="472" y="256" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="482" y="265" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">3</text>
+      <text x="620" y="282" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Red</text>
+      <text x="620" y="296" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">acceptance test committed failing</text>
+      <text x="796" y="274" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">test-engineer</text>
 
       <!-- 4 GREEN -->
-      <rect x="340" y="336" width="320" height="56" rx="6" fill="#f5f5f5"/>
-      <rect x="340" y="336" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-      <rect x="352" y="344" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
-      <text x="362" y="353" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">4</text>
-      <text x="500" y="370" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Green</text>
-      <text x="500" y="384" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">unit TDD · small green commits</text>
-      <text x="680" y="362" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">implementer</text>
+      <rect x="460" y="336" width="320" height="56" rx="6" fill="#f5f5f5"/>
+      <rect x="460" y="336" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="472" y="344" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="482" y="353" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">4</text>
+      <text x="620" y="370" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Green</text>
+      <text x="620" y="384" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">unit TDD · small green commits</text>
+      <text x="796" y="362" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">implementer</text>
 
       <!-- 5 REVIEW -->
-      <rect x="340" y="424" width="320" height="56" rx="6" fill="#f5f5f5"/>
-      <rect x="340" y="424" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-      <rect x="352" y="432" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
-      <text x="362" y="441" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">5</text>
-      <text x="500" y="458" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Review</text>
-      <text x="500" y="472" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">findings · layering · mutants</text>
-      <text x="680" y="450" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">reviewer</text>
+      <rect x="460" y="424" width="320" height="56" rx="6" fill="#f5f5f5"/>
+      <rect x="460" y="424" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="472" y="432" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="482" y="441" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">5</text>
+      <text x="620" y="458" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Review</text>
+      <text x="620" y="472" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">findings · layering · mutants</text>
+      <text x="796" y="450" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">reviewer</text>
 
       <!-- 6 GATE · FOCAL -->
-      <rect x="340" y="512" width="320" height="56" rx="6" fill="#f5f5f5"/>
-      <rect x="340" y="512" width="320" height="56" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
-      <rect x="352" y="520" width="20" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8"/>
-      <text x="362" y="529" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">6</text>
-      <text x="500" y="546" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Gate</text>
-      <text x="500" y="560" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">exploratory testing, then merge</text>
-      <text x="680" y="538" fill="#eb6c36" font-size="9" font-family="'Geist Mono', monospace">human</text>
+      <rect x="460" y="512" width="320" height="56" rx="6" fill="#f5f5f5"/>
+      <rect x="460" y="512" width="320" height="56" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <rect x="472" y="520" width="20" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8"/>
+      <text x="482" y="529" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">6</text>
+      <text x="620" y="546" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Gate</text>
+      <text x="620" y="560" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">exploratory testing, then merge</text>
+      <text x="796" y="538" fill="#eb6c36" font-size="9" font-family="'Geist Mono', monospace">human</text>
 
       <!-- 7 AS-BUILT -->
-      <rect x="340" y="600" width="320" height="56" rx="6" fill="#f5f5f5"/>
-      <rect x="340" y="600" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-      <rect x="352" y="608" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
-      <text x="362" y="617" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">7</text>
-      <text x="500" y="634" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">As-built</text>
-      <text x="500" y="648" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">arc42 reconciled to what merged</text>
-      <text x="680" y="626" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">architect</text>
+      <rect x="460" y="600" width="320" height="56" rx="6" fill="#f5f5f5"/>
+      <rect x="460" y="600" width="320" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="472" y="608" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="482" y="617" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">7</text>
+      <text x="620" y="634" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">As-built</text>
+      <text x="620" y="648" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">arc42 reconciled to what merged</text>
+      <text x="796" y="626" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace">architect</text>
+
+      <!-- ============ RIGHT ZONE · STEP 2 ADJUDICATION · a bounded ladder, not a loop ============ -->
+      <rect x="900" y="152" width="340" height="328" rx="6" fill="#f5f5f5"/>
+      <rect x="900" y="152" width="340" height="328" rx="6" fill="rgba(45,49,66,0.03)"
+            stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <rect x="916" y="164" width="48" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="940" y="173" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace"
+            text-anchor="middle" letter-spacing="0.08em">STEP 2</text>
+      <text x="916" y="196" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Adjudication — reply before you edit</text>
+      <text x="916" y="210" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">NON-NEGOTIABLE · ONE ROUND, THEN A DECISION</text>
+
+      <!-- ladder rail -->
+      <line x1="930" y1="228" x2="930" y2="352" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+
+      <!-- rung 1 -->
+      <rect x="924" y="232" width="12" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="930" y="241" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">1</text>
+      <text x="948" y="240" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">REPLY BEFORE YOU EDIT — one verdict per objection,</text>
+      <text x="948" y="252" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">AGREE or DISAGREE, reasoning stated. Where it agrees</text>
+      <text x="948" y="264" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">it states the change it would make; it does not make it.</text>
+
+      <!-- rung 2 -->
+      <rect x="924" y="284" width="12" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="930" y="293" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">2</text>
+      <text x="948" y="292" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">FINDING AND REMEDY ARE JUDGED SEPARATELY — a real</text>
+      <text x="948" y="304" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">problem with the wrong fix is a legitimate outcome.</text>
+
+      <!-- rung 3 -->
+      <rect x="924" y="320" width="12" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="930" y="329" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">3</text>
+      <text x="948" y="328" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">THE OBJECTOR MAY ANSWER ONCE.</text>
+
+      <!-- rung 4 -->
+      <rect x="924" y="344" width="12" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="930" y="353" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">4</text>
+      <text x="948" y="352" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">STILL APART — THE ARCHITECT MAY CALL A VOTE: a third</text>
+      <text x="948" y="364" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">role owning neither side returns a reasoned verdict,</text>
+      <text x="948" y="376" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">advisory to architect or human, recorded either way.</text>
+
+      <!-- TERMINUS · the exchange stops here; there is no return rung -->
+      <line x1="916" y1="400" x2="1224" y2="400" stroke="#2d3142" stroke-width="1.5"/>
+      <line x1="916" y1="396" x2="916" y2="404" stroke="#2d3142" stroke-width="1.5"/>
+      <line x1="1224" y1="396" x2="1224" y2="404" stroke="#2d3142" stroke-width="1.5"/>
+      <text x="1070" y="416" fill="#2d3142" font-size="8" font-family="'Geist Mono', monospace"
+            text-anchor="middle" letter-spacing="0.08em">THE ROUND ENDS HERE — NO SECOND EXCHANGE</text>
+
+      <!-- rung 5 · past the terminus -->
+      <line x1="930" y1="400" x2="930" y2="428" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+      <rect x="924" y="428" width="12" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="930" y="437" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">5</text>
+      <text x="948" y="436" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">ONLY THEN IS THE DESIGN AMENDED — in one pass,</text>
+      <text x="948" y="448" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">with the rulings attached.</text>
+
+      <!-- ============ LEFT ZONE · DESIGN CHANGE REQUEST · four outcomes, one return ============ -->
+      <rect x="40" y="336" width="340" height="308" rx="6" fill="#f5f5f5"/>
+      <rect x="40" y="336" width="340" height="308" rx="6" fill="rgba(45,49,66,0.03)"
+            stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <rect x="56" y="348" width="32" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8"/>
+      <text x="72" y="357" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace"
+            text-anchor="middle" letter-spacing="0.08em">DCR</text>
+      <text x="56" y="380" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Raised at any step, by any role</text>
+      <text x="56" y="394" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SLICE BLOCKED · ONE ROUND · FOUR OUTCOMES</text>
+
+      <!-- (a) -->
+      <rect x="56" y="408" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="66" y="417" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">a</text>
+      <text x="84" y="417" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif">Clarification</text>
+      <text x="84" y="430" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">resume from the raising step</text>
+
+      <!-- (b) -->
+      <rect x="56" y="452" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="66" y="461" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">b</text>
+      <text x="84" y="461" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif">Deferred improvement</text>
+      <text x="84" y="474" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">merge as-is · backlog slice · ADR (proposed)</text>
+
+      <!-- (c) · the only outcome with a return path -->
+      <rect x="56" y="496" width="20" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8"/>
+      <text x="66" y="505" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">c</text>
+      <text x="84" y="505" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif">Design defect</text>
+      <text x="84" y="518" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace">back to step 1 · supersede the ADR · revise</text>
+
+      <!-- (d) -->
+      <rect x="56" y="540" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="66" y="549" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">d</text>
+      <text x="84" y="549" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif">Defer to the gate</text>
+      <text x="84" y="562" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">architect rules now · the gate reviews it</text>
+
+      <!-- the teeth: (c) must be named, or it is (b) -->
+      <line x1="56" y1="584" x2="364" y2="584" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="56" y="600" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">TO RULE (c) THE ARCHITECT MUST NAME THE ACCEPTANCE</text>
+      <text x="56" y="612" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">CRITERION, QS-* OR §2 INVARIANT THAT WOULD FAIL —</text>
+      <text x="56" y="624" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">IF IT CANNOT NAME ONE, THE OUTCOME IS (b).</text>
 
       <!-- ============ EDITORIAL CALLOUT ============ -->
-      <text x="976" y="44" fill="#2d3142" font-size="14" font-style="italic"
-            font-family="'Instrument Serif', serif" text-anchor="end">any step may raise a DCR</text>
-      <path d="M 800 52 Q 700 60 664 92" fill="none" stroke="rgba(45,49,66,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
-      <circle cx="664" cy="92" r="2" fill="#2d3142"/>
+      <text x="96" y="228" fill="#2d3142" font-size="14" font-style="italic"
+            font-family="'Instrument Serif', serif">objections at step 2 are cheap;</text>
+      <text x="96" y="248" fill="#2d3142" font-size="14" font-style="italic"
+            font-family="'Instrument Serif', serif">at step 5 the same ambiguity</text>
+      <text x="96" y="268" fill="#2d3142" font-size="14" font-style="italic"
+            font-family="'Instrument Serif', serif">costs a cycle and a loopback</text>
+      <path d="M 290 262 Q 356 270 420 292" fill="none" stroke="rgba(45,49,66,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
+      <circle cx="420" cy="292" r="2" fill="#2d3142"/>
 
       <!-- ============ LEGEND ============ -->
-      <line x1="40" y1="700" x2="960" y2="700" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <line x1="40" y1="700" x2="1240" y2="700" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
       <text x="40" y="716" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
 
       <rect x="40" y="736" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
       <text x="60" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Human decision</text>
 
-      <rect x="200" y="736" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-      <text x="220" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Agent step</text>
+      <rect x="180" y="736" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="200" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Agent step</text>
 
-      <line x1="340" y1="742" x2="368" y2="742" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <text x="376" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Sequence</text>
+      <rect x="300" y="736" width="14" height="10" rx="2" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <text x="320" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Expanded detail</text>
 
-      <line x1="500" y1="742" x2="528" y2="742" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
-      <text x="536" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Loopback — max 2 per slice, then escalate</text>
+      <line x1="420" y1="742" x2="448" y2="742" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="456" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Sequence</text>
+
+      <line x1="540" y1="742" x2="568" y2="742" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <text x="576" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">On objection</text>
+
+      <line x1="680" y1="742" x2="708" y2="742" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <text x="716" y="744" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Loopback — only outcome (c), max 2 per slice, then escalate</text>
     </svg>
   </div>
 </body>

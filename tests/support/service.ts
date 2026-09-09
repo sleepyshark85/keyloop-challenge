@@ -165,6 +165,19 @@ export async function startService(options: {
    */
   otelExporterEndpoint?: string;
   /**
+   * `OTEL_SERVICE_NAME` — slice 14, `docs/slices/14-design.md` §1 (ruling D).
+   *
+   * Unset is the default and the production case: the artifact names itself
+   * `keyloop-service-scheduler` (AC-1). Set, it overrides that default on the resource of
+   * every exported signal (AC-2) — this is the one option that makes `OTEL_SERVICE_NAME`'s
+   * §7.3 table row true rather than decorative, so option (B) ("hardcode `serviceName` in
+   * `NodeSDK`") is the alternative this criterion exists to fail.
+   *
+   * NARROW ON PURPOSE, same discipline as `bookingSeed`/`otelExporterEndpoint` above: one
+   * named variable, not a general environment escape hatch.
+   */
+  otelServiceName?: string;
+  /**
    * `DB_POOL_MAX` — slice 09, `docs/slices/09-design.md` step-5 finding 10 (`R-09-10`,
    * `R-07-12`).
    *
@@ -193,6 +206,7 @@ export async function startService(options: {
     `  LOG_LEVEL    ${options.logLevel === null ? "(unset — the artifact's own default)" : (options.logLevel ?? 'silent')}`,
     `  BOOKING_SEED ${options.bookingSeed === undefined ? '(unset — a seed per request)' : String(options.bookingSeed)}`,
     `  OTEL_EXPORTER_OTLP_ENDPOINT ${options.otelExporterEndpoint ?? '(unset — production default)'}`,
+    `  OTEL_SERVICE_NAME ${options.otelServiceName ?? "(unset — the artifact's own default)"}`,
     `  DB_POOL_MAX  ${options.dbPoolMax === undefined ? "(unset — the artifact's own default)" : String(options.dbPoolMax)}`,
     `  entrypoint   ${entrypoint} (${existsSync(entrypoint) ? 'exists' : 'DOES NOT EXIST'})`,
   ].join('\n');
@@ -224,6 +238,9 @@ export async function startService(options: {
         ...(options.otelExporterEndpoint === undefined
           ? {}
           : { OTEL_EXPORTER_OTLP_ENDPOINT: options.otelExporterEndpoint }),
+        ...(options.otelServiceName === undefined
+          ? {}
+          : { OTEL_SERVICE_NAME: options.otelServiceName }),
         ...(options.dbPoolMax === undefined ? {} : { DB_POOL_MAX: String(options.dbPoolMax) }),
       },
       stdio: ['ignore', 'pipe', 'pipe'],

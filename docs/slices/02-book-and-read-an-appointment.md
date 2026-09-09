@@ -11,27 +11,23 @@ loopbacks: 0
 deferred_from: ["R-01-1", "R-01-4"]
 ---
 
-> **This slice carries three things at once.** Its own booking path; the error taxonomy, folded in
-> from slice 03 at the phase-4 gate as AC-7 to AC-12; and two domain fixes the human ratified before
-> folding them in as AC-13 to AC-19. Both folds are recorded in the event log. Because the remedies
-> were already agreed, this slice implements decisions rather than proposing them.
->
-> **Sequence it**: booking path green first, taxonomy on top, the two domain fixes independent of
-> both. Three things at once is why it keeps the full human gate. If it needs a second red commit it
-> was two slices after all — which is a DCR, not a workaround.
+> **Three things at once**: the booking path; the error taxonomy, folded in from slice 03 at the phase-4
+> gate as AC-7 to AC-12; and two domain fixes the human ratified before folding them in as AC-13 to
+> AC-19. Both folds are in the event log. Because the remedies were already agreed, this slice implements
+> decisions rather than proposing them — sequenced booking path first, taxonomy on top, the domain fixes
+> independent of both. A second red commit would mean it was two slices after all, which is a DCR.
 
 ## Goal
 
-`POST /appointments` books, and `GET /appointments/{id}` reads it back. The request names a customer,
+`POST /appointments` books and `GET /appointments/{id}` reads it back. The request names a customer,
 vehicle, service type, dealership and desired start — never a bay or technician, which the system
-allocates. The service attempts the insert and maps the exclusion violation PostgreSQL raises to
-`409`; it never asks whether a slot is free before writing. This is the slice where the flagship
-concurrency scenarios become executable end to end.
+allocates. The service attempts the insert and maps the exclusion violation PostgreSQL raises to `409`;
+it never asks whether a slot is free before writing. This is where the flagship concurrency scenarios
+become executable end to end.
 
-And every failure the system can produce gets one status and one machine-readable `type`, served as
-RFC 9457 `application/problem+json`. A client tells an out-of-hours request from a contended one from
-an unknown vehicle without parsing prose. The catalogue of those rows is the error taxonomy in
-arc42 §8.6.
+And every failure gets one status and one machine-readable `type`, served as RFC 9457
+`application/problem+json`, so a client tells an out-of-hours request from a contended one from an
+unknown vehicle without parsing prose. The catalogue is arc42 §8.6.
 
 ## Acceptance criteria
 
@@ -101,47 +97,40 @@ arc42 §8.6.
 
 ## In scope
 
-- The route with its TypeBox schemas, the booking use case, the persistence insert, and the single
-  place where a PostgreSQL error code is translated into a domain outcome.
-- `tests/concurrency/no-bay-overlap.test.ts` and `tests/concurrency/no-technician-overlap.test.ts`.
-- `tests/contract/error-taxonomy.test.ts`, the `problem+json` serialiser, and the mapping from a use
-  case's outcome to a status.
-- **The minimal prune-and-retry loop, brought into scope by the human on 2026-09-06.** Attempt,
-  classify the exclusion violation, prune *that candidate value*, retry; a list that empties is the
-  refusal, and the resource named is the list that emptied. How candidates are *ordered* stays the
-  next slice's; this is the loop only.
+- The route with its TypeBox schemas, the booking use case, the persistence insert, and the single place
+  where a PostgreSQL error code becomes a domain outcome.
+- `tests/concurrency/no-bay-overlap.test.ts`, `tests/concurrency/no-technician-overlap.test.ts`,
+  `tests/contract/error-taxonomy.test.ts`, the `problem+json` serialiser and the outcome-to-status map.
+- **The minimal prune-and-retry loop, brought into scope by the human on 2026-09-06.** Attempt, classify
+  the exclusion violation, prune *that candidate value*, retry; a list that empties is the refusal, and
+  the resource named is the list that emptied. Ordering stays the next slice's; this is the loop only.
 - The two ratified domain fixes: the epoch bound in the interval constructor **and** in the
   opening-hours module's first step, and the midnight normalisation.
 
 ## Out of scope
 
-- **Candidate ordering and the attempt cap** — the seeded shuffle and the cap of 16 belong to the
-  next slice, with the no-spurious-refusal scenario. Only the minimal loop is here.
-- `appointment-not-confirmed`, the `409` for moving a cancelled appointment. It needs rescheduling, so
-  it lands with that slice and extends the taxonomy test.
-- Asserting that the emitted OpenAPI document matches the committed one — the slice where the
-  document exists.
+- **Candidate ordering and the attempt cap** — the seeded shuffle and the cap of 16 belong to the next
+  slice with the no-spurious-refusal scenario.
+- `appointment-not-confirmed`, the `409` for moving a cancelled appointment: it needs rescheduling.
+- Asserting that the emitted OpenAPI document matches the committed one — the slice where it exists.
 - Cancellation, rescheduling, availability, telemetry.
 - **Sharing the `8_640_000_000_000_000` constant between the two domain files.** No domain module may
-  import another, so the literal appears twice with no mechanism to share it. That is the debt the
-  ruling booked, recorded in arc42 §11 rather than resolved here; reversing the ruling to avoid a
-  duplicated constant is a scope change and the human's.
-- **Deleting the `'24:00:00'` parse arm**, refused on measurement: PostgreSQL round-trips that value,
-  so real reference data can hold it. The dead branch was the *symptom*; the live defect is that a
+  import another, so the literal appears twice with nothing to share it. That is the debt the ruling
+  booked, recorded in arc42 §11; reversing the ruling to avoid a duplicated constant is the human's.
+- **Deleting the `'24:00:00'` parse arm**, refused on measurement: PostgreSQL round-trips that value, so
+  real reference data can hold it. The dead branch was the *symptom*; the live defect is that a
   midnight-ending job is refused.
-- Opening hours that wrap past midnight into the next day — an 18:00–02:00 window. A genuinely
-  two-day window, which neither the opening-hours ADR nor the midnight fix addresses.
+- Opening hours that wrap past midnight into the next day — a genuinely two-day window, which neither
+  the opening-hours ADR nor the midnight fix addresses.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
 - The concurrency tests run against real PostgreSQL with several pooled connections released from a
-  barrier, and record the shuffle's seed in the failure message so a failing interleaving is
-  re-runnable rather than a flake.
-- AC-15's property and AC-18's negative control are reported as **named mutants**, not as a score:
-  for a discrimination claim, name the mutant. AC-19 additionally retires the unreachable-branch
-  finding from the previous slice by making the `'24:00:00'` arm reachable **and** killed.
-- The taxonomy's one recorded tension is left recorded, not harmonised: out-of-hours stays `400`
-  although `422` would sit more naturally beside the reference failures. Changing it means
-  superseding the opening-hours ADR.
+  barrier, and record the seed in the failure message so a failing interleaving is re-runnable.
+- AC-15's property and AC-18's negative control are reported as **named mutants**, not as a score. AC-19
+  additionally retires the previous slice's unreachable-branch finding by making the `'24:00:00'` arm
+  reachable **and** killed.
+- The taxonomy's one recorded tension is left recorded, not harmonised: out-of-hours stays `400` although
+  `422` would sit more naturally beside the reference failures.

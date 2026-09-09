@@ -40,11 +40,22 @@ import { NodeSDK } from '@opentelemetry/sdk-node';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { metrics, trace } from '@opentelemetry/api';
 import type { Counter, Histogram, Meter, MetricOptions } from '@opentelemetry/api';
+import { DEFAULT_OTEL_SERVICE_NAME } from './config.js';
+import type { Config } from './config.js';
 
-const INSTRUMENTATION_NAME = 'keyloop-service-scheduler';
+/**
+ * The instrumentation SCOPE name — `getTracer`/`getMeter`/`getLogger` are all called with
+ * this, and it never moves: `OTEL_SERVICE_NAME` (slice 14) changes the RESOURCE's
+ * `service.name` only. The two happen to share a literal by default
+ * ({@link DEFAULT_OTEL_SERVICE_NAME}), which is `config.ts`'s to own; this file imports it
+ * rather than repeating the string a second place could drift from.
+ */
+export const INSTRUMENTATION_NAME = DEFAULT_OTEL_SERVICE_NAME;
 
 /** §8.4's spans: created wherever the work happens (decision 1), always through this tracer. */
 export const tracer = trace.getTracer(INSTRUMENTATION_NAME);
@@ -131,14 +142,36 @@ export const bookingAttempts: Histogram = lazyHistogram('booking_attempts', {
  * it also named is what shipped: `src/http/server.ts`'s hand-written `serverFactory` span, which
  * reaches the same lines this instrumentation would have and needs nothing at the process's
  * command line.
+ *
+ * ── SLICE 14 — `serviceName`, AND THE LOG RECORD PROCESSOR ─────────────────────────────────────
+ *
+ * `serviceName: config.otelServiceName` is passed explicitly rather than left to the SDK's own
+ * `envDetector`: measured on the pinned `sdk-node@0.222.0`, `NodeSDK` merges this option onto the
+ * resource AFTER `envDetector` runs (`sdk.js:173-178`), so it beats — never loses to — whatever
+ * `OTEL_SERVICE_NAME` would have contributed on its own. That is safe only because `config.ts` is
+ * itself the reader of `OTEL_SERVICE_NAME` (ruling D): the value handed here already IS the
+ * environment's, when set, or {@link DEFAULT_OTEL_SERVICE_NAME} otherwise — an unconditional
+ * `serviceName: 'keyloop-service-scheduler'` here (option B, rejected) would instead make the
+ * variable inert.
+ *
+ * `logRecordProcessors: [new BatchLogRecordProcessor({ exporter: ... })]`, never `Simple` (§7.1's "a collector
+ * outage must never propagate to a request"): a batch processor queues and returns, and a failed
+ * export is dropped by the SDK's own pipeline. `OTLPLogExporter` is named EXPLICITLY — left to
+ * `NodeSDK`'s own env-configured default, it defaults to `otlp` over `http/protobuf`
+ * (`sdk.js:274`), a different wire protocol from the JSON `OTLPTraceExporter`/`OTLPMetricExporter`
+ * pair above; naming the `-otlp-http` exporter here keeps all three signals on one protocol
+ * (measured: `application/json` to `${endpoint}/v1/logs`), which is what
+ * `tests/support/otelCollector.ts` decodes.
  */
-export function startTelemetry(): NodeSDK {
+export function startTelemetry(config: Pick<Config, 'otelServiceName'>): NodeSDK {
   const sdk = new NodeSDK({
+    serviceName: config.otelServiceName,
     contextManager: new AsyncLocalStorageContextManager(),
     traceExporter: new OTLPTraceExporter(),
     // Plural, not the deprecated singular `metricReader` — the SAME instance either way, but the
     // singular form logs a deprecation warning on every start.
     metricReaders: [new PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter() })],
+    logRecordProcessors: [new BatchLogRecordProcessor({ exporter: new OTLPLogExporter() })],
     instrumentations: [],
   });
   sdk.start();

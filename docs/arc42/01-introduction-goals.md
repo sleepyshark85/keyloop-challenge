@@ -4,9 +4,8 @@
 
 ## 1.1 Requirements overview
 
-A service-appointment scheduler for automotive dealerships. The brief states the task as *"Build an
-Appointment Scheduler application to replace manual booking systems"* and gives three core
-requirements, quoted because everything below traces to them:
+A service-appointment scheduler for automotive dealerships. The brief's three core requirements, quoted
+because everything below traces to them:
 
 1. **Resource Constrained Booking** — *"Allow a user to request a service appointment for a specific
    vehicle, service type, and dealership at a desired time."*
@@ -16,114 +15,84 @@ requirements, quoted because everything below traces to them:
    associating the customer, vehicle, technician, and service bay."*
 
 **What the system does.** A booking request names a customer, a vehicle, a service type, a dealership
-and a desired start. It does *not* name a bay or a technician: those are physical resources the system
-allocates. The system derives the interval from the service type's duration, finds a bay at that
-dealership and a qualified technician both free for the whole interval, and persists one Appointment
-binding all five. If either resource is unavailable the request is refused and nothing is written. A
-separate, read-only availability query answers *"what is free?"* for the booking screen.
+and a desired start — not a bay or a technician, which the system allocates. The server derives the
+interval from the service type's duration, finds a bay and a qualified technician free for the whole
+interval, and persists one Appointment binding all five; if either is unavailable, nothing is written.
+A separate read-only availability query answers *"what is free?"* for the booking screen.
 
-**Why this is not a CRUD exercise.** A single booking consumes two independently scarce physical
-resources for the same span, and requests arrive concurrently. The failure that matters is not a
-malformed payload; it is two customers told at 09:00:00.000 that bay 3 is theirs — a car on a ramp and
-a car on the forecourt, which software cannot undo. The brief's wording invites the defect: *"Before
-confirming, check for the availability"* describes check-then-act, the read-then-write race that
-produces the double booking. `CLAUDE.md` §2.1 therefore decides, before any architecture, that overlap
-is made unrepresentable by a PostgreSQL exclusion constraint and that availability queries exist for
-user experience and never for correctness. Requirement 2 is honoured as a UX affordance; requirement
-3's integrity is honoured by the database.
+**Why this is not a CRUD exercise.** One booking consumes two independently scarce physical resources
+over the same span, concurrently, and the failure that matters — two customers both told bay 3 is
+theirs — software cannot undo. The brief's own wording invites it: *"Before confirming, check for the
+availability"* is check-then-act. So overlap is made unrepresentable by a PostgreSQL exclusion
+constraint (§4.1): **requirement 2 is honoured as a UX affordance, requirement 3's integrity by the
+database.**
 
-**Scale and shape.** One deployment serves several dealerships, each with single-digit bays and tens of
-technicians. Booking volume is low — tens of appointments a day at a busy dealership — but bursts of
-contention are real, because everyone wants 08:00 on a Saturday. The design is therefore optimised for
-*provable correctness under contention* rather than throughput (§1.2).
-
-**Boundaries.** Backend only, per the brief's *"Choose one service layer to implement fully"*; the
-client is an OpenAPI contract and a cURL harness. No external system is integrated — *"replace manual
-booking systems"* is read as replacing a paper diary and a phone call, not as federating existing
-software. §3.3 lists what is deliberately excluded, and §1.4 records the dozen places Scenario A
-underdetermines the system.
+**Scale, and boundaries.** Several dealerships in one deployment, single-digit bays and tens of
+technicians each, tens of appointments a day — but real bursts of contention, because everyone wants
+08:00 on a Saturday. Backend only per *"Choose one service layer to implement fully"*, with the client
+an OpenAPI contract and a cURL harness and nothing external integrated (§3.3).
 
 ## 1.2 Quality goals
 
-Ranked, because unranked quality goals constrain nothing: the ranking tells a later reviewer which way
-to resolve a trade-off without reconvening a gate. Each goal becomes one or more executable scenarios
-in §10. Quality goals are the human's under `CLAUDE.md` §6, and this ranking — performance last, with
-its cost stated — was ratified at Gate A exactly as proposed.
+Ranked, because unranked goals constrain nothing: the ranking says which way to resolve a trade-off.
+Each becomes executable scenarios in §10. The ranking is the human's, ratified at Gate A.
 
-| # | Quality goal | What it means concretely | Why it ranks here |
-|---|---|---|---|
-| **1** | **Booking integrity under concurrency** | No two non-cancelled appointments share a bay, or a technician, with overlapping intervals — under any interleaving of concurrent requests | The only property whose violation cannot be undone by the software that caused it. Every other goal describes how well the system works; this one decides whether it works at all |
-| **2** | **Verifiability** | Every claim in this documentation is checkable by something other than an agent's assertion: the invariant by a concurrency test against real PostgreSQL, layering by `dependency-cruiser`, test quality by mutation score, "done" by a script | An unverified invariant is a claim, not a property. The brief also grades *"your process for verifying and refining"* AI output as a primary criterion |
-| **3** | **Modifiability** | A change to one of §1.4's ambiguities — durations varying by vehicle, a cleanup buffer, opening hours — is absorbed by one building block plus a migration, not a rewrite | §1.4 makes it near-certain the domain model *will* change: four open questions land after design begins, each with a defensible answer either way |
-| **4** | **Observability** | The availability check and the insert are separate spans, so the check-then-act window is visible in a waterfall; `booking_conflicts_total{resource}` makes goal 1 measurable in production | Explicitly requested by the brief. Below modifiability because it reports on the system rather than constituting it; above performance, because without it a correctness regression in production is invisible |
-| **5** | **Performance** | Availability queries answer within a human-interactive budget for one dealership's schedule; a booking is a single round trip | Last **deliberately and with a stated cost**: the correctness mechanism serialises conflicting writes, capping throughput for a contended resource. At this scale that ceiling is orders of magnitude from binding, so goal 1 is bought with headroom nothing else spends (§11.2 R-1) |
+| # | Quality goal | Why it ranks here |
+|---|---|---|
+| **1** | **Booking integrity under concurrency** — no two non-cancelled appointments share a bay or a technician over overlapping intervals, under any interleaving | The only property whose violation the software cannot undo |
+| **2** | **Verifiability** — invariant by concurrency tests against real PostgreSQL, layering by `dependency-cruiser`, test quality by mutation score, *done* by a script | An unverified invariant is a claim, not a property; the brief grades the process for verifying AI output |
+| **3** | **Modifiability** — a change to one of §1.4's ambiguities is absorbed by one building block plus a migration | §1.4 makes it near-certain the domain model *will* change |
+| **4** | **Observability** — check and insert are separate spans, so the check-then-act window is visible in a waterfall; `booking_conflicts_total{resource}` makes goal 1 measurable in production | Requested by the brief; below modifiability because it reports on the system rather than constituting it |
+| **5** | **Performance** — availability within a human-interactive budget, a booking one round trip | Last **deliberately, with a stated cost**: the mechanism serialises conflicting writes, a ceiling orders of magnitude from binding (§11.2 R-1) |
 
-**How to use the ranking.** Where two goals conflict the lower-numbered one wins, and the loss is
-recorded in §11 as debt rather than silently absorbed.
+Where two goals conflict the lower-numbered one wins, and the loss is recorded in §11 as debt.
 
 ## 1.3 Stakeholders
 
-**The system does not name its primary actor, and that is deliberate.** The brief says only
-*"allow **a user** to request a service appointment"*. OQ-2 asked who that user is and
-[ADR-0002](../adr/0002-service-advisor-actor-no-authentication.md) answered *dealership staff*,
-then rested the scope of authentication on that answer.
-[ADR-0034](../adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) withdraws
-the naming and keeps the scope: authentication is out because the client layer is stubbed, which
-is a fact about what was built rather than an inference about who uses it. `customer_id` still
-travels in the request body and a mismatched vehicle is still a `4xx` rather than a `403` — but
-those follow from a stubbed caller, not from a role. Both readings of *a user* stay open.
+**The system does not name its primary actor, deliberately**: the brief says only *"allow **a user** to
+request a service appointment"*, and
+[ADR-0034](../adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) withdraws the
+earlier naming while keeping its scope — authentication is out because the client layer is stubbed.
 
-| Role | Expectation |
-|---|---|
-| **A user** (primary actor, ADR-0034) | Books, cancels and reschedules for a customer named in the request. Wants a yes/no in seconds and, on a no, to be told *which* resource was unavailable |
-| **Customer / vehicle owner** | An appointment honoured on arrival — entirely quality goal 1. Named by the request rather than identified by it (ADR-0034) |
-| **Service manager** | No technician double-committed, and no bay left idle by a scheduler refusing bookings it could have accepted (ADR-0004). Owns the reference data, including opening hours (ADR-0001) |
-| **Technician** | A *resource*, not a user. Committed to one job at a time (`CLAUDE.md` §2.1, A-2) |
-| **Operator** | Runs the service from a clean checkout, tells whether it is healthy, and sees conflicts and latency without attaching a debugger |
-| **Human engineer** (the submitter) | Owns scope, acceptance criteria and quality goals; resolves Gate A; can defend every design decision as their own |
-| **Keyloop assessor** | Reads the repository under time pressure and expects the reasoning, not just the result: why this concurrency mechanism, what was assumed, what was left out, and how the AI's output was verified |
-| **Hypothetical downstream integrator** | Not in scope, named so the omission is visible: a real deployment would publish appointment events to a DMS (§3.3, §11) |
+**A user** books, cancels and reschedules for a customer named in the request, wanting a yes/no in
+seconds and, on a no, *which* resource was unavailable. The **customer / vehicle owner** wants the
+appointment honoured on arrival. The **service manager** wants no technician double-committed and no
+bay idled by a needless refusal, and owns the reference data. A **technician** is a *resource*, not a
+user: one job at a time (A-2). The **operator** sees health, conflicts and latency without a debugger.
+The **human engineer** who submits this owns scope, acceptance criteria and quality goals; the **Keyloop
+assessor** reads under time pressure and wants the reasoning. A **downstream integrator** is out of
+scope, named so the omission is visible.
 
 ## 1.4 Assumptions
 
-Ambiguity is deliberate in the brief, so none of it is silently resolved. Two kinds were distinguished
-and both are closed. An **assumption (A-n)** is a reading the architect took, stating what would change
-if it is wrong; Gate A left all ten standing, including **A-4** (no buffer between appointments) and
-**A-6** (nothing is created implicitly by a booking), which were put to the human explicitly and remain
-cheap to overturn. A **ruling** materially changed the design *and* was a scope decision, which
-`CLAUDE.md` §6 reserves to the human; all four blocked Gate A and were decided on 2026-09-03 as
-ADR-0001 to ADR-0004. Their `OQ-n` identifiers are retained so citations elsewhere still resolve, but
-they are answers now: overturning one means **superseding its ADR**, not editing a table.
+Ambiguity is deliberate in the brief and none of it is resolved silently. An **assumption (A-n)** is a
+reading the architect took, with what changes if it is wrong; Gate A left all ten standing. Four further
+ambiguities were **scope** decisions and went to the human as ADR-0001 to ADR-0004. Overturning one
+means superseding its ADR.
 
 ### Assumptions taken
 
-| id | Ambiguity | Reading taken | If the reading is wrong |
-|---|---|---|---|
-| **A-1** | Is a service duration fixed per service type, or does it vary by vehicle? | Fixed per service type. The request carries a desired **start**; the server derives the end and never trusts a client-supplied one | Duration becomes a function of *(service type, vehicle)*: a resolution table and a domain step before the interval exists. The invariant is untouched, because the constraint operates on whatever interval it is given — additive, hence an assumption rather than a blocker |
-| **A-2** | Can one technician cover two bays at once? | No. A technician is exclusively committed for the whole appointment | **Already settled**: `CLAUDE.md` §2.1's exclusion constraint on `technician_id` *is* the statement that technician capacity is one. Recorded so it is visible as considered. A capacity-*n* technician needs a different mechanism entirely (§11.2 R-2) |
-| **A-3** | Are technician qualifications global, or scoped per dealership? | A technician is employed by exactly one dealership, so a *(technician, service type)* qualification is dealership-scoped through employment | Floating technicians need an assignment table with validity periods, and the eligibility query gains a join and a temporal predicate. The invariant is unaffected — it does not care *why* a technician was chosen, only that they are not double-committed |
-| **A-4** | Does a bay need a setup or cleanup buffer between appointments? | No buffer. The appointment interval *is* the occupancy interval | The two separate and the constraint moves onto a padded range: one migration plus one constraint change. Bounded and mechanical — but the assumption most likely to be wrong in a real dealership, and the reason §5 keeps "the interval the constraint sees" a named concept |
-| **A-5** | Is "a desired time" an exact start, or a preference the system optimises within? | An exact start: *"can you have 09:00 on Tuesday?"*, not *"find me something Tuesday"* | Booking becomes search-then-book, a materially different endpoint, and the availability query stops being advisory and starts driving allocation. A one-word reading that quietly doubles the scope |
-| **A-6** | Must the customer, vehicle and reference data already exist? | Yes — all of it is seeded. Booking references by id and fails with a client error if one is absent or mismatched; nothing is created implicitly, and a vehicle belongs to exactly one customer | Booking becomes a multi-entity transaction, its failure modes multiply, and ownership becomes temporal because cars get sold. Keeping booking a *single insert* is what makes the invariant simple to state and test, so this is load-bearing |
-| **A-7** | Is reference data managed through the API? | No. It arrives via migrations and fixtures; the API is booking, availability and reading an appointment | Adds conventional CRUD carrying no interesting risk, which is why it is excluded: it would consume the review attention `CLAUDE.md` §8 identifies as scarce and buy nothing the assessor is grading |
-| **A-8** | How is time represented across the boundary? | Instants. RFC 3339 with an offset on the wire, `timestamptz` in storage, `tstzrange` in the constraint, so overlap is decided on the absolute timeline | Nothing, for the invariant — this reading is what makes it zone-safe. **Now load-bearing**: ADR-0001 validates opening hours stated in local wall-clock time, so the dealership carries an IANA zone used for validation only |
-| **A-9** | Does the system serve one dealership or many? | Many, in one deployment — the *"Unified"* of the title. A bay and a technician belong to exactly one dealership | Single-tenant would remove a scoping predicate from every query: harmless if wrong that way, expensive the other, so the multi-dealership reading is taken |
-| **A-10** | Does the requester choose the bay and technician? | No. The brief's request names a vehicle, service type, dealership and time and conspicuously not resources, so the system allocates them | If a requester may pin a technician — a real dealership expectation — allocation becomes optional and ADR-0004's conflict semantics change shape. The *policy* for choosing among free candidates was always an architecture decision |
+| id | Reading taken | If the reading is wrong |
+|---|---|---|
+| **A-1** | Duration is **fixed per service type**, not varying by vehicle. The request carries a start; the server derives the end and never trusts a client-supplied one | Duration becomes a function of *(service type, vehicle)*; the invariant is untouched, the constraint taking whatever interval it is given |
+| **A-2** | A technician **cannot** cover two bays at once — exclusively committed for the whole appointment | Already settled: the constraint on `technician_id` *is* the statement that capacity is one; capacity-*n* needs another mechanism (§11.2 R-2) |
+| **A-3** | Qualification is **dealership-scoped through employment**: a technician is employed by exactly one dealership | Floating technicians need an assignment table with validity periods, and a join in the eligibility query |
+| **A-4** | **No setup or cleanup buffer**: the appointment interval *is* the occupancy interval | One migration and one constraint change; the reading most likely to be wrong in a real dealership, and why §5 names "the interval the constraint sees" |
+| **A-5** | *"A desired time"* is an **exact start**, not a preference: *"can I have 09:00 on Tuesday?"*, not *"find me something Tuesday"* | Booking becomes search-then-book, availability starts driving allocation: one word, double the scope |
+| **A-6** | Customer, vehicle and reference data **already exist**, seeded. Booking references by id and fails with a client error if one is absent or mismatched | Booking becomes a multi-entity transaction; the **single `INSERT`** is what makes the invariant simple to state and test |
+| **A-7** | Reference data is **not** managed through the API: migrations and fixtures. The API is book, read, cancel, reschedule, availability | Conventional CRUD, no interesting risk |
+| **A-8** | Time crosses as **instants**: RFC 3339 with an offset on the wire, `timestamptz` in storage, `tstzrange` in the constraint | Nothing — this reading is what makes the invariant zone-safe; the dealership's IANA zone serves opening-hours validation alone (ADR-0001) |
+| **A-9** | **Many dealerships** in one deployment — the *"Unified"* of the title. A bay and a technician belong to exactly one | Single-tenant drops a scoping predicate: harmless wrong that way, expensive the other |
+| **A-10** | The requester **does not choose** bay or technician. The brief's request names a vehicle, service type, dealership and time, conspicuously not resources | Pinning a technician makes allocation optional and reshapes ADR-0004's conflict semantics |
 
-### Decided at Gate A — the four former open questions
+### Decided at Gate A — the four questions the architect could not answer
 
-Each ruling is the human's. The ADR carries the argument, the alternatives and whether the architect's
-recommendation was accepted, modified or overridden.
+| id | Ruling | Record |
+|---|---|---|
+| **OQ-1** | Opening hours and shifts: **hours validated, shifts not modelled.** Validating hours cannot reintroduce check-then-act — they are a static property of the *request* | [ADR-0001](../adr/0001-validate-dealership-opening-hours.md) — *architect's recommendation overridden* |
+| **OQ-2** | The actor and authentication: **neither.** The actor is unnamed; vehicle ownership is **validation**, not a security control | [ADR-0002](../adr/0002-service-advisor-actor-no-authentication.md), superseded by [ADR-0034](../adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) |
+| **OQ-3** | Cancellation and rescheduling: **both in scope.** Cancellation is a `confirmed → cancelled` transition, making the constraint's `WHERE (status <> 'cancelled')` predicate testable; a reschedule is a **single atomic `UPDATE`** | [ADR-0003](../adr/0003-cancellation-and-rescheduling-in-scope.md) — *human expanded scope and fixed the mechanism* |
+| **OQ-4** | A conflict while capacity remained: **retry across the remaining candidates, then refuse.** The candidate read stays **advisory**, so this is not check-then-act | [ADR-0004](../adr/0004-retry-across-remaining-candidates.md) — *accepted as recommended* |
 
-| id | The question that was open | Ruling | Record |
-|---|---|---|---|
-| **OQ-1** | Are opening hours and technician shifts modelled, or is time unbounded? | **Opening hours are validated; shifts are not modelled.** Validating them cannot reintroduce check-then-act, because they are a static property of the *request* | [ADR-0001](../adr/0001-validate-dealership-opening-hours.md) — *architect's "unbounded" recommendation overridden* |
-| **OQ-2** | Who is the actor, and is authentication in scope? | **No authentication, and the actor is not named.** Vehicle ownership is **validation**, not a security control | [ADR-0002](../adr/0002-service-advisor-actor-no-authentication.md) — *accepted as recommended*, then superseded by [ADR-0034](../adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md), which keeps the scope and drops the role |
-| **OQ-3** | Are cancellation and rescheduling in scope? | **Both.** Cancellation is a `confirmed → cancelled` transition, which is what makes the constraint's `WHERE (status <> 'cancelled')` predicate testable; rescheduling is a **single atomic `UPDATE`**, never a cancel followed by an insert | [ADR-0003](../adr/0003-cancellation-and-rescheduling-in-scope.md) — *architect recommended deferring rescheduling; the human expanded scope and fixed the mechanism* |
-| **OQ-4** | When a request conflicts but capacity remained, is a refusal acceptable? | **No — retry across the remaining candidates, then refuse.** The candidate read stays **advisory**, so this is not check-then-act | [ADR-0004](../adr/0004-retry-across-remaining-candidates.md) — *accepted as recommended* |
-
-*Not questions for Gate A, recorded so it is clear they were not asked:* the HTTP framework, the query
-layer, the migration tool and the module decomposition were reserved to the architect at phase 0;
-candidate ordering, the retry mechanism and the attempt cap's value by
-[ADR-0004](../adr/0004-retry-across-remaining-candidates.md). All were decided at Gate B (§2.2, §4.2).
-Gate A decided what the system does, not how.
+*Not asked at Gate A:* HTTP framework, query layer, migration tool and module decomposition were
+reserved to the architect and decided at Gate B (§4.2).

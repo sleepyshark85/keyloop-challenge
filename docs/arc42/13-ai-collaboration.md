@@ -1,140 +1,142 @@
 # 13. AI collaboration
 
-> Owner: scribe · Outside the standard twelve arc42 sections
+> Owner: scribe · Outside the standard twelve arc42 sections · The brief's sixth Part 1 deliverable
 
-Sourced from artifacts, never memory: `docs/team-log/events.jsonl` (1,249 lines), the 369-row
-register in [`../DEFECTS.md`](../DEFECTS.md), 18 ADRs, 21 PRs, prompts and reports under
-`docs/team-log/prompts/`, and git. Project closed: 11 built slices, backlog empty.
+Sourced from artifacts, never memory: `docs/team-log/events.jsonl` (1,269 lines, read with
+`tools/team-log/query.mjs`), the 374-row register in [`../DEFECTS.md`](../DEFECTS.md), 18 ADR files,
+`docs/team-log/phase-4-retro.md`, `docs/slices/`, and git. Project closed: 11 slices done, backlog
+empty. The narrative is in [`../../README.md`](../../README.md); this section is the evidence.
 
-## 13.1 Team structure and bounded authority
+## 13.1 From `Requirements.md` to a team
 
-| Role | Decides | Cannot |
-|---|---|---|
-| architect | interfaces, layering, data model; scope, AC, quality goals mid-slice (provisional until gate); `docs/arc42/`, `docs/adr/` | rule and edit in one pass; rule on a dispatch it did not log |
-| test-engineer | how *done* is asserted; outside-in suites | read `src/`; write `tests/unit/` |
-| implementer | `src/`, `tests/unit/` | edit an acceptance test — it raises a DCR |
-| reviewer | may block a merge, may raise a DCR | change the design or fix what it finds |
-| scribe | this section, `README.md`, §12 | claim anything an artifact does not support |
-| orchestrator | routing; sole writer of the event log | decide anything, or mark work done |
-| human | overrides anyone, at the gate and by ruling | — |
+The starting material was one page. Everything else — the team, its rules, its guards — is
+constructed, and the log shows the construction rather than a finished org chart.
 
-§5's bound carries the most weight: the test-engineer defines *done* without seeing the
-implementation, and the implementer cannot edit the test that judges it. Enforced by path, a
-`PreToolUse` hook, and `git commit --only <paths>` — added after a bare commit recorded the
-architect committing `src/` (O-10).
+**Phase 1 produced requirements *and* the ambiguities**, which is the interesting output: the
+brief was under-specified and the team's first deliverable was a list of what it could not decide
+alone. Gate A ruled four open questions, each ADR recording a `provenance`: **OQ-1** opening hours
+as request validation (ADR-0001, `overridden` — the architect's preferred option lost); **OQ-2** a
+service advisor actor, no authentication (ADR-0002, `accepted`, later superseded — §13.3); **OQ-3**
+both cancellation and rescheduling in scope (ADR-0003, `modified`), *expanding* on the architect's
+own recommendation; **OQ-4** retry remaining candidates then refuse (ADR-0004, `accepted`).
 
-## 13.2 Verification — what it caught
+**Phase 2 turned constraints into ADRs 0005–0010** — Fastify+TypeBox, Kysely with no ORM,
+`node-pg-migrate` over `.sql` files, five layered modules, seeded-shuffle candidates, GitHub Actions
+with `check.run` collected via API. Gate B accepted all six unmodified and added three rulings of
+its own: `tests/architecture/` and `tests/performance/` move to the test-engineer, on the same
+reasoning as the other outside-in directories; slice 00 splits into 00a so the pilot measures the
+loop rather than scaffolding friction; TC-10 bites locally via `.npmrc engine-strict=true`.
 
-The red commit is observed from CI, not asserted. Mutation is an audit, not a target — at slice 02 the reviewer reproduced a
-byte-identical survivor set independently; at slice 08 the test-engineer ran its own remedy's
-mutant 35 times rather than once and found 8 of 35 trials survived, then refused to raise
-`numRuns` or the generator weight to close the gap because "choosing the number that makes its own
-test look like a gate is the choice it should not make alone" (`T-08-7`) — the architect took the
-fault onto its own specification instead. At slice 09 the implementer
-built a live `@fastify/swagger` harness and disproved the architect's own projected 37-of-42 mutant
-count — the true mechanism reached 34, not 37, because nobody had run it (`I-09-1`).
+**Phase 3 produced thirteen slices**, every §10 quality scenario QS-1…QS-14 claimed by the slice
+that makes it executable, ordered by what must exist before the invariant is testable rather than by
+feature value — Gate C's three named seams (00a/00, 02/04, 06/07) are that rule applied.
 
-**One defect shape recurred and was named**: *a mechanism that reports success over work it never
-did.* `depcruise` cruising nothing; Stryker scoring mutants never run; a collector reading one
-file's report as the whole slice's (`O-73`); an aggregate mutation score hiding a failing member
-(`O-64`); a `loopbacks` field the governor that blocks a third loopback never read (`O-74`). Over twenty-five instances are on the register, several in the project's own tooling. The rule: **for a discrimination claim, name the mutant; for a mechanism
-claim, name the call site.**
+The through-line: **the rules and the guards are themselves outputs of the process, not givens.**
+CLAUDE.md §5's test-ownership split reached its current form only after Gate B; `.dependency-cruiser.js`
+and `.claude/hooks/guard-paths.mjs` exist because something needed them, and both grew mid-project in
+response to a finding (§13.3).
 
-## 13.3 Where the human overrode the agents
+## 13.2 The loop as it was run — agreement and disagreement
 
-- **ADR-0001** — the architect's recommendation overridden; a third option taken.
-- **AC-6, slice 01** — ruled *literally* against the architect's preference, reshaping module
-  signatures and booking four items of debt.
-- **Slice 08's mutation gate** — the human merged at 71.43% against §10's 0.75, the override of the
-  *metric*, not the evidence: every survivor was documentation prose or an unreachable arm, and two
-  roles had already refused to force the number green.
-- **H-1** — the human, not a tool, audited arc42 and found "service advisor" named about 85 times
-  while the brief says only *"a user"* — an invented actor, load-bearing because it put
-  authentication out of scope. Ruled: unname the actor everywhere. **ADR-0034 supersedes ADR-0002**
-  — this project's first ADR supersession — keeping the argument
-  (a stubbed client cannot verify a credential) and dropping the invented role.
-- **H-2** — a superseded ADR still read `status: accepted`; the human asked whether it was still
-  valid and the file said two different things. Fixed to `superseded`; `STATUS.md`'s accepted count
-  fell from 16 to 15 — the tell a withdrawn decision had counted as standing.
-- **The ADR retirement** — the human, reading ADR-0032: *"it doesn't seem to be in the level of
-  decision that require an ADR."* 33 ADRs → 16, folded into the slice designs that own them; then all 16 were rewritten so every cross-reference became the fact it pointed at.
-- **Slice 09's reopening of slice 10** — the architect argued at Gate D's fold-in step 1 that the
-  contract seam was *falser* than the cut assumed; at slice 09's review all three BLOCKING findings
-  landed on exactly that folded-in half, and it reversed on the evidence, recommending the human
-  un-fold it. The human agreed, naming the cost of the alternative: shipping without the
-  brief's own named OpenAPI deliverable.
+CLAUDE.md §6 states the risk directly: *"an adjudication round that has never produced a
+disagreement is not consensus, it is deference."* The honest question is whether this team
+disagreed or deferred, and the log answers it both ways.
 
-## 13.4 Design changes and the first (c)
+**The raw ratio looks like deference.** 374 `finding.raised` against 226 `finding.ruled` and 119
+`finding.resolved` — most findings closed as `accepted` (129 of 374 per the register, plus 20
+narrowed, 29 deferred, 3 escalated, 3 rejected; 190 of 374 without a final verdict in the register's
+own count). Reviewer output is thinner still: 23 `review.finding` against 8 `review.response`.
 
-Two loopbacks from **(c) design defects** at slices 01 and 02 (`T-01-2`, `T-02-9`), both ruled
-against the architect's own design — T-01-2 naming §2.4 directly, T-02-9 on a re-measured deadlock rate. **Slice 09 step 5 produced this project's first
-literal `(c)` ruling** (`docs/slices/09-observability.md`): fifteen findings, all agreed —
-but two got (c) rather than the softer (a), naming **AC-9** and **QS-11**
-(the OpenAPI document declared `application/problem+json` on 0 of 25 responses) and **AC-6** (a
-"trace-correlated" claim certified by one log line, because `telemetry.ts` registered no
-instrumentations at all) — because §6 requires exactly that naming to block, and both were
-nameable. Loopback 1 of 2 spent; a second red commit followed only because of it.
+**Where it did disagree, it is on record.** Six DCRs were raised (test-engineer ×1, implementer ×4,
+reviewer ×1), all resolved by the architect, and the outcomes vary rather than cluster: slice 02's
+`T-02-9` was ruled **(c) design defect** — a simultaneous loser refused as `500` where the design
+called for `40P01`, naming AC-3, AC-4, QS-1, QS-2, and spending the project's first loopback; slice
+04's was ruled **(a)**, no loopback, ordering and design both correct; slice 05's reviewer DCR was
+ruled **(d)**, landing as ADR-0024; slice 07's `AC-5` DCR was ruled **(a)**. Four loopbacks total —
+slices 01, 02, 07, 09 — against a two-per-slice cap, none reaching three.
 
-**Slice 10 reproduced the shape it was convened to remove — twice.** First, in design: measuring
-rather than reading, the architect found TypeBox collapses a one-member `Type.Union` to a bare
-literal and silently *substitutes* a wrong value — §8.5's documented defect, reproduced **inside its
-own fix**, reachable through eight narrowed response cells (`I-10-1`/M2). Caught before code existed
-by refusing to decide by reading. Second, past the fix: the reviewer re-measured
-rather than trusting the new contract test, and found *that very test* could not fail on the
-collapse it was written to guard — `fast-json-stringify` passes an `enum` value through rather than
-substituting it, so the probe stayed green regardless (`R-10-2`) — caught only by a
-reviewer who ran the falsification rather than trusting the guard.
+**Slice 09 is the sharpest case.** Four adjudication rounds, fifteen agreed findings, eight
+objections, **one logged DISAGREE** (`I-09-4`) ruled **(b)** — correct under the agreed design, the
+better idea booked as ADR-0035 rather than conceded — and two findings ruled **(c)** in one round:
+AC-9 and QS-11 against a document declaring `application/problem+json` on zero of 25 responses, and
+AC-6 against a "trace-correlated" claim resting on one log line inside an uninstrumented span.
 
-**Dispatches contradicted role definitions by silence, at least four times in one remediation
-round**: an ownership table assigned an outside-in half to the implementer alone and the
-test-engineer built it anyway (`T-09-5`); a dispatch named the wrong file and omitted
-an item it had ruled implementer-owned (`O-72`, two instances); the PR-posting obligation was
-missing from three dispatches in one session until the human — not a check — noticed no implementer
-comment on PR 21 (`O-76`). Each time, work survived because a role read past its instructions. That
-is not a mechanism, and the orchestrator said so on the record.
+**The vote mechanism was never exercised.** §6 lets the architect "call a vote" — a third role
+adjudicating a deadlock. Added at commit `084a34b` (2026-09-04); no finding, DCR or slice record in
+this project ever invokes it. The one place it was live for the taking, a reviewer conceded outright
+instead: *"NO VOTE REQUESTED"* (slice 08 `review.response`). The honest read is mixed: disagreement
+is real where it happened, but the mechanism built for the hardest case sat unused — the team never
+reached a genuine three-way deadlock, not that the mechanism failed.
 
-## 13.5 What the process cost
+## 13.3 Self-correction
 
-**Reconstructed from session transcripts, not a billing record.** 236 agent runs across the whole
-project; 232 of them (146.7 agent-hours) in the slice loop proper.
+**Decisions are superseded, never rewritten.** 17 `adr.retired` events against 23 `adr.recorded`,
+holding CLAUDE.md §4's rule that "an ADR's decision is immutable; its prose is not." Clearest
+instance: ADR-0034 supersedes ADR-0002, dropping the invented "service advisor" role the human found
+named roughly 85 times in arc42 while the brief says only "a user" (`H-1`, §13.4) — ADR-0002 keeps
+its filename and status; only `superseded_by` changes.
 
-| | runs | agent-hours | billable | architect share |
-|---|---|---|---|---|
-| 00a | 25 | 26.1 h | 23.90 M | 52% |
-| 00 | 17 | 30.7 h | 30.53 M | 68% |
-| 01–10 | 190 | 89.9 h | 110.37 M | 38% |
+**The constitution corrected itself after a §2 breach.** At slice 00a, `S-1` — self-raised by the
+architect — found the design had worked around §2.4 (test-first, observed in CI) and substituted
+four other evidence items for the missing red-in-CI proof; green either way, so no AC or QS could
+name it. Ruled **(c)** on §2's own authority. CLAUDE.md §6 was then amended (`ae26cf5`, 2026-09-04)
+to let a **(c)** ruling name a standing invariant, not only an AC or QS — the clause now reading *"a
+design once worked around §2.4 and substituted an evidence chain for it... the gravest defect was
+the one the rule could not reach."*
 
-**Was the ceremony worth it?** Slice 09 spent four adjudication rounds and fifteen findings on a
-seventeen-criterion slice — and every BLOCKING finding sat on the half Gate D had folded in without
-review of its own. That is the ceremony finding the seam the cut missed, not spending for
-nothing. Architect share fell from 68% at slice 00 to 12% by slice 10, as the work shifted from
-adjudication to implementer-run measurement (`I-09-1`, `I-10-1`) — cost moving from decision to
-verification. C6's ceiling (10 h / $100 over 13 slices) failed at the
-pilot and was never re-met: 146.7 agent-hours in under 5 calendar days, 11 slices. No dollar figure
-is computed — METHODOLOGY prices tokens rather than storing a figure, and R-5 found the collector
-itself untested until fixed.
+**The adjudication rule exists because ruling and amending in one pass favours agreement.** Step 2's
+first real use produced five objections under a single prompt asking the architect to both rule and
+redraft; commit `084a34b` (same day) split "reply" from "edit" and made it NON-NEGOTIABLE — added
+mid-project, in direct response, not designed in advance.
 
-## 13.6 What did not work
+**The word-budget ratchet caught its own author.** `tools/docs/budget.mjs`'s own comment records
+`02-design.md` falling 13,566 → 1,200 words while the stored ceiling still read 13,566 — "it could
+have grown back twelvefold with the check green the whole way. Found by the architect immediately
+after making it." The ratchet now tightens on every reduction.
 
-**§6(b) has no terminal case on a final slice.** `ADR-0035`'s counter semantics were ruled *correct
-under the agreed design, a better idea available* — textbook (b) — and (b)'s remedy is a backlog
-slice. There was none: slice 09 was last. The ADR exits `proposed` permanently — the rule
-assumes a project that keeps running.
+**The retro changed its own thresholds rather than the results.** `phase-4-retro.md` scored eight
+criteria; two failed (C5 gates-in-the-right-place, C6 time budget) and both were kept rather than
+argued away — *"a threshold turning out to be wrong is changed for future slices, and the pilot is
+still recorded as having failed it."*
 
-**The tooling caught its own author, repeatedly.** The orchestrator built the per-file mutation
-check (`O-64`) after an aggregate score hid a failing file, then wrote a false pass under its own
-new check when a file-scoped Stryker run overwrote its own report (`O-73`) — caught
-by the same orchestrator re-reading its own record. It set `loopbacks: 1` in a slice
-file and the governor that blocks a third loopback went on reading zero, because the governor counts
-log events, not frontmatter (`O-74`). None were caught by a different role — each was the same one, minutes
-later, testing its own new check.
+**A recurring defect shape was named and turned into a rule.** The same shape recurs across the
+register — depcruise cruising nothing, Stryker scoring unrun mutants, a collector reading one file
+as the whole slice's — producing: *"for a discrimination claim, name the mutant; for a mechanism
+claim, name the call site."*
 
-**Gates and governors are only as good as what feeds them**, true past the pilot too:
-a criterion can pass on a number that answers a different question (`O-6`, `O-64`,
-`O-73`), and a machine-readable field can silently disagree with the human-readable one it mirrors
-(`O-74`, and slice 02's `loopbacks: 0` against a log recording one). Two homes for one fact is a
-standing risk this project never fully closed.
+## 13.4 Results
 
-**A stale fixture outlived its own instruction — and this section's reach.**
-`docs/slices/99-availability.md` said *"delete once slice 00 has run"*; slice 00 ran nine slices
-ago. The scribe's write guard denies `docs/slices/`, so this is the flag, not the fix.
+**11 of 13 planned slices shipped** (00a, 00, 01, 02, 04, 05, 06, 07, 08, 09, 10); three are
+tombstoned, not outstanding — slice 11 folded into 09's observability work, 12 and 13 folded into
+02's domain layer, each kept in `docs/slices/` "because the backlog's shape is part of the record."
+Backlog is empty at close.
+
+**18 ADR files stand**: 15 `accepted`, 1 `superseded` (0002 → 0034), 2 `proposed` with no receiving
+slice — ADR-0016 and ADR-0035, the deferred-improvement rule's uncovered case: rule (b) books a
+backlog slice as remedy, and a **(b)** ruling on the last slice has none to book. 17 of a peak 33
+ADRs were retired at a 2026-09-08 human ruling — *"it doesn't seem to be in the level of decision
+that requires an ADR"* — folded into the slice designs that own them.
+
+**829 tests across 59 files, all passing**, pinned to commit `c91eb5a` (`docs/TEST-REPORT.md`).
+**Mutation: 92.00% aggregate (1,392 of 1,513 killed, 26 files); every mutated file now clears the
+0.75 per-file gate**, including `src/http/problem.ts`, which missed by seven-tenths of a point at
+slice 10 and was fixed rather than argued down — the one prior exception, slice 08's 71.43% merge,
+is a recorded human override on the metric, not the evidence. `npm run lint:arch`: clean, 130
+modules cruised, every root covered, zero violations.
+
+**The defect register closes at 374 findings**: 14 blocking, 181 major, 179 minor; verdicts 20
+narrowed, 129 accepted, 29 deferred, 3 escalated, 3 rejected, 190 without a final verdict recorded in
+the register itself. Raised by architect 80, test-engineer 75, orchestrator 75, reviewer 66,
+implementer 61, scribe 12, human 5. Mean escape distance 1.46 steps.
+
+**Cost, reconstructed from the log's own token counts, not billed.** 247 `agent.finish` runs — 4 in
+phases 1–2, 42 in the 00a/00 pilot (architect 10/25, 9/17), 201 across slices 01–10 (architect 86 of
+201, 43%). 4.52M output tokens, 173.4M cache-write tokens. Agent-hours are not reported: summing
+`duration_ms` overstates, since 24 of the pilot's 42 runs carry `duration_caveat: agent was resumed`
+— an unmeasured idle gap (`phase-4-retro.md`); the token collector behind any dollar figure is itself
+untested (`R-5`).
+
+**What is not finished.** ADR-0016 and ADR-0035 remain `proposed` with no slice to build them.
+`R-4` (an absolute path bypasses the Bash write guard) and `O-9`/`O-10` (`guard-paths.mjs` cannot see
+`tests/integration/` writes or `git` operations) are open in the register — `O-10`'s remedy landed as
+`git commit --only`; the other two have not. The `R-5` token accumulator stays unverified.

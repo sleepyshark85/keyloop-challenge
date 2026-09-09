@@ -15,15 +15,14 @@ gate: light          # human cost ruling 2026-09-05; revoked by any open MAJOR/B
 
 ## Goal
 
-`POST /appointments/{id}/cancellation` moves an appointment to `cancelled`, and the slot it held
-becomes bookable again. A sub-resource rather than `DELETE`, because the appointment stays readable
-at its URL afterwards, which `DELETE` would misdescribe.
+`POST /appointments/{id}/cancellation` moves an appointment to `cancelled`, and the slot it held becomes
+bookable again. A sub-resource rather than `DELETE`, because the appointment stays readable at its URL
+afterwards, which `DELETE` would misdescribe.
 
-The schema slice already proved that a cancelled row releases the **bay**, both by the constraint's
-own definition and behaviourally. What AC-1 adds is the **technician** side, which nothing else
-asserts, plus an attribution: the candidate list carries no availability filter, so it is identical
-before and after the cancel, and the only thing that moved between the `409` and the `201` is the
-constraint's verdict.
+The schema slice already proved a cancelled row releases the **bay**, definitionally and behaviourally.
+What AC-1 adds is the **technician** side, which nothing else asserts, plus an attribution: the candidate
+list carries no availability filter, so it is identical before and after the cancel, and the only thing
+that moved between the `409` and the `201` is the constraint's verdict.
 
 ## Acceptance criteria
 
@@ -48,46 +47,39 @@ constraint's verdict.
 ## In scope
 
 - The cancel route, use case and `UPDATE`.
-- **`src/http/server.ts`** — AC-5's one predicate. The only line in this slice that changes behaviour
-  on an already-merged route, which is why the gate must exercise it.
-- `tests/integration/cancellation-releases-slot.test.ts`.
-- `tests/concurrency/cancellation-takes-no-lock.test.ts`, respecified at step 2 so it can fail for
-  the reason it exists: the discriminating case holds the bay's advisory lock in a second session,
-  with a booking control and a release witness.
-- **Two controls added at step 5**, both deferred into this slice by an earlier ruling and neither
-  built:
-  - **The fourth cell of the exclusion-constraint adjudication matrix.** With the constraint dropped
-    and each racing insert wrapped in the two advisory locks written out by hand — a test in this
-    directory may not import `src/` — expect **twenty overlapping rows**. It is the one sentence the
-    matrix cannot otherwise say: *the lock cannot replace the constraint.* The test-engineer's.
-  - **One unit case proving the response schema is an output whitelist.** Stub the read with a view
-    carrying a member the contract does not declare and assert the `200` body carries exactly the ten
-    schema members. Measured against the build: it does today, and with the response map absent
-    Fastify installs no serializer and emits the extra members. It kills a mutant that has survived
-    since the booking slice. The implementer's.
+- **`src/http/server.ts`** — AC-5's one predicate. The only line here that changes behaviour on an
+  already-merged route, which is why the gate must exercise it.
+- `tests/integration/cancellation-releases-slot.test.ts`, and
+  `tests/concurrency/cancellation-takes-no-lock.test.ts`, respecified at step 2 so it can fail for the
+  reason it exists: the discriminating case holds the bay's advisory lock in a second session, with a
+  booking control and a release witness.
+- **Two controls added at step 5**, both deferred into this slice by an earlier ruling and neither built.
+  **The fourth cell of the exclusion-constraint adjudication matrix** — constraint dropped, each racing
+  insert wrapped in the two advisory locks written out by hand, expecting **twenty overlapping rows**: the
+  one sentence the matrix cannot otherwise say, *the lock cannot replace the constraint*. And **one unit
+  case proving the response schema is an output whitelist**, stubbing the read with a view carrying an
+  undeclared member and asserting the `200` body carries exactly the ten schema members.
 
 ## Out of scope
 
-- Cancellation windows, fees, notification, or any record of *who* cancelled. This system has no
-  actor and no audit trail, and arc42 §11 carries that as debt.
-- Restoring a cancelled appointment. Not in the brief; a fresh booking is the path back.
-- **Making the lock a value the write must take**, so that "correctly exempt" cannot read like
-  "forgot the lock". **Owned by the reschedule slice**, which writes a new locking path and so makes
-  the control stronger rather than merely later. Until then the rule is enforced by review.
-- **An empty body on a route that reads no body answering `200` rather than `400`.** Re-routed at
-  step 5 to the close-out slice.
-- **A handler for unmatched routes and the `404 /problems/route-not-found` row.** Ruled here and
-  built at the reschedule slice, because registering it breaks the media-type half of AC-4's vacuity
-  guard and this step has no test-engineer round left to re-derive it.
+- Cancellation windows, fees, notification, or any record of *who* cancelled. This system has no actor
+  and no audit trail; arc42 §11.3 carries that.
+- Restoring a cancelled appointment — a fresh booking is the path back.
+- **Making the lock a value the write must take**, so *"correctly exempt"* cannot read like *"forgot the
+  lock"*. **Owned by the reschedule slice**, which writes a new locking path and so makes the control
+  stronger rather than merely later.
+- **An empty body on a route that reads no body answering `200` rather than `400`.** Re-routed at step 5
+  to the close-out slice.
+- **A handler for unmatched routes and the `404 /problems/route-not-found` row.** Ruled here and built at
+  the reschedule slice: registering it breaks the media-type half of AC-4's vacuity guard, and this step
+  has no test-engineer round left to re-derive it.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
 - The freed-slot assertion books **through the API** rather than inserting directly, so it proves the
-  released slot over the whole path — allocation, retry, and the constraint's verdict — rather than
-  at the SQL level the schema slice already covers.
-- **The step-7 arc42 edits were ruled at step 5, so step 7 executed rather than decided. All are
-  done.** §6.1 was added to the declaration at step 7, the adjudication matrix's fourth cell having
-  been built here: what was claimed as measured from the booking slice was only argued until this
-  slice ran it.
+  released slot over allocation, retry and the constraint's verdict rather than at the SQL level.
+- **The step-7 arc42 edits were ruled at step 5, so step 7 executed rather than decided.** §6.1 was added
+  to the declaration at step 7, the adjudication matrix's fourth cell having been built here: what was
+  claimed as measured from the booking slice was only argued until this slice ran it.

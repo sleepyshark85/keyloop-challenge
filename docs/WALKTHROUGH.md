@@ -359,6 +359,102 @@ equality rather than assumed.
 
 ---
 
+## Scenario 9 — Naming the service, and the Loki–Tempo join, in Grafana
+
+Slice 14 made two sentences in arc42 true rather than aspirational: §8.4's log records now carry
+the active span's own `trace_id`/`span_id`, "so Loki and Tempo join without a correlation id of
+their own"; and §7.3's `OTEL_SERVICE_NAME` row means the service names itself instead of landing
+under `unknown_service:node`. Both are checked here against the running `otel-lgtm` container —
+Grafana on `http://localhost:3001` (mapped off `3000` so the service can keep that port,
+`docker-compose.yml`), the collector on `4318` — through the same datasource-proxy API calls
+Grafana's own Explore view makes, so no browser is required to reproduce this.
+
+### The join
+
+Repeat Scenario 2's by-hand pair (fresh seed, identical payload, fired twice at once). The loser's
+full stdout line — Scenario 2 showed only the fields that mattered there — carries its own
+`trace_id`/`span_id`:
+
+```json
+{"level":30,"time":1788969024548,"pid":126622,"hostname":"agentcomp",
+ "trace_id":"f43ae2801e04eee71f8a9debf9cdf9f0","span_id":"2dde6484999434a1",
+ "event":"booking.conflict","constraint":"no_bay_overlap","resource":"bay","attempt":1,
+ "bayId":"9fdf333d-...","technicianId":"c29dcad3-...","msg":"booking.conflict"}
+```
+
+Query Loki for that `trace_id`, scoped to the service:
+
+```bash
+TRACE=f43ae2801e04eee71f8a9debf9cdf9f0
+curl -sS -G "http://localhost:3001/api/datasources/proxy/uid/loki/loki/api/v1/query_range" \
+  --data-urlencode "query={service_name=\"keyloop-service-scheduler\"} | trace_id = \`$TRACE\`" \
+  --data-urlencode "start=$(( ($(date +%s) - 3600) * 1000000000 ))" \
+  --data-urlencode "end=$(( ($(date +%s) + 60) * 1000000000 ))"
+```
+
+```
+"stream": {"event": "booking.conflict", "constraint": "no_bay_overlap", "resource": "bay",
+  "service_name": "keyloop-service-scheduler", "span_id": "2dde6484999434a1",
+  "trace_id": "f43ae2801e04eee71f8a9debf9cdf9f0", ...}
+```
+
+`trace_id` and `span_id` came back as Loki stream labels — promoted from the OTLP `LogRecord`'s own
+`spanContext`, not parsed out of the line's text (ADR-0037). Pivot to Tempo on the same id — this is
+the one click Grafana's Loki datasource does itself, wired by its own `derivedFields` config, when
+a reader clicks the line's `trace_id`:
+
+```bash
+curl -sS "http://localhost:3001/api/datasources/proxy/uid/tempo/api/traces/$TRACE" \
+  | python3 -c "
+import json, sys, base64
+d = json.load(sys.stdin)
+for b in d['batches']:
+    for ss in b['scopeSpans']:
+        for sp in ss['spans']:
+            if base64.b64decode(sp['spanId']).hex() == '2dde6484999434a1':
+                print(sp['name'], {a['key']: list(a['value'].values())[0] for a in sp['attributes']})
+"
+```
+
+```
+POST /appointments {'http.target': '/appointments', 'http.method': 'POST', 'http.status_code': '409'}
+```
+
+(Tempo's wire format is base64; pino's mixin writes hex — the decode above is what a click does
+invisibly.) That is the exact span the `booking.conflict` line was emitted inside: the request's
+root span, refused. Its siblings in the same trace are `availability.candidates` and
+`appointment.insert` (carrying `db.sqlstate: 23P01`, `db.constraint: no_bay_overlap`) — the
+waterfall §8.4's figure draws.
+
+Fetching the trace by its own id, as above, is the reliable pivot. Tempo's free-text tag search
+(`/api/search?tags=service.name=...`) can come back with zero traces for one that demonstrably
+exists — an indexing lag in that path, not a break in the join — so a reader who tries the search
+box before following a `trace_id` should not read an empty result there as the join having failed.
+
+### The name
+
+The trace above already carries half the answer: every span's resource read
+`service.name = keyloop-service-scheduler` with **no** `OTEL_SERVICE_NAME` set. Restarting the
+service with the variable set renames it, checked the same way on all three signals:
+
+| Signal | Where the name showed up | Default (unset) | `OTEL_SERVICE_NAME=probe-override` |
+|---|---|---|---|
+| Logs | Loki `service_name` stream label | `keyloop-service-scheduler` | `probe-override` |
+| Traces | Tempo resource `service.name` | `keyloop-service-scheduler` | `probe-override` |
+| Metrics | Prometheus `service_name` label on `appointments_booked_total` | `keyloop-service-scheduler` | `probe-override` |
+
+The metrics row needed a longer wait than the other two: `telemetry.ts` reads with a
+`PeriodicExportingMetricReader`, whose default export interval is a full minute, where the trace and
+log processors it configures alongside it (`BatchSpanProcessor`'s NodeSDK default,
+`BatchLogRecordProcessor` explicitly per ADR-0037) both flush on a several-second schedule — so the
+first two rows above were queryable almost immediately and the third needed roughly a minute's wait.
+
+**Proves:** AC-1, AC-2 and AC-4 end to end, against the real Grafana instance rather than only
+`tests/integration/telemetry-logs.test.ts`'s collector double — the join and the resource naming
+both hold where an operator would actually look.
+
+---
+
 ## Running the tests
 
 `npm test` runs three separate Vitest projects and merges the results (`tools/ci/run-tests.mjs`;

@@ -46,64 +46,49 @@ without being obvious.
   learn its own dealership and service type — **and the `UPDATE` is never issued.** Zero rows from
   the `UPDATE` therefore means exactly one thing, which is what makes AC-4 assertable.
 
-## Inherited scope — five arrived, two re-ruled at step 1, all five written out here
+## Inherited scope — five arrived, two re-ruled at step 1
 
-- **`A-06-3` — a concurrency test for racing moves. Deferred on to slice 07**, where it is written
-  in full. The reason for keeping it here — *"the atomic-move ADR's claim is what this slice ships
-  on"* — is equally true of the two scenarios that are already slice 07's, and a reason that does not
-  distinguish its own case is not one. The deferral criterion is met and re-measurable on arrival.
+- **`A-06-3` — a concurrency test for racing moves. Deferred on to slice 07**, where it is written in
+  full. The reason for keeping it here — *"the atomic-move ADR's claim is what this slice ships on"* — is
+  equally true of the two scenarios already slice 07's, and a reason that does not distinguish its own
+  case is not one.
 - **`F-05-1` — the lock becomes a value the write takes.** `lockResources` returns a branded
-  `ResourceLock` that the insert requires as a parameter. Type-only, erased at runtime, with one
-  minting cast: *forgot the lock* becomes a compile error, and *correctly exempt* becomes a signature
-  that does not ask for one. This slice is the destination because it writes a **new** locking path,
-  which is the first moment the mistake is live rather than historical. *As built the lock also
-  carries the keys it took, so nothing can disagree between locking and writing. **`F-02-9`'s half
-  here is discharged by that required parameter**, not by the minting site being unique. What is left:
-  the lock does not prove the write shares its transaction — declined and deferred to the close-out
-  slice — and a `ResourceLock` can still be written by hand with no cast.*
-- **`R-05-7` — a handler for unmatched routes, the `404 /problems/route-not-found` row, and a corpus
-  of hostile requests.** *Both merged: `GET /nope` now answers `404 /problems/route-not-found`, and
-  an `application/xml` request producing a `500` is the taxonomy's one remaining residual.* The
-  corpus lives in `tests/contract/` and is the test-engineer's, asserted in the direction that can
-  fail: every response has a row, rather than every row has a response. Two warnings were ruled a
-  slice early so they would not be discovered here: registering the handler **breaks the media-type
-  half of AC-4's vacuity guard**, where the `type` member still discriminates and the test-engineer
-  re-derives the case rather than deleting it; and `problem.ts`, which renders every row, sits at
-  exactly the mutation threshold with three survivors. *That second warning was wrong, and the
-  merged report says so: `PROBLEM_TYPES` is `as const`, which the instrumenter skips, so the file is
-  immune to mutation rather than one survivor away from failing.*
-- **`R-05-9` — the exhaustiveness disables.** About thirteen structurally unkillable mutants cap the
-  appointments route near 88 %, so its published score had stopped discriminating. A
-  `// Stryker disable` … `// Stryker restore` pair goes around each `const unhandled: never` arm —
-  **those arms only**, not the schema-option or description mutants, which are inert for reasons that
-  change when Fastify's configuration or the OpenAPI assertion does. This slice adds the fourth arm,
-  so doing it once costs one pass instead of two. The *decision* is the architect's; the *edit* is in
-  `src/` and is the implementer's. *As applied the pair suppressed 93 mutants where 8 were ruled, and
-  was narrowed at step 5.*
-- **`src/domain/appointment.ts` — retired at step 1, not deferred** *(no ref — a prediction in arc42
-  §5.2, never a logged finding)*. Under this slice's ADR, whether a transition is legal is a database
-  verdict, so a module holding one allowlist whose only consumer is a SQL predicate is a relocation
-  of a literal. arc42 §5.2 records the retirement; the residue — the constraints denylist where the
-  move's guard allowlists — goes to §11.
+  `ResourceLock` the write requires as a parameter, so *forgot the lock* is a compile error and *correctly
+  exempt* is a signature that does not ask for one. This slice is the destination because it writes a
+  **new** locking path, the first moment the mistake is live rather than historical. *As built the lock
+  also carries the keys it took; **`F-02-9`'s half here is discharged by that required parameter**, not by
+  the minting site being unique. Left open: the lock does not prove the write shares its transaction, and
+  a `ResourceLock` can still be hand-written with no cast.*
+- **`R-05-7` — a handler for unmatched routes, the `404 /problems/route-not-found` row, and a hostile
+  corpus** asserting in the direction that can fail: every response has a row, rather than every row has a
+  response. *Both merged; an `application/xml` request producing a `500` is the taxonomy's one remaining
+  residual.* Registering the handler **breaks the media-type half of AC-4's vacuity guard**, warned a
+  slice early so it would not be discovered here.
+- **`R-05-9` — the exhaustiveness disables.** A `// Stryker disable` … `// Stryker restore` pair around
+  each `const unhandled: never` arm, **those arms only** — not the schema-option or description mutants,
+  inert for reasons that change when Fastify's configuration does. The *decision* is the architect's, the
+  *edit* the implementer's. *As applied it suppressed 93 mutants where 8 were ruled, and was narrowed at
+  step 5.*
+- **`src/domain/appointment.ts` — retired at step 1, not deferred** *(no ref — a prediction in arc42 §5.2,
+  never a logged finding)*. Under this slice's ADR a transition's legality is a database verdict, so a
+  module holding one allowlist whose only consumer is a SQL predicate relocates a literal. The residue —
+  the constraints denylist where the move's guard allowlists — goes to arc42 §11.
 
 ## In scope
 
-- The reschedule route, use case, candidate loop and `UPDATE`; the taxonomy contract test extended to
-  nine rows, `appointment-not-confirmed` and `route-not-found` landing together so the taxonomy
-  changes once.
-- `tests/integration/reschedule-self-overlap.test.ts` and
-  `tests/integration/reschedule-is-one-statement.test.ts`, which carries AC-2's audit trigger.
+- The reschedule route, use case, candidate loop and `UPDATE`; the taxonomy contract test extended to nine
+  rows, `appointment-not-confirmed` and `route-not-found` landing together so it changes once.
+- `tests/integration/reschedule-self-overlap.test.ts` and `reschedule-is-one-statement.test.ts`, which
+  carries AC-2's audit trigger.
 
 ## Out of scope
 
-- Moving to a different dealership, changing the service type, or reassigning to a named technician.
-  A move changes `startsAt`; anything else is a cancel plus a booking.
-- Rescheduling under contention — the next slice, where the concurrency scenarios live.
+- Moving to a different dealership, changing the service type, or reassigning to a named technician. A
+  move changes `startsAt`; anything else is a cancel plus a booking.
+- Rescheduling under contention — the next slice.
 
 ## Definition of done
 
-Beyond `CLAUDE.md` §10:
-
-- AC-2 is asserted by the audit trigger **and** the reviewer reads the generated SQL. Two independent
-  checks, because AC-2 is the criterion most easily satisfied by a test that passes for the wrong
-  reason, and *"the reviewer looked"* is not executable.
+Beyond `CLAUDE.md` §10: AC-2 is asserted by the audit trigger **and** the reviewer reads the generated
+SQL. Two independent checks, because AC-2 is the criterion most easily satisfied by a test that passes for
+the wrong reason, and *"the reviewer looked"* is not executable.

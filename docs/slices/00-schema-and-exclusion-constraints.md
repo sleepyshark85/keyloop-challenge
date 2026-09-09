@@ -11,15 +11,13 @@ loopbacks: 0
 
 ## Goal
 
-The database refuses to represent a double booking, and it does so with no application code in
-existence. Migrations create the schema: both exclusion constraints, and every composite foreign key
-that makes an invalid appointment unrepresentable — a technician not qualified for the service type,
-a bay belonging to another dealership, a vehicle not owned by the named customer. Proven by SQL
-alone.
+The database refuses to represent a double booking, with no application code in existence. Migrations
+create the schema: both exclusion constraints, and every composite foreign key that makes an invalid
+appointment unrepresentable — a technician not qualified for the service type, a bay belonging to another
+dealership, a vehicle not owned by the named customer. Proven by SQL alone.
 
-**This is the phase-4 pilot slice.** It runs the full loop against retro criteria registered in
-advance. It was chosen because it is small, its criteria are unambiguous, and it lands the single
-artifact the whole submission rests on.
+**This is the phase-4 pilot slice**, run against retro criteria registered in advance: small,
+unambiguous criteria, and the single artifact the whole submission rests on.
 
 ## Acceptance criteria
 
@@ -59,24 +57,23 @@ artifact the whole submission rests on.
 
 ## In scope
 
-- `0001_extensions.sql` (`btree_gist`), `0002_reference_data.sql`, `0003_appointment.sql` — exactly
-  the schema arc42 §8.1 states, as plain `.sql` run by `node-pg-migrate`.
+- `0001_extensions.sql` (`btree_gist`), `0002_reference_data.sql`, `0003_appointment.sql` — exactly the
+  schema arc42 §8.1 states, as plain `.sql` run by `node-pg-migrate`.
 - Both exclusion constraints, both carrying `WHERE (status <> 'cancelled')`.
-- Seed fixtures: one dealership with opening hours and an IANA zone, bays, technicians,
-  qualifications, service types with durations, customers, vehicles.
-- `tests/integration/exclusion-constraints.test.ts`. It asserts a database invariant, so it is the
+- Seed fixtures: one dealership with opening hours and an IANA zone, bays, technicians, qualifications,
+  service types with durations, customers, vehicles.
+- `tests/integration/exclusion-constraints.test.ts` — it asserts a database invariant, so it is the
   test-engineer's.
 
 ## Out of scope
 
-- Every line of TypeScript that is not a migration runner or a fixture loader. The point of this
-  slice is that the invariant holds with no application code to hold it.
-- Mapping a violation to `409` — that is the taxonomy slice. Here the assertion is on SQLSTATE.
+- Every line of TypeScript that is not a migration runner or a fixture loader. The point of this slice is
+  that the invariant holds with no application code to hold it.
+- Mapping a violation to `409` — the taxonomy slice. Here the assertion is on SQLSTATE.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
 - Migrations run forward from empty on a fresh Testcontainers instance in CI.
-- The phase-4 retro is written against the pre-registered criteria before the next slice starts. The
-  next gate decides whether the loop is tuned or proceeds as-is.
+- The phase-4 retro is written against the pre-registered criteria before the next slice starts.

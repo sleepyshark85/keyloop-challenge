@@ -1,31 +1,39 @@
 # Reader's guide
 
-This is the architecture documentation for the Keyloop service scheduler, following
-[arc42](https://arc42.org) (CC BY-SA). All twelve standard sections are retained; several are
-deliberately thin and say why. One section is added outside the standard twelve: **§13 AI
-Collaboration**.
+Architecture documentation for the Keyloop service scheduler, following [arc42](https://arc42.org)
+(CC BY-SA). All twelve standard sections are retained; several are deliberately thin and say why.
+**§13 AI Collaboration** is added outside the standard twelve.
 
-**If you are assessing this submission** — §1 goals, §4 solution strategy, §9 decisions,
-§11 risks and debt, §13 AI collaboration.
-**If you are implementing** — §5 building blocks, §8 cross-cutting concepts, §10 quality scenarios.
-**If you are operating it** — §7 deployment, §8 observability.
+## What the brief asks for, and where it is
+
+The assessment's Part 1 asks a System Design Document for six things:
+
+| The brief asks for | It is in |
+|---|---|
+| An architecture diagram | §5.1 (containers and modules), §6.1 (the concurrent-booking sequence) |
+| A brief description of each component's role | §5.1, §5.2 |
+| An explanation of the data flow | §6.1–§6.6 |
+| A list of chosen technologies with justifications | §4.2, and §2.2 for what was imposed rather than chosen |
+| A strategy for observability | §8.4 — spans, metrics, logs |
+| How GenAI assisted the design | §13, and `README.md` for the collaboration narrative |
+
+Part 2's *"scalability, performance, reliability, maintainability, observability"* are §1.2's ranked
+quality goals, made executable as §10's scenarios and costed in §11.
+
+**The one thing to read if you read one thing: §4.1.** Double-booking is prevented by a PostgreSQL
+exclusion constraint rather than by application code. §8.2 is the constraint itself, §6.1 the race it
+decides.
 
 ## How to read the quality scenarios
 
-§10 numbers each scenario `QS-n`, and every one names the test that enforces it. The chain
-
-```
-§10 quality scenario → slice acceptance criterion → test name → CI result
-```
-
-is walkable in both directions, and CI fails if a `QS-*` names a test that does not exist. A quality
+§10 numbers each scenario `QS-n` and names the test that enforces it, so
+`§10 scenario → slice acceptance criterion → test name → CI result` is walkable both ways. A quality
 attribute that cannot be traced to a test is aspiration.
 
 ## As-designed versus as-built
 
-This document was written as-designed at the architecture gate and corrected to as-built at each
-slice merge. The difference is preserved on purpose: where the plan was wrong is worth more than a
-plan that reads as though it never was. §11 and §13 discuss the material deltas.
+Written as-designed at the architecture gate and corrected to as-built at each slice merge. The
+difference is preserved on purpose; §11 and §13 discuss the material deltas.
 
-*Sections are maintained as separate files under `docs/arc42/`; `docs/system-design.md` is generated
-from them by `npm run docs:build`. Edit the sections, never the generated file.*
+*Sections are separate files under `docs/arc42/`; `docs/system-design.md` is generated from them by
+`npm run docs:build`. Edit the sections, never the generated file.*

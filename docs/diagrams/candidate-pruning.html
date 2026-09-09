@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Candidate pruning · Elimination</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --color-paper:#f5f5f5;--color-ink:#2d3142;--color-muted:#4f5d75;--color-accent:#eb6c36;
+      --font-sans:'Geist',system-ui,sans-serif;--font-serif:'Instrument Serif',serif;
+      --font-mono:'Geist Mono',ui-monospace,monospace}
+    body{font-family:var(--font-sans);background:var(--color-paper);color:var(--color-ink);
+      min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3rem 2rem}
+    .frame{max-width:1100px;width:100%}
+    .eyebrow{font-family:var(--font-mono);font-size:.66rem;font-weight:500;letter-spacing:.18em;
+      text-transform:uppercase;color:var(--color-muted);margin-bottom:.5rem}
+    h1{font-family:var(--font-serif);font-size:clamp(1.5rem,2.4vw + .75rem,2rem);font-weight:400;
+      letter-spacing:-.02em;line-height:1.15;margin-bottom:.375rem}
+    .subtitle{font-size:.8125rem;color:var(--color-muted);margin-bottom:1.5rem}
+    svg{width:100%;min-width:900px;display:block}
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Elimination · arc42 §6.2</p>
+    <h1>A booking that retries, and succeeds</h1>
+    <p class="subtitle">Two seeded-shuffled lists, paired at their heads. Each database verdict removes a whole resource from one list and leaves the other alone — which is what bounds the loop.</p>
+
+    <svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="candidate-pruning-title candidate-pruning-desc">
+      <title id="candidate-pruning-title">Candidate pruning across three attempts</title>
+      <desc id="candidate-pruning-desc">Three booking attempts shown as shrinking candidate lists. Bays and technicians are shuffled into two independent lists and each attempt writes the pair formed by the two heads; an exclusion violation names one resource, whose entire entry is removed from its own list while the other list is untouched, so the third attempt succeeds. A side panel shows the conflict arm, in which classification, the conflict counter, the prune and both refusal exits — an emptied list and the sixteen-attempt cap — all live.</desc>
+
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+        <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- ================================ TRANSITIONS ================================ -->
+      <!-- Drawn before the panels so the panels sit on top of the strokes. -->
+
+      <line x1="124" y1="144" x2="124" y2="196" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <rect x="136" y="156" width="248" height="28" rx="2" fill="#f5f5f5"/>
+      <text x="140" y="166" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.04em">23P01 · constraint = no_bay_overlap</text>
+      <text x="140" y="180" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.04em">prune bay B1 — every pair behind it goes too</text>
+
+      <line x1="124" y1="296" x2="124" y2="348" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <rect x="136" y="308" width="264" height="28" rx="2" fill="#f5f5f5"/>
+      <text x="140" y="318" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.04em">23P01 · constraint = no_technician_overlap</text>
+      <text x="140" y="332" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.04em">prune technician T1 — the bay list is untouched</text>
+
+      <line x1="124" y1="448" x2="124" y2="500" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="136" y="466" width="168" height="14" rx="2" fill="#f5f5f5"/>
+      <text x="140" y="476" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.04em">no 23P01 — the row is in</text>
+
+      <!-- ================================= ATTEMPT 1 ================================= -->
+      <rect x="64" y="48" width="600" height="96" rx="6" fill="#f5f5f5"/>
+      <rect x="64" y="48" width="600" height="96" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="72" y="58" width="64" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="104" y="67" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ATTEMPT 1</text>
+      <text x="652" y="67" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.04em">span appointment.insert</text>
+
+      <text x="76" y="98" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">bays</text>
+      <rect x="104" y="80" width="48" height="24" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="128" y="96" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B1</text>
+      <rect x="164" y="80" width="48" height="24" rx="4" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <text x="188" y="96" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B2</text>
+      <rect x="224" y="80" width="48" height="24" rx="4" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <text x="248" y="96" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B3</text>
+      <text x="292" y="98" fill="#4f5d75" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">×</text>
+      <text x="312" y="98" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">techs</text>
+      <rect x="344" y="80" width="48" height="24" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="368" y="96" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">T1</text>
+      <rect x="404" y="80" width="48" height="24" rx="4" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <text x="428" y="96" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">T2</text>
+      <text x="652" y="98" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">nextCandidate → bays[0] × techs[0]</text>
+
+      <text x="76" y="128" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">BEGIN · lock (1,B1),(2,T1) · INSERT · COMMIT — its own transaction</text>
+
+      <!-- ================================= ATTEMPT 2 ================================= -->
+      <rect x="64" y="200" width="600" height="96" rx="6" fill="#f5f5f5"/>
+      <rect x="64" y="200" width="600" height="96" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="72" y="210" width="64" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="104" y="219" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ATTEMPT 2</text>
+      <text x="652" y="219" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.04em">span appointment.insert</text>
+
+      <text x="76" y="250" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">bays</text>
+      <rect x="104" y="232" width="48" height="24" rx="4" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="128" y="248" fill="#9aa1b1" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B1</text>
+      <line x1="112" y1="244" x2="144" y2="244" stroke="#9aa1b1" stroke-width="1"/>
+      <rect x="164" y="232" width="48" height="24" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="188" y="248" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B2</text>
+      <rect x="224" y="232" width="48" height="24" rx="4" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <text x="248" y="248" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B3</text>
+      <text x="292" y="250" fill="#4f5d75" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">×</text>
+      <text x="312" y="250" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">techs</text>
+      <rect x="344" y="232" width="48" height="24" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="368" y="248" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">T1</text>
+      <rect x="404" y="232" width="48" height="24" rx="4" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <text x="428" y="248" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">T2</text>
+      <text x="652" y="250" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">nextCandidate → B2 × T1</text>
+
+      <text x="76" y="280" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">a new transaction — none of them encloses the loop</text>
+
+      <!-- ================================= ATTEMPT 3 ================================= -->
+      <rect x="64" y="352" width="600" height="96" rx="6" fill="#f5f5f5"/>
+      <rect x="64" y="352" width="600" height="96" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="72" y="362" width="64" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="104" y="371" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ATTEMPT 3</text>
+      <text x="652" y="371" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.04em">span appointment.insert</text>
+
+      <text x="76" y="402" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">bays</text>
+      <rect x="104" y="384" width="48" height="24" rx="4" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="128" y="400" fill="#9aa1b1" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B1</text>
+      <line x1="112" y1="396" x2="144" y2="396" stroke="#9aa1b1" stroke-width="1"/>
+      <rect x="164" y="384" width="48" height="24" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="188" y="400" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B2</text>
+      <rect x="224" y="384" width="48" height="24" rx="4" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+      <text x="248" y="400" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">B3</text>
+      <text x="292" y="402" fill="#4f5d75" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">×</text>
+      <text x="312" y="402" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">techs</text>
+      <rect x="344" y="384" width="48" height="24" rx="4" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="368" y="400" fill="#9aa1b1" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">T1</text>
+      <line x1="352" y1="396" x2="384" y2="396" stroke="#9aa1b1" stroke-width="1"/>
+      <rect x="404" y="384" width="48" height="24" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="428" y="400" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">T2</text>
+      <text x="652" y="402" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">nextCandidate → B2 × T2</text>
+
+      <text x="76" y="432" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">the survivors keep the seed's order — a recorded seed replays this run</text>
+
+      <!-- ================================== OUTCOME ================================== -->
+      <rect x="64" y="504" width="280" height="48" rx="6" fill="#f5f5f5"/>
+      <rect x="64" y="504" width="280" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="204" y="526" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">201 Created</text>
+      <text x="204" y="541" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">bay B2 · technician T2</text>
+
+      <!-- ============================= THE ARM, ONCE ============================= -->
+      <rect x="712" y="200" width="224" height="248" rx="6" fill="#f5f5f5"/>
+      <rect x="712" y="200" width="224" height="248" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+      <rect x="720" y="210" width="32" height="12" rx="2" fill="transparent" stroke="rgba(79,93,117,0.50)" stroke-width="0.8"/>
+      <text x="736" y="219" fill="#4f5d75" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ARM</text>
+      <text x="824" y="244" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">The 23P01 arm</text>
+      <text x="824" y="260" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">every conflict, once</text>
+      <line x1="728" y1="272" x2="920" y2="272" stroke="rgba(45,49,66,0.15)" stroke-width="0.8"/>
+      <text x="728" y="292" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">classify → resource</text>
+      <text x="728" y="308" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">booking_conflicts_total++</text>
+      <text x="728" y="324" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">prune(order, resource, id)</text>
+      <text x="728" y="340" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">— the whole bay or technician</text>
+      <line x1="728" y1="356" x2="920" y2="356" stroke="rgba(45,49,66,0.15)" stroke-width="0.8"/>
+      <text x="728" y="376" fill="#2d3142" font-size="8" font-family="'Geist Mono', monospace">[list emptied]  → 409 exhausted</text>
+      <text x="728" y="396" fill="#2d3142" font-size="8" font-family="'Geist Mono', monospace">[attempts ≥ 16] → 409 capped</text>
+      <text x="728" y="416" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">[else] → the next attempt</text>
+      <text x="728" y="436" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace">no refusal lives outside it</text>
+
+      <!-- ============================== EDITORIAL ASIDE ============================== -->
+      <text x="64" y="600" fill="#4f5d75" font-size="14" font-style="italic" font-family="'Instrument Serif', serif">A conflict removes a resource, not a pair — which is why the bound is |B| + |T| - 1 rather than |B| × |T|.</text>
+
+      <!-- ================================== LEGEND ================================== -->
+      <line x1="64" y1="632" x2="936" y2="632" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="64" y="652" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+
+      <rect x="140" y="640" width="32" height="16" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="180" y="652" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Head — what the next attempt writes</text>
+
+      <rect x="400" y="640" width="32" height="16" rx="4" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="406" y1="648" x2="426" y2="648" stroke="#9aa1b1" stroke-width="1"/>
+      <text x="440" y="652" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Pruned — the whole resource</text>
+
+      <line x1="700" y1="648" x2="732" y2="648" stroke="#eb6c36" stroke-width="1.4"/>
+      <text x="740" y="652" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">23P01 — the only thing that prunes</text>
+    </svg>
+  </div>
+</body>
+</html>

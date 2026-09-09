@@ -15,18 +15,17 @@ reopened_at: 2026-09-08     # human ruling A-09-4; history below, not tidied awa
 reopened_by: human
 ---
 
-> **A tombstone for four days, reopened 2026-09-08 by human ruling `A-09-4`.** Both decisions stay
-> in the record; the history is at the foot of this file.
+> **A tombstone for four days, reopened 2026-09-08 by human ruling `A-09-4`.** Both decisions stay in the
+> record; the history is at the foot of this file.
 
 ## Goal
 
-The five operations already have a committed OpenAPI document and two cURL scripts, both merged with
-the previous slice. What is missing is the half that can fail.
-
-Every error response must be declared as `application/problem+json` on the operations that can
-produce it — today all 25 declare `application/json` while the service has sent `problem+json` since
-the taxonomy landed. No operation may accept a caller-supplied appointment id. And the harness must
-**check** the statuses it prints rather than printing whatever it got.
+The five operations already have a committed OpenAPI document and two cURL scripts, both merged with the
+previous slice. What is missing is the half that can fail. Every error response must be declared as
+`application/problem+json` on the operations that can produce it — today all 25 declare
+`application/json` while the service has sent `problem+json` since the taxonomy landed. No operation may
+accept a caller-supplied appointment id. And the harness must **check** the statuses it prints rather
+than printing whatever it got.
 
 ## Acceptance criteria
 
@@ -57,72 +56,65 @@ the taxonomy landed. No operation may accept a caller-supplied appointment id. A
 
 ## What the previous slice keeps, and why it is not here
 
-Three contract criteria are green, asserted by tests that can fail, and **stay where they are**: that
-the committed document matches the one the builder emits byte for byte; that it is a valid OpenAPI
-3.1 description over all five operations; and that `GET /availability` documents that a free answer
-is not a reservation and is true only of the interval queried.
-
-Their subject merges there and this slice amends it, so they are standing guards it must keep green —
-the advisory-disclosure one guards the exact string AC-7 rewrites. Moving a drift guard into an
-unstarted slice would leave the committed document unpinned for however long that slice takes.
+Three contract criteria are green, asserted by tests that can fail, and **stay where they are**: that the
+committed document matches what the builder emits byte for byte; that it is a valid OpenAPI 3.1
+description over all five operations; and that `GET /availability` documents that a free answer is not a
+reservation and is true only of the interval queried. Their subject merges there and this slice amends
+it, so they are standing guards it must keep green — and moving a drift guard into an unstarted slice
+would leave the committed document unpinned for however long that slice takes.
 
 ## Inherited scope
 
-- **`A-06-2` — nothing asserts that the id generator is the only place an appointment id is minted**,
-  and a `404` meaning *never existed* rests on it: an id must be unreachable before it exists.
-  Deferred first to the slice that emits the document, then **re-deferred here**, because that slice
-  emitted the document and never built the assertion. It pays both ways — AC-1's per-operation walk
-  is the same traversal, and it runs over every operation rather than the files someone grepped.
-  Discharged as **AC-3**.
-- **`R-09-1`** — the finding that carried the previous slice's design-defect ruling: media types, and
-  a taxonomy with no operation dimension. Its telemetry half was built there; this is the half that
-  was not. **AC-1, AC-2.**
-- **`R-09-2`** — the id-minting assertion rides that ruling rather than being softened into an
-  assumption. **AC-3.**
-- **`R-09-7`** — the harness must bind each step to the status that operation must answer, with the
-  ruling that `type` is an error-response word: a `200` has none. **AC-4.**
+- **`A-06-2` — nothing asserts that the id generator is the only place an appointment id is minted**, and
+  a `404` meaning *never existed* rests on it: an id must be unreachable before it exists. Deferred first
+  to the slice that emits the document, then **re-deferred here**, because that slice emitted the document
+  and never built the assertion. AC-1's per-operation walk is the same traversal, over every operation
+  rather than the files someone grepped. Discharged as **AC-3**.
+- **`R-09-1`** — the finding that carried the previous slice's design-defect ruling: media types, and a
+  taxonomy with no operation dimension. Its telemetry half was built there; this is the half that was not.
+  **AC-1, AC-2.**
+- **`R-09-2`** — the id-minting assertion rides that ruling rather than being softened into an assumption.
+  **AC-3.**
+- **`R-09-7`** — the harness must bind each step to the status that operation must answer, with the ruling
+  that `type` is an error-response word: a `200` has none. **AC-4.**
 - **`R-09-12`** — GNU-only `date -u -d` in the harness, and no seed script. **AC-6.**
 - **`R-09-13`** — a TypeBox implementation note published as contract prose. **AC-7.**
 
 ## In scope
 
-- `src/http/routes/*.ts` response schemas, the taxonomy's operation matrix behind them, and the
-  re-emitted `docs/api/openapi.json`.
-- `tests/contract/openapi-document.test.ts` — AC-1 by equality, AC-3's negative walk.
-- `harness/`, its `package.json` scripts, and the README's run section.
+- `src/http/routes/*.ts` response schemas, the taxonomy's operation matrix behind them, the re-emitted
+  `docs/api/openapi.json`, `tests/contract/openapi-document.test.ts`, `harness/` and the README run
+  section.
 
 ## Out of scope
 
-- Anything the document describes changing shape: this slice makes the description true, moving no
-  status, `type` or body.
-- A `503` row for a saturated pool: a new row in a closed taxonomy, which QS-11 requires reached end
-  to end — so a booking-path slice, not this one.
+- Anything the document describes changing shape: this slice makes the description true, moving no status,
+  `type` or body.
+- A `503` row for a saturated pool: a new row in a closed taxonomy, which QS-11 requires reached end to
+  end — so a booking-path slice, not this one.
 - A client SDK, a UI or a Postman collection.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
-- **A red commit of its own.** AC-1's assertion is green today because it reads the `type` strings
-  and never the media type; strengthening it to compare declared content by equality is what turns it
-  red, and the standing invariant wants that observed rather than argued.
+- **A red commit of its own.** AC-1's assertion is green today because it reads the `type` strings and
+  never the media type; strengthening it to compare declared content by equality is what turns it red.
 - The three standing contract guards still green — the regression this slice is most able to cause.
 - The harness run by hand on a clean checkout, from the README, before it is claimed.
 
 ## History — folded at the phase-4 gate, reopened by human ruling
 
-**Folded 2026-09-04.** The measured cost of a slice missed the budget by more than an order of
-magnitude, and that criterion's own wording offers two remedies; the human cut slices — eleven to
-eight — and declined to cut agents. All five criteria moved into the close-out slice.
+**Folded 2026-09-04.** The measured cost of a slice missed the budget by more than an order of magnitude,
+and the human cut slices — eleven to eight — rather than agents. All five criteria moved into the
+close-out slice.
 
-**Reopened 2026-09-08.** That slice's step-5 review raised three blocking findings and **all three
-sat on the contract half** — the evidence that the fold was wrong, a half separable after the fact
-having been separable all along. The third option, merging it with those criteria recorded as debt,
-was declined: it ships the assessment without one of the brief's named deliverables.
+**Reopened 2026-09-08.** That slice's step-5 review raised three blocking findings and **all three sat on
+the contract half** — the evidence that the fold was wrong, a half separable after the fact having been
+separable all along. The third option, merging it with those criteria recorded as debt, was declined: it
+ships the assessment without one of the brief's named deliverables.
 
-**`folded_into` is gone from the front matter and nothing else is.** That field is a live redirect
-rather than a historical fact — the deferral tooling follows it, so leaving it in place would resolve
-the id-minting obligation back to the close-out slice and silently undo this split. `folded_at` and
-`folded_by` stay, because they record when and by whom. Deleting the evidence of the first decision
-to make the second look tidy is the quiet change the rules on source of truth exist to prevent —
-this file's own sentence as a tombstone, now binding the edit that stopped it being one.
+**`folded_into` is gone from the front matter and nothing else is.** That field is a live redirect rather
+than a historical fact — the deferral tooling follows it, so leaving it would resolve the id-minting
+obligation back to the close-out slice and silently undo this split. `folded_at` and `folded_by` stay,
+because they record when and by whom.

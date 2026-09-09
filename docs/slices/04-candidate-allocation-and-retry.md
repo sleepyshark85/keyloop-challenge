@@ -36,73 +36,42 @@ shuffle, and a failed attempt prunes by the constraint that actually fired.
 
 ## In scope
 
-- The retry loop in `src/application`, the seeded shuffle, and pruning on the constraint name the
-  driver reports — available only because the query layer preserves it.
+- The retry loop in `src/application`, the seeded shuffle, and pruning on the constraint name the driver
+  reports — available only because the query layer preserves it.
 - `tests/concurrency/no-spurious-refusal.test.ts`.
 
 ## Out of scope
 
-- Load balancing across bays. It was rejected because it degenerates to sorted order under burst,
-  which is the quadratic contention the retry decision named.
+- Load balancing across bays: it degenerates to sorted order under burst, which is the quadratic
+  contention the retry decision named.
 - Changing what the client is told on refusal — the taxonomy is already fixed.
 
 ## Definition of done
 
 Beyond `CLAUDE.md` §10:
 
-- The pruning rule is the architect's own addition and was flagged at the phase-2 gate as
-  theoretically over-eager if a blocking appointment is cancelled mid-loop. The reviewer checks that
-  case explicitly; if it is real, it is a deferred improvement, not a defect.
+- The pruning rule was flagged at the phase-2 gate as theoretically over-eager if a blocking appointment
+  is cancelled mid-loop. The reviewer checks that case explicitly; if it is real, it is a deferred
+  improvement, not a defect.
 
-## The concurrency fixture's two-attempt assertion is removed — ruled at step 4
+## Mid-slice rulings — both clarifications, no loopback
 
-Provisional until the gate; the constitution makes updating the slice file the remedy for a
-clarification, so the ruling lands here.
+Recorded here because the constitution makes updating the slice file the remedy for a clarification;
+the reasoning for each is in the event log, which `npm run slice:check 04` prints.
 
-**The defect.** The seeded shuffle removes the premise `no-technician-overlap.test.ts` states in its
-own header. With 24 bays and one technician, a loser conflicts on the **technician** at attempt 1 and
-refuses correctly unless it happened to draw the winner's bay — so the closing assertion that two
-distinct attempts occurred holds only about 56 % of the time. The implementer's measurement is
-confirmed.
-
-**Why a clarification and not a defect or a deferral.** It is not a design defect: the ordering
-decision, this design and the implementation are all correct, and nothing in this slice fails. Nor is
-it a deferred improvement, because that outcome merges as-is and this cannot — it is green in the
-merge run only 56 % of the time. The cost of merging it is nameable, and it is the standing invariant
-that every slice begins with an observed failing test: a suite that fails ~44 % of the time
-independently of the change under test makes both *red observed in CI* and its green counterpart
-non-evidential for every slice after it. No loopback consumed; resume from step 3. A step-4 test
-defect was ruled the same way once before — but that one failed loudly, and this one fails in the
-passing direction, which is strictly worse.
-
-**The obligation, which is the test-engineer's to write.** The two-attempt claim is unrepairable in
-this fixture and must be **removed, not substituted**. What must still hold, and does under every
-permutation: the 1/19 split, at least 19 technician conflicts, and a refusal naming the technician as
-the contended resource. The *loop actually looped* obligation needs no new home — it is deterministic
-in the acceptance test, where both bays are blocked and the attempt sequence is fixed, and gated in
-the concurrency test's own maximum-attempt assertion. The header prose goes with the assertion.
-Verified by repeated runs, not by one green.
-
-**Blast radius: one file breaks.** Every other assertion is permutation-independent. The bay mirror
-is safe *because* its scarce resource is the singleton list; the taxonomy test's two refusal cases
-assert terminal state only; the two concurrency files were authored against the shuffle. Four files
-carry stale premise **prose** with sound assertions, and they are fixed this slice anyway: a comment
-that is false is the more dangerous half.
-
-## The arc42 declaration is amended to §7.3 and §13 — ruled at step 5
-
-Both sections moved on this branch and neither was declared. §7.3 gained the environment-variable
-table and the sentence saying it is the deployment contract, which is mine. §13 is scribe-owned
-prose, and it is **declared rather than exempted**: the declaration governs the branch, not the
-author, and nobody silences a guard by writing a name into it.
-
-Ruled a clarification. The content of both edits is correct and only the declaration was missing, so
-no acceptance criterion, quality scenario or standing invariant fails either way. No loopback.
-
-**The derivation the finding asks for already existed and had already fired.** `npm run slice:check
-04` had been printing both undeclared files since the commit that made the second edit — 98 minutes
-before step 5 — because it is branch-selected, so a commit subject cannot hide a mid-slice edit. The
-reviewer re-derived it by reading the diff and found one of the two; the tool had both. **What is
-missing is the reading, not the derivation**: the CI evidence record carries job outcomes only, so no
-artifact carried this verdict and nothing failed loudly. Carrying the check grid into that record is
-a change under `tools/`, which is not the architect's — the fourth slice running.
+- **`I-04-10`, step 4 — the concurrency fixture's two-attempt assertion is removed, not substituted.**
+  The seeded shuffle removes the premise `no-technician-overlap.test.ts` states in its own header: with
+  24 bays and one technician a loser conflicts on the **technician** at attempt 1 and refuses correctly
+  unless it drew the winner's bay, so the closing two-attempt assertion holds about 56 % of the time. Not
+  a design defect — ordering, design and implementation are all correct — and not a deferred improvement,
+  because that outcome merges as-is and this is green in the merge run only 56 % of the time. The cost of
+  merging it is nameable and it is the standing invariant that every slice begins with an observed
+  failing test. What still holds under every permutation, and stays: the 1/19 split, at least 19
+  technician conflicts, and a refusal naming the technician as the contended resource. Blast radius one
+  file; four others carry stale premise **prose** with sound assertions, fixed this slice.
+- **`R-04-1`, step 5 — the arc42 declaration is amended to §7.3 and §13.** Both sections moved on this
+  branch and neither was declared; the content of both edits is correct, so nothing fails either way. §13
+  is scribe-owned prose and is **declared rather than exempted**: the declaration governs the branch, not
+  the author. `npm run slice:check 04` had been printing both undeclared files for 98 minutes before step
+  5 — what was missing is the reading, not the derivation, the CI evidence record carrying job outcomes
+  only.

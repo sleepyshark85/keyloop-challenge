@@ -708,3 +708,98 @@ describe('slice 09 / QS-10 — otel-sdk-only-in-platform fires on the SDK outsid
     ).toEqual([]);
   });
 });
+
+// ═══════════════════════════════════════════════════════ slice 14 — otel-logs-api-only-in-platform's plant ══
+
+/**
+ * `docs/slices/14-design.md` §3: `@opentelemetry/api-logs` is a facade and would inherit
+ * `@opentelemetry/api`'s freedom by default (slice 09 decision 1) — ruled otherwise. §8.4
+ * wants log lines created exactly ONE way, in the bridge, so a module emitting a LogRecord
+ * directly would put a line in Loki with no stdout twin. New rule, `src/platform` ONLY —
+ * and unlike `otel-sdk-only-in-platform`, `src/main.ts` is NOT a second permitted home: the
+ * design's own words are "not main.ts, which has no need". "A new forbidden rule arrives
+ * with its plant or it does not arrive" (decision 1, slice 09) applies here too.
+ *
+ * Own, self-contained fixture, for the same reason slice 09's block is separate from
+ * `VIOLATING_SOURCES`: that fixture's "exactly one violation per planted file" assertion is
+ * a closed inventory over the four founding rules, and a fifth and sixth rule's plants
+ * belong beside their own decisions, not folded into a count `AC-4`'s text does not name.
+ *
+ * The rule does not exist in `.dependency-cruiser.js` yet — it is the implementer's to add
+ * (`docs/slices/14-otlp-logs-and-service-identity.md` §4 ownership table). Every case below
+ * is RED for the reason the founding rules once were: the ruleset has no rule of this name to
+ * fire, so "found 0" is what the assertion reports rather than a crash.
+ */
+describe('slice 14 / QS-10 — otel-logs-api-only-in-platform fires on @opentelemetry/api-logs outside platform, INCLUDING main.ts', () => {
+  const OTEL_LOGS_SOURCES: Record<string, string> = {
+    'src/domain/thing.ts': 'export interface Thing { readonly id: string }\n',
+    // `cruise()` invokes `depcruise src tests`; a `tests/` directory must exist even though
+    // this fixture plants no `outside-in-tests-do-not-import-src` case of its own.
+    'tests/acceptance/placeholder.test.ts': 'export const placeholder = true;\n',
+    // legal: the facade, confined to its one permitted home.
+    'src/platform/otelLogStream.ts':
+      "import { logs } from '@opentelemetry/api-logs';\nexport const logger = logs.getLogger('probe');\n",
+    // illegal: reached from application or persistence, same shape as the SDK's own rule.
+    'src/application/bad-otel-logs.ts':
+      "import { logs } from '@opentelemetry/api-logs';\nexport const leaked = logs.getLogger('probe');\n",
+    'src/persistence/bad-otel-logs.ts':
+      "import { logs } from '@opentelemetry/api-logs';\nexport const leakedToo = logs.getLogger('probe');\n",
+    // illegal, and the point of departure from otel-sdk-only-in-platform: main.ts has no
+    // need for the logs facade (it starts and shuts down the SDK; it does not emit a line),
+    // so it is not a second permitted home the way it is for the SDK itself.
+    'src/main.ts':
+      "import { logs } from '@opentelemetry/api-logs';\nexport const bootLogger = (): unknown => logs.getLogger('probe');\n",
+  };
+
+  function stubOtelLogsPackage(root: string): void {
+    stubPackage(
+      root,
+      '@opentelemetry/api-logs',
+      'export declare const logs: { getLogger(name: string): unknown };\n',
+    );
+  }
+
+  let result: CruiseResult;
+  let planted: string[];
+
+  beforeAll(() => {
+    const root = newFixture('otel-logs-confinement');
+    stubOtelLogsPackage(root);
+    planted = plant(root, OTEL_LOGS_SOURCES);
+    ({ result } = cruise(root));
+  });
+
+  it('cruised the fixture: no environment issues, and every planted file was analysed', () => {
+    guardTheCruiseHappened(result, planted);
+  });
+
+  it.each([
+    ['src/application/bad-otel-logs.ts', 'node_modules/@opentelemetry/api-logs'],
+    ['src/persistence/bad-otel-logs.ts', 'node_modules/@opentelemetry/api-logs'],
+    ['src/main.ts', 'node_modules/@opentelemetry/api-logs'],
+  ])('reports otel-logs-api-only-in-platform on %s -> %s', (from, to) => {
+    guardTheCruiseHappened(result, planted);
+    const matching = result.summary.violations.filter(
+      (violation) => violation.rule.name === 'otel-logs-api-only-in-platform' && violation.from === from,
+    );
+    expect(
+      matching.map((v) => `${v.rule.name} ${v.from} -> ${v.to}`),
+      `expected otel-logs-api-only-in-platform to fire on ${from}; all violations reported were ` +
+        JSON.stringify(result.summary.violations.map((v) => `${v.rule.name} ${v.from} -> ${v.to}`), null, 2),
+    ).toHaveLength(1);
+    expect(matching[0]?.to).toContain(to);
+  });
+
+  it('does NOT fire on src/platform/otelLogStream.ts — the facade\'s one permitted home', () => {
+    guardTheCruiseHappened(result, planted);
+    const matching = result.summary.violations.filter(
+      (violation) =>
+        violation.rule.name === 'otel-logs-api-only-in-platform' &&
+        violation.from === 'src/platform/otelLogStream.ts',
+    );
+    expect(
+      matching,
+      'src/platform/otelLogStream.ts is the facade\'s one permitted home and must not be flagged',
+    ).toEqual([]);
+  });
+});
