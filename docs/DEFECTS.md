@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **374** |
-| Severity | 14 blocking · 181 major · 179 minor |
-| Verdicts | 20 narrowed · 129 accepted · 3 escalated · 29 deferred · 3 rejected |
-| Raised by | architect 80 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
+| Findings recorded | **376** |
+| Severity | 14 blocking · 181 major · 181 minor |
+| Verdicts | 20 narrowed · 130 accepted · 3 escalated · 30 deferred · 3 rejected |
+| Raised by | architect 82 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
 | Awaiting a ruling | **190** |
-| Mean escape distance | 1.46 step(s) |
+| Mean escape distance | 1.45 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2564,6 +2564,29 @@ rather than narrated.*
 
 - *scenario:* ASKED TO POINT THE README AT THE GENERATED TEST REPORT, THE SCRIBE WAS ALSO TOLD TO REPORT ANYTHING ELSE STALE IN THE SAME PARAGRAPH — AND FOUND ONE NOBODY HAD NAMED. FIRST, ALREADY KNOWN: the section opened npm test RUNS THE TWO VITEST PROJECTS while the table two lines below said ALL THREE PROJECTS MERGED — the paragraph contradicted itself, stale since slice 09 added the perf project. Corrected to three, with one clause on WHY perf exists, which is T-09-3's finding: a budget measured beside the twenty-racer concurrency suite is measuring the runner rather than the service. SECOND, ALREADY KNOWN: a hand-typed LAST LOCAL RUN 829 TESTS 59 FILES ALL PASSING, correct that day and wrong on the next change — the A-04-14 and O-61 shape, six hand-copied figures wrong within two hours. Replaced by a pointer to the generated report, with ONE snapshot figure LABELLED AS A SNAPSHOT AND PINNED TO A COMMIT rather than floating free. THIRD, AND THIS ONE WAS FOUND RATHER THAN GIVEN: the test:nodb row CREDITED THAT PROJECT WITH CONTRACT TESTS, and vitest.config.ts PUTS tests/contract IN THE db PROJECT — the scribe checked the config rather than trusting the table it was editing. So a reader running test:nodb expecting the contract suite would have got no contract coverage and no signal. THE PATTERN ACROSS ALL THREE IS ONE THING: prose about the tooling drifts from the tooling, and only reading the tooling catches it. docs:refs verifies that citations RESOLVE, never that a claim about a config is TRUE.
 - *file:* `README.md`
+
+</details>
+
+## Slice 14
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **A-14-1** | MINOR | 1 *(+0)* | architect | THE DESIGN ASSUMED grafana/otel-lgtm ACCEPTS OTLP/JSON LOGS ON 4318/v1/logs, AND NOTHING HAD TESTED IT | accepted |
+| **OQ-14-1** | MINOR | 1 *(+0)* | architect | THE BRIDGE DOES NOT CARRY pino's err SERIALISATION INTO exception.* ATTRIBUTES | deferred |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**A-14-1** — THE DESIGN ASSUMED grafana/otel-lgtm ACCEPTS OTLP/JSON LOGS ON 4318/v1/logs, AND NOTHING HAD TESTED IT
+
+- *scenario:* The design's log pipeline rests on the collector accepting the SAME OTLP/JSON encoding the trace and metric exporters already use. The architect recorded this as an assumption rather than a fact, and named the limit precisely: the test collector proves the wire, never Loki's ingestion. Left unclosed, the slice could have shipped a bridge that satisfies every acceptance criterion against the test collector and still puts nothing in Grafana, because no AC reads Loki.
+- *file:* `docs/slices/14-design.md`
+- *accepted* by orchestrator — CLOSED BY PROBE BEFORE STEP 2, NOT CARRIED INTO THE SLICE. The orchestrator posted a hand-built resourceLogs document to the RUNNING image at 127.0.0.1:4318/v1/logs and got 200 {"partialSuccess":{}}, then queried the record back out of Loki through Grafana's datasource proxy: it returned with trace_id, span_id, service_name, severity_text and severity_number PROMOTED TO STREAM LABELS. So the Tempo/Loki join arc42 8.4 claims works on the wire once a bridge exists. THE LIMIT OF THIS EVIDENCE, STATED: it is evidence about the IMAGE, not about src/. It closes the assumption the design named; it is not a substitute for any acceptance criterion, and none was relaxed on the strength of it.
+
+**OQ-14-1** — THE BRIDGE DOES NOT CARRY pino's err SERIALISATION INTO exception.* ATTRIBUTES
+
+- *scenario:* An error logged through pino arrives at the collector as a log record whose body and severity are right and whose exception detail is absent, so an operator reading Loki sees that an error happened and must go to stdout for the stack. The architect named this in the design as OUT OF SCOPE AS DESIGNED and, in the same sentence, as THE FIRST THING AN OPERATOR WILL ASK FOR.
+- *file:* `docs/slices/14-design.md`
+- *deferred* by orchestrator — DEFERRED, AND THE DEFERRAL IS THE DESIGN'S OWN, NOT A DISCOVERY. No acceptance criterion, QS or section 2 invariant names exception attributes; AC-6 constrains what a record MAY NOT carry rather than what it must. The slice file's Out of scope section records it as a DCR rather than a drive-by, which is where it stays. IT IS RECORDED HERE BECAUSE A FINDING WHOSE ONLY HOME IS A DOCUMENT CANNOT BE IN THE REGISTER AND HAS NO ESCAPE DISTANCE (O-39) - which is exactly what slice:check caught, at step 5, on this slice.
 
 </details>
 
