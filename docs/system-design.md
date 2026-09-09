@@ -57,7 +57,7 @@ difference is preserved on purpose; §11 and §13 discuss the material deltas.
 | **1** | [Introduction and goals](arc42/01-introduction-goals.md) | A service-appointment scheduler for automotive dealerships. |
 | **2** | [Architecture constraints](arc42/02-constraints.md) | A constraint is something **imposed** — by the brief, the human, the constitution or the environment. |
 | **3** | [Context and scope](arc42/03-context-scope.md) | The system sits alone: human actors, one persistent store, and **no neighbouring systems**. |
-| **4** | [Solution strategy](arc42/04-solution-strategy.md) | Read the headings below in order. |
+| **4** | [Solution strategy](arc42/04-solution-strategy.md) | §6.1 has the runtime sequence, §8.2 the DDL, and ADR-0036 the decision with the options it beat. |
 | **5** | [Building block view](arc42/05-building-blocks.md) | Why this decomposition beat the alternatives is ADR-0008; this is what it *is*. |
 | **6** | [Runtime view](arc42/06-runtime-view.md) | The data flow, in five scenarios. |
 | **7** | [Deployment view](arc42/07-deployment-view.md) | !Three pieces on one machine, and the one that is not in compose |
@@ -94,6 +94,7 @@ without taking anyone's word for it.
 - [**ADR-0030**](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) — A move locks the pair it leaves as well as the pair it takes *(accepted)*
 - [**ADR-0034**](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) — The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed *(accepted)*
 - [**ADR-0035**](adr/0035-one-conflict-counted-per-exclusion-violation.md) — Count one conflict per exclusion violation, not one per contended request *(proposed)*
+- [**ADR-0036**](adr/0036-overlap-is-unrepresentable-the-database-adjudicates.md) — Make overlap unrepresentable — every booking is adjudicated by the database, never by application code *(accepted)*
 
 ---
 

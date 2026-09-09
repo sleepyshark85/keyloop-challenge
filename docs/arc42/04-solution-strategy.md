@@ -8,8 +8,9 @@ adds the four technology choices Gate B reserved, plus one rejection belonging t
 
 ## 4.1 How a booking is made
 
-Read the headings below in order. §6.1 has the runtime sequence and §8.2 the DDL; neither is repeated
-here.
+§6.1 has the runtime sequence, §8.2 the DDL, and
+[ADR-0036](../adr/0036-overlap-is-unrepresentable-the-database-adjudicates.md) the decision with the
+options it beat.
 
 ### The problem
 
@@ -23,79 +24,55 @@ if (free) await createAppointment(bayId, interval);   // ← another request boo
 ```
 
 Two requests arriving at 09:00:00.000 both read *free*, both insert, and both customers are told bay 3 is
-theirs. The window between the read and the write is not a small window to be narrowed; it cannot be
-closed by any amount of care in application code, because the read's result stops being true the instant
-it is returned.
-
-### Rejected, and why
-
-- **Check-then-act itself.** Every mitigation that keeps the shape — a shorter window, a re-check, a
-  version column, a `SELECT … FOR UPDATE` over a row that does not yet exist — either fails under some
-  interleaving or is a lock in disguise.
-- **A lock as the correctness mechanism.** Its serious cousin: a per-dealership application lock, or
-  `SERIALIZABLE` isolation, under which check-then-act would genuinely be *correct*. Rejected on a
-  different and more interesting ground — a lock makes correctness depend on every present and future
-  write path remembering to take it. One missed call site — a repair script, a new endpoint, a well-meant
-  refactor — and the guarantee is silently gone, with nothing failing until two cars arrive for the same
-  ramp ([ADR-0004](../adr/0004-retry-across-remaining-candidates.md) Option D).
-- **A `BookingRepository` port.** Ports and adapters would offer an interface that *can* be implemented
-  in memory, and any in-memory implementation is a check-then-act booking. Offering the socket invites
-  the substitution §2.1 bans ([ADR-0008](../adr/0008-module-decomposition.md)).
+theirs. The window cannot be closed by care in application code: the read's result stops being true the
+instant it is returned.
 
 ### Chosen — overlap is made unrepresentable
 
 **The system does not check whether a resource is free before booking it. It attempts the booking and
-lets PostgreSQL refuse.** Two exclusion constraints (verbatim in §8.2) make a row overlapping an existing
+lets PostgreSQL refuse.** Two exclusion constraints (verbatim in §8.2) make a row overlapping a
 non-cancelled appointment on the same bay, or the same technician, an object the database will not store.
-Four consequences run through the whole design:
+Rejected: check-then-act itself; a per-dealership lock or `SERIALIZABLE`, under which it would be
+*correct*; a `UNIQUE` index; an overlap trigger; and a `BookingRepository` port, whose in-memory
+implementation would be one
+([ADR-0036](../adr/0036-overlap-is-unrepresentable-the-database-adjudicates.md),
+[ADR-0008](../adr/0008-module-decomposition.md)). Four consequences run through the whole design:
 
 - **Correctness is a property of the data, not of the code.** It holds for the API, for a migration, for
   a `psql` session, for a bug. There is no call site to forget.
 - **The write is the decision.** A booking exists if and only if PostgreSQL accepted the statement.
-- **Availability queries are advisory**, and the API says so out loud (§3.1, §8.6).
+- **Availability queries are advisory**, and the API says so (§3.1, §8.6).
 - **The failure mode is specific and catchable**: SQLSTATE `23P01` with the violated constraint named,
   which §8.6 maps to `409 Conflict` and §8.4 counts as `booking_conflicts_total{resource}`.
 
-### Determinate — two advisory locks, which decide nothing
+Each attempt takes `pg_advisory_xact_lock` over its bay and then its technician before the write. That
+buys a determinate *verdict* and decides nothing: unlocked, the losers deadlock, and a deadlock carries no
+constraint name to render as a `409`
+([ADR-0018](../adr/0018-lock-the-bay-and-the-technician-before-each-insert.md), measured both ways).
 
-Each attempt takes `pg_advisory_xact_lock` over its bay and then its technician before the write
-([ADR-0018](../adr/0018-lock-the-bay-and-the-technician-before-each-insert.md)). **This does not readmit
-the bullet above.** Without the locks, simultaneous inserters do not queue: `check_exclusion_constraint`
-inserts the index tuple and *then* scans, so each waits on the others' in-progress tuples and they cycle.
-The invariant was never in question; the *status* was — a deadlock carries no constraint, and so yields
-no verdict to render as `409`. The lock reads no table and decides nothing.
-
-That is measured **both ways**, in `tests/integration/exclusion-constraint-adjudicates.test.ts`: drop the
-lock and keep the constraints and exactly one row still survives, with 108 deadlocks; drop the
-constraints and *hold* the locks and twenty overlapping rows land one at a time, zero refusals.
-
-### On top — allocation and retry, which prevent a different failure
+### On top — retry, which prevents a different failure
 
 **The constraints prevent double-booking, completely and alone. Retry and candidate ordering prevent
 *spurious refusal*** — QS-3: with *M* free bays and *M* qualified technicians over one interval and *N*
 concurrent bookings, exactly `min(N, M)` are confirmed. Without retry the system would be correct and
 useless: no double-booking, and customers refused while bays stood empty. §10 files QS-3 under goal 1
-beside the constraints, so the proximity is right; the mechanisms are still two.
+beside the constraints, but the mechanisms are two.
 
 Candidates are ordered by a **seeded shuffle** so concurrent requests disagree about what to try first,
-and a `23P01` prunes the **whole resource** the violated constraint names rather than only the failed
-pair — which changes the attempt bound from bays × technicians to bays + technicians, and is what makes a
-cap of **16** meaningful ([ADR-0004](../adr/0004-retry-across-remaining-candidates.md),
-[ADR-0009](../adr/0009-candidate-ordering-and-attempt-cap.md)). A `409` therefore means the dealership
-was full rather than that the allocator guessed badly.
+and a `23P01` prunes the **whole resource** the violated constraint names, making a cap of **16**
+meaningful ([ADR-0004](../adr/0004-retry-across-remaining-candidates.md),
+[ADR-0009](../adr/0009-candidate-ordering-and-attempt-cap.md)). A `409` therefore means the dealership was
+full rather than that the allocator guessed badly.
 
 ### And requirement 2's other half
 
 *"A qualified Technician"* is a composite foreign key from `appointment (technician_id,
 service_type_id)` to `technician_qualification`, so qualification is adjudicated by the database too,
-never by the caller (§8.1).
-
-Two further decisions sit on top without moving any of this. A reschedule is one atomic `UPDATE` on the
-existing row, so a refused move leaves the original confirmed and never transiently releases its slot
-([ADR-0003](../adr/0003-cancellation-and-rescheduling-in-scope.md)). Opening hours are validated before
-any candidate is considered — decidable from the request alone, so it cannot reintroduce a window
-([ADR-0001](../adr/0001-validate-dealership-opening-hours.md), GC-1). Neither adds a second place where
-correctness lives.
+never by the caller (§8.1). Two decisions sit on top without moving any of this: a reschedule is one
+atomic `UPDATE` on the existing row, so a refused move never transiently releases its slot
+([ADR-0003](../adr/0003-cancellation-and-rescheduling-in-scope.md)); and opening hours, decidable from
+the request alone, are validated before any candidate and so reintroduce no window
+([ADR-0001](../adr/0001-validate-dealership-opening-hours.md), GC-1).
 
 ## 4.2 Technology decisions
 
