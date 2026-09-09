@@ -48,7 +48,7 @@ CREATE TABLE appointment (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────────────────
--- Reproduced VERBATIM from CLAUDE.md §2.1 and arc42 §8.2, unaltered. Paraphrasing the one
+-- Reproduced VERBATIM from arc42 §8.2, unaltered. Paraphrasing the one
 -- thing that must be exactly right is how it stops being exactly right.
 --
 -- EXCLUDE USING gist, not a UNIQUE index and not a trigger. A unique index forbids two rows

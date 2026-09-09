@@ -30,15 +30,7 @@ const free = await checkAvailability(...);
 if (free) await createAppointment(...);
 ```
 
-Overlap is made unrepresentable using PostgreSQL exclusion constraints:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS btree_gist;
-ALTER TABLE appointment ADD CONSTRAINT no_bay_overlap
-  EXCLUDE USING gist (bay_id WITH =, tstzrange(starts_at, ends_at) WITH &&)
-  WHERE (status <> 'cancelled');
--- and the equivalent on technician_id
-```
+Overlap is unrepresentable by exclusion constraints ([arc42 §8.2](docs/arc42/08-crosscutting-concepts.md)).
 
 The service layer attempts the insert and maps SQLSTATE `23P01` (exclusion_violation) to
 `409 Conflict`. Availability queries exist to give good UX, never to guarantee correctness.

@@ -9,8 +9,9 @@
 -- numbering and by NOTHING ELSE.
 --
 -- `IF NOT EXISTS` appears here and nowhere else in the corpus. Idempotence is the runner's
--- job — `pgmigrations` is the gate, and a second run applies nothing. This line is VERBATIM
--- from CLAUDE.md §2.1 and is not edited for consistency's sake.
+-- job — `pgmigrations` is the gate, and a second run applies nothing. It is here because the
+-- line was copied verbatim from CLAUDE.md §2.1, which carried the DDL until phase 6 moved it
+-- to arc42 §8.2; this is now the only copy, and it is not edited for consistency's sake.
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;      -- TC-3: gist over (uuid =, tstzrange &&)
 
