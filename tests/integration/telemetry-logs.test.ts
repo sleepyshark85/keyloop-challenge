@@ -57,6 +57,32 @@ import type { HttpAnswer, Scenario } from '../support/booking.js';
  * No import from `src/` — `outside-in-tests-do-not-import-src` covers `tests/integration/`
  * only for its DATABASE-INVARIANT tests, and this file asserts a PROCESS invariant instead,
  * exactly as `telemetry-booking.test.ts`'s own header explains for the same reason.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * DCR-14-1 (ruled (a), `docs/slices/14-design.md`) — HOW A RECORD IS MATCHED TO ITS LINE,
+ * REWORKED FOR AC-5 AND AC-6's ATTRIBUTE CHECK.
+ *
+ * The first version matched on `(traceId, spanId)` string equality alone, against a
+ * REQUEST-scoped stdout window. Two measured failures: `logger.ts`'s `mixin` omits both
+ * keys from a line when no span is active, so a record with `traceId=''` (e.g. the shutdown
+ * line) could never match anything by that key; and the window was sliced BEFORE
+ * `service.stop()`, so a shutdown-time line was never in it at all. `.find()` on span alone
+ * also let AC-5 pick the wrong one of three records sharing a span.
+ *
+ * `lineMatchesRecord` below is the ruling's fix, literally: correlate on the line's own
+ * IDENTITY — `body` against `msg`, plus every attribute the record itself carries checked
+ * against the same-named field on the line — and layer `(traceId, spanId)` on top as an
+ * ADDITIONAL constraint only where the record actually carries both (AC-4's own claim,
+ * preserved rather than dropped, never loosened to make matching easier). The stdout side
+ * used with it is the FULL process output (`service.logRecords()`, read after
+ * `service.stop()`), not a request-scoped slice, so an out-of-span line has a match
+ * available to be found at all.
+ *
+ * Constraint 3 of the ruling is load-bearing for how these are USED, not just how they are
+ * written: every caller below collects records `lineMatchesRecord` could NOT match and
+ * asserts that set `toEqual([])` — never filters them out before the assertion runs. A
+ * helper that quietly dropped what it could not match would delete the criterion it exists
+ * to prove, which is the exact failure mode DCR-14-1 names.
  */
 
 const TRACE_ID_HEX32 = /^[0-9a-f]{32}$/;
@@ -72,8 +98,31 @@ const PINO_TO_OTEL_SEVERITY: Readonly<Record<number, { readonly number: number; 
   60: { number: 21, text: 'FATAL' },
 };
 
-/** Fields that are structural on a pino line and never belong in an OTLP LogRecord's own `attributes`. */
-const PINO_STRUCTURAL_FIELDS = new Set(['level', 'time', 'pid', 'hostname', 'msg', 'trace_id', 'span_id', 'v', 'reqId']);
+/** DCR-14-1's correlation — see the header note. */
+function lineMatchesRecord(line: Record<string, unknown>, record: CollectedLogRecord): boolean {
+  if (line['msg'] !== record.body) return false;
+  for (const [key, value] of Object.entries(record.attributes)) {
+    if (line[key] !== value) return false;
+  }
+  if (record.traceId !== '' && record.spanId !== '') {
+    if (line['trace_id'] !== record.traceId || line['span_id'] !== record.spanId) return false;
+  }
+  return true;
+}
+
+function findCorrelatedLine(
+  record: CollectedLogRecord,
+  lines: readonly Record<string, unknown>[],
+): Record<string, unknown> | undefined {
+  return lines.find((line) => lineMatchesRecord(line, record));
+}
+
+function findCorrelatedRecord(
+  line: Record<string, unknown>,
+  records: readonly CollectedLogRecord[],
+): CollectedLogRecord | undefined {
+  return records.find((record) => lineMatchesRecord(line, record));
+}
 
 interface LogsRun {
   readonly answer: HttpAnswer;
@@ -125,11 +174,6 @@ function stdoutTraceSpanPairs(records: readonly Record<string, unknown>[]): Read
     }
   }
   return pairs;
-}
-
-/** Every stdout line sharing a record's exact `(traceId, spanId)` pair — see AC-6's attribute check. */
-function stdoutLinesFor(record: CollectedLogRecord, requestLogRecords: readonly Record<string, unknown>[]): readonly Record<string, unknown>[] {
-  return requestLogRecords.filter((r) => r['trace_id'] === record.traceId && r['span_id'] === record.spanId);
 }
 
 describe('slice 14 / AC-1 — no OTEL_SERVICE_NAME: every exported resource names the artifact, not unknown_service:node', () => {
@@ -379,19 +423,22 @@ describe('slice 14 / AC-3, AC-4, AC-6 — one booking, read off its exported log
     const records = run.collector.logRecords();
     // Same guard, same reason: vacuous over an empty array.
     expect(records.length, `no exported records exist to examine — this assertion would be vacuous.${where()}`).toBeGreaterThan(0);
-    const offending: { readonly record: CollectedLogRecord; readonly extraKeys: readonly string[] }[] = [];
-    for (const record of records) {
-      const correlatedLines = stdoutLinesFor(record, run.requestLogRecords);
-      const allowedKeys = new Set<string>();
-      for (const line of correlatedLines) {
-        for (const key of Object.keys(line)) if (!PINO_STRUCTURAL_FIELDS.has(key)) allowedKeys.add(key);
-      }
-      const extraKeys = Object.keys(record.attributes).filter((key) => !allowedKeys.has(key));
-      if (extraKeys.length > 0) offending.push({ record, extraKeys });
-    }
+
+    // DCR-14-1: the FULL process output, read after service.stop() — a line written at
+    // shutdown (no span active) is only findable in the whole output, never in a
+    // request-scoped slice taken before the process stopped.
+    const allLines = run.service.logRecords();
+    // DCR-14-1 constraint 3: a record `lineMatchesRecord` cannot match ANY line is a
+    // failure, not something this loop quietly drops before the assertion sees it — a
+    // record whose attributes disagree with every candidate line IS "an attribute the
+    // correlated line does not carry", by construction of the matcher.
+    const uncorrelated = records.filter((record) => findCorrelatedLine(record, allLines) === undefined);
     expect(
-      offending.map((o) => ({ traceId: o.record.traceId, spanId: o.record.spanId, extraKeys: o.extraKeys })),
-      `an exported record carried an attribute key the correlated stdout line(s) did not.${where()}`,
+      uncorrelated.map((r) => ({ traceId: r.traceId, spanId: r.spanId, body: r.body, attributes: r.attributes })),
+      `these exported records could not be correlated to ANY line in the process's stdout — either an ` +
+        `attribute names a field the line does not carry (or carries a different value for), or the ` +
+        `line simply is not in the output.\n  stdout (${String(allLines.length)} lines): ` +
+        `${JSON.stringify(allLines, null, 2)}${where()}`,
     ).toEqual([]);
   });
 });
@@ -449,21 +496,34 @@ describe('slice 14 / AC-5 — a request producing an error line: the exported se
     ).toBeGreaterThan(0);
   });
 
-  it("AC-5 — the correlated exported record's severityNumber/severityText match pino's level, not a hardcoded default", async () => {
+  it("AC-5 — EVERY correlated exported record's severityNumber/severityText match pino's level, not a hardcoded default", async () => {
     if (run === undefined) return;
     const atOrAboveWarn = run.requestLogRecords.filter((r) => typeof r['level'] === 'number' && r['level'] >= 40);
     const records = await run.collector.awaitLogRecords((r) => r.length > 0, AWAIT_LOGS_MS);
 
+    // DCR-14-1 constraints 1 and 4: match on the line's own identity (body + its
+    // attributes), over EVERY warn-or-error line — not `.find()` on span alone, which
+    // ties whenever one span produced more than one record (a request's own handler is
+    // one span, slice 09), and not "at least one", which a single correlated line would
+    // satisfy vacuously while a second, uncorrelated one went unchecked.
+    const unmatched: Record<string, unknown>[] = [];
     const matches: { readonly line: Record<string, unknown>; readonly record: CollectedLogRecord }[] = [];
     for (const line of atOrAboveWarn) {
-      const record = records.find((r) => r.traceId === line['trace_id'] && r.spanId === line['span_id']);
-      if (record !== undefined) matches.push({ line, record });
+      const record = findCorrelatedRecord(line, records);
+      // DCR-14-1 constraint 3: a line with no correlated record fails outright — collected
+      // here and asserted below, never silently dropped from `matches`.
+      if (record === undefined) unmatched.push(line);
+      else matches.push({ line, record });
     }
     expect(
-      matches.length,
-      `expected at least one warn-or-error stdout line to have a correlated exported record.\n` +
-        `  stdout warn/error lines: ${JSON.stringify(atOrAboveWarn, null, 2)}\n` +
+      unmatched,
+      `every warn-or-error stdout line must have a correlated exported record; these did not.\n` +
         `  exported records: ${JSON.stringify(records, null, 2)}${where()}`,
+    ).toEqual([]);
+    expect(
+      matches.length,
+      `ARRANGE — expected at least one warn-or-error stdout line to check.\n` +
+        `  stdout warn/error lines: ${JSON.stringify(atOrAboveWarn, null, 2)}${where()}`,
     ).toBeGreaterThan(0);
 
     for (const { line, record } of matches) {
