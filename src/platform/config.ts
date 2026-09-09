@@ -60,6 +60,21 @@ export interface Config {
    * to set and a reader has one file to open.
    */
   readonly poolMax: number;
+  /**
+   * `OTEL_SERVICE_NAME` — slice 14, `docs/slices/14-design.md` §1 (ruling D). Resource
+   * `service.name` for all three exported signals. Defaults to
+   * {@link DEFAULT_OTEL_SERVICE_NAME}, which is also `src/platform/telemetry.ts`'s
+   * `INSTRUMENTATION_NAME` — the resource and the instrumentation scope agree by default,
+   * though only the resource moves when this variable is set.
+   *
+   * Read HERE rather than left to the SDK's own `envDetector`: measured on the pinned
+   * `sdk-node@0.222.0`, an operator who forgets the variable gets `unknown_service:node`
+   * (arc42 §8.4 traceability lost), and hardcoding `serviceName` on `NodeSDK`'s options
+   * instead would make this variable inert. `config.ts` reading it with a default is the one
+   * option that keeps both true: the forgetful operator is still named, and the variable
+   * still works — `src/main.ts` passes it to `startTelemetry(config)`.
+   */
+  readonly otelServiceName: string;
 }
 
 /** Thrown by {@link loadConfig}. Names every problem it found, not just the first. */
@@ -121,6 +136,12 @@ export const DEFAULT_DB_POOL_MAX = 10;
  */
 const MIN_POOL_MAX = 1;
 const MAX_POOL_MAX = 100;
+
+/**
+ * `OTEL_SERVICE_NAME`'s default, and `src/platform/telemetry.ts`'s `INSTRUMENTATION_NAME` —
+ * the artifact's own name, deliberately the same literal in both places (slice 14 design §1).
+ */
+export const DEFAULT_OTEL_SERVICE_NAME = 'keyloop-service-scheduler';
 
 function isLogLevel(value: string): value is LogLevel {
   return (LOG_LEVELS as readonly string[]).includes(value);
@@ -225,6 +246,13 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     }
   }
 
+  // Slice 14, ruling (D). Absent means the default — the artifact names itself rather than
+  // landing on the collector as `unknown_service:node` (AC-1). No format is validated: any
+  // non-empty string is a legal service name, and an empty/unset value is not a problem — it
+  // is the normal case.
+  const rawOtelServiceName = (env['OTEL_SERVICE_NAME'] ?? '').trim();
+  const otelServiceName = rawOtelServiceName === '' ? DEFAULT_OTEL_SERVICE_NAME : rawOtelServiceName;
+
   if (problems.length > 0) throw new ConfigError(problems);
 
   // Spread rather than `bookingSeed: undefined`, so "unset" is genuinely an absent property and
@@ -235,6 +263,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     logLevel,
     attemptCap,
     poolMax,
+    otelServiceName,
     ...(bookingSeed === undefined ? {} : { bookingSeed }),
   };
 }

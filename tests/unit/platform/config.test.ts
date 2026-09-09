@@ -3,6 +3,7 @@ import {
   ConfigError,
   DEFAULT_ATTEMPT_CAP,
   DEFAULT_DB_POOL_MAX,
+  DEFAULT_OTEL_SERVICE_NAME,
   LOG_LEVELS,
   configWarnings,
   loadConfig,
@@ -30,6 +31,7 @@ describe('loadConfig', () => {
       logLevel: 'warn',
       attemptCap: 16,
       poolMax: 10,
+      otelServiceName: DEFAULT_OTEL_SERVICE_NAME,
     });
   });
 
@@ -225,6 +227,34 @@ describe('DB_POOL_MAX — the pool ceiling, R-07-12/R-09-10', () => {
     // is: a ceiling that quietly became 20 would still pass a test that read the constant to
     // compute its own expectation.
     expect(DEFAULT_DB_POOL_MAX).toBe(10);
+  });
+});
+
+describe('OTEL_SERVICE_NAME — slice 14, ruling D: config.ts is the reader, not the SDK\'s envDetector', () => {
+  it('defaults to the artifact\'s own name when unset', () => {
+    expect(loadConfig(VALID).otelServiceName).toBe(DEFAULT_OTEL_SERVICE_NAME);
+    expect(loadConfig({ ...VALID, OTEL_SERVICE_NAME: '' }).otelServiceName).toBe(
+      DEFAULT_OTEL_SERVICE_NAME,
+    );
+    expect(loadConfig({ ...VALID, OTEL_SERVICE_NAME: '   ' }).otelServiceName).toBe(
+      DEFAULT_OTEL_SERVICE_NAME,
+    );
+  });
+
+  it('is read verbatim (trimmed) when set — AC-2\'s override', () => {
+    expect(loadConfig({ ...VALID, OTEL_SERVICE_NAME: 'probe-override' }).otelServiceName).toBe(
+      'probe-override',
+    );
+    expect(loadConfig({ ...VALID, OTEL_SERVICE_NAME: '  padded  ' }).otelServiceName).toBe(
+      'padded',
+    );
+  });
+
+  it('is the DEFAULT constant, asserted unconditionally — AC-1\'s literal', () => {
+    // Same duplication `DEFAULT_ATTEMPT_CAP`/`DEFAULT_DB_POOL_MAX` carry: a default that
+    // quietly drifted would still pass a test that read the constant to build its own
+    // expectation.
+    expect(DEFAULT_OTEL_SERVICE_NAME).toBe('keyloop-service-scheduler');
   });
 });
 
