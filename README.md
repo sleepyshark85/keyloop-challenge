@@ -69,23 +69,28 @@ and the concurrency invariant from a terminal — no test suite, no other toolin
 ```bash
 export DATABASE_URL=postgresql://keyloop:keyloop@127.0.0.1:5432/keyloop
 export BASE_URL=http://localhost:3000
-eval "$(npm run --silent harness:seed)"       # exports DEALERSHIP_ID, SERVICE_TYPE_ID, CUSTOMER_ID, VEHICLE_ID, STARTS_AT
+eval "$(npm run --silent harness:seed)"       # exports DEALERSHIP_ID, SERVICE_TYPE_ID, CUSTOMER_ID, VEHICLE_ID, STARTS_AT, and more
 
 bash harness/book-read-reschedule-cancel.sh   # book, read, reschedule, cancel
-bash harness/double-booking.sh                # REQUEST_COUNT (default 10) racers at the same slot
+bash harness/double-booking.sh                # REQUEST_COUNT (default 10) racers at one bay
+bash harness/spurious-refusal.sh              # REQUEST_COUNT (default 10) racers at the CAPACITY_ dealership
 ```
 
-`harness:seed` (`harness/seed.mjs`) inserts a fresh, unrelated dealership subtree on every
-invocation and prints the five ids above as `export` lines — `eval` on its own output is the whole
-setup. Run it again before a second demonstration; re-using one `STARTS_AT` re-books an already
-non-free slot.
+`harness:seed` (`harness/seed.mjs`) reads `harness/fixture.json` (ADR-0038) and seeds **two**
+dealership subtrees on every invocation — a scarce one, exported unprefixed as above, and an
+abundant `CAPACITY_`-prefixed one `spurious-refusal.sh` uses — printing every id as an `export`
+line; `eval` on its own output is the whole setup. Run it again before a second demonstration;
+re-using one `STARTS_AT` re-books an already non-free slot.
 
 `book-read-reschedule-cancel.sh` prints each step's HTTP status and `type`, and exits non-zero the
 moment one status is not the one that step must answer. `double-booking.sh` fires `REQUEST_COUNT`
-concurrent bookings at the identical slot, prints every response, and exits non-zero unless exactly
-one is `201` and the rest `409` — the one invariant, demonstrated rather than asserted. Both scripts
-need `bash` and `curl` only — no GNU coreutils, no `jq` — and were run by hand on a clean checkout
-before this slice was claimed done.
+concurrent bookings at the identical slot and exits non-zero unless exactly one is `201` and the
+rest `409` — the one invariant, demonstrated rather than asserted. `spurious-refusal.sh` fires
+`REQUEST_COUNT` concurrent bookings at the abundant subtree and exits non-zero unless exactly
+`min(N, M)` are confirmed, on that many distinct bays and technicians, with *M* read from the
+seed's own exported counts, never from the responses — capacity confirmed, not just scarcity
+refused (QS-3, slice 15). All three need `bash` and `curl` only — no GNU coreutils, no `jq` — and
+were run by hand on a clean checkout before their slice was claimed done.
 
 For every scenario above walked by hand — availability's staleness, a refused reschedule, opening
 hours, the error taxonomy — see [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).

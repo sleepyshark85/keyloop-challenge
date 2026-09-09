@@ -1,0 +1,40 @@
+{
+  "serviceTypes": [
+    { "key": "oil-change", "name": "Oil change", "durationMinutes": 60 },
+    { "key": "detailing", "name": "Detailing", "durationMinutes": 90 },
+    { "key": "brake-service", "name": "Brake service", "durationMinutes": 60 }
+  ],
+  "subtrees": [
+    {
+      "key": "scarce",
+      "purpose": "Scenarios 1/2/4/5/6/9 — today's shape, 1 bay and 1 qualified technician, exactly slice 10's scarcity demo. Also AC-10: a second customer+vehicle for vehicle-not-owned, and a second, unqualified service type for unknown-reference.",
+      "exportPrefix": "",
+      "timeZone": "Europe/London",
+      "openingHours": { "days": [0, 1, 2, 3, 4, 5, 6], "opensAt": "08:00", "closesAt": "18:00" },
+      "serviceTypes": ["oil-change", "detailing"],
+      "bays": ["bay-1"],
+      "technicians": [{ "key": "tech-1", "qualifiedFor": ["oil-change"] }],
+      "customers": ["cust-1", "cust-2"],
+      "vehicles": [
+        { "key": "veh-1", "owner": "cust-1" },
+        { "key": "veh-2", "owner": "cust-2" }
+      ]
+    },
+    {
+      "key": "capacity",
+      "purpose": "QS-3's no-spurious-refusal demo, run by harness/spurious-refusal.sh — M=3 bays and 3 qualified technicians, so min(N,M) is worth seeing rather than the scarce subtree's trivial min(N,1).",
+      "exportPrefix": "CAPACITY_",
+      "timeZone": "Europe/London",
+      "openingHours": { "days": [0, 1, 2, 3, 4, 5, 6], "opensAt": "08:00", "closesAt": "18:00" },
+      "serviceTypes": ["brake-service"],
+      "bays": ["cap-bay-1", "cap-bay-2", "cap-bay-3"],
+      "technicians": [
+        { "key": "cap-tech-1", "qualifiedFor": ["brake-service"] },
+        { "key": "cap-tech-2", "qualifiedFor": ["brake-service"] },
+        { "key": "cap-tech-3", "qualifiedFor": ["brake-service"] }
+      ],
+      "customers": ["cap-cust-1"],
+      "vehicles": [{ "key": "cap-veh-1", "owner": "cap-cust-1" }]
+    }
+  ]
+}

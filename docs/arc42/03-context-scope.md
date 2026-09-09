@@ -17,7 +17,14 @@ the stakeholders; this is what crosses the boundary.
 Nothing crosses for the **customer**, named by `customer_id` *inside* the request, or for the
 **technician**, a resource rather than a user. The client layer is stubbed (TC-5):
 `docs/api/openapi.json`, emitted from the route schemas, is the contract every actor reaches through,
-and `harness/` is a cURL client for the five operations and the contention demo. There are no
+and `harness/` is a cURL client for the five operations and **both** contention demos —
+`double-booking.sh` shows scarcity refusing every racer but one, `spurious-refusal.sh` shows capacity
+confirming exactly `min(N, M)` of them, which is the claim a dealership cares about more. **The world
+they run against is a declared fixture** (`harness/fixture.json`, ADR-0038): the seed reads rows from
+it and keeps its `INSERT`s hand-written, so it stays a second, independent transcription of §8.1's
+shape. Two subtrees, because bays and technicians are dealership-scoped — one scarce, one abundant —
+and the scarce one carries the empty export prefix, which is what reproduces the older demo's
+environment unchanged. There are no
 neighbouring systems because the brief says *"replace manual booking systems"*, so *"unified"* is one
 scheduler across a dealership group (A-9), not one view over several.
 

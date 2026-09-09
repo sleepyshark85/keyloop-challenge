@@ -96,6 +96,7 @@ without taking anyone's word for it.
 - [**ADR-0035**](adr/0035-one-conflict-counted-per-exclusion-violation.md) — Count one conflict per exclusion violation, not one per contended request *(proposed)*
 - [**ADR-0036**](adr/0036-overlap-is-unrepresentable-the-database-adjudicates.md) — Make overlap unrepresentable — every booking is adjudicated by the database, never by application code *(accepted)*
 - [**ADR-0037**](adr/0037-bridge-pino-to-opentelemetry-in-process.md) — Bridge pino to OpenTelemetry in-process, on the thread that emitted the line *(accepted)*
+- [**ADR-0038**](adr/0038-the-harness-fixture-carries-data-never-schema.md) — The harness fixture carries data, never schema *(accepted)*
 
 ---
 

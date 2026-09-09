@@ -252,5 +252,14 @@
    "Option D \u2014 An in-process pino destination emitting through @opentelemetry/api-logs, compos"
   ],
   "decision": "Chosen option: D \u2014 a DestinationStream that emits an OTel LogRecord on the same call, added"
+ },
+ "0038-the-harness-fixture-carries-data-never-schema.md": {
+  "options": [
+   "Option A \u2014 Keep the data hard-coded in seed.mjs",
+   "Option B \u2014 A generic {table, columns, rows} document the seeder replays",
+   "Option C \u2014 A domain-shaped fixture of keys and attributes, replayed by hand-written per-ta",
+   "Option D \u2014 Generate the fixture from the migrations"
+  ],
+  "decision": "Chosen option: C \u2014 the fixture supplies rows, not tables. It names entities by key"
  }
 }

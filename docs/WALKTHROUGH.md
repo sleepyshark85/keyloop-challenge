@@ -8,8 +8,10 @@ with the command, the response actually returned, and one line on what it proves
 
 Every response shown below is output this walkthrough actually saw, on a clean checkout, on
 2026-09-08 — see the report that accompanies this document for the one thing that did not behave
-on the first try. If you follow the same steps your ids and timestamps will differ (everything is
-seeded fresh, per `harness/seed.mjs`), but the shapes and status codes will not.
+on the first try. Scenario 2b and the fixture-driven half of Scenario 7 were captured against
+`86542a2` on 2026-09-10 (slice 15). If you follow the same steps your ids and timestamps will
+differ (everything is seeded fresh, per `harness/seed.mjs`), but the shapes and status codes will
+not.
 
 ## Before you start
 
@@ -20,15 +22,21 @@ the harness section does:
 ```bash
 export DATABASE_URL=postgresql://keyloop:keyloop@127.0.0.1:5432/keyloop
 export BASE_URL=http://localhost:3000
-eval "$(npm run --silent harness:seed)"        # DEALERSHIP_ID, SERVICE_TYPE_ID, CUSTOMER_ID, VEHICLE_ID, STARTS_AT
+eval "$(npm run --silent harness:seed)"        # DEALERSHIP_ID, SERVICE_TYPE_ID, CUSTOMER_ID, VEHICLE_ID, STARTS_AT, and more below
 ```
 
-Each seed is a **fresh, unrelated dealership** with one bay, one qualified technician, opening
-hours 08:00–18:00 local every day (`Europe/London`), and a 60-minute service type
-(`harness/seed.mjs`). Run it again before any scenario that needs a clean slot — reusing a
-`STARTS_AT` re-books an already non-free interval. The full contract behind every request and
-response below is [`docs/api/openapi.json`](api/openapi.json); the invariant behind the
-double-booking scenario is `CLAUDE.md` §2.1 and [arc42 §8.2](arc42/08-crosscutting-concepts.md#82-persistence-and-the-exclusion-constraint).
+One run of `harness:seed` reads `harness/fixture.json` and seeds **two** dealership subtrees — the
+fixture carries data, never schema (ADR-0038); arc42 §3.1 records why. The **scarce** one, exported
+unprefixed (the ids above), is one bay and one qualified technician, opening hours 08:00–18:00
+local every day (`Europe/London`), a 60-minute service type, and — new in slice 15 — a second
+customer/vehicle pair (`CUSTOMER_ID_2`/`VEHICLE_ID_2`) and a second, unqualified service type
+(`SERVICE_TYPE_ID_2`), both used in Scenario 7. The **abundant** one, exported `CAPACITY_`-prefixed
+(`CAPACITY_DEALERSHIP_ID`, …, `CAPACITY_BAY_COUNT`, `CAPACITY_QUALIFIED_TECHNICIAN_COUNT`), is three
+bays and three qualified technicians, used by Scenario 2b. Run the seed again before any scenario
+that needs a clean slot — reusing a `STARTS_AT` re-books an already non-free interval. The full
+contract behind every request and response below is
+[`docs/api/openapi.json`](api/openapi.json); the invariant behind the double-booking scenario is
+`CLAUDE.md` §2.1 and [arc42 §8.2](arc42/08-crosscutting-concepts.md#82-persistence-and-the-exclusion-constraint).
 
 ---
 
@@ -120,6 +128,51 @@ availability and then decided; the constraint decided, and the service only aske
 
 **Proves:** QS-1 / QS-2 (no bay or technician overlap) and `CLAUDE.md` §2.1 — check-then-act is
 structurally impossible here, not merely untested.
+
+---
+
+## Scenario 2b — Capacity: never refuse you while a bay is free
+
+Scenario 2 shows *we never double-book* — one bay, ten racers, exactly one confirmed. This is the
+harness's other contention demo, added at slice 15 (`harness/spurious-refusal.sh`, AC-4/AC-5): the
+**abundant** subtree seeded above has three bays and three qualified technicians, so it can show
+*we never refuse you while a bay is free* — the claim a dealership cares about more.
+
+```bash
+REQUEST_COUNT=10 bash harness/spurious-refusal.sh
+```
+
+```
+racer 1: HTTP 409
+racer 2: HTTP 409
+racer 3: HTTP 201
+racer 4: HTTP 409
+racer 5: HTTP 201
+racer 6: HTTP 201
+racer 7: HTTP 409
+racer 8: HTTP 409
+racer 9: HTTP 409
+racer 10: HTTP 409
+summary: 3 confirmed, 7 refused, 10 fired, CAPACITY=3
+PASS: exactly 3 confirmed (distinctly) and 7 refused.
+```
+
+Ten racers, `CAPACITY_BAY_COUNT=3`: exactly 3 confirmed on 3 distinct bays and 3 distinct
+technicians (read from the response bodies), 7 refused. `CAPACITY` comes from the fixture's own
+exported counts, never from what the racers answered — AC-6 is the negative control that makes
+that an assertion rather than a print statement: overriding `CAPACITY` to the wrong value fails
+the script, with no fault injected into the service.
+
+**What this does not prove.** Neither the count nor the distinct-bay/technician check can tell a
+genuinely contended run from one that happened to serialise. Distinctness among confirmed,
+overlapping appointments is *implied by the exclusion constraints* under any interleaving, because
+this demo's contention is over **persisted rows, not instants** — the same fact behind ADR-0004's
+rejected global-mutex option (`docs/slices/15-design.md`, A-15-1, corrected at step 2).
+`tests/concurrency/no-spurious-refusal.test.ts` is the actual evidence for QS-3: its conflict-log
+assertions and `max(attempt) ≥ 2` are what a terminal script cannot see. This is a demonstration of
+that test, not a substitute for it.
+
+**Proves:** QS-3, demonstrated rather than asserted — the test above carries the assertion.
 
 ---
 
@@ -296,12 +349,13 @@ HTTP/1.1 422 Unprocessable Entity
  "detail":"no vehicle matches the id in this request","reference":"vehicle"}
 ```
 
-A vehicle that exists, but belongs to a **different** customer than the one named in the request
-(seed a second dealership for a second customer/vehicle pair, then mix them):
+A vehicle that exists, but belongs to a **different** customer than the one named in the request —
+the default fixture seeds a second customer/vehicle pair for exactly this, from the **same** seed
+run above (`VEHICLE_ID_2`/`CUSTOMER_ID_2`, AC-10):
 
 ```bash
 curl -sS -i -X POST "$BASE_URL/appointments" -H 'content-type: application/json' \
-  -d "{\"dealershipId\":\"$DEALERSHIP_ID\",\"customerId\":\"$CUSTOMER_ID\",\"vehicleId\":\"$OTHER_CUSTOMERS_VEHICLE_ID\", ...}"
+  -d "{\"dealershipId\":\"$DEALERSHIP_ID\",\"customerId\":\"$CUSTOMER_ID\",\"vehicleId\":\"$VEHICLE_ID_2\", ...}"
 ```
 
 ```
@@ -310,13 +364,33 @@ HTTP/1.1 422 Unprocessable Entity
  "detail":"the named vehicle does not belong to the named customer"}
 ```
 
-Both are `422`, not `404` and not `403`: an unknown reference is treated the same shape as a
-mismatched one, and ownership is **validation**, not authorisation, because there is no
-authenticated party to authorise (ADR-0002, ADR-0034). The same `unknown-reference` type
+A service type nobody at the dealership is qualified for is the **same shape**, not a shortage: the
+fixture's second service type (`SERVICE_TYPE_ID_2`, `detailing`) is seeded with no qualified
+technician in the scarce subtree (AC-10):
+
+```bash
+curl -sS -i -X POST "$BASE_URL/appointments" -H 'content-type: application/json' \
+  -d "{\"dealershipId\":\"$DEALERSHIP_ID\",\"customerId\":\"$CUSTOMER_ID\",\"vehicleId\":\"$VEHICLE_ID\",\"serviceTypeId\":\"$SERVICE_TYPE_ID_2\", ...}"
+```
+
+```
+HTTP/1.1 422 Unprocessable Entity
+{"type":"/problems/unknown-reference","title":"A named reference does not exist","status":422,
+ "detail":"no service-type matches the id in this request","reference":"service-type"}
+```
+
+arc42 §8.6 states this row explicitly: unknown-reference covers "a service type no technician
+there is qualified for, a pair that does not resolve rather than a shortage" — previously reachable
+in this walkthrough only by inventing a random uuid, not by an actually-unqualified pair.
+
+All three `422`s above are the same shape, never `404` and never `403`: an unknown reference, a
+mismatched owner and an unqualified pair are all **validation**, not authorisation, because there
+is no authenticated party to authorise (ADR-0002, ADR-0034). The same `unknown-reference` type
 appears identically on `GET /availability` for an unknown dealership.
 
-**Proves:** A-6 (nothing is created implicitly; a vehicle belongs to exactly one customer) and
-arc42 §8.6's four deliberate choices, specifically *"ownership failure is a `422`, not a `403`."*
+**Proves:** A-6 (nothing is created implicitly; a vehicle belongs to exactly one customer), arc42
+§8.6's four deliberate choices — *"ownership failure is a `422`, not a `403`"* and the
+no-qualified-technician row of `unknown-reference` — and AC-10 (`docs/slices/15-seed-fixtures-and-capacity-harness.md`).
 
 ---
 

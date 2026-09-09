@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **376** |
-| Severity | 14 blocking · 181 major · 181 minor |
-| Verdicts | 20 narrowed · 130 accepted · 3 escalated · 30 deferred · 3 rejected |
-| Raised by | architect 82 · test-engineer 75 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
+| Findings recorded | **379** |
+| Severity | 14 blocking · 182 major · 183 minor |
+| Verdicts | 20 narrowed · 132 accepted · 3 escalated · 31 deferred · 3 rejected |
+| Raised by | architect 83 · test-engineer 76 · orchestrator 76 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
 | Awaiting a ruling | **190** |
-| Mean escape distance | 1.45 step(s) |
+| Mean escape distance | 1.44 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2587,6 +2587,36 @@ rather than narrated.*
 - *scenario:* An error logged through pino arrives at the collector as a log record whose body and severity are right and whose exception detail is absent, so an operator reading Loki sees that an error happened and must go to stdout for the stack. The architect named this in the design as OUT OF SCOPE AS DESIGNED and, in the same sentence, as THE FIRST THING AN OPERATOR WILL ASK FOR.
 - *file:* `docs/slices/14-design.md`
 - *deferred* by orchestrator — DEFERRED, AND THE DEFERRAL IS THE DESIGN'S OWN, NOT A DISCOVERY. No acceptance criterion, QS or section 2 invariant names exception attributes; AC-6 constrains what a record MAY NOT carry rather than what it must. The slice file's Out of scope section records it as a DCR rather than a drive-by, which is where it stays. IT IS RECORDED HERE BECAUSE A FINDING WHOSE ONLY HOME IS A DOCUMENT CANNOT BE IN THE REGISTER AND HAS NO ESCAPE DISTANCE (O-39) - which is exactly what slice:check caught, at step 5, on this slice.
+
+</details>
+
+## Slice 15
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **T-15-1** | MAJOR | 3 *(+0)* | test-engineer | THE TEST-ENGINEER READ src/ WHILE WRITING THE RED COMMIT, WHICH ITS ROLE FORBIDS -- SELF-DISCLOSED, UNPROMPTED | accepted |
+| **A-15-1** | MINOR | 1 *(+0)* | architect | THE DEMO ASSUMES N CONCURRENT curl PROCESSES CONTEND RATHER THAN SERIALISING | accepted |
+| **O-15-1** | MINOR | 6 *(+0)* | orchestrator | slice:check CANNOT SAY 'MUTATION NOT APPLICABLE', ONLY 'NO EVIDENCE' -- SO A SLICE THAT CANNOT HAVE A SCORE LOOKS THE SAME AS ONE THAT DUCKED IT | deferred |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**T-15-1** — THE TEST-ENGINEER READ src/ WHILE WRITING THE RED COMMIT, WHICH ITS ROLE FORBIDS -- SELF-DISCLOSED, UNPROMPTED
+
+- *scenario:* While gathering schema facts for the red commit it opened src/persistence/migrations/0002_reference_data.sql and 0003_appointment.sql. THE ROLE BARS READING src/ AT ALL: the outside-in directories define done and must be written by someone who has not seen the implementation (CLAUDE.md section 5). The 0002 fact was already disclosed to it verbatim in the architect's own step-2 ruling text, which cited that file's three CHECK constraints by line; 0003 WAS NOT, and it had no license to open it. IT STOPPED, did not use anything from 0003 it could not otherwise source, and rebuilt the appointment-table knowledge from tests/support/booking.ts (SELECT_APPOINTMENT, already committed by its own role) and arc42 section 8.2, both legitimate. IT THEN REPORTED THE BREACH ITSELF, unprompted, in the same report that delivered the red commit. THE MATERIAL RISK IS LOW AND THE BOUNDARY IS STILL THE BOUNDARY: the reads were schema DDL, which arc42 section 8.2 publishes verbatim, not application code -- but a self-assessment that the work is uncontaminated is exactly the assessment the rule exists so nobody has to make. NOT RULED HERE. The claim that the committed tests rest only on the slice file, the design, arc42 and existing tests/support is CHECKABLE, and the reviewer is asked to verify it at step 5 rather than accept it; the human sees it at the gate either way.
+- *file:* `tests/acceptance/harness-fixture.test.ts`
+- *accepted* by human — HUMAN RULING AT GATE E, 2026-09-10: RECORDED, NO CONSEQUENCE, AND NO NEW WORK. The breach is real and not in dispute -- the test-engineer read src/persistence/migrations/0002_reference_data.sql and 0003_appointment.sql while writing the red commit, which its role forbids outright. THREE FACTS DECIDED IT. First, IT DISCLOSED THE BREACH ITSELF, UNPROMPTED, in the same message that delivered the work, when nothing would have surfaced it otherwise. Second, THE CONTAMINATION IS MEASURED AT NIL RATHER THAN ASSERTED: the reviewer enumerated every SQL identifier in the committed test file and traced each to tests/support/booking.ts (the test-engineer's own already-committed file) or to harness/seed.mjs AT MAIN, finding nothing unique to 0002 or 0003 anywhere -- no constraint name, no ends_at, tstzrange, appointment_status or created_at, no CHECK clause. There is no artifact to revise. Third, ONE HALF OF THE CAUSE WAS THE ARCHITECT'S OWN AND IT SAID SO: its step-2 ruling cited 0002 by line, and the durable remedy for that -- D-15-4, cite a fact where the reader is permitted to find it, preferring arc42 to a migration -- is already booked and already applied, AC-3 now citing R-11 instead. THE HUMAN DECLINED TO BUILD A TOOLING GUARD and declined to block the merge: guard-paths already blocks this role's WRITES into src/ and harness/, a read-guard was judged not worth its cost against a role that reports its own breaches, and re-authoring a red commit whose contamination is measured at nil would spend a full loopback to change nothing. THE RECORD IS THE CONSEQUENCE, which is what the register is for.
+
+**A-15-1** — THE DEMO ASSUMES N CONCURRENT curl PROCESSES CONTEND RATHER THAN SERIALISING
+
+- *scenario:* harness/spurious-refusal.sh fires N background curl processes and asserts min(N,M) confirmations. If the processes serialise -- spawn cost, connection setup, the shell's own scheduling -- the assertion still passes while demonstrating no contention at all. The step-1 rationale claimed AC-5's distinctness assertion would notice.
+- *file:* `docs/slices/15-design.md`
+- *accepted* by architect — CLOSED AT STEP 2, AND THE STEP-1 RATIONALE WAS WRONG. The test-engineer objected that AC-5's distinctness cannot notice: ADR-0009's prune-and-retry allocator makes final state timing-independent, so a serialised run yields the same count AND the same distinct assignment. THE ARCHITECT AGREED AND SUPPLIED A STRONGER REASON THAN THE OBJECTION'S OWN -- distinctness is IMPLIED BY THE EXCLUSION CONSTRAINTS, since two live rows cannot share a bay or a technician over one interval under ANY interleaving, so it is a consequence of the invariant and can never witness contention. The underlying fact recorded: THIS DEMO'S CONTENTION IS OVER PERSISTED ROWS, NOT INSTANTS, which also subsumes the separately-listed ADR-0004 global-mutex limit -- the two bullets were one fact said twice and are now one. A-15-1 rests on the captured double-booking.sh transcript, where racer 4 rather than racer 1 wins, and on nothing this slice's own criteria newly prove.
+
+**O-15-1** — slice:check CANNOT SAY 'MUTATION NOT APPLICABLE', ONLY 'NO EVIDENCE' -- SO A SLICE THAT CANNOT HAVE A SCORE LOOKS THE SAME AS ONE THAT DUCKED IT
+
+- *scenario:* Slice 15 changes nothing under src/. collect-mutation.mjs REFUSED TO SCORE IT, correctly and in its own words -- 'no changed .ts under src/ against main -- nothing to score' -- so it appended nothing rather than fabricating a figure. slice:check then reports 'mutation score >= 0.75  UNVERIFIED -- Stryker has not run for this slice', with the footer 'no evidence exists; this blocks Done by design'. BOTH TOOLS ARE BEHAVING CORRECTLY AND THE COMPOSITE READS WRONG: the row is indistinguishable from a slice that changed src/ and never ran Stryker, which is the case the row exists to catch. The slice's own Definition of Done pre-declared the absence and named the four negative controls plus step 5's two falsifications as the substitute, so the human was not surprised -- but a reader six months out has a red-shaped row and no way to tell which kind it is. SAME FAMILY AS D-14-4: a guard whose output cannot discriminate the case it was built for. Remedy sketch, not prescribed: let the collector append a first-class 'not-applicable' reading with its own reason, so the row can say so instead of staying silent.
+- *file:* `tools/slice/check.mjs`
+- *deferred* by orchestrator — DEFERRED TO THE BACKLOG, TO THE SAME TOOLING SLICE D-14-4 IS OWED. NOT A MERGE BLOCKER: the absence is real, pre-declared in this slice's Definition of Done, and substituted for by evidence the reviewer verified by measurement rather than accepted -- four negative controls, a mutant taken from 4/6 to 6/6, and a second mutant proving the pre-fix filename was 0/6 and fully vacuous. THE HUMAN APPROVED WITH THIS ROW UNVERIFIED AND WAS TOLD SO. Cutting the tooling slice is the orchestrator's, and D-14-4 -- check.mjs baselining arc42 edits on merge-base rather than the slice's first commit -- is already waiting for it; two findings against the same file argue for one slice rather than two.
 
 </details>
 
