@@ -55,6 +55,23 @@ attributed forward. The cost is not noise: a genuinely undeclared edit in the ne
 indistinguishable from the baseline's own. Remedy: baseline on the slice's first commit. Booked rather
 than fixed — it is the orchestrator's tool, and the next slice inherits it.
 
+**D-15-1** — ADR-0009's attempt cap of 16 is deliberately **not** encoded in `harness/`, that constant
+having one home in `src/`, so a fixture declaring capacity above 8 gets a demo that can refuse while a
+bay is free and nothing warns its author. **D-15-2** — likewise `REQUEST_COUNT` above `DB_POOL_MAX`
+demonstrates queueing rather than contention. **D-15-3** — the seed's `ROLLBACK` path is exercised by
+hand and asserted by nothing (`R-11`); an acceptance criterion for it was refused inside slice 15
+because the transaction was already built and the criterion would have been green on arrival.
+**D-15-4 · a standing rule, not a slice-15 event** — **an architect's citation can launder a `src/`
+fact into a role forbidden to read it.** Slice 15's AC-3 cited a migration by line to justify which
+validator rules earn a case, and that citation was one of two routes by which the test-engineer read
+`src/` (`T-15-1`; the reviewer enumerated every SQL identifier in the committed file and measured
+contamination at **nil**, and the human recorded the breach without consequence). The remedy, applied:
+cite a fact where the reader is permitted to find it — here `R-11` — and prefer arc42 to a migration.
+**D-15-5** — **the one slice whose deliverable is a runnable demonstration is the one no human ran.**
+Gate E delegated the merge without an exploratory pass, so `spurious-refusal.sh`'s only end-to-end runs
+are the implementer's and the reviewer's. Agent-verified is what the record says, and it is weaker than
+slice 14, where the human observed the joined trace in Grafana themselves.
+
 ## 11.2 Known risks
 
 Ordered by the cost of being wrong, not by likelihood.
@@ -104,7 +121,13 @@ decision the code silently stopped implementing, to be conformed rather than sup
 **R-10** — `updated_at` is maintained by the writer with no trigger, and only the *holding* half of
 cancellation's `CASE` is asserted.
 **R-11** — four reference-table constraints (`day_of_week BETWEEN 0 AND 6`, `closes_at > opens_at`,
-`duration_minutes > 0`, `vehicle.vin UNIQUE`) are asserted by nothing, and
+`duration_minutes > 0`, `vehicle.vin UNIQUE`) are asserted by nothing. **Three now have hand-run
+evidence and still no committed assertion**: slice 15 drove `harness/seed.mjs` at three fixtures built
+to pass its validator and violate those CHECKs, and each was refused with PostgreSQL's own SQLSTATE and
+rolled back to zero rows. That is a measurement in a report, not coverage — nothing in CI re-runs it,
+and `vehicle.vin UNIQUE` is untouched. Minting the criterion inside slice 15 was refused because the
+transaction it would ride on was already built, so it could not be red first (§2.4); it belongs to a
+slice that can take it red first. Separately,
 `appointment_technician_in_dealership` is proven to exist and not to fire, so the technician half of A-9
 rides on a catalogue assertion and the bay half on a behavioural one.
 **R-12 · the mutation gate's failure mode is silence.** Stryker has a demonstrated mode in which it
