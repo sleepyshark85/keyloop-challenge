@@ -426,6 +426,11 @@ root span, refused. Its siblings in the same trace are `availability.candidates`
 `appointment.insert` (carrying `db.sqlstate: 23P01`, `db.constraint: no_bay_overlap`) — the
 waterfall §8.4's figure draws.
 
+Fetching the trace by its own id, as above, is the reliable pivot. Tempo's free-text tag search
+(`/api/search?tags=service.name=...`) can come back with zero traces for one that demonstrably
+exists — an indexing lag in that path, not a break in the join — so a reader who tries the search
+box before following a `trace_id` should not read an empty result there as the join having failed.
+
 ### The name
 
 The trace above already carries half the answer: every span's resource read
