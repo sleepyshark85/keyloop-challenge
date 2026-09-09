@@ -9,51 +9,17 @@ Two conventions hold throughout. **Each attempt is exactly one transaction wide*
 then the one `INSERT` or `UPDATE` — so every attempt is independently recoverable, and **no transaction
 may enclose the loop** (QS-3 catches it immediately). And **reads before the loop are validation; reads
 inside it are advisory**: the candidate read only suggests *which write to attempt next*, never whether a
-write is allowed.
+write is allowed. **Every figure below is generated from the `.html` beside it** — regenerate with
+`npm run diagram:export`.
 
 ## 6.1 Concurrent booking — the database decides
 
 **Mandatory scenario.** Two users book the same service, dealership and start at the same instant. There
 is exactly one free bay.
 
-![Two racing bookings and where PostgreSQL rejects the second](../diagrams/concurrent-booking.svg)
+![Two racing bookings, and where PostgreSQL rejects the second](../diagrams/concurrent-booking.svg)
 
-*Source: [`diagrams/concurrent-booking.html`](../diagrams/concurrent-booking.html) · regenerate with `npm run diagram:export`. It predates ADR-0018 and does not draw the locks*
-
-```
-R1                                  R2                        PostgreSQL
-──                                  ──                        ──────────
-POST /appointments                  POST /appointments
-  ├ schema validation (TypeBox)       ├ schema validation
-  ├ read dealership + service type    ├ read dealership + service type
-  ├ withinOpeningHours()  ✓ pure      ├ withinOpeningHours()  ✓ pure
-  ├ span: availability.candidates     ├ span: availability.candidates
-  │   SELECT free bays, free techs ───┼──────────────────────▶ {B1}, {T1}
-  │   ◀── {B1}, {T1}                  │   ◀── {B1}, {T1}          ← BOTH see B1 free.
-  │                                   │                            Advisory. Nothing is
-  │                                   │                            concluded from it.
-  ├ BEGIN                             ├ BEGIN
-  ├ pg_advisory_xact_lock(1,B1),      ├ pg_advisory_xact_lock(1,B1)
-  │    (2,T1) ── granted ─────────────┼──────────────────────▶ the locks read no table
-  │                                   │   ── WAITS on R1 ───▶  and decide nothing
-  ├ span: appointment.insert          │
-  │   INSERT … B1, T1, [09:00,10:00) ─┼──────────────────────▶ exclusion check: no
-  │                                   │                        conflicting row
-  ├ COMMIT ── locks released ─────────┼──────────────────────▶ COMMIT ✓
-  │   ◀── appointment a-1             ├ lock granted
-  │                                   ├ span: appointment.insert
-  │                                   │   INSERT … B1, T1 ──▶  conflicts with a-1,
-  │                                   │                        which is COMMITTED
-  │                                   │   ◀── ERROR 23P01, constraint = "no_bay_overlap"
-  │                                   ├ classify → {conflict, resource:'bay'}
-  │                                   ├ booking_conflicts_total{bay, absorbed}++
-  │                                   ├ prune bay B1 — that bay, not all bays
-  │                                   ├ candidate set now empty
-  │                                   ├ booking_conflicts_total{bay, refused}++
-  ▼                                   ▼
-201 Created                         409 Conflict
-{ appointment a-1 }                 problem+json, type=/problems/no-capacity, resource="bay"
-```
+*Source: [`concurrent-booking.html`](../diagrams/concurrent-booking.html)*
 
 **Where the race is actually decided.** Not in `withinOpeningHours`, which reads no booking. Not in the
 candidate query, whose answer both requests believe and which is *wrong for one of them* the moment it is
@@ -64,9 +30,8 @@ window after.**
 **Why the lock is there, and why it is not part of that.** Without it, simultaneous inserters do not
 queue: `check_exclusion_constraint` inserts the index tuple and *then* scans, so each waits on the others'
 in-progress tuples and they cycle. The invariant was never in question; the *status* was — a deadlock
-carries no constraint, so no verdict to render as `409`. One `pg_advisory_xact_lock` per bay and per
-technician now precedes each attempt, so every loser conflicts with a **committed** row and the reported
-constraint is deterministic ([ADR-0018](../adr/0018-lock-the-bay-and-the-technician-before-each-insert.md)).
+carries no constraint, so no verdict to render as `409`. The two locks the figure draws buy that verdict
+and nothing else ([ADR-0018](../adr/0018-lock-the-bay-and-the-technician-before-each-insert.md)).
 
 **The lock decides nothing, and that is measured both ways** in
 `tests/integration/exclusion-constraint-adjudicates.test.ts`. Drop the lock, keep the constraints: still
@@ -83,6 +48,10 @@ path locked less than it wrote — an internal fault rendering `500`.
 
 The same path when the dealership still has capacity — the reason a `409` means *the dealership was full*
 rather than *the allocator guessed badly*.
+
+![Three attempts, and the candidate lists shrinking between them](../diagrams/candidate-pruning.svg)
+
+*Source: [`candidate-pruning.html`](../diagrams/candidate-pruning.html)*
 
 ```
 POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
@@ -153,6 +122,10 @@ UPDATE appointment
 RETURNING <the ten columns>;   -- as built: named, never `*`
 ```
 
+![The lock union a move takes, and the order it takes it in](../diagrams/reschedule-lock-union.svg)
+
+*Source: [`reschedule-lock-union.html`](../diagrams/reschedule-lock-union.html)*
+
 **No `AND id <> $1` predicate anywhere, no pre-read of the target slot, no application-side "is it free?"
 step.** Four properties follow, none obvious, each pinned in §10: a refused move leaves the original
 **confirmed at its original time**, the statement having aborted, so nothing was released and nothing must
@@ -161,16 +134,15 @@ be restored (QS-4); a move never transiently frees its slot (QS-5); a move onto 
 because it is an `UPDATE`.
 
 **A move is in flight against two pairs, not one.** Its vacated index entry stays live until commit, so it
-both waits and is waited on, and it therefore locks the **union** of both (ADR-0030) — the pair it leaves
-re-read inside the attempt's own transaction under the row's lock: **row lock, advisory locks, write**.
-`(class, hashtext(key))` total-orders the advisory waits and a complete lock set covers every tuple wait,
-which keeps that acyclic. Measured: **11.7 % of contended moves deadlocked before this rule, 0 / 1000
+both waits and is waited on, and it therefore locks the **union** of both — row lock, advisory locks,
+write, ordered by `(class, hashtext(key))` over a lock set covering every tuple wait, which is what keeps
+that acyclic (ADR-0030). Measured: **11.7 % of contended moves deadlocked before this rule, 0 / 1000
 after.** `0 rows` then means one thing — not `confirmed` — existence having been settled by the read above.
 
 ## 6.4 Cancellation
 
 `POST /appointments/{id}/cancellation` — one unconditional statement: no guard, no pre-read and **no
-advisory lock**, a cancelled row satisfying no constraint's `WHERE` and leaving nothing to serialise.
+advisory lock**.
 
 ```sql
 UPDATE appointment
@@ -179,6 +151,10 @@ UPDATE appointment
  WHERE id = $1
 RETURNING …;
 ```
+
+![A cancelled row leaving the constraints' scope](../diagrams/cancellation-scope.svg)
+
+*Source: [`cancellation-scope.html`](../diagrams/cancellation-scope.html)*
 
 The row leaves the constraints' scope through their `WHERE (status <> 'cancelled')` predicate, so the
 slot becomes bookable again **by the same mechanism that guards every other write** — no bookkeeping, no
@@ -192,9 +168,12 @@ is true where *writes nothing* is not.
 `GET /availability?dealershipId&serviceTypeId&from&to` is **two reads composed in
 `src/application/queryAvailability.ts`**: `candidateResources` (reference data) minus
 `appointmentRepository.busyResources` (the window); `candidateRepository.ts` cannot see `appointment` at
-all. It takes no lock, reserves nothing, and may be stale before the response is serialised — staleness is
-a property of the domain interface, not an implementation detail — and it is about **exactly the window
-queried**.
+all. It takes no lock and reserves nothing, and its staleness is a property of the domain interface rather
+than an implementation detail.
+
+![Availability as reference data minus the busy window](../diagrams/availability-composition.svg)
+
+*Source: [`availability-composition.html`](../diagrams/availability-composition.html)*
 
 The overlap predicate is the same expression the exclusion constraint uses:
 
