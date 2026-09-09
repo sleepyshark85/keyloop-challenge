@@ -1,7 +1,7 @@
 ---
 id: "15"
 title: The harness seeds from a declared fixture, and demonstrates capacity as well as scarcity
-status: ready
+status: done
 depends_on: ["10"]
 arc42: ["§3.1", "§11.1"]
 adr: [38]

@@ -19,12 +19,12 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **378** |
-| Severity | 14 blocking · 182 major · 182 minor |
-| Verdicts | 20 narrowed · 132 accepted · 3 escalated · 30 deferred · 3 rejected |
-| Raised by | architect 83 · test-engineer 76 · orchestrator 75 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
+| Findings recorded | **379** |
+| Severity | 14 blocking · 182 major · 183 minor |
+| Verdicts | 20 narrowed · 132 accepted · 3 escalated · 31 deferred · 3 rejected |
+| Raised by | architect 83 · test-engineer 76 · orchestrator 76 · reviewer 66 · implementer 61 · scribe 12 · human 5 |
 | Awaiting a ruling | **190** |
-| Mean escape distance | 1.45 step(s) |
+| Mean escape distance | 1.44 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
 caught. Zero means it was caught in the step that produced it. It is the shift-left measure
@@ -2596,6 +2596,7 @@ rather than narrated.*
 |---|---|---|---|---|---|
 | **T-15-1** | MAJOR | 3 *(+0)* | test-engineer | THE TEST-ENGINEER READ src/ WHILE WRITING THE RED COMMIT, WHICH ITS ROLE FORBIDS -- SELF-DISCLOSED, UNPROMPTED | accepted |
 | **A-15-1** | MINOR | 1 *(+0)* | architect | THE DEMO ASSUMES N CONCURRENT curl PROCESSES CONTEND RATHER THAN SERIALISING | accepted |
+| **O-15-1** | MINOR | 6 *(+0)* | orchestrator | slice:check CANNOT SAY 'MUTATION NOT APPLICABLE', ONLY 'NO EVIDENCE' -- SO A SLICE THAT CANNOT HAVE A SCORE LOOKS THE SAME AS ONE THAT DUCKED IT | deferred |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2610,6 +2611,12 @@ rather than narrated.*
 - *scenario:* harness/spurious-refusal.sh fires N background curl processes and asserts min(N,M) confirmations. If the processes serialise -- spawn cost, connection setup, the shell's own scheduling -- the assertion still passes while demonstrating no contention at all. The step-1 rationale claimed AC-5's distinctness assertion would notice.
 - *file:* `docs/slices/15-design.md`
 - *accepted* by architect — CLOSED AT STEP 2, AND THE STEP-1 RATIONALE WAS WRONG. The test-engineer objected that AC-5's distinctness cannot notice: ADR-0009's prune-and-retry allocator makes final state timing-independent, so a serialised run yields the same count AND the same distinct assignment. THE ARCHITECT AGREED AND SUPPLIED A STRONGER REASON THAN THE OBJECTION'S OWN -- distinctness is IMPLIED BY THE EXCLUSION CONSTRAINTS, since two live rows cannot share a bay or a technician over one interval under ANY interleaving, so it is a consequence of the invariant and can never witness contention. The underlying fact recorded: THIS DEMO'S CONTENTION IS OVER PERSISTED ROWS, NOT INSTANTS, which also subsumes the separately-listed ADR-0004 global-mutex limit -- the two bullets were one fact said twice and are now one. A-15-1 rests on the captured double-booking.sh transcript, where racer 4 rather than racer 1 wins, and on nothing this slice's own criteria newly prove.
+
+**O-15-1** — slice:check CANNOT SAY 'MUTATION NOT APPLICABLE', ONLY 'NO EVIDENCE' -- SO A SLICE THAT CANNOT HAVE A SCORE LOOKS THE SAME AS ONE THAT DUCKED IT
+
+- *scenario:* Slice 15 changes nothing under src/. collect-mutation.mjs REFUSED TO SCORE IT, correctly and in its own words -- 'no changed .ts under src/ against main -- nothing to score' -- so it appended nothing rather than fabricating a figure. slice:check then reports 'mutation score >= 0.75  UNVERIFIED -- Stryker has not run for this slice', with the footer 'no evidence exists; this blocks Done by design'. BOTH TOOLS ARE BEHAVING CORRECTLY AND THE COMPOSITE READS WRONG: the row is indistinguishable from a slice that changed src/ and never ran Stryker, which is the case the row exists to catch. The slice's own Definition of Done pre-declared the absence and named the four negative controls plus step 5's two falsifications as the substitute, so the human was not surprised -- but a reader six months out has a red-shaped row and no way to tell which kind it is. SAME FAMILY AS D-14-4: a guard whose output cannot discriminate the case it was built for. Remedy sketch, not prescribed: let the collector append a first-class 'not-applicable' reading with its own reason, so the row can say so instead of staying silent.
+- *file:* `tools/slice/check.mjs`
+- *deferred* by orchestrator — DEFERRED TO THE BACKLOG, TO THE SAME TOOLING SLICE D-14-4 IS OWED. NOT A MERGE BLOCKER: the absence is real, pre-declared in this slice's Definition of Done, and substituted for by evidence the reviewer verified by measurement rather than accepted -- four negative controls, a mutant taken from 4/6 to 6/6, and a second mutant proving the pre-fix filename was 0/6 and fully vacuous. THE HUMAN APPROVED WITH THIS ROW UNVERIFIED AND WAS TOLD SO. Cutting the tooling slice is the orchestrator's, and D-14-4 -- check.mjs baselining arc42 edits on merge-base rather than the slice's first commit -- is already waiting for it; two findings against the same file argue for one slice rather than two.
 
 </details>
 
