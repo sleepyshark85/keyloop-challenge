@@ -183,3 +183,44 @@ reading stdout would join on them."* I will not leave the claim standing unbuilt
 human pick the branch than have me pick it from the chair. My recommendation, non-binding: **build it** —
 the retraction costs a sentence but leaves the assessment's own observability goal short of its
 documented shape, and the mechanism is now measured end to end rather than hoped for.
+
+## DCR-14-1 — ruled **(a)**: the two red assertions are the test's correlation, not the bridge
+
+Raised by the implementer mid step 4, on `tests/integration/telemetry-logs.test.ts` (test-engineer's,
+unedited). **Measured before ruled** — one run of that file on the branch, 19 of 21 green:
+
+- **AC-6's attribute check.** The single offending record is `body=shutting down`,
+  `attrs={"signal":"SIGTERM"}`, `traceId=''`. The stdout line it came from carries `signal`, so the
+  criterion holds *substantively*. Two independent reasons the helper cannot see that: `stdoutLinesFor`
+  (`:131`) matches by string equality on `trace_id`/`span_id`, and `logger.ts`'s `mixin` **omits** both
+  keys when no span is active, so no line ever carries `''`; and the record set is process-lifetime
+  (`collector.logRecords()`) while the line set is request-scoped (`requestLogRecords`, sliced *before*
+  `service.stop()`), so the shutdown line is not in the window at all. Fixing only the first leaves it red.
+- **AC-5.** The collector **did** receive `severity=ERROR(17) body=dealership reference data cannot be
+  read` on span `b6e16c55c76dab2e`. `.find()` (`:459`) returned the `INFO` `incoming request` record
+  sharing that same span — one request's handler is one span (slice 09), so three records tie. The
+  bridge's mapping is right; the selector picks the wrong record of the three.
+
+**Not (c):** I can name no acceptance criterion, `QS-*` or `CLAUDE.md` §2 invariant that the merged code
+would fail — the records AC-5 and AC-6 describe were exported, correctly. A wrong selector is not a defect
+in what it selects from. **Not (b):** (b) merges as-is, and a red assertion cannot merge (§7, "`main` only
+ever receives green merges"; §10's *Done*). So, to the implementer's second question: **the slice does not
+merge with these two failing.** Step 4 holds. The slice returns to **step 3** for the test-engineer to
+correct its own file; step 4 then resumes, with no implementation change expected. No ADR — nothing about
+the system changed.
+
+**The correction may not be a loosening.** §2.4's evidence is the red commit `fe574ea`, which stands
+untouched; what follows must keep the criteria's teeth, and these four are the ruling, not advice:
+
+1. Correlate on the **line's own identity** — `body` ↔ `msg` plus its non-structural fields — not on
+   trace/span alone. Where both ids are non-empty they remain an *additional* constraint: that is AC-4's
+   claim and must not be dropped to make the matching easier.
+2. Widen the stdout window to the process's whole output (slice after `service.stop()`), so an
+   out-of-span line has a match available to be found.
+3. **An uncorrelatable record must fail, not be skipped.** A helper that returns `[]` and thereby passes
+   would delete the assertion rather than fix it.
+4. AC-5 must assert that **every** warn/error line has its matching record, not that at least one does.
+
+Booked against this design's own "what cannot fail" list, from the side it was not expected on: the named
+risk was that AC-5's severity table might be *transcribed* from the bridge. The table was in fact sourced
+externally and is correct; what bit was the selection of the record the table is applied to.
