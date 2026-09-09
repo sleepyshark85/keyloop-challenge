@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| Last commit | `6211c48 docs: point README at the generated test report, fix stale test-project claims` |
+| Last commit | `b0ebe74 docs(phase-6): diagrams for the slice loop, the domain model and the booking trace` |
 | Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E, process |
-| Agent runs recorded | 241 |
+| Agent runs recorded | 249 |
 | ADRs accepted | 15 |
 | Slices defined | 11 |
 | Open DCRs | none |
@@ -403,7 +403,15 @@
 | 2026-09-08 14:35 | implementer | 5m52 | 166 / 2,460 / 4,412,827 | `derived` |
 | 2026-09-08 15:51 | architect | 53m34 | 574 / 15,824 / 74,690,954 | `derived` |
 | 2026-09-08 16:50 | scribe | 4m30 | 106 / 1,830 / 2,914,778 | `derived` |
-| | **total** | **8976m06** | **64,416 / 4,350,229 / 5,726,123,202** | |
+| 2026-09-08 18:41 | architect | 40m53 | 442 / 30,924 / 65,857,052 | `derived` |
+| 2026-09-08 18:42 | architect | 42m06 | 458 / 31,351 / 68,250,064 | `derived` |
+| 2026-09-08 18:43 | architect | 42m23 | 470 / 31,377 / 71,064,118 | `derived` |
+| 2026-09-08 19:02 | architect | 61m32 | 550 / 33,188 / 89,066,785 | `derived` |
+| 2026-09-09 03:15 | architect | 18m57 | 118 / 35,753 / 7,407,979 | `derived` |
+| 2026-09-09 07:23 | architect | 10m52 | 80 / 12,006 / 3,139,332 | `derived` |
+| 2026-09-09 07:34 | architect | 12m42 | 124 / 9,845 / 6,876,837 | `derived` |
+| 2026-09-09 07:34 | scribe | 9m21 | 280 / 21,260 / 13,193,471 | `derived` |
+| | **total** | **9214m51** | **66,938 / 4,555,933 / 6,050,978,840** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
