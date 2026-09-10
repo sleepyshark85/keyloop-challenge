@@ -17,15 +17,11 @@ scope_ruled_by: architect
 
 ## Goal
 
-`POST /appointments` takes a start and derives the end from the service type's duration.
-`GET /availability` receives the same service type and then makes the caller supply the window
-anyway — so a caller who guesses a 30-minute window for a 60-minute job is told a bay is free and
-then refused `409` by the booking. Nothing is racing and nothing is stale: the caller named a
-window that is not the interval the booking would occupy, and the endpoint cannot refuse to answer
-a question it was asked. This slice removes the caller's ability to ask it. Availability takes
-`startsAt`, derives the interval through `deriveInterval` — the booking path's own function, not a
-copy of it — and **names the interval it answered about in its own response**, so duration has one
-source of truth and the window is observable rather than assumed.
+`GET /availability` makes the caller supply a window that `POST /appointments` derives for itself,
+so a caller guessing 30 minutes for a 60-minute job is told a bay is free and then refused `409`.
+Nothing is racing or stale: it named an interval the booking would not occupy. Availability now
+takes `startsAt`, derives the interval through `deriveInterval` — the booking path's own function,
+not a copy — and **names the interval it answered about**, so duration has one source of truth.
 
 ## Acceptance criteria
 
@@ -43,9 +39,9 @@ source of truth and the window is observable rather than assumed.
   fail if the two paths ever derive differently.*
 - **AC-3** — *(the contract, replaced not extended)* The emitted `docs/api/openapi.json` declares
   exactly three query parameters for `GET /availability` — `dealershipId`, `serviceTypeId`,
-  `startsAt` — with no parameter named `from` or `to`; the operation declares exactly the problem
-  types it can produce: `/problems/malformed-request`, `/problems/outside-opening-hours`,
-  `/problems/unknown-reference`, `/problems/internal`. A request carrying `from` and `to` and no
+  `startsAt` — with no parameter named `from` or `to`; the operation declares exactly three problem
+  types and no `500` (I-02-5): `/problems/malformed-request`, `/problems/outside-opening-hours`,
+  `/problems/unknown-reference`. A request carrying `from` and `to` and no
   `startsAt` answers `400 /problems/malformed-request`. `npm run docs:openapi -- --check` passes.
 - **AC-4** — *(the two endpoints agree on every shared failure)* For one
   `(dealershipId, serviceTypeId, startsAt)`, the booking's customer and vehicle valid, availability
@@ -100,8 +96,8 @@ disclaimer no longer describing a caller-supplied window) fails red with the res
 - `docs/api/openapi.json`, regenerated — never hand-edited.
 - `docs/WALKTHROUGH.md` Scenario 3, whose `curl` is the only place outside tests that sends
   `from`/`to`.
-- The retired-ADR citation in `queryAvailability.ts:2`, because this slice deletes the docblock
-  section carrying it anyway. See *Known limits* — there are ten, not one.
+- The retired-ADR citation in `queryAvailability.ts:2`, whose docblock section this slice deletes
+  anyway (`F-16-1` — there are ten, not one).
 
 ## Out of scope
 
@@ -131,33 +127,37 @@ Beyond `CLAUDE.md` §10:
 
 `CLAUDE.md` §6 places this with the architect and the gate reviews it. What moved:
 
-- **The `src/persistence/appointmentRepository.ts:516,526` citations stay with the booked sweep.**
-  `busyResources` is genuinely unedited and neither citation becomes false once the caller derives
-  the bounds, so the drive-by buys nothing and costs the "persistence not edited" claim.
-- **The ownership count is corrected.** Of the seven `tests/` citations the test-engineer claimed
-  as its own, **four** are: `tests/property/availability-agrees-with-constraint.db.test.ts:20,69`
-  and `tests/acceptance/availability.test.ts:22,52`.
-  `tests/unit/application/queryAvailability.test.ts:14,105` and
+- **The `appointmentRepository.ts:516,526` citations stay with the booked sweep.** `busyResources`
+  is genuinely unedited and neither citation becomes false once the caller derives the bounds, so
+  the drive-by buys nothing and costs the *persistence not edited* claim.
+- **The ownership count is corrected**: of the seven `tests/` citations the test-engineer claimed,
+  **four** are its own. `tests/unit/application/queryAvailability.test.ts:14,105` and
   `tests/unit/persistence/appointmentRepository.test.ts:533` are the **implementer's** under §5,
   which is NON-NEGOTIABLE. Acting on the original count would have been a §5 breach — in the slice
   whose whole subject is two things agreeing.
 
-## `F-16-2` — step 4/5 DCR, outcome (a)
+## `R-16-1` — step 5 DCR, outcome (d), provisional until the gate
+
+**Upheld in part.** §7's *green* binds build plus that commit's own `tests/unit`; a whole-suite
+reading would contradict §2.4, which needs the outside-in suites red until implementation completes.
+So `2601410` breached it under any reading — it could not compile — and `7d572d8` did not, its
+failing contract test being named in this slice's own red set. Remedied by rewriting history as two
+commits, not a squash: `8c688c1`, `54d8d35`. §7 is the human's text, so the reading is **provisional
+until step 6**. Residue booked as §11.1 `D-16-4`. Evidence and reasoning on PR #24.
+
+## The step-4 DCR — outcome (a)
 
 **No loopback; `loopbacks` stays 0.** *"At step 7"* read as post-merge; it lands on the branch
 (`7519274` precedes `d3699bd`), so AC-6's wording failed, not the loop. Reasoning on PR #24.
 
 ## Known limits, recorded at step 1
 
-- **`F-16-1` — ten live citations of ADR-0032, which was retired.** The 2026-09-07 retirement's
-  reference rewrite missed this cluster: `src/application/queryAvailability.ts`,
-  `src/persistence/appointmentRepository.ts` (×2), and seven in `tests/`. **ADR-0032 has no file in
-  `docs/adr/` at all** — these cite an ADR that does not exist. Roles fix what they are already
-  rewriting, in their own paths: the test-engineer four, the implementer three. **The residue is
-  three, all in the `busyResources` cluster** — `appointmentRepository.ts:516,526` and
-  `tests/unit/persistence/appointmentRepository.test.ts:533` — which is the coherent unit for the
-  repository-wide sweep booked in §11.1.
-- **`D-16-2` — `docs/diagrams/availability-composition.svg` will depict a retired parameter.**
-  Presentation diagrams are refreshed once, in phase 6; redrawing per slice costs several hundred
-  lines of mandatory reading for an artifact that does not diff. Same treatment as
-  `concurrent-booking.svg`, which has carried the same debt since slice 07.
+- **`F-16-1` — ten live citations of ADR-0032, retired 2026-09-07, whose reference rewrite missed
+  this cluster. ADR-0032 has no file in `docs/adr/` at all**: these cite an ADR that does not exist.
+  Roles fixed seven in files they were rewriting anyway — the test-engineer four, the implementer
+  three. **The residue is three**, all in the `busyResources` cluster
+  (`appointmentRepository.ts:516,526`, `tests/unit/persistence/appointmentRepository.test.ts:533`),
+  the coherent unit for the repository-wide sweep §11.1 takes at step 7.
+- **`D-16-2`** — `docs/diagrams/availability-composition.svg` depicts a retired parameter until
+  phase 6's single refresh, which is where presentation diagrams are redrawn; same treatment as
+  `concurrent-booking.svg`, carrying the same debt since slice 07.

@@ -186,6 +186,23 @@ hand-built `Type.Unsafe` shape slice 10 adopted.
 import is already the shape here — `availability.ts` imports `RFC3339_PATTERN, UUID_PATTERN` from
 `./appointments.js` today.*
 
+### Ruling 6, premise corrected — 2026-09-10, reviewer MAJOR-3
+
+**The decision stands; no DCR.** The measurement is right; its consequence is narrower than it looks.
+
+- **The contract test's agreement is enumerated per operation, not inherited.**
+  `error-taxonomy.test.ts` has zero occurrences of `availability` — the net covered two sites and
+  does not extend itself to a third. Ruling 6 should have booked that row as a step-3 obligation
+  rather than assuming it; the omission is mine.
+- **Sharing the symbol would not have changed the measurement.** Delete the arm and the outcome
+  falls to `default:`, throws, and `server.ts` renders the same status, `type` and `title`; a shared
+  `INTERNAL` would be equally unobserved. The gap is in the test set, so the remedy sits inside the
+  design and the ruling is untouched by it.
+- **What the row does not buy**: it makes the three sites' agreement asserted rather than assumed,
+  but it still passes against the deleted arm. Handled fault versus escaped exception (§8.4) is
+  distinguished by no test at any of the three sites — repo-wide, older than this slice, and **one
+  §11.1 row at step 7** rather than work here.
+
 ### Ruling 7 — `F-16-1a`, **(d)**: recorded in the slice file, not here
 
 The scope ruling and the corrected ownership count live in
@@ -238,7 +255,7 @@ Not a §11 debt row: nothing is owed and there is no work to book.
   `book, reschedule` → `book, reschedule, availability`. Nothing else in the table moves.
 - **§10.2** — QS-8's scenario rewritten per ruling 2; QS-14's *one-day availability query* replaced
   per AC-6, budget unchanged.
-- **§11.1** — four rows: `F-16-1` (ten live citations of retired ADR-0032, sweep not done — the
+- **§11.1** — five rows: `F-16-1` (ten live citations of retired ADR-0032, sweep not done — the
   residue after this slice is **three**, all in the `busyResources` cluster), `D-16-2`
   (`availability-composition.svg` depicts a retired parameter until phase 6), and:
   - **`D-16-1`** — QS-14 now measures a narrower range against the same number: the derived window
@@ -249,8 +266,9 @@ Not a §11 debt row: nothing is owed and there is no work to book.
     three symbols other route files consume; extraction to `src/http/shared.ts` is deferred, not
     rejected. Added at step 2 by ruling 6, and **already written** into §11.1 rather than held for
     step 7, because ruling 6 is what created it.
-  <br>Plus `F-16-2` as a fact rather than work: §8.6 claims availability answers `422` for an
-  unqualified service type and it returns empty lists instead.
+  - **`D-16-4`** — `tests/performance/availability-budget.test.ts` couples `npm test`'s exit code
+    to arc42 prose. Raised at step 5 under `R-16-1`; written into §11.1 before the gate, for the
+    reason `D-16-3` was.
 - **§5.2 is deliberately not edited.** It describes the module boundaries and `BookOutcome`; no
   boundary moves and no repository changes shape. Listing it would let it move.
 

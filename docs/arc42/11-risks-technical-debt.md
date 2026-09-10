@@ -81,6 +81,27 @@ go looking for wire patterns and a verdict-to-problem mapping. Extraction to `sr
 **deferred, not rejected**: it is a rename across two files with no behaviour in it, and doing it inside
 a slice whose diff is meant to be a parameter change would bury the change under it.
 
+**D-16-4** — **`npm test`'s exit code is coupled to prose in an architect-owned file.**
+`tests/performance/availability-budget.test.ts` is *"a documentation assertion wearing a performance
+test's clothes"* (slice 11's `d1de141`). AC-6's and AC-15's recording halves `readFileSync` this file
+and match a regex against it — no database, no service, no timing — and they sit in
+`tests/performance/` only because §5 puts QS-14's threshold there. Each also rides **inside the same
+`it()` as its own measurement**, so a re-wording cannot fail apart from a timing regression and is
+reported as one. It has bitten twice, neither time about performance. **Slice 11**: a condensation
+turned *"which no dealership generates organically"* into *"not organic traffic"*, leaving only
+`dealership_id`, which `\bdealership\b` cannot match because `_` is a word character — the branch
+was red for several commits over a clause that read correctly to a human. **Slice 16**: the step-4
+DCR (`events.jsonl` `s-16-dcr-raised`) proposed outcome **(c)** on the belief the slice could
+satisfy neither §10's Definition of Done nor §7's green-merge rule. It was wrong on its premise,
+but the premise was plausible *because* of this coupling, and it cost a full adjudication round. **Discharged by** separating the two halves:
+the timing assertion stays where §5 puts it, and the recording obligation moves to where prose
+obligations are already checked — `docs:check`, beside `docs:refs` and `docs:budget` — so a
+re-wording fails a documentation check instead of the test suite. The durable form is a **generated
+block**, the precedent being §11.1's own debt register: a figure `docs:build` writes cannot be
+re-worded out of a match. What makes it a booked decision rather than a chore is the ownership move —
+§5 keeps QS-14's threshold with the test-engineer *because* it is an acceptance threshold, and the
+recording half would leave `tests/` entirely.
+
 ## 11.2 Known risks
 
 Ordered by the cost of being wrong, not by likelihood.
