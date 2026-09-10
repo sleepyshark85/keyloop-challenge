@@ -50,7 +50,7 @@
 import { runAttemptLoop } from './attemptLoop.js';
 import type { AttemptLoopOutcome } from './attemptLoop.js';
 import { deriveInterval } from './deriveInterval.js';
-import { orderCandidates } from '../domain/candidates.js';
+import { EMPTY_OCCUPANCY, orderCandidates } from '../domain/candidates.js';
 import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
 import {
@@ -249,7 +249,9 @@ export async function bookAppointment(
   // 4. Candidates — REFERENCE DATA ONLY. `candidateResources` does not read `appointment`.
   const candidates = await candidateResources(db, command.dealershipId, command.serviceTypeId);
 
-  // 5. The order — ADR-0009's Order-C, from one seed drawn for this request.
+  // 5. The order — ADR-0040's Order-E, from one seed drawn for this request. `EMPTY_OCCUPANCY`
+  // here for now: this commit lands `orderCandidates`'s new signature and P4 makes it a NO-OP —
+  // byte-identical to ADR-0009's Order-C — until the occupancy read itself is wired in.
   //
   // THE TWO EMPTY-CANDIDATE ANSWERS LIVE IN THIS `null` BRANCH RATHER THAN IN FRONT OF IT
   // (I-04-4). Guards ahead of the call would make this branch unreachable: `tsc` would still
@@ -265,7 +267,7 @@ export async function bookAppointment(
   // which this API knows service types at all. Neither is a `409`: there is no verdict here to
   // build one from (ADR-0016).
   const seed = deps.seed();
-  const initialOrder = orderCandidates(candidates.bays, candidates.technicians, seed);
+  const initialOrder = orderCandidates(candidates.bays, candidates.technicians, EMPTY_OCCUPANCY, seed);
   if (initialOrder === null) {
     if (candidates.bays.length === 0) {
       deps.logger.error(

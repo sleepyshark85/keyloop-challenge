@@ -58,8 +58,8 @@
  * the count of attempts ACTUALLY MADE, tracked alongside the loop rather than recomputed from it.
  */
 import { SpanStatusCode } from '@opentelemetry/api';
-import { nextCandidate, orderCandidates, prune } from '../domain/candidates.js';
-import type { CandidateOrder } from '../domain/candidates.js';
+import { EMPTY_OCCUPANCY, nextCandidate, orderCandidates, prune } from '../domain/candidates.js';
+import type { CandidateOrder, OccupancySnapshot } from '../domain/candidates.js';
 import type { CandidateSet } from '../persistence/candidateRepository.js';
 import type { Db } from '../persistence/db.js';
 import {
@@ -85,6 +85,10 @@ export type CandidateStrategy =
       readonly kind: 'incumbent';
       readonly bayId: string;
       readonly technicianId: string;
+      /** `19-design.md` §3 ruling 5: `rescheduleAppointment` supplies `EMPTY_OCCUPANCY` itself —
+       * never defaulted here, so a shared loop never silently chooses an allocation policy for
+       * its caller. */
+      readonly busy: OccupancySnapshot;
       /** Drawn lazily, only if the incumbent pair itself conflicts. */
       readonly drawSeed: () => number;
     };
@@ -186,6 +190,12 @@ export async function runAttemptLoop<TRow, TAbort>(
           throw new Error('attempt loop: drawSeed invoked without an incumbent strategy');
         };
 
+  /** The same reachable-only-under-'incumbent' reasoning as `drawIncumbentSeed`, for the
+   * snapshot its lazily-drawn shuffle is ordered against. `EMPTY_OCCUPANCY` here is never read —
+   * the 'shuffled' strategy's `order` is never `null`, so the branch below never runs for it. */
+  const incumbentBusy: OccupancySnapshot =
+    strategy.kind === 'incumbent' ? strategy.busy : EMPTY_OCCUPANCY;
+
   /** The resource of the most recent conflict — what makes a following success "absorbed". */
   let lastConflictResource: ContendedResource | null = null;
 
@@ -264,7 +274,12 @@ export async function runAttemptLoop<TRow, TAbort>(
 
           if (order === null) {
             seed = drawIncumbentSeed();
-            const initialOrder = orderCandidates(candidates.bays, candidates.technicians, seed);
+            const initialOrder = orderCandidates(
+              candidates.bays,
+              candidates.technicians,
+              incumbentBusy,
+              seed,
+            );
             if (initialOrder === null) return refuse('exhausted', outcome.resource, attempts);
             order = initialOrder;
           } else {

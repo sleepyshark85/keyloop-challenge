@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { bookAppointment, toAppointmentView } from '../../../src/application/bookAppointment.js';
 import type { BookCommand, BookDeps } from '../../../src/application/bookAppointment.js';
 import type { Logger } from '../../../src/platform/logger.js';
-import { orderCandidates } from '../../../src/domain/candidates.js';
+import { EMPTY_OCCUPANCY, orderCandidates } from '../../../src/domain/candidates.js';
+import type { OccupancySnapshot } from '../../../src/domain/candidates.js';
 import { scriptedDb } from '../helpers/stub-db.js';
 import type { ScriptedStep } from '../helpers/stub-db.js';
 
@@ -54,12 +55,17 @@ const bays6 = ['bay-0', 'bay-1', 'bay-2', 'bay-3', 'bay-4', 'bay-5'];
  * forbid the shuffle ever changing behind its contract. What it pins is the claim this file is
  * about — the loop draws in the order the DOMAIN gives it, in that order, and does not re-sort,
  * re-shuffle or ignore it.
+ *
+ * `busy` defaults to `EMPTY_OCCUPANCY` — `bookAppointment` itself passes `EMPTY_OCCUPANCY` for
+ * now too (this commit lands `orderCandidates`'s new signature; the occupancy read is wired in
+ * next), so the prediction and the production call agree without every call site saying so.
  */
 function drawn(
   bays: readonly string[],
   technicians: readonly string[],
+  busy: OccupancySnapshot = EMPTY_OCCUPANCY,
 ): { readonly bays: readonly string[]; readonly technicians: readonly string[] } {
-  const order = orderCandidates(bays, technicians, SEED);
+  const order = orderCandidates(bays, technicians, busy, SEED);
   if (order === null) throw new Error('the fixture has no candidates');
   return order;
 }
@@ -207,8 +213,9 @@ describe('bookAppointment — the happy path', () => {
     );
     await bookAppointment(db, collectingDeps().deps, COMMAND);
 
-    // Everything before the INSERT is reference data. If a `select ... from appointment` ever
-    // appears here, check-then-act has a subject again.
+    // Everything before the INSERT is reference data. `orderCandidates` is called with
+    // `EMPTY_OCCUPANCY` for now — the occupancy read itself lands next, and this assertion is
+    // what will change deliberately when it does.
     const beforeInsert = recorded.slice(0, -1).map((q) => q.sql).join('\n');
     expect(beforeInsert).not.toMatch(/appointment/i);
   });
@@ -354,7 +361,7 @@ describe('bookAppointment — the loop walks ADR-0009 Order-C, not the repositor
     const head = drawn(bays6, ['tech-0']).bays[0];
     let other = SEED;
     for (let candidate = SEED + 1; candidate < SEED + 64; candidate += 1) {
-      const order = orderCandidates(bays6, ['tech-0'], candidate);
+      const order = orderCandidates(bays6, ['tech-0'], EMPTY_OCCUPANCY, candidate);
       if (order !== null && order.bays[0] !== head) {
         other = candidate;
         break;

@@ -87,8 +87,39 @@ function shuffle(ids: readonly string[], next: () => number): string[] {
 }
 
 /**
- * ADR-0009's Order-C. Both lists are shuffled from ONE stream — bays, then technicians — so the
- * seed decides the whole order and not merely half of it.
+ * ADR-0040's Order-E. What the ordering is told is taken — two lists of ids and nothing else, no
+ * freshness marker, no timestamp, nothing a later reader could mistake for a hold. `EMPTY_OCCUPANCY`
+ * is reschedule's own argument (`19-design.md` §3, ruling 5) and is also what a `busy = EMPTY_OCCUPANCY`
+ * call collapses to element-for-element the pre-slice-19 order (P4).
+ */
+export interface OccupancySnapshot {
+  readonly bays: readonly string[];
+  readonly technicians: readonly string[];
+}
+
+/** The ordering with nothing known to be busy. */
+export const EMPTY_OCCUPANCY: OccupancySnapshot = { bays: [], technicians: [] };
+
+/**
+ * ADR-0040's Order-E: partition `ids` into the free prefix and the busy remainder, THEN shuffle
+ * each half — both from the SAME stream, free first, so a caller draws every free candidate
+ * before it draws any busy one without membership ever changing.
+ *
+ * A plain `filter` twice rather than one pass building two buckets: `filter` preserves the input
+ * order (ADR-0021's replay concern, one step early — `shuffle` only ever sees `ids` in the order
+ * `candidateResources` returned it), and there is no other reader of either intermediate list.
+ */
+function freeFirst(ids: readonly string[], busy: readonly string[], next: () => number): string[] {
+  const taken = new Set(busy);
+  const free = ids.filter((id) => !taken.has(id));
+  const rest = ids.filter((id) => taken.has(id));
+  return [...shuffle(free, next), ...shuffle(rest, next)];
+}
+
+/**
+ * ADR-0009's Order-C, now ADR-0040's Order-E: ONE `mulberry32(seed)` stream, drawn from in a
+ * fixed order — bays-free, bays-rest, technicians-free, technicians-rest — so the seed decides
+ * the whole order and not merely a quarter of it.
  *
  * `null` when either list is empty: no candidate exists, so no attempt can be made. That is the
  * ONLY empty-candidate branch on the booking path (arc42 §6.2 step 6). This module does not say
@@ -96,21 +127,28 @@ function shuffle(ids: readonly string[], next: () => number): string[] {
  * application owns "whose fault is it" — and in particular it never fabricates a capacity
  * refusal, which would need a verdict nobody has (ADR-0016).
  *
- * THE EMPTINESS TEST IS THE DESTRUCTURING, not a `length` check in front of it. Splitting head
- * from tail is what BUILDS the tuple the carrier needs, and `head === undefined` is exactly the
- * condition a `length === 0` check would have tested — so the two collapse into one branch that
- * is both reachable and the thing `tsc` narrows on. The alternative pairs a length guard with an
- * `as NonEmpty<string>` per list, which asserts the very fact the guard just established: I-04-4
- * one level down.
+ * THE EMPTINESS TEST IS THE DESTRUCTURING OF `freeFirst`'S CONCATENATED RETURN, never a check on
+ * the free group alone. A group may legitimately be empty — every bay busy is the ordinary state
+ * this slice exists for — so testing `freeHead === undefined` in front of this would refuse a
+ * fully-occupied dealership through the `500`/`422` exit, which is this slice's own defect
+ * inverted and worse (`19-design.md` §4, P2). Splitting head from tail on the WHOLE list is what
+ * BUILDS the tuple the carrier needs, and `head === undefined` is exactly the condition a
+ * `length === 0` check over the concatenation would have tested — so the two collapse into one
+ * branch that is both reachable and the thing `tsc` narrows on.
+ *
+ * `busy` cannot reach this `null` exit for a non-empty input — AC-3b: `freeFirst` only ever
+ * reorders `ids`, it never removes from it, so the concatenated list is exactly as long as `ids`
+ * whatever `busy` says.
  */
 export function orderCandidates(
   bays: readonly string[],
   technicians: readonly string[],
+  busy: OccupancySnapshot,
   seed: number,
 ): CandidateOrder | null {
   const next = mulberry32(seed);
-  const [bayHead, ...bayTail] = shuffle(bays, next);
-  const [technicianHead, ...technicianTail] = shuffle(technicians, next);
+  const [bayHead, ...bayTail] = freeFirst(bays, busy.bays, next);
+  const [technicianHead, ...technicianTail] = freeFirst(technicians, busy.technicians, next);
   if (bayHead === undefined || technicianHead === undefined) return null;
 
   const orderedBays: NonEmpty<string> = [bayHead, ...bayTail];

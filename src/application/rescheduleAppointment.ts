@@ -50,6 +50,7 @@ import type { AttemptLoopOutcome } from './attemptLoop.js';
 import { deriveInterval } from './deriveInterval.js';
 import { toAppointmentView } from './bookAppointment.js';
 import type { AppointmentView } from './bookAppointment.js';
+import { EMPTY_OCCUPANCY } from '../domain/candidates.js';
 import type { OpeningHoursVerdict } from '../domain/openingHours.js';
 import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
@@ -196,6 +197,11 @@ export async function rescheduleAppointment(
       kind: 'incumbent',
       bayId: existing.bayId,
       technicianId: existing.technicianId,
+      // ADR-0040 ruling 5: a snapshot over the NEW interval would report the row's own pair busy
+      // against itself (ADR-0030 vacates it), sorting the two candidates most likely to be free
+      // last. Supplied HERE, not defaulted inside the loop — a shared loop silently choosing an
+      // allocation policy for its own caller is a place the eventual fix would have no address.
+      busy: EMPTY_OCCUPANCY,
       drawSeed: deps.seed,
     },
     spanName: 'appointment.update',

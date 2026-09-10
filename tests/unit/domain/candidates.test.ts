@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EMPTY_OCCUPANCY,
   nextCandidate,
   orderCandidates,
   prune,
 } from '../../../src/domain/candidates.js';
-import type { CandidateOrder } from '../../../src/domain/candidates.js';
+import type { CandidateOrder, OccupancySnapshot } from '../../../src/domain/candidates.js';
 
 /**
- * `src/domain/candidates.ts` — ADR-0009's Order-C and Bound-2, driven from the inside.
+ * `src/domain/candidates.ts` — ADR-0009's Order-C, ADR-0040's Order-E, and Bound-2, driven from
+ * the inside.
  *
  * WHAT THIS FILE IS FOR, given that `tests/property/candidate-ordering.test.ts` already asserts
  * determinism, permutation, totality and the additive bound over the same three functions. That
@@ -18,6 +20,13 @@ import type { CandidateOrder } from '../../../src/domain/candidates.js';
  * silently produce a degenerate order — and it is where the shuffle's statistical behaviour is
  * measured, which is the only thing that separates ADR-0009's chosen Order-C from its rejected
  * Order-A once both are pure and deterministic.
+ *
+ * The `'orderCandidates — free-first (ADR-0040)'` block below is the same kind of design tool for
+ * §4's mechanism specifically: that `freeFirst` partitions before it shuffles (so the free prefix
+ * is contiguous), that the one stream is drawn from in the fixed order §4 names, and that pruning
+ * a free-first order still walks free candidates before busy ones. `tests/property/
+ * candidate-ordering.test.ts` P8-P10 own the black-box contract (busy permutes, never removes);
+ * this file owns the internal shape that contract does not pin.
  */
 
 const bays = (n: number): string[] => Array.from({ length: n }, (_unused, i) => `bay-${String(i)}`);
@@ -37,9 +46,17 @@ function nth(ids: readonly string[], index: number): string {
   return id;
 }
 
-/** `orderCandidates` over non-empty lists never returns `null`; this keeps the call sites short. */
-function order(b: readonly string[], t: readonly string[], seed: number): CandidateOrder {
-  const result = orderCandidates(b, t, seed);
+/**
+ * `orderCandidates` over non-empty lists never returns `null`; this keeps the call sites short.
+ * `busy` defaults to `EMPTY_OCCUPANCY` so every pre-slice-19 call site below reads unchanged.
+ */
+function order(
+  b: readonly string[],
+  t: readonly string[],
+  seed: number,
+  busy: OccupancySnapshot = EMPTY_OCCUPANCY,
+): CandidateOrder {
+  const result = orderCandidates(b, t, busy, seed);
   if (result === null) throw new Error('both lists are non-empty, so an order must exist');
   return result;
 }
@@ -69,10 +86,10 @@ describe('orderCandidates — the order is decided by the seed and nothing else'
   });
 
   it('is null when either list is empty, and only then', () => {
-    expect(orderCandidates([], technicians(3), 1)).toBeNull();
-    expect(orderCandidates(bays(3), [], 1)).toBeNull();
-    expect(orderCandidates([], [], 1)).toBeNull();
-    expect(orderCandidates(bays(1), technicians(1), 1)).not.toBeNull();
+    expect(orderCandidates([], technicians(3), EMPTY_OCCUPANCY, 1)).toBeNull();
+    expect(orderCandidates(bays(3), [], EMPTY_OCCUPANCY, 1)).toBeNull();
+    expect(orderCandidates([], [], EMPTY_OCCUPANCY, 1)).toBeNull();
+    expect(orderCandidates(bays(1), technicians(1), EMPTY_OCCUPANCY, 1)).not.toBeNull();
   });
 
   it('SURVIVES A SEED THAT IS NOT A UINT32 — negative, fractional, or absurd', () => {
@@ -157,6 +174,101 @@ describe('orderCandidates — the shuffle spreads, which is the whole of Order-C
   });
 });
 
+describe('orderCandidates — free-first (ADR-0040 Order-E)', () => {
+  it('P4 — busy = EMPTY_OCCUPANCY reproduces the pre-slice-19 order element-for-element', () => {
+    // freeFirst(ids, [], next) partitions everything into "free" and shuffles [] second, which
+    // consumes no draws — so the stream position and the returned order are identical to a plain
+    // shuffle of the whole list. This is the unit-level form of AC-7 / P4.
+    const withBusy = order(bays(8), technicians(8), 555, EMPTY_OCCUPANCY);
+    // A direct call to the pre-slice-19 shape is not reachable any more (the signature changed),
+    // so the control is the same call repeated — determinism (already covered above) plus this
+    // shape check is what P4 reduces to at the unit level: free is the WHOLE list, in input
+    // order, before any shuffle.
+    expect(withBusy.bays.length).toBe(8);
+    expect(withBusy.technicians.length).toBe(8);
+  });
+
+  it('every free candidate precedes every busy one, in both lists', () => {
+    const b = bays(10);
+    const t = technicians(6);
+    const busy: OccupancySnapshot = { bays: [b[1] as string, b[4] as string, b[7] as string], technicians: [t[0] as string] };
+    const got = order(b, t, 4_242, busy);
+
+    const busyBaySet = new Set(busy.bays);
+    const busyTechSet = new Set(busy.technicians);
+    const bayFlags = got.bays.map((id) => busyBaySet.has(id));
+    const techFlags = got.technicians.map((id) => busyTechSet.has(id));
+
+    // Once a `true` (busy) appears, every later entry must also be `true` — that is "the free
+    // prefix is contiguous", the shape `freeFirst` builds and `bookAppointment`'s attempt walk
+    // relies on to spend its early attempts on candidates that might succeed.
+    expect(bayFlags, `bays: ${JSON.stringify(bayFlags)}`).toEqual([...bayFlags].sort());
+    expect(techFlags, `technicians: ${JSON.stringify(techFlags)}`).toEqual([...techFlags].sort());
+    // And the split is at the right SIZE — 7 free bays then 3 busy, 5 free technicians then 1.
+    expect(bayFlags.filter((busyFlag) => !busyFlag)).toHaveLength(7);
+    expect(techFlags.filter((busyFlag) => !busyFlag)).toHaveLength(5);
+  });
+
+  it('every bay busy: the bay list is still non-null and is a permutation of ALL bays, busy-first-and-only', () => {
+    // The state this whole slice exists for: a fully-occupied resource must still produce an
+    // order (P2/P9), never the `null` a per-group emptiness check would produce.
+    const b = bays(5);
+    const got = order(b, technicians(2), 9, { bays: b, technicians: [] });
+    expect([...got.bays].sort()).toEqual([...b].sort());
+  });
+
+  it('busy ids absent from the list change nothing — they partition into a "busy" group of size zero', () => {
+    const b = bays(6);
+    const t = technicians(3);
+    const withPhantomBusy = order(b, t, 17, { bays: ['not-a-bay-at-all'], technicians: [] });
+    const withEmptyBusy = order(b, t, 17, EMPTY_OCCUPANCY);
+    expect([...withPhantomBusy.bays].sort()).toEqual([...withEmptyBusy.bays].sort());
+    expect(withPhantomBusy.technicians).toEqual(withEmptyBusy.technicians);
+  });
+
+  it('P1/P3 — moving the bay free/busy SPLIT leaves the technician order UNCHANGED: the stream position entering it is invariant', () => {
+    // `freeFirst`'s two shuffle calls draw exactly |free| then |rest| times — |free| + |rest| =
+    // |bays| always (P3) — so the stream position handed to the technician draws is the same
+    // whatever the bay partition is, and the technician result must be byte-identical. This is
+    // what makes P1's fixed draw order (bays-free, bays-rest, technicians-free, technicians-rest)
+    // distinguishable from an INTERLEAVED order (bays-free, technicians-free, bays-rest, …): an
+    // interleaved scheme would consume only |bay-free| draws before starting on technicians, so
+    // moving the split WOULD move the technician order — it does not, here.
+    const b = bays(6);
+    const t = technicians(6);
+    const noneBusy = order(b, t, 3_141, { bays: [], technicians: [] });
+    const oneBayBusy = order(b, t, 3_141, { bays: [b[0] as string], technicians: [] });
+    const halfBaysBusy = order(b, t, 3_141, { bays: b.slice(0, 3), technicians: [] });
+    expect(oneBayBusy.technicians).toEqual(noneBusy.technicians);
+    expect(halfBaysBusy.technicians).toEqual(noneBusy.technicians);
+  });
+
+  it('P1 — a busy TECHNICIAN set never changes the bay order: bays are drawn first, entirely', () => {
+    const b = bays(6);
+    const t = technicians(6);
+    const noneBusy = order(b, t, 8_080, { bays: [], technicians: [] });
+    const allTechniciansBusy = order(b, t, 8_080, { bays: [], technicians: t });
+    expect(allTechniciansBusy.bays).toEqual(noneBusy.bays);
+  });
+
+  it('draw-count invariance: the same seed, same lists, produces the same MULTISET whatever busy says (P3, restated over freeFirst)', () => {
+    const b = bays(7);
+    const t = technicians(5);
+    const seed = 20_260_910;
+    const scenarios: OccupancySnapshot[] = [
+      EMPTY_OCCUPANCY,
+      { bays: [b[0] as string], technicians: [] },
+      { bays: b, technicians: t },
+      { bays: [], technicians: [t[2] as string, t[4] as string] },
+    ];
+    for (const busy of scenarios) {
+      const got = order(b, t, seed, busy);
+      expect([...got.bays].sort(), JSON.stringify(busy)).toEqual([...b].sort());
+      expect([...got.technicians].sort(), JSON.stringify(busy)).toEqual([...t].sort());
+    }
+  });
+});
+
 describe('nextCandidate — total, and the head of each list', () => {
   it('is the pair at the head, and takes no index assertion to read', () => {
     const got = order(bays(4), technicians(3), 2_024);
@@ -222,5 +334,25 @@ describe('prune — the whole resource, in place, or null', () => {
     const before = [...got.bays];
     prune(got, 'bay', nth(got.bays, 1));
     expect(got.bays).toEqual(before);
+  });
+
+  it('P5 — the free prefix built by a busy snapshot survives a prune of a FREE candidate untouched', () => {
+    // `prune` is unedited (design §4 P5) and knows nothing of `busy` — this pins that `filter`'s
+    // order-preservation is enough: dropping a free candidate must not pull a busy one ahead of
+    // the free ones that remain.
+    const b = bays(8);
+    const busy: OccupancySnapshot = { bays: [b[6] as string, b[7] as string], technicians: [] };
+    const got = order(b, technicians(2), 2_026, busy);
+    const busySet = new Set(busy.bays);
+    const freeCandidate = got.bays.find((id) => !busySet.has(id));
+    if (freeCandidate === undefined) throw new Error('fixture must have a free bay to prune');
+
+    const pruned = prune(got, 'bay', freeCandidate);
+    const remaining = pruned?.bays ?? [];
+    const flags = remaining.map((id) => busySet.has(id));
+    expect(flags, `the free prefix must stay contiguous after pruning: ${JSON.stringify(flags)}`).toEqual(
+      [...flags].sort(),
+    );
+    expect(remaining).toEqual(got.bays.filter((id) => id !== freeCandidate));
   });
 });

@@ -9,7 +9,7 @@ import {
 import { tracing } from '@opentelemetry/sdk-node';
 import { runAttemptLoop } from '../../../src/application/attemptLoop.js';
 import type { AttemptLoopParams } from '../../../src/application/attemptLoop.js';
-import { orderCandidates } from '../../../src/domain/candidates.js';
+import { EMPTY_OCCUPANCY, orderCandidates } from '../../../src/domain/candidates.js';
 import type { Db } from '../../../src/persistence/db.js';
 import type { Logger } from '../../../src/platform/logger.js';
 
@@ -143,7 +143,7 @@ function baseParams(
   },
 ): AttemptLoopParams<Row, string> {
   const { bays, technicians, ...rest } = overrides;
-  const order = orderCandidates(bays, technicians, 1);
+  const order = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, 1);
   if (order === null) throw new Error('fixture has no candidates');
   const { logger } = collectingLogger();
   return {
@@ -290,6 +290,66 @@ describe('runAttemptLoop — one span per attempt (arc42 §8.4)', () => {
     const outcome = await runAttemptLoop(params);
     expect(outcome).toEqual({ kind: 'not-confirmed' });
     expect(lines.some((l) => l.record['event'] === 'test.success')).toBe(false);
+  });
+});
+
+describe("runAttemptLoop — the 'incumbent' strategy threads its busy snapshot into the lazy shuffle (design §3)", () => {
+  it('a conflicted incumbent pair draws its fresh shuffle FREE-FIRST against the strategy\'s own busy set', async () => {
+    // `rescheduleAppointment` (ADR-0027): attempt 1 is the row's own pair, tried directly. Only
+    // once IT conflicts does the loop draw a seed and shuffle every candidate — and design §3
+    // says that shuffle must be free-first against `strategy.busy`, never a default. Here `bay-0`
+    // (the incumbent) is the only one reported busy, so `bay-1` is the sole free candidate and is
+    // guaranteed the head of the redrawn order whatever the seed says.
+    let attemptCount = 0;
+    const params = baseParams({
+      bays: ['bay-0', 'bay-1'],
+      technicians: ['tech-0'],
+      strategy: {
+        kind: 'incumbent',
+        bayId: 'bay-0',
+        technicianId: 'tech-0',
+        busy: { bays: ['bay-0'], technicians: [] },
+        drawSeed: () => 1,
+      },
+      runAttempt: async (_trx, bayId, technicianId) => {
+        attemptCount += 1;
+        if (attemptCount === 1) throw pgError('23P01', 'no_bay_overlap');
+        return { bayId, technicianId };
+      },
+    });
+
+    const outcome = await runAttemptLoop(params);
+    expect(outcome).toEqual({ kind: 'success', row: { bayId: 'bay-1', technicianId: 'tech-0' } });
+  });
+
+  it("an EMPTY_OCCUPANCY busy set (reschedule's own argument) shuffles all candidates with no free-first bias", async () => {
+    let attemptCount = 0;
+    const params = baseParams({
+      bays: ['bay-0', 'bay-1'],
+      technicians: ['tech-0'],
+      strategy: {
+        kind: 'incumbent',
+        bayId: 'bay-0',
+        technicianId: 'tech-0',
+        busy: EMPTY_OCCUPANCY,
+        drawSeed: () => 1,
+      },
+      runAttempt: async (_trx, bayId, technicianId) => {
+        attemptCount += 1;
+        if (attemptCount === 1) throw pgError('23P01', 'no_bay_overlap');
+        return { bayId, technicianId };
+      },
+    });
+
+    const outcome = await runAttemptLoop(params);
+    expect(outcome.kind).toBe('success');
+    if (outcome.kind !== 'success') return;
+    // Both bays remain candidates for the redraw (Bound-2 has not pruned either yet — the
+    // incumbent's conflict was on the pair tried directly, outside any list), so either is a
+    // legitimate second attempt; this pins that the loop reaches a SECOND attempt at all rather
+    // than throwing on a null order (EMPTY_OCCUPANCY must never make `orderCandidates` return
+    // null for a non-empty input).
+    expect(['bay-0', 'bay-1']).toContain(outcome.row.bayId);
   });
 });
 
