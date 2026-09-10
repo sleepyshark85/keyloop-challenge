@@ -50,10 +50,11 @@
 import { runAttemptLoop } from './attemptLoop.js';
 import type { AttemptLoopOutcome } from './attemptLoop.js';
 import { deriveInterval } from './deriveInterval.js';
-import { EMPTY_OCCUPANCY, orderCandidates } from '../domain/candidates.js';
+import { orderCandidates } from '../domain/candidates.js';
 import type { Db } from '../persistence/db.js';
 import type { Logger } from '../platform/logger.js';
 import {
+  busyResources,
   insertAppointment,
   lockResources,
 } from '../persistence/appointmentRepository.js';
@@ -246,12 +247,19 @@ export async function bookAppointment(
       break;
   }
 
-  // 4. Candidates — REFERENCE DATA ONLY. `candidateResources` does not read `appointment`.
-  const candidates = await candidateResources(db, command.dealershipId, command.serviceTypeId);
+  // 4. Candidates — REFERENCE DATA ONLY, `candidateResources` never reads `appointment` — and the
+  // ADVISORY occupancy read (ADR-0040, `A-19-1`) over the OCCUPANCY interval the exclusion
+  // constraint itself sees. One round trip each, run together: neither depends on the other's
+  // result, and both must finish before ordering (step 5) can run.
+  const startsAt = new Date(derivation.occupancyStartsAt);
+  const endsAt = new Date(derivation.occupancyEndsAt);
+  const [candidates, busy] = await Promise.all([
+    candidateResources(db, command.dealershipId, command.serviceTypeId),
+    busyResources(db, command.dealershipId, startsAt, endsAt),
+  ]);
 
-  // 5. The order — ADR-0040's Order-E, from one seed drawn for this request. `EMPTY_OCCUPANCY`
-  // here for now: this commit lands `orderCandidates`'s new signature and P4 makes it a NO-OP —
-  // byte-identical to ADR-0009's Order-C — until the occupancy read itself is wired in.
+  // 5. The order — ADR-0040's Order-E, free-first from the occupancy read above, from one seed
+  // drawn for this request.
   //
   // THE TWO EMPTY-CANDIDATE ANSWERS LIVE IN THIS `null` BRANCH RATHER THAN IN FRONT OF IT
   // (I-04-4). Guards ahead of the call would make this branch unreachable: `tsc` would still
@@ -265,9 +273,10 @@ export async function bookAppointment(
   // this service type" is an entirely ordinary state of an ordinary dealership: the request names
   // a (dealership, service-type) pair and that pair does not resolve, which is the only sense in
   // which this API knows service types at all. Neither is a `409`: there is no verdict here to
-  // build one from (ADR-0016).
+  // build one from (ADR-0016). `busy` cannot reach this branch for a non-empty input either way —
+  // AC-3b, `orderCandidates`'s own P2/P9.
   const seed = deps.seed();
-  const initialOrder = orderCandidates(candidates.bays, candidates.technicians, EMPTY_OCCUPANCY, seed);
+  const initialOrder = orderCandidates(candidates.bays, candidates.technicians, busy, seed);
   if (initialOrder === null) {
     if (candidates.bays.length === 0) {
       deps.logger.error(
@@ -280,8 +289,6 @@ export async function bookAppointment(
   }
 
   const appointmentId = deps.newId();
-  const startsAt = new Date(derivation.occupancyStartsAt);
-  const endsAt = new Date(derivation.occupancyEndsAt);
 
   // 6. The loop — `attemptLoop.ts` (F-06-1), starting from the whole-tree shuffle already drawn
   // above. `runAttempt` is ADR-0018's two lock acquisitions plus ONE `INSERT`; `onBadReference`
