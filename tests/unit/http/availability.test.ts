@@ -2,27 +2,35 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildOpenApiDocument, buildServer } from '../../../src/http/server.js';
 import type { AvailabilityOutcome } from '../../../src/application/queryAvailability.js';
+import type { Instant } from '../../../src/domain/interval.js';
 import type { HealthOutcome } from '../../../src/application/checkHealth.js';
 import { createLogger } from '../../../src/platform/logger.js';
 
 /**
- * `GET /availability` through `app.inject` — no database, no network. AC-2 through AC-6 assert
- * the same route end to end against a real container (`tests/acceptance/availability.test.ts`)
- * and QS-8 asserts the query agrees with the constraint
- * (`tests/property/availability-agrees-with-constraint.db.test.ts`); both are the
- * test-engineer's. What is here instead: the exhaustive switch's three arms render the right
- * status and taxonomy `type`, the querystring schema rejects what it should before any handler
- * runs, and the AC-5 fields survive the response schema unchanged (`Type.Boolean()`/
- * `Type.String()`, not `Type.Literal` — see `routes/availability.ts`'s own docblock for why a
- * literal would let a wrongly-computed value through silently).
+ * `GET /availability` through `app.inject` — no database, no network. AC-1 through AC-4, AC-7
+ * assert the same route end to end against a real container
+ * (`tests/acceptance/availability.test.ts`) and QS-8 asserts the query agrees with the
+ * constraint (`tests/property/availability-agrees-with-constraint.db.test.ts`); both are the
+ * test-engineer's. What is here instead: the exhaustive switch's five arms render the right
+ * status and taxonomy `type`, the querystring schema (now `startsAt` alone, ADR-0039) rejects
+ * what it should before any handler runs, and the AC-5/AC-7 fields survive the response schema
+ * unchanged (`Type.Boolean()`/`Type.String()`, not `Type.Literal` — see
+ * `routes/availability.ts`'s own docblock for why a literal would let a wrongly-computed value
+ * through silently).
+ *
+ * `docs/slices/16-availability-derives-its-own-window.md`, `docs/slices/16-design.md` §2-§3 ·
+ * ADR-0039. SUPERSEDES the slice 08/10 version at this path: `from`/`to` are gone, the `200`
+ * now requires `startsAt`/`endsAt`, and `malformed-window` is replaced by
+ * `malformed-instant`/`outside-opening-hours`/`reference-data-invalid`.
  */
 
 const silentLogger = createLogger({ logLevel: 'silent' });
 
 const DEALERSHIP = '11111111-1111-4111-8111-111111111111';
 const SERVICE_TYPE = '22222222-2222-4222-8222-222222222222';
-const FROM = '2026-09-08T09:00:00.000Z';
-const TO = '2026-09-08T10:00:00.000Z';
+const STARTS_AT = '2026-09-08T09:00:00.000Z';
+const STARTS_AT_MILLIS = Date.parse(STARTS_AT) as Instant;
+const ENDS_AT_MILLIS = (STARTS_AT_MILLIS + 3_600_000) as Instant;
 
 const apps: FastifyInstance[] = [];
 
@@ -79,18 +87,27 @@ async function get(app: FastifyInstance, query: Record<string, string>): Promise
 const VALID_QUERY = {
   dealershipId: DEALERSHIP,
   serviceTypeId: SERVICE_TYPE,
-  from: FROM,
-  to: TO,
+  startsAt: STARTS_AT,
+};
+
+const AVAILABLE: AvailabilityOutcome = {
+  kind: 'available',
+  startsAt: STARTS_AT_MILLIS,
+  endsAt: ENDS_AT_MILLIS,
+  bays: ['bay-1'],
+  technicians: ['tech-1'],
 };
 
 describe('GET /availability — the exhaustive status mapping', () => {
-  it('available is 200 with bays, technicians, advisory: true and a disclaimer', async () => {
-    const app = serverAnswering({ kind: 'available', bays: ['bay-1'], technicians: ['tech-1'] });
+  it('available is 200 with startsAt, endsAt, bays, technicians, advisory: true and a disclaimer', async () => {
+    const app = serverAnswering(AVAILABLE);
     const response = await get(app, VALID_QUERY);
 
     expect(response.statusCode).toBe(200);
     expect(response.contentType).toMatch(/application\/json/);
     const body = response.json() as Record<string, unknown>;
+    expect(body['startsAt']).toBe(new Date(STARTS_AT_MILLIS).toISOString());
+    expect(body['endsAt']).toBe(new Date(ENDS_AT_MILLIS).toISOString());
     expect(body['bays']).toEqual(['bay-1']);
     expect(body['technicians']).toEqual(['tech-1']);
     expect(body['advisory']).toBe(true);
@@ -100,20 +117,41 @@ describe('GET /availability — the exhaustive status mapping', () => {
   });
 
   it('an EMPTY available answer is still 200 with two empty arrays, not a problem document', async () => {
-    const app = serverAnswering({ kind: 'available', bays: [], technicians: [] });
+    const app = serverAnswering({ ...AVAILABLE, bays: [], technicians: [] });
     const response = await get(app, VALID_QUERY);
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ bays: [], technicians: [] });
   });
 
-  it('malformed-window is 400 /problems/malformed-request (AC-6, F-08-3)', async () => {
-    const app = serverAnswering({ kind: 'malformed-window' });
+  it('malformed-instant is 400 /problems/malformed-request', async () => {
+    const app = serverAnswering({ kind: 'malformed-instant' });
     const response = await get(app, VALID_QUERY);
     expect(response.statusCode).toBe(400);
     expect(response.contentType).toMatch(/application\/problem\+json/);
     expect((response.json() as Record<string, unknown>)['type']).toBe(
       '/problems/malformed-request',
     );
+  });
+
+  it('outside-opening-hours is 400 /problems/outside-opening-hours, carrying the verdict', async () => {
+    const app = serverAnswering({
+      kind: 'outside-opening-hours',
+      verdict: { kind: 'outside-window', dayOfWeek: 2, opensAt: '08:00:00', closesAt: '18:00:00' },
+    });
+    const response = await get(app, VALID_QUERY);
+    expect(response.statusCode).toBe(400);
+    expect(response.contentType).toMatch(/application\/problem\+json/);
+    const body = response.json() as Record<string, unknown>;
+    expect(body['type']).toBe('/problems/outside-opening-hours');
+    expect(body['opensAt']).toBe('08:00:00');
+    expect(body['closesAt']).toBe('18:00:00');
+  });
+
+  it('reference-data-invalid is 500 /problems/internal', async () => {
+    const app = serverAnswering({ kind: 'reference-data-invalid', detail: 'unknown-zone' });
+    const response = await get(app, VALID_QUERY);
+    expect(response.statusCode).toBe(500);
+    expect((response.json() as Record<string, unknown>)['type']).toBe('/problems/internal');
   });
 
   it.each(['dealership', 'service-type'] as const)(
@@ -129,18 +167,17 @@ describe('GET /availability — the exhaustive status mapping', () => {
     },
   );
 
-  it('passes from/to through as the query named them, verbatim', async () => {
+  it('passes startsAt through as the query named it, verbatim (as millis, ADR-0039)', async () => {
     let seen: unknown;
     const app = serverAnswering((query) => {
       seen = query;
-      return { kind: 'available', bays: [], technicians: [] };
+      return { ...AVAILABLE, bays: [], technicians: [] };
     });
     await get(app, VALID_QUERY);
     expect(seen).toEqual({
       dealershipId: DEALERSHIP,
       serviceTypeId: SERVICE_TYPE,
-      fromMillis: Date.parse(FROM),
-      toMillis: Date.parse(TO),
+      startsAtMillis: Date.parse(STARTS_AT),
     });
   });
 });
@@ -155,24 +192,11 @@ describe('GET /availability — the querystring schema', () => {
     expect(response.contentType).toMatch(/application\/problem\+json/);
   });
 
-  it('a from value with no explicit offset is 400 — the same RFC 3339 discipline booking uses', async () => {
+  it('a startsAt value with no explicit offset is 400 — the same RFC 3339 discipline booking uses', async () => {
     const app = serverAnswering((): never => {
       throw new Error('a schema violation must never reach the handler');
     });
-    const response = await get(app, { ...VALID_QUERY, from: '2026-09-08T09:00:00' });
-    expect(response.statusCode).toBe(400);
-  });
-
-  it("a to value with no explicit offset is 400 — from's twin pattern, not from's mutant (I-08-6)", async () => {
-    // `to`'s own `{ pattern: RFC3339_PATTERN }` (routes/availability.ts:57) is a distinct
-    // property from `from`'s (line 56); this is the case that removeAdditional/the fixed-shape
-    // literal cannot reach, and it is a different code path from the route's own to<=from guard
-    // above — a schema violation here answers via server.ts's catch-all (`detail: error.message`),
-    // never the route's fixed 'to must be strictly later than from'.
-    const app = serverAnswering((): never => {
-      throw new Error('a schema violation must never reach the handler');
-    });
-    const response = await get(app, { ...VALID_QUERY, to: '2026-09-08T10:00:00' });
+    const response = await get(app, { ...VALID_QUERY, startsAt: '2026-09-08T09:00:00' });
     expect(response.statusCode).toBe(400);
   });
 
@@ -180,11 +204,24 @@ describe('GET /availability — the querystring schema', () => {
     "an unknown extra query parameter is STRIPPED, not rejected — Fastify's default ajv " +
       'removeAdditional: true, measured identically on the booking route (routes/appointments.ts)',
     async () => {
-      const app = serverAnswering({ kind: 'available', bays: [], technicians: [] });
+      const app = serverAnswering({ ...AVAILABLE, bays: [], technicians: [] });
       const response = await get(app, { ...VALID_QUERY, extra: 'nope' });
       expect(response.statusCode).toBe(200);
     },
   );
+
+  it("a request still carrying from and to, and no startsAt, is 400 — the retired parameters are no longer accepted (ADR-0039)", async () => {
+    const app = serverAnswering((): never => {
+      throw new Error('a schema violation must never reach the handler');
+    });
+    const response = await app.inject({
+      method: 'GET',
+      url:
+        `/availability?dealershipId=${DEALERSHIP}&serviceTypeId=${SERVICE_TYPE}` +
+        `&from=2026-09-08T09:00:00.000Z&to=2026-09-08T10:00:00.000Z`,
+    });
+    expect(response.statusCode).toBe(400);
+  });
 
   it('a missing required parameter is 400', async () => {
     const app = serverAnswering((): never => {
@@ -192,7 +229,7 @@ describe('GET /availability — the querystring schema', () => {
     });
     const response = await app.inject({
       method: 'GET',
-      url: `/availability?dealershipId=${DEALERSHIP}&serviceTypeId=${SERVICE_TYPE}&from=${FROM}`,
+      url: `/availability?dealershipId=${DEALERSHIP}&serviceTypeId=${SERVICE_TYPE}`,
     });
     expect(response.statusCode).toBe(400);
   });
@@ -218,36 +255,33 @@ describe('GET /availability — the querystring schema', () => {
       let seen: unknown;
       const app = serverAnswering((query) => {
         seen = query;
-        return { kind: 'available', bays: [], technicians: [] };
+        return { ...AVAILABLE, bays: [], technicians: [] };
       });
       await get(app, { ...VALID_QUERY, extra: 'nope' });
       expect(seen).toEqual({
         dealershipId: DEALERSHIP,
         serviceTypeId: SERVICE_TYPE,
-        fromMillis: Date.parse(FROM),
-        toMillis: Date.parse(TO),
+        startsAtMillis: Date.parse(STARTS_AT),
       });
       expect(seen).not.toHaveProperty('extra');
     },
   );
 });
 
-describe('GET /availability — the whole problem document on both error arms (R-08-5)', () => {
+describe('GET /availability — the whole problem document on both 4xx arms (R-08-5)', () => {
   /**
-   * Until now this file asserted `type`, `status` and `reference` and never `title` or `detail`
-   * — the same shape of gap `routes/appointments.ts` closed for its own arms (that file's own
-   * `describe('every row carries a title and a detail a client can read', …)`). A `title` or
-   * `detail` string reduced to `''` passed every assertion this file had.
+   * A `title` or `detail` string reduced to `''` passed every assertion this file had before
+   * (`routes/appointments.ts`'s own `describe('every row carries a title and a detail…')`).
    */
-  it('malformed-window (400) carries its title and detail, not just its type and status', async () => {
-    const app = serverAnswering({ kind: 'malformed-window' });
+  it('malformed-instant (400) carries its title and detail, not just its type and status', async () => {
+    const app = serverAnswering({ kind: 'malformed-instant' });
     const response = await get(app, VALID_QUERY);
     const body = response.json() as Record<string, unknown>;
     expect(response.statusCode).toBe(400);
     expect(body['type']).toBe('/problems/malformed-request');
     expect(body['status']).toBe(400);
     expect(body['title']).toBe('The request could not be understood');
-    expect(body['detail']).toBe('to must be strictly later than from');
+    expect(body['detail']).toBe('startsAt is not a usable instant');
   });
 
   it.each(['dealership', 'service-type'] as const)(
@@ -272,7 +306,7 @@ describe('GET /availability — the whole problem document on both error arms (R
  * byte-for-byte diff in `tests/contract/openapi-document.test.ts` (the test-engineer's, over the
  * COMMITTED document) cannot kill a mutant in `routes/availability.ts`'s source. This file calls
  * `buildOpenApiDocument()` directly — no database, no subprocess — which is the one path that
- * reaches those seven `description` string literals from a suite Stryker actually scores.
+ * reaches those description string literals from a suite Stryker actually scores.
  */
 describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachable from a unit test (D-08-1)', () => {
   interface OpenApiOperation {
@@ -290,20 +324,19 @@ describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachabl
     readonly paths?: Record<string, Record<string, OpenApiOperation>>;
   }
 
-  it('the operation-level description carries the querystring rule that Fastify drops when exploding it into query parameters', async () => {
+  it('the operation-level description carries what the operation answers and both reachable consequences (ADR-0039)', async () => {
     const doc = (await buildOpenApiDocument()) as OpenApiDoc;
     const operation = doc.paths?.['/availability']?.['get'];
 
     expect(operation, 'no GET /availability operation in the generated document').toBeDefined();
-    // `R-09-13`'s split (`10-design.md` §3): three concatenated literals, one fact each — what
-    // the operation answers, the rule (`A-10-4`), the consequence. Each assertion below binds
-    // to exactly one piece, unique to it, so `D-08-1`'s three surviving mutants (one per
-    // emptied literal) each stay separately killable.
+    // Three concatenated literals, one fact each — what the operation answers (a window derived
+    // from startsAt), and the two consequences a client can still reach. Each assertion below
+    // binds to exactly one piece, unique to it, so each stays separately killable (D-08-1).
     expect(operation?.description).toContain(
-      'for this dealership and service type over the requested from/to window',
+      "derived from startsAt and the service type's duration",
     );
-    expect(operation?.description).toContain('strictly later than from');
-    expect(operation?.description).toContain('400 /problems/malformed-request');
+    expect(operation?.description).toContain('malformed-request');
+    expect(operation?.description).toContain('outside-opening-hours');
   });
 
   it("the 200 response schema's own description carries AC-5's two facts", async () => {
@@ -315,9 +348,8 @@ describe('AC-5b — buildOpenApiDocument() documents GET /availability, reachabl
     expect(responseSchema?.description).toContain('not a reservation');
     expect(responseSchema?.description).toContain('true only of the interval queried');
     // The two remaining concatenated literals in this same description — asserted so a
-    // mutation to either is not free of the score's reach either (measured: without these,
-    // AvailabilityBody's own first and last literal pieces survive Stryker unkilled).
-    expect(responseSchema?.description).toContain('bays and technicians free over the queried interval');
+    // mutation to either is not free of the score's reach either.
+    expect(responseSchema?.description).toContain('startsAt/endsAt');
     expect(responseSchema?.description).toContain('adjudicated, database-verified booking');
   });
 

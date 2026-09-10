@@ -15,6 +15,12 @@ import type { PerfFixture } from '../support/perfFixture.js';
  * QS-14 — `docs/slices/09-observability.md` AC-12 through AC-15 · `09-design.md` "What makes
  * QS-14 assertable rather than aspirational" · arc42 §11.
  *
+ * SLICE 16 AMENDMENT (`docs/slices/16-availability-derives-its-own-window.md` AC-6, ADR-0039):
+ * slice 09's AC-12 — a one-day availability query — is UNREPRESENTABLE once the caller no
+ * longer states a window (there is no `to` to widen to a day). The block below is renamed
+ * AC-6 and times the derived-window query in its place, against the SAME unchanged fixture;
+ * AC-13 through AC-15 are untouched.
+ *
  * `tests/performance/**` is its OWN vitest project (`T-09-3`) with its OWN `globalSetup`
  * container (`vitest.config.ts`), run alone by `tools/ci/run-tests.mjs` — so "uncontended"
  * describes the RUNNER as well as the request (§11's own protocol). This file follows every
@@ -104,15 +110,22 @@ describe('QS-14 — the availability and booking budgets, and the N+1/INSERT-cou
     await client?.end();
   });
 
-  describe('AC-12 — a one-day availability query, p95 under 200ms over 100 uncontended runs', () => {
-    it('p95 < 200ms', async () => {
-      const dayStart = fixture.weekStart;
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
+  describe('AC-6 (slice 16) — the derived-window availability query, p95 under 200ms over 100 uncontended runs', () => {
+    /**
+     * `docs/slices/16-availability-derives-its-own-window.md` AC-6: the one-day query this
+     * block used to time is UNREPRESENTABLE once the window is derived (ADR-0039) — there is
+     * no `to` to widen to a day any more. The replacement times a query over the window the
+     * server itself derives from `startsAt` and the fixture's service duration, against the
+     * SAME unchanged fixture (5 bays, 20 technicians, 500 filler appointments over a week):
+     * only the query shape changes, not the data it reads. `fixture.weekStart` sits exactly at
+     * the dealership's opening instant (08:00, `Europe/London` is UTC+0 in November), so it is
+     * a valid `startsAt` without needing a second fixture.
+     */
+    it('p95 < 200ms, and arc42 §11 records the measured figure beside its machine class', async () => {
       const query = {
         dealershipId: fixture.scenario.dealershipId,
         serviceTypeId: fixture.scenario.serviceTypeId,
-        from: dayStart.toISOString(),
-        to: dayEnd.toISOString(),
+        startsAt: fixture.weekStart.toISOString(),
       };
 
       const { failure, value } = await withService({}, async (service) => {
@@ -131,8 +144,30 @@ describe('QS-14 — the availability and booking budgets, and the N+1/INSERT-cou
       const samples = value as number[];
       const p95 = p95NearestRank(samples);
       // eslint-disable-next-line no-console
-      console.log(`[QS-14][AC-12] ${machineClass()} p95=${p95.toFixed(2)}ms over ${String(SAMPLES)} samples (warmup=${String(WARMUP)})`);
-      expect(p95, `AC-12 — p95 must be under 200ms; measured ${p95.toFixed(2)}ms. ${machineClass()}`).toBeLessThan(200);
+      console.log(`[QS-14][AC-6] ${machineClass()} p95=${p95.toFixed(2)}ms over ${String(SAMPLES)} samples (warmup=${String(WARMUP)})`);
+      expect(p95, `AC-6 — p95 must be under 200ms; measured ${p95.toFixed(2)}ms. ${machineClass()}`).toBeLessThan(200);
+
+      // The measured figure must be RECORDED, not merely produced — arc42 §11 at step 7,
+      // beside its machine class, "so a future tightening has a baseline" (slice file, DoD).
+      // Mirrors AC-15's own precedent below: a document-text check, not a mechanism check.
+      const arc42Risks = readFileSync(resolve(process.cwd(), 'docs/arc42/11-risks-technical-debt.md'), 'utf8');
+      const mentionsP95Figure =
+        /\bp95\b[\s\S]{0,120}?\d+(\.\d+)?\s*ms\b/i.test(arc42Risks) &&
+        /\bavailabilit\w*\b/i.test(arc42Risks);
+      const mentionsMachineClassBesideIt =
+        /\bp95\b[\s\S]{0,300}?\bcpus?=\d+/i.test(arc42Risks) ||
+        /\bcpus?=\d+[\s\S]{0,300}?\bp95\b/i.test(arc42Risks);
+
+      expect(
+        mentionsP95Figure,
+        `AC-6 — arc42 §11 (docs/arc42/11-risks-technical-debt.md) does not yet state a measured ` +
+          `p95 figure for the derived-window availability query. Measured here: ${p95.toFixed(2)}ms.`,
+      ).toBe(true);
+      expect(
+        mentionsMachineClassBesideIt,
+        `AC-6 — arc42 §11 does not yet state the measured p95 beside its machine class ` +
+          `(${machineClass()}).`,
+      ).toBe(true);
     }, 120_000);
   });
 
@@ -209,15 +244,12 @@ describe('QS-14 — the availability and booking budgets, and the N+1/INSERT-cou
   describe('AC-14 — candidate selection reads the candidate set once, not once per candidate', () => {
     it('the availability.candidates span does not contain a number of nested query spans proportional to bays x technicians', async () => {
       const collector = await startOtelCollector();
-      const dayStart = fixture.weekStart;
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
 
       const { failure, value } = await withService({ otelExporterEndpoint: collector.endpoint }, async (service) => {
         return await getAvailability(service, {
           dealershipId: fixture.scenario.dealershipId,
           serviceTypeId: fixture.scenario.serviceTypeId,
-          from: dayStart.toISOString(),
-          to: dayEnd.toISOString(),
+          startsAt: fixture.weekStart.toISOString(),
         });
       });
       try {

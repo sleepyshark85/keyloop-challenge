@@ -460,7 +460,7 @@ export function registerAppointmentRoutes(
  * without the hours is a client that has to guess. The two verdicts that mean broken reference
  * data never reach here — `deriveInterval` routes them to `reference-data-invalid`.
  */
-function outsideOpeningHours(verdict: OpeningHoursVerdict): Problem {
+export function outsideOpeningHours(verdict: OpeningHoursVerdict): Problem {
   const extra =
     verdict.kind === 'outside-window'
       ? { opensAt: verdict.opensAt, closesAt: verdict.closesAt }

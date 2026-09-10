@@ -9,6 +9,7 @@ import {
   describeAnswer,
   describeScenario,
   getAppointment,
+  getAvailability,
   isoAt,
   member,
   occupy,
@@ -334,6 +335,75 @@ describe('QS-11 — the error taxonomy is total and stable', () => {
       ).toBe('technician');
     });
   });
+
+  /* ─────────────────────────────────────────────────────────────── slice 16, MAJOR-3 ──
+   *
+   * `docs/slices/16-design.md` ruling 6 (premise corrected 2026-09-10): `/problems/internal`
+   * is held in agreement BY THIS FILE across every construction site, not by shared code —
+   * there is no response schema to share (I-02-5), so a frozen literal is rebuilt at each
+   * site on the settled precedent of `src/http/server.ts` and `src/http/routes/
+   * appointments.ts` (already two such sites). This slice adds a THIRD, in
+   * `src/http/routes/availability.ts`, and the ruling's own premise — "duplicated by
+   * construction site and held in agreement by the contract test" — was false for that third
+   * site until this case existed: the net above had zero occurrences of `availability`.
+   *
+   * This asserts AGREEMENT, the thing the ruling names, and stops there. It does not — and
+   * per the ruling need not — distinguish this handled `reference-data-invalid` arm from an
+   * escaped exception reaching the same catch-all; that distinction (arc42 §8.4's error log
+   * and ERROR span) is undertaken by no test at ANY of the three sites, is repo-wide and
+   * older than this slice, and is booked as an arc42 §11.1 debt row at step 7.
+   */
+  it(
+    "slice 16, MAJOR-3 — GET /availability's 500 /problems/internal agrees with POST /appointments's, asserted rather than assumed",
+    async () => {
+      // The SAME broken-timezone fixture booking's own `500` case uses (line ~408, below) —
+      // reference data the client cannot see or correct, T-02-4's route to this row.
+      const scenario = await seedScenario(client, 'tax-availability-internal', {
+        bays: 1,
+        technicians: 1,
+        timeZone: 'Not/AZone',
+      });
+      const where = `\n${describeScenario(scenario)}`;
+
+      await withService(async (service) => {
+        const availabilityAnswer = await getAvailability(service, {
+          dealershipId: scenario.dealershipId,
+          serviceTypeId: scenario.serviceTypeId,
+          startsAt: isoAt(0),
+        });
+        const bookingAnswer = await postBooking(service, bookingBody(scenario));
+
+        expectProblem(
+          availabilityAnswer,
+          500,
+          '/problems/internal',
+          `MAJOR-3 — GET /availability's own construction site${where}`,
+        );
+        expectProblem(
+          bookingAnswer,
+          500,
+          '/problems/internal',
+          `MAJOR-3 — POST /appointments's own construction site (the settled precedent)${where}`,
+        );
+
+        // `expectProblem` already pins status/content-type/type/status-member identically
+        // for both. `title` and `detail` are the two fields it does not touch — exactly the
+        // two ruling 6 named as part of the "identical type, status, title and detail"
+        // claim — so THIS case is what makes that claim true of the third site rather than
+        // assumed of it.
+        expect(
+          member(availabilityAnswer, 'title'),
+          `MAJOR-3 — the two sites' 'title' must agree.\n` +
+            `availability: ${describeAnswer(availabilityAnswer)}\nbooking:      ${describeAnswer(bookingAnswer)}${where}`,
+        ).toBe(member(bookingAnswer, 'title'));
+        expect(
+          member(availabilityAnswer, 'detail'),
+          `MAJOR-3 — and 'detail' too.\n` +
+            `availability: ${describeAnswer(availabilityAnswer)}\nbooking:      ${describeAnswer(bookingAnswer)}${where}`,
+        ).toBe(member(bookingAnswer, 'detail'));
+      });
+    },
+  );
 
   /* ────────────────────────────────────────────────────────────── slice 06, ADR-0024 ──
    *

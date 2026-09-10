@@ -165,25 +165,46 @@ is true where *writes nothing* is not.
 
 ## 6.5 Availability query — advisory by contract
 
-`GET /availability?dealershipId&serviceTypeId&from&to` is **two reads composed in
+`GET /availability?dealershipId&serviceTypeId&startsAt` is **two reads composed in
 `src/application/queryAvailability.ts`**: `candidateResources` (reference data) minus
 `appointmentRepository.busyResources` (the window); `candidateRepository.ts` cannot see `appointment` at
 all. It takes no lock and reserves nothing, and its staleness is a property of the domain interface rather
 than an implementation detail.
 
+**The caller states a start and the server derives the window**, by calling `deriveInterval` — the
+function `bookAppointment` calls, unedited — so duration arithmetic keeps one home and the
+opening-hours gate cannot be left behind ([ADR-0039](../adr/0039-availability-takes-a-start-not-a-window.md)).
+The `200` **names the interval it answered about**. That is what makes the reuse checkable rather
+than merely claimed: the two endpoints can be required to return the same two instants for one
+`(dealership, service type, start)`, and QS-8 can probe the interval the response named instead of
+recomputing one.
+
+**Two intervals, one value today.** `deriveInterval` yields both, and they are not the same concept:
+the busy read is issued over the **occupancy** interval — what the exclusion constraint sees — while
+the response names the **appointment** interval the client asked about. `A-4` holds the buffer at
+zero, so the two are currently the same value, and `occupancyInterval` (`src/domain/interval.ts`) is
+the single site a non-zero buffer would change. The distinction is consequently **asserted by no
+test, and deliberately so**: while the values are equal a test could only assert `x === x` and would
+have failed at no point in its life, which §2.4 does not accept as evidence. Its reader is whoever
+introduces a buffer, and this paragraph — not the code comment that cites it — is the record.
+
 ![Availability as reference data minus the busy window](../diagrams/availability-composition.svg)
 
-*Source: [`availability-composition.html`](../diagrams/availability-composition.html)*
+*Source: [`availability-composition.html`](../diagrams/availability-composition.html) — **the drawing
+still shows the retired `from`/`to` signature**; presentation diagrams are redrawn once, in phase 6
+(§11.1 `D-16-2`).*
 
 The overlap predicate is the same expression the exclusion constraint uses:
 
 ```sql
-tstzrange(starts_at, ends_at) && tstzrange($from, $to)   AND status <> 'cancelled'
+tstzrange(starts_at, ends_at) && tstzrange($occupancyStartsAt, $occupancyEndsAt)
+  AND status <> 'cancelled'
   AND dealership_id = $1      -- redundant by the composite FKs; it scopes the index, not the answer
 ```
 
 Two expressions in two files with nothing structural holding them equal (§11.2 R-5). QS-8 is what holds
-them together, and the partial GiST indexes serve this query's range predicate.
+them together — over the interval the response names, never one the test recomputes — and the partial
+GiST indexes serve this query's range predicate.
 
 ## 6.6 Where each failure is decided
 

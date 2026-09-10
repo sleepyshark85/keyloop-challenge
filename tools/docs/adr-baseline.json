@@ -261,5 +261,15 @@
    "Option D \u2014 Generate the fixture from the migrations"
   ],
   "decision": "Chosen option: C \u2014 the fixture supplies rows, not tables. It names entities by key"
+ },
+ "0039-availability-takes-a-start-not-a-window.md": {
+  "options": [
+   "Option A \u2014 Keep from/to; document the hazard",
+   "Option B \u2014 Accept startsAt or from/to",
+   "Option C \u2014 startsAt only; availability re-derives the end from durationMinutes itself",
+   "Option D \u2014 startsAt only, derived by deriveInterval, and the response names the interval",
+   "Option E \u2014 A separate day-view endpoint taking a date and returning free start times"
+  ],
+  "decision": "Chosen option: D. GET /availability?dealershipId&serviceTypeId&startsAt derives its window by"
  }
 }

@@ -226,7 +226,7 @@ failures is decided.
 | Status | `type` | Operations | When |
 |---|---|---|---|
 | `400` | `/problems/malformed-request` | all five | Schema violation, unparseable timestamp, empty or unparseable body |
-| `400` | `/problems/outside-opening-hours` | book, reschedule | The derived interval leaves the dealership's hours |
+| `400` | `/problems/outside-opening-hours` | book, reschedule, availability | The derived interval leaves the dealership's hours |
 | `404` | `/problems/appointment-not-found` | read, reschedule, cancel | The id in the path does not exist |
 | `404` | `/problems/route-not-found` | **none** | The path matches no route — distinct from a missing appointment, which shares the status |
 | `409` | `/problems/no-capacity` | book, reschedule | Every candidate refused, or the cap reached. Carries `resource` |
