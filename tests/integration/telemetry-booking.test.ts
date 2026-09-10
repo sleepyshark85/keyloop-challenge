@@ -423,10 +423,38 @@ describe('QS-13(i) / AC-8 leg (i) — the window, on the two-bay fixture that no
       insert?.statusCode,
       `the single, succeeding attempt must not carry OTel ERROR status: ${describeSpanForFailure(insert)}${where()}`,
     ).not.toBe(2);
+    // R-19-4: the old file asserted this against the collector (old L328-329, L345-358) —
+    // the export path, not just the in-process counting rule at attemptLoop.test.ts:183-187.
+    // A change that stamped db.sqlstate onto a SUCCEEDING insert span must fail here.
+    expect(
+      insert?.attributes['db.sqlstate'],
+      `a succeeding attempt span must carry no db.sqlstate at all: ${JSON.stringify(insert?.attributes)}${where()}`,
+    ).toBeUndefined();
+    expect(
+      insert?.attributes['booking.attempt'],
+      `booking.attempt missing on the succeeding appointment.insert span: ${JSON.stringify(insert?.attributes)}${where()}`,
+    ).not.toBeUndefined();
+    expect(
+      insert?.attributes['bay.id'],
+      `bay.id missing on the succeeding appointment.insert span: ${JSON.stringify(insert?.attributes)}${where()}`,
+    ).not.toBeUndefined();
+    expect(
+      insert?.attributes['technician.id'],
+      `technician.id missing on the succeeding appointment.insert span: ${JSON.stringify(insert?.attributes)}${where()}`,
+    ).not.toBeUndefined();
   });
 
   it('QS-13(i) — no booking_conflicts_total point of any outcome — nothing conflicted', () => {
     if (run === undefined) return;
+    // R-19-7: GUARD FIRST, same discipline as the AC-5 absence claim below (L756-760) — a
+    // metric pipeline that exported nothing at all would pass "zero booking_conflicts_total
+    // points" vacuously. The insert span asserted above proves telemetry arrived this run.
+    expect(
+      run.collector.spans().length,
+      `no telemetry arrived at all in this run — the claim below would be vacuously true ` +
+        `rather than evidence that this specific metric did not fire.${where()}`,
+    ).toBeGreaterThan(0);
+
     const points = run.collector.metricPoints().filter((p) => p.metric === 'booking_conflicts_total');
     expect(
       points,
