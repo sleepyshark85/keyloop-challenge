@@ -1,7 +1,7 @@
 ---
 id: "0039"
 title: Availability takes a start, not a window
-status: proposed
+status: accepted
 date: 2026-09-10
 supersedes: null
 superseded_by: null
@@ -21,8 +21,9 @@ ai-input: >
   about, and availability inheriting the opening-hours gate. Both were ruled by the architect
   mid-slice under CLAUDE.md §6 and are provisional until the gate.
 
-  `status: proposed` is honest: this was written at step 1 and the human has not yet decided. It
-  moves to `accepted` at step 7, or is booked in arc42 §11.1 if the slice does not merge.
+  Accepted at Gate E, 2026-09-10 — approved with conditions, none of them about this decision. It
+  was written `proposed` at step 1 and stayed that way until the human had ruled, which is what the
+  status field is for.
 ---
 
 ## Context and problem statement
@@ -89,8 +90,10 @@ server can derive.**
 
 **Bad, or deferred**
 
-- **A breaking contract change** for any client sending `from`/`to`. There is none outside this
-  repository (`A-16-1`); if that is wrong, this is re-argued at the gate.
+- **A breaking contract change** for any client sending `from`/`to`. `A-16-1` assumed there is none
+  outside this repository; at Gate E that stopped being an assumption — `CLAUDE.md` §1 makes the
+  client layer a stub over an OpenAPI contract and a cURL harness, so no external consumer exists by
+  constitution rather than by belief.
 - **The range query is foreclosed in this operation.** The day-view question (option E) is a
   backlog item, and answering it by widening this endpoint again would reintroduce exactly what
   this ADR removes.

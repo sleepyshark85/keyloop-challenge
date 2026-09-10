@@ -1,7 +1,7 @@
 ---
 id: "16"
 title: Availability derives its own window from the service type
-status: ready
+status: done
 depends_on: ["15"]
 arc42: ["§6.5", "§8.6", "§10.2", "§11.1"]
 adr: [39]
