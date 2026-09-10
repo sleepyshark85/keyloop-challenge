@@ -83,6 +83,23 @@ This slice makes a `409` mean what §4.1 says it means, and makes arc42 agree wi
   and the figure recorded in arc42 §11 beside its machine class.
 - **AC-7** — `rescheduleAppointment`'s outcomes are **unchanged**, so the move path cannot regress
   silently behind a booking-path change.
+- **AC-8** — **QS-13's claims are re-sourced, not weakened** (`I-19-2`, ruled (a) at step 4). Free-first
+  makes a conflict **unconstructible single-threaded while capacity exists** — `busyResources` shares
+  the exclusion constraint's range predicate, dealership scope and `status <> 'cancelled'` filter, and
+  `A-4` makes the two intervals identical — so slice 09's retry-then-succeed fixture has no
+  deterministic construction any more. All three QS-13 claims survive, on three fixtures:
+  **(i)** the **window** (`availability.candidates` ends before the first `appointment.insert`, and
+  that span is not ERROR) stays on the two-bay fixture, which now confirms on attempt 1;
+  **(ii)** the **waterfall** — every attempt an `appointment.insert` span with a distinct
+  `booking.attempt`, `db.sqlstate=23P01`, a `db.constraint` in the exclusion pair, and ERROR status —
+  moves to the **fully-blocked** fixture AC-4 already seeds, which is permutation-safe and needs no
+  seed; **(iii)** `booking_conflicts_total{outcome=absorbed}` moves to the **reschedule** path, which
+  ruling 5 leaves ordering from `EMPTY_OCCUPANCY` and so keeps ADR-0009's blind seeded shuffle.
+  *Leg (iii) is ruled **in**, not traded away: without it a §10 metric claim drops silently to a unit
+  test — evidence of the counting rule, not of the export path. Two traps, named so they are not
+  rediscovered: `I-09-2`'s technician coin-flip, which slice 09 solved by de-qualifying the blocker;
+  and reschedule's **lazy** seed draw, so the fixture must make the **incumbent pair itself** conflict
+  before any shuffle happens. If leg (iii) proves unbuildable it is a DCR, never a silent drop.*
 
 ## In scope
 
