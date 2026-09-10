@@ -88,8 +88,8 @@ import type { HttpAnswer, Scenario } from '../support/booking.js';
  *
  * WHAT WOULD STILL PASS WHILE WRONG, beyond these six — see this role's step-3 report. In
  * short: a bug that moves BOTH the query's answer and every probe's fixture data the same way
- * (there is no such shared code path — ADR-0032 keeps the range expression's two copies in two
- * files with no shared constant a bug could move once and have both sides agree on), or a bug
+ * (there is no such shared code path — ADR-0032, retired, kept the range expression's two copies
+ * in two files with no shared constant a bug could move once and have both sides agree on), or a bug
  * whose wrongness lies OUTSIDE the candidate universe (a resource this dealership does not
  * have) — which is exactly the scope T-08-1 corrected AC-1 to, and which QS-8's own words
  * (§10.2, before F-08-2's correction) got wrong the first time.

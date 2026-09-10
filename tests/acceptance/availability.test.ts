@@ -467,6 +467,15 @@ describe('GET /availability — AC-1 through AC-4, AC-7', () => {
             `flag.\n${describeAnswer(answer)}${where}`,
         ).toBe(true);
 
+        // MINOR (step-5 remediation) — each claim the disclaimer makes is asserted
+        // SEPARATELY, so no one clause can be deleted while these checks stay green. Before
+        // this fix, the two checks below both matched off the SAME sentence, and
+        // `docs/WALKTHROUGH.md`'s captured `200` (Scenario 3) shows the disclaimer makes
+        // (at least) four distinct claims across that one sentence and two more: not a
+        // reservation; true only of the interval NAMED IN THIS RESPONSE (not a generic
+        // "some interval"); the result can go STALE the instant a concurrent booking lands;
+        // and only `POST /appointments` makes the ADJUDICATED decision. Deleting any one of
+        // the latter three left every check before this fix green.
         const text = (answer.rawBody ?? '').toLowerCase();
         expect(
           text.includes('reservation'),
@@ -475,6 +484,27 @@ describe('GET /availability — AC-1 through AC-4, AC-7', () => {
         expect(
           text.includes('interval') || text.includes('window'),
           `AC-7 — the response must say the answer is true only of ONE interval.\n${describeAnswer(answer)}${where}`,
+        ).toBe(true);
+        expect(
+          text.includes('this response') || text.includes('this result'),
+          `AC-7 — the interval claimed must be the one NAMED IN THIS SAME RESPONSE, not a ` +
+            `generic assurance that could describe any interval whatsoever ` +
+            `(docs/WALKTHROUGH.md Scenario 3: "the interval named in this response").` +
+            `\n${describeAnswer(answer)}${where}`,
+        ).toBe(true);
+        expect(
+          text.includes('stale'),
+          `AC-7 — the disclaimer must say the result can go STALE (docs/WALKTHROUGH.md ` +
+            `Scenario 3: "a concurrent booking can make it stale immediately afterwards") — ` +
+            `this is the fact Scenario 3's whole demonstration depends on.` +
+            `\n${describeAnswer(answer)}${where}`,
+        ).toBe(true);
+        expect(
+          text.includes('appointments') && (text.includes('adjudicat') || text.includes('decision')),
+          `AC-7 — the disclaimer must say only POST /appointments makes the ADJUDICATED ` +
+            `decision (docs/WALKTHROUGH.md Scenario 3: "Only POST /appointments makes an ` +
+            `adjudicated decision") — the fact that separates this endpoint's advisory read ` +
+            `from the one call that actually commits.\n${describeAnswer(answer)}${where}`,
         ).toBe(true);
 
         // NEW to slice 16: that interval is now the one this SAME response names, not a
