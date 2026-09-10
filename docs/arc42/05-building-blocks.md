@@ -51,8 +51,10 @@ that there is no buffer (A-4); `instant()` refuses anything outside ±8 640 000 
 only place minutes become milliseconds (A-1). `openingHours.ts` owns `withinOpeningHours`, returning a
 verdict union rather than a boolean, and is the only place that reasons in wall-clock time (GC-1, A-8).
 `candidates.ts` owns `orderCandidates` — a seeded Fisher–Yates shuffle, uniform to ±1.7 % over 8 bays and
-100 000 seeds — with `prune` and a total `nextCandidate`, a `CandidateOrder` being non-empty by
-construction (A-10).
+100 000 seeds, **partitioned free-then-busy** and shuffled within each group from an occupancy snapshot
+that arrives **as a parameter**, `domain-is-pure` admitting no other route by which the ordering could
+learn what is taken (ADR-0040) — with `prune` and a total `nextCandidate`, a `CandidateOrder` being
+non-empty by construction (A-10).
 
 **Use cases return discriminated unions, not exceptions**, declared in `src/application` rather than
 `src/http`, so every route `switch` is exhaustiveness-checked and every use case stays callable without a

@@ -271,5 +271,9 @@
    "Option E \u2014 A separate day-view endpoint taking a date and returning free start times"
   ],
   "decision": "Chosen option: D. GET /availability?dealershipId&serviceTypeId&startsAt derives its window by"
+ },
+ "0040-order-candidates-free-first-from-one-advisory-read.md": {
+  "options": [],
+  "decision": "Chosen option: Order-E, with the cap unchanged at 16."
  }
 }

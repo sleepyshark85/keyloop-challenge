@@ -330,9 +330,14 @@ describe('slice 04 — pruning, the attempt cap, and the seeded shuffle', () => 
       seen.refusals.map((r) => `${r.exit}/${r.resource}/${String(r.attempts)}`),
       `AC-4 — 'capped', not 'exhausted': one bay was never tried. This is the leg that makes ` +
         `the cap "visible in telemetry rather than silent", and it is also D-04-1's standing ` +
-        `partial evidence — the cap of 16 sits BELOW the additive bound of 34 here, so this ` +
-        `refusal is spurious BY DESIGN and ADR-0009's "a non-zero cap-exceeded counter means ` +
-        `the cap is wrong" is already false before slice 08.${where}`,
+        `partial evidence — the cap of 16 sits BELOW the additive bound of 34 here. CORRECTED ` +
+        `at slice 19 (docs/slices/19-attempt-cap-sized-against-occupancy.md AC-5): this ` +
+        `refusal is HONEST, not spurious — this fixture blocks all 17 bays AND all 17 ` +
+        `technicians, so no capacity exists anywhere in the dealership for any candidate the ` +
+        `loop could still have reached, and 'exhausted' would have said the same thing had the ` +
+        `cap not intervened first. What is true here is narrower than "a non-zero cap-exceeded ` +
+        `counter means the cap is wrong": only the EXIT LABEL is decided by which bound (16 or ` +
+        `34) is hit first, never whether capacity remained.${where}`,
     ).toEqual([`capped/bay/${String(ATTEMPT_CAP)}`]);
   });
 

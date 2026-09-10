@@ -125,7 +125,9 @@ The figure is the contract; the bullets name what it cannot show.
   `http.target` and `http.status_code`. Why auto-instrumentation could not do this is §11.1 D-09-3.
 - **`availability.candidates` is a separate span from the insert, deliberately.** The gap between its end
   and the next span's start *is* the window check-then-act would have raced in — drawn so a reader can
-  see nothing depends on it. Attributes: `candidates.bays`, `candidates.technicians`.
+  see nothing depends on it. Attributes: `candidates.bays`, `candidates.technicians`. ADR-0040's occupancy read rides
+  beside it **unspanned**, as on `GET /availability`: a span means editing
+  `appointmentRepository.ts`, and D-09-6's figure leaves no case (`OQ-19-1`).
 - **`appointment.insert` is one span per attempt**, so a retried booking's waterfall shows the retries
   rather than one long bar. Each carries `booking.attempt`, `bay.id`, `technician.id`, and on failure
   `db.sqlstate` and `db.constraint` — naming which resource refused it.
@@ -136,7 +138,7 @@ The figure is the contract; the bullets name what it cannot show.
 
 | Metric | Type | Labels | Notes |
 |---|---|---|---|
-| `booking_conflicts_total` | counter | `resource` ∈ {bay, technician}, `outcome` ∈ {absorbed, refused, capped} | **The invariant, made observable.** `absorbed` = retried successfully, `refused` = candidates exhausted, `capped` = the attempt cap hit — three outcomes and not one, because conflating them hides contention behind failure. A non-zero `capped` is expected today (§11.2 R-4) |
+| `booking_conflicts_total` | counter | `resource` ∈ {bay, technician}, `outcome` ∈ {absorbed, refused, capped} | **The invariant, made observable.** `absorbed` = retried successfully, `refused` = candidates exhausted, `capped` = the attempt cap hit — three outcomes and not one, because conflating them hides contention behind failure. A non-zero `capped` is unlikely, not impossible (ADR-0040, §11.2 R-4) |
 | `appointments_booked_total` | counter | `dealership` | |
 | `appointments_rescheduled_total` | counter | `outcome` ∈ {moved, refused} | A move refused for *state* increments neither — §8.6's two `409`s |
 | `appointments_cancelled_total` | counter | | |

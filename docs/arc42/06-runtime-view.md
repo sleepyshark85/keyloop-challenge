@@ -46,8 +46,8 @@ path locked less than it wrote — an internal fault rendering `500`.
 
 ## 6.2 A booking that retries, and succeeds
 
-The same path when the dealership still has capacity — the reason a `409` means *the dealership was full*
-rather than *the allocator guessed badly*.
+The same path when the dealership still has capacity — the reason a `409` all but always means *the
+dealership was full* rather than *the allocator guessed badly*, and §11.2 R-4 owns *all but always*.
 
 ![Three attempts, and the candidate lists shrinking between them](../diagrams/candidate-pruning.svg)
 
@@ -67,8 +67,15 @@ POST /appointments {customer, vehicle, serviceType, dealership, startsAt}
  │                                                           any booking, so no window
  ├─ 5. span availability.candidates
  │     candidateResources(dealership, serviceType) → bays[], technicians[]   ADVISORY
- ├─ 6. orderCandidates(bays, technicians, deps.seed())       domain/candidates.ts
- │        seeded, pure, injected — never a global RNG
+ │     — and OUTSIDE that span, issued concurrently with it:
+ │     busyResources(dealership, occupancy)  → busy{bays[], technicians[]}   ADVISORY
+ │        neither read needs the other's result, so this one costs no round trip.
+ │        ONCE per request, never inside the loop, over the OCCUPANCY interval —
+ │        what the constraint sees. Deliberately unspanned (§8.4)
+ ├─ 6. orderCandidates(bays, technicians, busy, deps.seed())  domain/candidates.ts
+ │        seeded, pure, injected — never a global RNG. Free candidates first,
+ │        shuffled WITHIN each group, ONE stream (ADR-0040). Membership is
+ │        INVARIANT: busy reorders and never removes, so busy cannot reach ↓
  │        null → THE ONLY empty-candidate branch, and it is REACHABLE:
  │             no bay ........................ → 500  ┐ two different failures, and
  │             no qualified technician ....... → 422  ┘ NEVER a fabricated 409 — there
@@ -106,7 +113,10 @@ ADR-0006 disqualified any query layer that wraps the driver error (§11.2 R-3).
 Both refusals carry the resource this arm's own classification minted, the cap tested **inside** the
 `23P01` arm and never as the loop's bound, so no refusal exit is reachable without a database verdict.
 Because the bound is exact, `capped` is reachable only where |bays| + |technicians| ≥ 18 — and at §1.1
-scale it is, so a non-zero `capped` is expected today (§11.2 R-4).
+scale it is. Since [ADR-0040](../adr/0040-order-candidates-free-first-from-one-advisory-read.md) the
+ordering spends those attempts free-first, so reaching attempt 16 takes fifteen conflicts among
+candidates the advisory read called free: a non-zero `capped` is **unlikely rather than impossible**,
+restored probabilistically where a larger cap would restore it structurally (§11.2 R-4).
 
 ## 6.3 Rescheduling — one atomic `UPDATE`
 

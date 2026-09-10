@@ -12,6 +12,7 @@ import {
   describeAnswer,
   describeScenario,
   member,
+  occupy,
   postBooking,
   postCancellation,
   postReschedule,
@@ -58,33 +59,37 @@ import type { HttpAnswer, Scenario } from '../support/booking.js';
  * with a crash — a real, diagnosable red for a seam whose other side does not exist yet.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * WHY AC-1/AC-2/AC-3 SHARE ONE BOOKING RATHER THAN EACH REPEATING IT.
+ * QS-13 IS THREE FIXTURES, NOT ONE — `I-19-2` RULED (a), AC-8 (`docs/slices/19-design.md`
+ * ruling 15). CITE [arc42 §10 QS-13](../../docs/arc42/10-quality-requirements.md), REWRITTEN;
+ * THE SLICE-09 AC-1/AC-2/AC-3 LABELS BELOW NAME PROVENANCE ONLY.
  *
- * All three read facts off the SAME trace and the SAME metric export — "the same run", in
- * AC-3's own words. A `beforeAll` in that describe block runs the booking once; each `it`
- * asserts a different fact against the telemetry it produced, so a failure in one is legible
- * on its own criterion rather than smeared across a shared assertion.
+ * Slice 19's free-first ordering (ADR-0040) shares `busyResources`' range predicate,
+ * dealership scope and `status <> 'cancelled'` filter with the exclusion constraint itself,
+ * and `A-4` makes the two intervals identical — so whenever a free bay and a free technician
+ * both exist, free-first heads both candidate lists with them and attempt 1 succeeds. **No
+ * single-threaded interleaving on the BOOKING path yields a conflict while capacity
+ * remains** — the mechanism working, not a defect; a snapshot disagreeing with its own
+ * adjudicator would be the defect. `seedRetryOnceFixture` below, which used to retry once
+ * then succeed under ADR-0009's blind shuffle, now confirms on attempt 1, and its own
+ * docblock predicted exactly this: "it would stop transferring only if candidate ordering
+ * itself changed, which is exactly the kind of regression a fixed seed is supposed to catch."
  *
- * ─────────────────────────────────────────────────────────────────────────────────────────
- * THE AC-1/AC-2/AC-3 FIXTURE, AND WHY IT NEEDS A FIXED `BOOKING_SEED`.
+ * What was one shared fixture for slice 09's AC-1/AC-2/AC-3 is now re-sourced onto three:
  *
- * "Retries once then succeeds, on `resource=bay`" needs the FIRST draw to be doomed and the
- * SECOND to succeed — unlike `tests/acceptance/candidate-retry.test.ts`'s AC-3/AC-4 fixtures,
- * which are permutation-safe because every remaining path has the SAME outcome. Here two
- * outcomes are reachable from a two-candidate list (dealership: 2 bays, 2 technicians;
- * `bayIds[0]` occupied by `technicianIds[1]` for the target window, `technicianIds[0]` free
- * throughout), so ADR-0021's `BOOKING_SEED` is the actual subject, exactly the case its own
- * design note ("used below only where it is the actual subject") anticipates.
- *
- * `BOOKING_SEED=7` is not read off any source: MEASURED against this repository's already
- * merged, already shipped candidate-ordering implementation (slices 02/04, pre-dating this
- * slice) by seeding this exact fixture shape against a throwaway container and a compiled
- * `dist/main.js`, and observing the request, reset, and repeat across many seeds and two
- * independently-derived namespaces (different UUIDs, same shuffle) until one produced
- * `resource=bay` on attempt 1 and a `201` on attempt 2, reproducibly across five repeats. The
- * shuffle is a pure function of (list lengths, seed) — ADR-0009 — so the seed transfers
- * across namespaces; it would stop transferring only if candidate ordering itself changed,
- * which is exactly the kind of regression a fixed seed is supposed to catch.
+ *   (i)   THE WINDOW    — stays on `seedRetryOnceFixture`, which now confirms on attempt 1;
+ *                          `BOOKING_SEED` is no longer pinned because free-first makes the
+ *                          outcome independent of it — one busy bay, one free bay, and the
+ *                          free one always heads the list regardless of the shuffle within it.
+ *   (ii)  THE WATERFALL — moves to the fully-blocked fixture this file's QS-13(ii) describe
+ *                          block already seeded for slice 09's AC-4 (2 bays, 2 technicians,
+ *                          both pairs blocked): every draw meets a busy bay, so it is
+ *                          permutation-safe and needs no seed either.
+ *   (iii) THE ABSORBED   — moves to a RESCHEDULE: arc42 §6.3 tries the incumbent pair (the
+ *         CONFLICT         row's own bay/technician) FIRST, before ADR-0040's shuffle opens,
+ *                          and ruling 5 leaves that shuffle `EMPTY_OCCUPANCY` (still ADR-0009's
+ *                          blind shuffle), so an incumbent-pair conflict is the one conflict
+ *                          still constructible single-threaded, per `attemptLoop.ts`'s shared
+ *                          increment site (`F-06-1`).
  */
 
 const TRACE_ID_HEX32 = /^[0-9a-f]{32}$/;
@@ -133,8 +138,6 @@ function describeSpanForFailure(span: CollectedSpan | undefined): string {
     statusCode: span.statusCode,
   });
 }
-
-const SHARED_SEED = 7;
 
 async function seedRetryOnceFixture(client: Client, namespace: string): Promise<Scenario> {
   const scenario = await seedScenario(client, namespace, { bays: 2, technicians: 2 });
@@ -200,6 +203,97 @@ async function seedRetryOnceFixture(client: Client, namespace: string): Promise<
   return scenario;
 }
 
+/**
+ * How many minutes past `ANCHOR` the reschedule below moves its appointment TO. Disjoint
+ * from `seedRescheduleAbsorbedFixture`'s origin interval `[at(0), at(60))`, and inside the
+ * default 08:00–18:00 opening hours (ANCHOR renders 10:00 BST, so +120..+180 is 12:00–13:00).
+ */
+const RESCHEDULE_TARGET_MINUTES = 120;
+
+/**
+ * AC-8 leg (iii) (`docs/slices/19-design.md` ruling 15) — a RESCHEDULE whose INCUMBENT pair
+ * conflicts, then succeeds. arc42 §6.3: "attempt 1 is the pair the row already holds" —
+ * before ADR-0040's shuffle ever opens — so the conflict this fixture needs must be built
+ * into the incumbent pair itself, never into what a later, still-blind (ruling 5) shuffle
+ * draws.
+ *
+ * Two bays, and only ONE technician qualified for the scenario's own service type:
+ * `technicianIds[1]` is de-qualified from it and re-qualified under a throwaway service type
+ * instead — `seedRetryOnceFixture`'s own `I-09-2` remedy, reused verbatim — so it is never a
+ * live candidate for the real service type and the technician list going into ANY draw,
+ * blind or free-first, stays the single remaining qualified technician (I-04-10's
+ * permutation-safe singleton). Only the BAY draw can matter, so no `BOOKING_SEED` is needed.
+ *
+ * The moved appointment is seeded directly at `bayIds[0]`/`technicianIds[0]` for the ORIGIN
+ * interval (`occupy()` — arrangement, not the conflict under test: the reschedule PATCH
+ * itself is the one genuine `23P01` this fixture produces). The de-qualified technician then
+ * occupies `bayIds[0]` for the TARGET interval, so the incumbent pair
+ * (`bayIds[0]`/`technicianIds[0]`) collides there on `no_bay_overlap` the instant the
+ * reschedule tries it — never on the technician, which is free throughout and not the
+ * blocker's identity. `no_bay_overlap` prunes `bayIds[0]`; the sole remaining pair,
+ * `bayIds[1]`/`technicianIds[0]`, is free at the target interval and confirms.
+ */
+async function seedRescheduleAbsorbedFixture(
+  client: Client,
+  namespace: string,
+): Promise<{ readonly scenario: Scenario; readonly movedAppointmentId: string }> {
+  const scenario = await seedScenario(client, namespace, { bays: 2, technicians: 2 });
+
+  const blockerServiceTypeId = uuidNamespaceOf(scenario, 'service_type/blocker');
+  await client.query('insert into service_type (id, name, duration_minutes) values ($1, $2, $3)', [
+    blockerServiceTypeId,
+    `${namespace} blocker service`,
+    scenario.durationMinutes,
+  ]);
+  await client.query(
+    'insert into technician_qualification (technician_id, service_type_id) values ($1, $2)',
+    [scenario.technicianIds[1], blockerServiceTypeId],
+  );
+  await client.query(
+    'delete from technician_qualification where technician_id = $1 and service_type_id = $2',
+    [scenario.technicianIds[1], scenario.serviceTypeId],
+  );
+
+  const bay0 = scenario.bayIds[0];
+  const technician0 = scenario.technicianIds[0];
+  const technician1 = scenario.technicianIds[1];
+  const customer = scenario.customers[0];
+  if (bay0 === undefined || technician0 === undefined || technician1 === undefined || customer === undefined) {
+    throw new Error('seedRescheduleAbsorbedFixture needs 2 bays, 2 technicians and a seeded customer');
+  }
+
+  // The appointment under test: bayIds[0] / technicianIds[0], at the ORIGIN interval.
+  const movedAppointmentId = await occupy(client, scenario, {
+    label: 'moved',
+    bayId: bay0,
+    technicianId: technician0,
+    startsAt: at(0),
+    endsAt: at(60),
+  });
+
+  // The blocker: bayIds[0], held by the de-qualified technician, at the TARGET interval — so
+  // the incumbent pair (bayIds[0]/technicianIds[0]) conflicts there on no_bay_overlap before
+  // ADR-0040's shuffle ever opens (ruling 5 leaves reschedule's shuffle EMPTY_OCCUPANCY).
+  await client.query(
+    `insert into appointment
+       (id, dealership_id, customer_id, vehicle_id, service_type_id, technician_id, bay_id, starts_at, ends_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      uuidNamespaceOf(scenario, 'occupied/blocker'),
+      scenario.dealershipId,
+      customer.customerId,
+      customer.vehicleId,
+      blockerServiceTypeId,
+      technician1,
+      bay0,
+      at(RESCHEDULE_TARGET_MINUTES).toISOString(),
+      at(RESCHEDULE_TARGET_MINUTES + scenario.durationMinutes).toISOString(),
+    ],
+  );
+
+  return { scenario, movedAppointmentId };
+}
+
 interface TelemetryRun {
   readonly answer: HttpAnswer;
   readonly service: StartedService;
@@ -254,7 +348,7 @@ async function runWithTelemetry(
   return { run: { answer, service, collector, requestLogRecords } };
 }
 
-describe('QS-13 / AC-1, AC-2, AC-3 — one retried-then-succeeded booking, read off its trace and its metric export', () => {
+describe('QS-13(i) / AC-8 leg (i) — the window, on the two-bay fixture that now confirms on attempt 1 (I-19-2)', () => {
   let client: Client;
   let scenario: Scenario;
   let run: TelemetryRun | undefined;
@@ -263,23 +357,25 @@ describe('QS-13 / AC-1, AC-2, AC-3 — one retried-then-succeeded booking, read 
   beforeAll(async () => {
     client = new Client({ connectionString: inject('databaseUrl') });
     await client.connect();
-    scenario = await seedRetryOnceFixture(client, 'ac1-telemetry-retry-once');
+    scenario = await seedRetryOnceFixture(client, 'ac8i-telemetry-window');
 
-    const { failure, run: started } = await runWithTelemetry({ bookingSeed: SHARED_SEED }, async (service) =>
+    // No BOOKING_SEED pinned (unlike slice 09's original fixture): free-first ordering
+    // (ADR-0040) makes the outcome independent of the shuffle — one busy bay, one free bay,
+    // and the free one always heads the list regardless of how the singleton free/busy
+    // groups are individually permuted.
+    const { failure, run: started } = await runWithTelemetry({}, async (service) =>
       postBooking(service, bookingBody(scenario)),
     );
     startFailure = failure;
     run = started;
 
     if (run !== undefined) {
-      // AC-1/AC-2 need the insert spans; AC-3 needs the counter's export. Both are async
-      // relative to the HTTP response, so wait for the shape this fixture is KNOWN to
-      // produce (two `appointment.insert` spans) before any `it` reads the collector —
-      // otherwise a slow exporter reads as "the spans don't exist" instead of "not yet".
-      await run.collector.awaitSpans(
-        (spans) => spans.filter((s) => s.name === 'appointment.insert').length >= 2,
-      );
-      await run.collector.awaitMetricPoints((points) => points.some((p) => p.metric === 'booking_conflicts_total'));
+      // No `awaitMetricPoints` here: this fixture never conflicts (I-19-2), so a predicate
+      // waiting for `booking_conflicts_total` to appear would never resolve and would just
+      // burn its timeout for nothing. `run.service.stop()` inside `runWithTelemetry` sends
+      // SIGTERM, which flushes the metrics reader on shutdown (`otelCollector.ts`'s own
+      // header) — whatever WOULD have exported already has by the time `run` is populated.
+      await run.collector.awaitSpans((spans) => spans.some((s) => s.name === 'appointment.insert'));
     }
   });
 
@@ -295,125 +391,79 @@ describe('QS-13 / AC-1, AC-2, AC-3 — one retried-then-succeeded booking, read 
     return `\n${fixture}\n  HTTP answer: ${answer}\n${telemetry}`;
   }
 
-  it('the service started and the booking succeeded (201) — the shared arrangement for AC-1/AC-2/AC-3', () => {
+  it('the service started and the booking succeeded (201) on attempt 1 — free-first draws the free bay (I-19-2)', () => {
     expect(startFailure ?? 'started', `ARRANGE failed.${where()}`).toBe('started');
-    expect(run?.answer.status, `ARRANGE — the seeded BOOKING_SEED=${String(SHARED_SEED)} fixture did not retry-then-succeed as measured.${where()}`).toBe(201);
+    expect(
+      run?.answer.status,
+      `ARRANGE — free-first ordering (ADR-0040) should draw the FREE bay first, confirming on attempt 1.${where()}`,
+    ).toBe(201);
   });
 
-  it('AC-1 — an `availability.candidates` span ends before the first `appointment.insert` span begins', () => {
+  it('QS-13(i) — an `availability.candidates` span ends before the (single) `appointment.insert` span begins, which does not carry ERROR', () => {
     if (run === undefined) return;
     const spans = run.collector.spans();
     const candidates = spans.filter((s) => s.name === 'availability.candidates');
-    const inserts = [...spans.filter((s) => s.name === 'appointment.insert')].sort(
-      (a, b) => (a.startTimeUnixNano < b.startTimeUnixNano ? -1 : a.startTimeUnixNano > b.startTimeUnixNano ? 1 : 0),
-    );
+    const inserts = spans.filter((s) => s.name === 'appointment.insert');
 
     expect(candidates.length, `expected an availability.candidates span.${where()}`).toBeGreaterThanOrEqual(1);
-    expect(inserts.length, `expected at least one appointment.insert span.${where()}`).toBeGreaterThanOrEqual(1);
+    // I-19-2: free-first makes a single-threaded conflict unconstructible on this fixture
+    // while capacity remains, so it now confirms in exactly ONE attempt — not "at least one".
+    // A count that drifted back to two would mean ordering regressed to ADR-0009's blind
+    // shuffle, which QS-13(ii)'s fixture below exists to catch, not this one's to absorb.
+    expect(inserts.length, `expected exactly one appointment.insert span (I-19-2).${where()}`).toBe(1);
 
-    const firstInsert = inserts[0];
-    const endsBeforeFirstInsert = candidates.some((c) => c.endTimeUnixNano <= (firstInsert?.startTimeUnixNano ?? 0n));
+    const insert = inserts[0];
+    const endsBeforeInsert = candidates.some((c) => c.endTimeUnixNano <= (insert?.startTimeUnixNano ?? 0n));
     expect(
-      endsBeforeFirstInsert,
-      `expected an availability.candidates span to END before the first appointment.insert ` +
-        `span BEGINS — the window check-then-act would have raced in (§8.4).${where()}`,
+      endsBeforeInsert,
+      `expected an availability.candidates span to END before the appointment.insert span ` +
+        `BEGINS — the window check-then-act would have raced in (§8.4).${where()}`,
     ).toBe(true);
-  });
-
-  it('AC-2 — exactly two appointment.insert spans; the failed one carries db.sqlstate=23P01, db.constraint and ERROR status', () => {
-    if (run === undefined) return;
-    const inserts = run.collector.spans().filter((s) => s.name === 'appointment.insert');
-    expect(inserts.map((s) => s.attributes), `expected exactly two appointment.insert spans.${where()}`).toHaveLength(2);
-
-    const failed = inserts.filter((s) => s.attributes['db.sqlstate'] !== undefined);
-    expect(failed.map((s) => s.attributes), `expected exactly one failed attempt span.${where()}`).toHaveLength(1);
-    expect(failed[0]?.attributes['db.sqlstate']).toBe('23P01');
-    expect(failed[0]?.attributes['db.constraint'], `db.constraint missing on the failed span.${where()}`).toBe(
-      'no_bay_overlap',
-    );
-    // R-09-5: §8.4's own claim that `db.sqlstate=23P01` labels an EXCLUSION conflict — a
-    // correctness claim, not a name — so any span carrying it must name one of the two
-    // exclusion constraints, never (say) a foreign-key constraint mislabelled as a conflict.
     expect(
-      ['no_bay_overlap', 'no_technician_overlap'],
-      `a span carrying db.sqlstate=23P01 named a constraint outside the exclusion pair: ${String(failed[0]?.attributes['db.constraint'])}${where()}`,
-    ).toContain(failed[0]?.attributes['db.constraint']);
-
-    // R-09-5: §1.2 goal 4 / this slice's own retry-waterfall screenshot reads bars by WHICH
-    // bay and WHICH attempt each one was — blank these and the chart loses its own subject
-    // while every status-code-only test stays green.
-    for (const span of inserts) {
-      expect(
-        span.attributes['booking.attempt'],
-        `booking.attempt missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`,
-      ).not.toBeUndefined();
-      expect(
-        span.attributes['bay.id'],
-        `bay.id missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`,
-      ).not.toBeUndefined();
-      expect(
-        span.attributes['technician.id'],
-        `technician.id missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`,
-      ).not.toBeUndefined();
-    }
-    const attemptNumbers = inserts.map((s) => s.attributes['booking.attempt']);
-    expect(
-      new Set(attemptNumbers).size,
-      `both attempts must carry a DISTINCT booking.attempt — a constant value would still ` +
-        `pass an "attribute present" check while erasing the waterfall: ${JSON.stringify(attemptNumbers)}${where()}`,
-    ).toBe(2);
-
-    // R-09-5: a failed attempt that never sets its OWN span's status renders identically to
-    // a slow success on any dashboard reading spans by OTel status — 2 = ERROR.
-    expect(
-      failed[0]?.statusCode,
-      `the failed attempt's span must carry OTel's ERROR status (2): ${describeSpanForFailure(failed[0])}${where()}`,
-    ).toBe(2);
-    const succeeded = inserts.filter((s) => s.attributes['db.sqlstate'] === undefined);
-    expect(
-      succeeded[0]?.statusCode,
-      `a succeeded attempt's span must not carry ERROR status: ${describeSpanForFailure(succeeded[0])}${where()}`,
+      insert?.statusCode,
+      `the single, succeeding attempt must not carry OTel ERROR status: ${describeSpanForFailure(insert)}${where()}`,
     ).not.toBe(2);
+    // R-19-4: the old file asserted this against the collector (old L328-329, L345-358) —
+    // the export path, not just the in-process counting rule at attemptLoop.test.ts:183-187.
+    // A change that stamped db.sqlstate onto a SUCCEEDING insert span must fail here.
+    expect(
+      insert?.attributes['db.sqlstate'],
+      `a succeeding attempt span must carry no db.sqlstate at all: ${JSON.stringify(insert?.attributes)}${where()}`,
+    ).toBeUndefined();
+    expect(
+      insert?.attributes['booking.attempt'],
+      `booking.attempt missing on the succeeding appointment.insert span: ${JSON.stringify(insert?.attributes)}${where()}`,
+    ).not.toBeUndefined();
+    expect(
+      insert?.attributes['bay.id'],
+      `bay.id missing on the succeeding appointment.insert span: ${JSON.stringify(insert?.attributes)}${where()}`,
+    ).not.toBeUndefined();
+    expect(
+      insert?.attributes['technician.id'],
+      `technician.id missing on the succeeding appointment.insert span: ${JSON.stringify(insert?.attributes)}${where()}`,
+    ).not.toBeUndefined();
   });
 
-  it('AC-3 — booking_conflicts_total{resource=bay,outcome=absorbed} increments by exactly 1, with no outcome=refused', () => {
+  it('QS-13(i) — no booking_conflicts_total point of any outcome — nothing conflicted', () => {
     if (run === undefined) return;
+    // R-19-7: GUARD FIRST, same discipline as the AC-5 absence claim below (L756-760) — a
+    // metric pipeline that exported nothing at all would pass "zero booking_conflicts_total
+    // points" vacuously. The insert span asserted above proves telemetry arrived this run.
+    expect(
+      run.collector.spans().length,
+      `no telemetry arrived at all in this run — the claim below would be vacuously true ` +
+        `rather than evidence that this specific metric did not fire.${where()}`,
+    ).toBeGreaterThan(0);
+
     const points = run.collector.metricPoints().filter((p) => p.metric === 'booking_conflicts_total');
-    const absorbed = points.filter((p) => p.attributes['resource'] === 'bay' && p.attributes['outcome'] === 'absorbed');
-    const refused = points.filter((p) => p.attributes['outcome'] === 'refused');
-
-    expect(absorbed.length, `expected a booking_conflicts_total{resource=bay,outcome=absorbed} point.${where()}`).toBeGreaterThanOrEqual(1);
-    // Cumulative temporality may export the same point more than once across periodic
-    // exports; every exported value for THIS attribute set must read exactly 1, never more.
-    expect(absorbed.every((p) => p.value === 1), `every absorbed export must read exactly 1.${where()}`).toBe(true);
-    expect(refused, `no outcome=refused increment is expected in this run.${where()}`).toHaveLength(0);
-  });
-
-  it('AC-6 — the retry produces a booking.conflict line, and it too is trace-correlated', () => {
-    if (run === undefined) return;
-    // This fixture's whole point (SHARED_SEED=7) is that attempt 1 conflicts before attempt
-    // 2 succeeds — R-09-6's own falsification named `booking.conflict` as a line that carried
-    // no trace_id. Guard first: if the loop never actually conflicted, the assertion below
-    // would be vacuous rather than evidence.
-    const conflicts = run.requestLogRecords.filter(
-      (r) => r['event'] === 'booking.conflict' || r['msg'] === 'booking.conflict',
-    );
     expect(
-      conflicts.length,
-      `expected a booking.conflict line in this request's window — the fixture's own ` +
-        `arrangement.${where()}\n  window:\n${JSON.stringify(run.requestLogRecords, null, 2)}`,
-    ).toBeGreaterThanOrEqual(1);
-
-    const spanTraceIds = new Set<string>(run.collector.spans().map((s: CollectedSpan) => s.traceId));
-    const uncorrelated = uncorrelatedRequestLogLines(conflicts, spanTraceIds);
-    expect(
-      uncorrelated,
-      `the booking.conflict line(s) below carry no correlated trace_id/span_id:\n${JSON.stringify(uncorrelated, null, 2)}${where()}`,
+      points,
+      `attempt 1 confirmed, so neither outcome=absorbed nor outcome=refused should increment.${where()}`,
     ).toHaveLength(0);
   });
 });
 
-describe('QS-13 / AC-4 — a booking refused after exhausting candidates', () => {
+describe('QS-13(ii) / AC-8 leg (ii) — a booking refused after exhausting candidates: the waterfall', () => {
   let client: Client;
   let scenario: Scenario;
   let run: TelemetryRun | undefined;
@@ -423,7 +473,11 @@ describe('QS-13 / AC-4 — a booking refused after exhausting candidates', () =>
     client = new Client({ connectionString: inject('databaseUrl') });
     await client.connect();
     // Both bays blocked (candidate-retry.test.ts's AC-3a/AC-4 shape): permutation-safe —
-    // every draw conflicts on `no_bay_overlap`, so no BOOKING_SEED is needed here.
+    // every draw meets a busy bay so every draw conflicts on `no_bay_overlap`, hence no
+    // `BOOKING_SEED` is needed here. This is now QS-13(ii)'s fixture too (I-19-2, AC-8): with
+    // both bays occupied, free-first's free partition is empty for the bay list, so it
+    // degrades to today's shuffle over the whole (busy) list — the waterfall free-first
+    // makes unreachable on the two-bay fixture above is still reachable here.
     scenario = await seedScenario(client, 'ac4-telemetry-exhausted', { bays: 2, technicians: 2 });
     await blockPairs(client, scenario, 2, at(0), at(60));
 
@@ -433,6 +487,7 @@ describe('QS-13 / AC-4 — a booking refused after exhausting candidates', () =>
     startFailure = failure;
     run = started;
     if (run !== undefined) {
+      await run.collector.awaitSpans((spans) => spans.filter((s) => s.name === 'appointment.insert').length >= 2);
       await run.collector.awaitMetricPoints((points) => points.some((p) => p.metric === 'booking_conflicts_total'));
     }
   });
@@ -462,6 +517,45 @@ describe('QS-13 / AC-4 — a booking refused after exhausting candidates', () =>
     expect(absorbed, `outcome=absorbed must not increment when every candidate is exhausted.${where()}`).toHaveLength(0);
   });
 
+  it('QS-13(ii) — one appointment.insert span per attempt, each with a distinct booking.attempt, bay.id, technician.id, db.sqlstate=23P01, a db.constraint in the exclusion pair, and OTel ERROR', () => {
+    if (run === undefined) return;
+    const inserts = run.collector.spans().filter((s) => s.name === 'appointment.insert');
+    // ADR-0009's Bound-2 prunes the WHOLE bay a failed attempt names, unchanged by ADR-0040
+    // (§5 "the cap does not change; the insert still adjudicates") — both bays are occupied
+    // for the whole run, so attempt 1 conflicts and prunes one bay, attempt 2 conflicts and
+    // prunes the other, and the bay list is then empty: the THIRD candidate draw returns
+    // `null` and refuses without ever issuing an INSERT. Exactly two spans, deterministically.
+    expect(inserts.map((s) => s.attributes), `expected exactly two appointment.insert spans.${where()}`).toHaveLength(2);
+
+    for (const span of inserts) {
+      expect(span.attributes['db.sqlstate'], `db.sqlstate missing on a failed attempt span: ${JSON.stringify(span.attributes)}${where()}`).toBe('23P01');
+      // R-09-5: §8.4's own claim that `db.sqlstate=23P01` labels an EXCLUSION conflict — a
+      // correctness claim, not a name — so any span carrying it must name one of the two
+      // exclusion constraints, never (say) a foreign-key constraint mislabelled as a conflict.
+      expect(
+        ['no_bay_overlap', 'no_technician_overlap'],
+        `a span carrying db.sqlstate=23P01 named a constraint outside the exclusion pair: ${String(span.attributes['db.constraint'])}${where()}`,
+      ).toContain(span.attributes['db.constraint']);
+      // R-09-5: §1.2 goal 4 / the retry-waterfall screenshot reads bars by WHICH bay and
+      // WHICH attempt each one was — blank these and the chart loses its own subject while
+      // every status-code-only test stays green.
+      expect(span.attributes['booking.attempt'], `booking.attempt missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`).not.toBeUndefined();
+      expect(span.attributes['bay.id'], `bay.id missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`).not.toBeUndefined();
+      expect(span.attributes['technician.id'], `technician.id missing on an appointment.insert span: ${JSON.stringify(span.attributes)}${where()}`).not.toBeUndefined();
+      // R-09-5: a failed attempt that never sets its OWN span's status renders identically
+      // to a slow success on any dashboard reading spans by OTel status — 2 = ERROR. Every
+      // span in THIS fixture is a failed attempt — the request is refused overall.
+      expect(span.statusCode, `a failed attempt's span must carry OTel's ERROR status (2): ${describeSpanForFailure(span)}${where()}`).toBe(2);
+    }
+
+    const attemptNumbers = inserts.map((s) => s.attributes['booking.attempt']);
+    expect(
+      new Set(attemptNumbers).size,
+      `every attempt must carry a DISTINCT booking.attempt — a constant value would still ` +
+        `pass an "attribute present" check while erasing the waterfall: ${JSON.stringify(attemptNumbers)}${where()}`,
+    ).toBe(inserts.length);
+  });
+
   it('AC-6 — the exhausted refusal produces a booking.refused line, and it too is trace-correlated', () => {
     if (run === undefined) return;
     // R-09-6's own falsification named `booking.refused` as a line that carried no trace_id.
@@ -480,6 +574,87 @@ describe('QS-13 / AC-4 — a booking refused after exhausting candidates', () =>
     expect(
       uncorrelated,
       `the booking.refused line(s) below carry no correlated trace_id/span_id:\n${JSON.stringify(uncorrelated, null, 2)}${where()}`,
+    ).toHaveLength(0);
+  });
+});
+
+describe('QS-13(iii) / AC-8 leg (iii) — a reschedule whose incumbent pair conflicts, then succeeds', () => {
+  let client: Client;
+  let scenario: Scenario;
+  let movedAppointmentId: string;
+  let run: TelemetryRun | undefined;
+  let startFailure: string | undefined;
+
+  beforeAll(async () => {
+    client = new Client({ connectionString: inject('databaseUrl') });
+    await client.connect();
+    const fixture = await seedRescheduleAbsorbedFixture(client, 'ac8iii-telemetry-reschedule-absorbed');
+    scenario = fixture.scenario;
+    movedAppointmentId = fixture.movedAppointmentId;
+
+    const { failure, run: started } = await runWithTelemetry({}, async (service) =>
+      postReschedule(service, movedAppointmentId, at(RESCHEDULE_TARGET_MINUTES).toISOString()),
+    );
+    startFailure = failure;
+    run = started;
+    if (run !== undefined) {
+      await run.collector.awaitMetricPoints((points) => points.some((p) => p.metric === 'booking_conflicts_total'));
+    }
+  });
+
+  afterAll(async () => {
+    await run?.collector.stop();
+    await client?.end();
+  });
+
+  function where(): string {
+    const fixture = describeScenario(scenario);
+    const answer = run === undefined ? '(service did not start)' : describeAnswer(run.answer);
+    const telemetry = run === undefined ? '(no collector)' : run.collector.describe();
+    return `\n${fixture}\n  moved appointment: ${movedAppointmentId}\n  HTTP answer: ${answer}\n${telemetry}`;
+  }
+
+  it('the arrangement: the incumbent pair conflicts on bayIds[0], and the move still succeeds (200)', () => {
+    expect(startFailure ?? 'started', `ARRANGE failed.${where()}`).toBe('started');
+    expect(
+      run?.answer.status,
+      `ARRANGE — the incumbent pair (bayIds[0]/technicianIds[0]) should conflict with the ` +
+        `blocker on no_bay_overlap, be pruned, and the sole remaining pair should confirm.${where()}`,
+    ).toBe(200);
+  });
+
+  it('QS-13(iii) — booking_conflicts_total{resource=bay,outcome=absorbed} increments by exactly 1, with no outcome=refused', () => {
+    if (run === undefined) return;
+    const points = run.collector.metricPoints().filter((p) => p.metric === 'booking_conflicts_total');
+    const absorbed = points.filter((p) => p.attributes['resource'] === 'bay' && p.attributes['outcome'] === 'absorbed');
+    const refused = points.filter((p) => p.attributes['outcome'] === 'refused');
+
+    expect(absorbed.length, `expected a booking_conflicts_total{resource=bay,outcome=absorbed} point.${where()}`).toBeGreaterThanOrEqual(1);
+    // Cumulative temporality may export the same point more than once across periodic
+    // exports; every exported value for THIS attribute set must read exactly 1, never more.
+    expect(absorbed.every((p) => p.value === 1), `every absorbed export must read exactly 1.${where()}`).toBe(true);
+    expect(refused, `no outcome=refused increment is expected in this run.${where()}`).toHaveLength(0);
+  });
+
+  it('QS-13(iii) — the move produces a booking.conflict line, and it too is trace-correlated', () => {
+    if (run === undefined) return;
+    // This fixture's whole point is that the INCUMBENT pair conflicts before ADR-0040's
+    // shuffle ever opens (arc42 §6.3, ruling 5). Guard first: if the move never actually
+    // conflicted, the assertion below would be vacuous rather than evidence.
+    const conflicts = run.requestLogRecords.filter(
+      (r) => r['event'] === 'booking.conflict' || r['msg'] === 'booking.conflict',
+    );
+    expect(
+      conflicts.length,
+      `expected a booking.conflict line in this request's window — the fixture's own ` +
+        `arrangement.${where()}\n  window:\n${JSON.stringify(run.requestLogRecords, null, 2)}`,
+    ).toBeGreaterThanOrEqual(1);
+
+    const spanTraceIds = new Set<string>(run.collector.spans().map((s: CollectedSpan) => s.traceId));
+    const uncorrelated = uncorrelatedRequestLogLines(conflicts, spanTraceIds);
+    expect(
+      uncorrelated,
+      `the booking.conflict line(s) below carry no correlated trace_id/span_id:\n${JSON.stringify(uncorrelated, null, 2)}${where()}`,
     ).toHaveLength(0);
   });
 });

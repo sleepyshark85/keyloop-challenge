@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { bookAppointment, toAppointmentView } from '../../../src/application/bookAppointment.js';
 import type { BookCommand, BookDeps } from '../../../src/application/bookAppointment.js';
 import type { Logger } from '../../../src/platform/logger.js';
-import { orderCandidates } from '../../../src/domain/candidates.js';
+import { EMPTY_OCCUPANCY, orderCandidates } from '../../../src/domain/candidates.js';
+import type { OccupancySnapshot } from '../../../src/domain/candidates.js';
 import { scriptedDb } from '../helpers/stub-db.js';
 import type { ScriptedStep } from '../helpers/stub-db.js';
 
@@ -54,12 +55,16 @@ const bays6 = ['bay-0', 'bay-1', 'bay-2', 'bay-3', 'bay-4', 'bay-5'];
  * forbid the shuffle ever changing behind its contract. What it pins is the claim this file is
  * about — the loop draws in the order the DOMAIN gives it, in that order, and does not re-sort,
  * re-shuffle or ignore it.
+ *
+ * `busy` defaults to `EMPTY_OCCUPANCY` so every fixture below that does not opt into
+ * `bookingScript`'s `busyRows` reads an empty occupancy snapshot, matching the script.
  */
 function drawn(
   bays: readonly string[],
   technicians: readonly string[],
+  busy: OccupancySnapshot = EMPTY_OCCUPANCY,
 ): { readonly bays: readonly string[]; readonly technicians: readonly string[] } {
-  const order = orderCandidates(bays, technicians, SEED);
+  const order = orderCandidates(bays, technicians, busy, SEED);
   if (order === null) throw new Error('the fixture has no candidates');
   return order;
 }
@@ -132,8 +137,19 @@ function insertedRow(bayId: string, technicianId: string): Record<string, unknow
 
 /**
  * The reference reads every booking makes before the loop: dealership, opening hours, service
- * type, bays, technicians. Then `attempts`, each of which is a lock statement followed by an
- * insert statement.
+ * type, bays, [the advisory occupancy read — ADR-0040], technicians. Then `attempts`, each of
+ * which is a lock statement followed by an insert statement.
+ *
+ * ── WHY THE OCCUPANCY STEP SITS BETWEEN `bays` AND `technicians` ─────────────────────────────
+ *
+ * `bookAppointment.ts` reads candidates and occupancy with ONE `Promise.all`
+ * (`candidateResources` + `busyResources`), not sequentially. MEASURED against the real stub
+ * driver (kysely's own scheduling, not an assumption): `candidateResources`'s bay `SELECT`
+ * dispatches first, then `busyResources`'s single `SELECT` (its function body runs to its own
+ * first `await` while the bay query's promise is still pending), then `candidateResources`
+ * resumes and dispatches the technician `SELECT` last. That interleaving is stable for a fixed
+ * implementation shape and is exactly what `scriptedDb`'s strict-order script requires this
+ * fixture to match.
  */
 function bookingScript(options: {
   readonly bays?: readonly string[];
@@ -141,6 +157,9 @@ function bookingScript(options: {
   readonly durationMinutes?: number;
   readonly timeZone?: string;
   readonly hours?: readonly Record<string, unknown>[];
+  /** Rows `busyResources` resolves with — `{ bay_id, technician_id }` pairs. Defaults to no
+   * occupancy at all, matching `drawn()`'s own `EMPTY_OCCUPANCY` default. */
+  readonly busyRows?: readonly Record<string, unknown>[];
   readonly attempts: readonly ScriptedStep[];
 }): readonly ScriptedStep[] {
   const bays = options.bays ?? ['bay-0'];
@@ -150,6 +169,7 @@ function bookingScript(options: {
     { rows: options.hours ?? OPEN_ALL_WEEK },
     { rows: [{ duration_minutes: options.durationMinutes ?? 60 }] },
     { rows: bays.map((id) => ({ id })) },
+    { rows: options.busyRows ?? [] },
     { rows: technicians.map((id) => ({ id })) },
     ...options.attempts,
   ];
@@ -195,22 +215,32 @@ describe('bookAppointment — the happy path', () => {
     // no table and decide nothing".
     expect(events).toEqual(['begin', 'commit']);
 
-    const inTransaction = recorded.slice(5).map((q) => q.sql.replace(/\s+/g, ' ').trim());
+    // 6 reference reads precede the loop now: dealership, hours, service type, bays, the
+    // occupancy read (ADR-0040), technicians.
+    const inTransaction = recorded.slice(6).map((q) => q.sql.replace(/\s+/g, ' ').trim());
     expect(inTransaction).toHaveLength(2);
     expect(inTransaction[0]).toContain('pg_advisory_xact_lock');
     expect(inTransaction[1]?.startsWith('insert into "appointment"')).toBe(true);
   });
 
-  it('reads the appointment table NOWHERE before the insert (AC-5)', async () => {
+  it('reads the appointment table EXACTLY ONCE before the insert — the advisory occupancy read, never a filter (ADR-0040)', async () => {
+    // Before this commit this asserted NO `appointment` read pre-insert at all — that assertion
+    // is now false BY DESIGN (ADR-0040's advisory occupancy read). What survives it is the
+    // check-then-act concern itself: exactly ONE such read, scoped by dealership and window
+    // only, naming no candidate id — never a second read, and never a `WHERE` bound to `bay-0`
+    // or `tech-0` (this fixture's only candidates), which is what would turn it into a FILTER
+    // (§2.1's forbidden shape with the `if` moved into the query planner).
     const { db, recorded } = scriptedDb(
       bookingScript({ attempts: [...attempt({ rows: [insertedRow('bay-0', 'tech-0')] })] }),
     );
     await bookAppointment(db, collectingDeps().deps, COMMAND);
 
-    // Everything before the INSERT is reference data. If a `select ... from appointment` ever
-    // appears here, check-then-act has a subject again.
-    const beforeInsert = recorded.slice(0, -1).map((q) => q.sql).join('\n');
-    expect(beforeInsert).not.toMatch(/appointment/i);
+    const beforeInsert = recorded.slice(0, -1);
+    const appointmentReads = beforeInsert.filter((q) => /from "appointment"/i.test(q.sql));
+    expect(appointmentReads).toHaveLength(1);
+    expect(appointmentReads[0]?.sql).toContain('tstzrange');
+    expect(appointmentReads[0]?.parameters).not.toContain('bay-0');
+    expect(appointmentReads[0]?.parameters).not.toContain('tech-0');
   });
 
   it('uses the injected id, so a retried attempt reuses it (DA-02-1)', async () => {
@@ -354,7 +384,7 @@ describe('bookAppointment — the loop walks ADR-0009 Order-C, not the repositor
     const head = drawn(bays6, ['tech-0']).bays[0];
     let other = SEED;
     for (let candidate = SEED + 1; candidate < SEED + 64; candidate += 1) {
-      const order = orderCandidates(bays6, ['tech-0'], candidate);
+      const order = orderCandidates(bays6, ['tech-0'], EMPTY_OCCUPANCY, candidate);
       if (order !== null && order.bays[0] !== head) {
         other = candidate;
         break;
@@ -377,6 +407,71 @@ describe('bookAppointment — the loop walks ADR-0009 Order-C, not the repositor
       return lines.find((l) => l.record['event'] === 'booking.conflict')?.record['bayId'];
     };
     expect(await firstBayOf(other)).not.toBe(await firstBayOf(SEED));
+  });
+});
+
+describe('bookAppointment — the advisory occupancy read orders free-first (ADR-0040, `19-design.md`)', () => {
+  it('a busy bay is tried AFTER the free one — no conflict is logged when the free bay is drawn first', async () => {
+    // Two bays, one reported busy. Free-first guarantees bay-1 (the only free one) is the head
+    // of the shuffle whatever the seed says, so the FIRST attempt succeeds and there is no
+    // `booking.conflict` line at all — the AC-1 mechanism, exercised at this module's own level.
+    const { db, recorded } = scriptedDb(
+      bookingScript({
+        bays: ['bay-0', 'bay-1'],
+        busyRows: [{ bay_id: 'bay-0', technician_id: 'not-a-candidate-technician' }],
+        attempts: [...attempt({ rows: [insertedRow('bay-1', 'tech-0')] })],
+      }),
+    );
+    const { deps, lines } = collectingDeps();
+    const outcome = await bookAppointment(db, deps, COMMAND);
+
+    expect(outcome.kind).toBe('confirmed');
+    if (outcome.kind !== 'confirmed') return;
+    expect(outcome.appointment.bayId).toBe('bay-1');
+    expect(lines.some((l) => l.record['event'] === 'booking.conflict')).toBe(false);
+    expect(recorded.filter((q) => q.sql.startsWith('insert'))).toHaveLength(1);
+  });
+
+  it('candidateResources and busyResources run TOGETHER — both queries are issued before the insert, and neither result is dropped', async () => {
+    // A `busyRows` fixture that reports the ONLY bay and the ONLY technician busy still confirms
+    // — orderCandidates never turns `busy` into a filter (AC-3b), so both reads' results reach
+    // the loop and the insert still adjudicates.
+    const { db, recorded } = scriptedDb(
+      bookingScript({
+        busyRows: [{ bay_id: 'bay-0', technician_id: 'tech-0' }],
+        attempts: [...attempt({ rows: [insertedRow('bay-0', 'tech-0')] })],
+      }),
+    );
+    const outcome = await bookAppointment(db, collectingDeps().deps, COMMAND);
+    expect(outcome.kind).toBe('confirmed');
+    expect(recorded.filter((q) => /from "appointment"/i.test(q.sql))).toHaveLength(1);
+  });
+
+  it("the occupancy read is scoped to THIS dealership over the OCCUPANCY interval (A-19-1) — the derived, not the client's raw, window", async () => {
+    const { db, recorded } = scriptedDb(
+      bookingScript({ attempts: [...attempt({ rows: [insertedRow('bay-0', 'tech-0')] })] }),
+    );
+    await bookAppointment(db, collectingDeps().deps, COMMAND);
+
+    const busyQuery = recorded.find((q) => /from "appointment"/i.test(q.sql));
+    if (busyQuery === undefined) throw new Error('the occupancy read never ran');
+    expect(busyQuery.parameters).toContain(DEALERSHIP);
+    // 60-minute service type, 09:00-10:00Z (COMMAND's fixture) — the SAME interval
+    // `insertAppointment` below is scripted to write, because A-4 makes the occupancy interval
+    // and the appointment interval identical today (`19-design.md` `A-19-1`).
+    expect(busyQuery.parameters).toContainEqual(new Date('2026-09-08T09:00:00.000Z'));
+    expect(busyQuery.parameters).toContainEqual(new Date('2026-09-08T10:00:00.000Z'));
+  });
+
+  it('a busy snapshot naming every candidate free does not refuse: the loop still succeeds first attempt (AC-3a — busy cannot mint a refusal)', async () => {
+    const { db } = scriptedDb(
+      bookingScript({
+        busyRows: [],
+        attempts: [...attempt({ rows: [insertedRow('bay-0', 'tech-0')] })],
+      }),
+    );
+    const outcome = await bookAppointment(db, collectingDeps().deps, COMMAND);
+    expect(outcome.kind).toBe('confirmed');
   });
 });
 

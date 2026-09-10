@@ -555,11 +555,13 @@ export interface BusyResources {
  *
  * ── ADVISORY, STRUCTURALLY — NOT MERELY BY THE RESPONSE'S OWN FLAG ────────────────────────────
  *
- * This function's result reaches nowhere near an `INSERT`: `bookAppointment.ts` and
- * `rescheduleAppointment.ts` call `candidateResources` and `lockResources`/`insertAppointment`,
- * never this. Design §1.3: what makes "advisory" true is that there is no representation of a
- * hold anywhere in this system for a caller to mistakenly trust — not a promise kept by this
- * function's caller.
+ * This function's result reaches nowhere near an `INSERT`: `bookAppointment.ts` calls this
+ * function once per request (alongside `candidateResources`, to order candidates free-first —
+ * slice 19), and both it and `rescheduleAppointment.ts` still commit only through
+ * `lockResources`/`insertAppointment`. Design §1.3: what makes "advisory" true is that there is
+ * no representation of a hold anywhere in this system for a caller to mistakenly trust — not a
+ * promise kept by this function's caller, and not that this function goes uncalled on the
+ * booking path.
  */
 export async function busyResources(
   db: Db,
