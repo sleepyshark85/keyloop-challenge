@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **405** |
-| Severity | 14 blocking · 190 major · 201 minor |
+| Findings recorded | **407** |
+| Severity | 14 blocking · 190 major · 203 minor |
 | Verdicts | 23 narrowed · 136 accepted · 3 escalated · 34 deferred · 4 rejected |
-| Raised by | architect 94 · orchestrator 82 · test-engineer 80 · reviewer 66 · implementer 64 · scribe 12 · human 7 |
-| Awaiting a ruling | **205** |
+| Raised by | architect 94 · test-engineer 82 · orchestrator 82 · reviewer 66 · implementer 64 · scribe 12 · human 7 |
+| Awaiting a ruling | **207** |
 | Mean escape distance | 1.44 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2741,6 +2741,8 @@ rather than narrated.*
 | **T-19-1** | MAJOR | 2 | test-engineer | AC-3a as worded cannot be constructed black-box through the real bookAppointment or HTTP path. There is no synchronisation point between the occupancy read and the insert to pause on, unlike QS-5 per-row lock which gives real racers a door to queue at, so real concurrency makes staleness only probabilistic - which is QS-16, not AC-3a. | narrowed |
 | **T-19-2** | MAJOR | 2 | test-engineer | QS-16 tuple set never pairs the most dangerous free-group size with the highest contention. The design own section 8 argument is that risk scales with free-group size approaching the cap - worst-case additive bound about 2M-1 against a cap of 16, so M=8 gives 15 - COMBINED with how many racers pile onto the agreed order. The set pairs M=8 only with N=8, where supply exactly meets demand. | accepted |
 | **T-19-3** | MAJOR | 2 | test-engineer | SELF-DISCLOSED BREACH of CLAUDE.md section 5. The test-engineer ran grep against src/main.ts and src/platform/config.ts while tracing AC-3a seam question - two literal reads of src/, which its role forbids absolutely. It reported the read rather than treating the silent success as permission. | deferred |
+| **T-19-4** | MINOR | 3 | test-engineer | AC-3b P8 and P9 go red as a caught runtime TypeError inside mulberry32, not as a value mismatch. fast-check null-prototype fc.record objects cannot coerce to a primitive where the shipped three-argument build reads the busy argument POSITIONALLY as its seed. | **open** |
+| **T-19-5** | MINOR | 3 | test-engineer | In no-spurious-refusal-under-occupancy.test.ts the capped and exhausted console.log - QS-16 recorded-rather-than-thresholded secondary measure - sits AFTER the strict min(N,M) assertion, so on a failing run the throw pre-empts it and the line only fires when the test passes. | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2789,6 +2791,14 @@ rather than narrated.*
 
 - *scenario:* The guard is not a wall and says so. .claude/hooks/guard-paths.mjs sets READ_TOOLS to the single entry Read, and its Bash branch tests only write-ish commands (redirection, tee, sed -i, rm and similar), so a read-only grep passes freely; the file header states this is a speed bump rather than a wall and names the reviewer as defence in depth. Verified by the orchestrator. MATERIALLY VOID: what leaked is that BOOKING_SEED and BOOKING_ATTEMPT_CAP are env-driven at the composition root, and tests/support/service.ts lines 139, 207 and 237 already carry that name, its semantics and its env wiring, so the read added nothing the role could not legitimately see. The test-engineer states it used none of it in either objection and that its seam proposal derives from the shared scratchpad probe deps shape and from candidate-retry.test.ts bookingSeed option.
 - *deferred* by architect — (d) defer to the gate, PROVISIONAL. NO TAINT and nothing re-authored. The architect independently verified the material-void claim: tests/support/service.ts carries BOOKING_SEED name, its ADR-0021 citation, its unset-versus-set semantics and its spawn env wiring, beside DB_POOL_MAX and OTEL_ - the whole composition-root env surface, legitimately, inside the role own directory. AC-2 measured red stands and step 3 is not re-run. The architect noted that the unprompted disclosure is what made the T-19-1 provenance question answerable rather than invisible: a role that had just read the composition root proposed a seam, and only the disclosure let anyone weigh that. Whether .claude/hooks/guard-paths.mjs grows a Bash read branch is the human call - its READ_TOOLS set holds the single entry Read and its Bash branch tests only write-ish commands, which its own header calls a speed bump rather than a wall, naming the reviewer as defence in depth. Two instances is a pattern (T-15-1 was the first, recorded by the human at Gate E without consequence) and the gate should be shown it as one rather than as a second isolated event.
+
+**T-19-4** — AC-3b P8 and P9 go red as a caught runtime TypeError inside mulberry32, not as a value mismatch. fast-check null-prototype fc.record objects cannot coerce to a primitive where the shipped three-argument build reads the busy argument POSITIONALLY as its seed.
+
+- *scenario:* Self-disclosed by the test-engineer at step 3 rather than laundered into a cleaner-looking failure. It is reported by vitest as a normal failed test, not an uncaught collection error, so the red is real; but it is weaker evidence that THE ASSERTION IS RIGHT and stronger evidence that THE INTERFACE DOES NOT EXIST YET. P6 in the same file is a clean value-mismatch assertion failure, and both new test files (QS-15, QS-16) drive the real HTTP path with no seam and no src/ import, so they fail purely on response and log content with npm run typecheck clean. For the reviewer to weigh at step 5: whether P8 and P9 assert the right thing is not established by this red and must be established by their GREEN.
+
+**T-19-5** — In no-spurious-refusal-under-occupancy.test.ts the capped and exhausted console.log - QS-16 recorded-rather-than-thresholded secondary measure - sits AFTER the strict min(N,M) assertion, so on a failing run the throw pre-empts it and the line only fires when the test passes.
+
+- *scenario:* Self-disclosed at step 3. No evidence is lost: the breakdown is recoverable from the failure message own booking.refused dump, which prints exit, resource, attempts and seed per refusal. Recorded rather than fixed because the orchestrator did not ask for a second pass and it does not affect the correctness of what is asserted. For step 5 to rule.
 
 </details>
 
