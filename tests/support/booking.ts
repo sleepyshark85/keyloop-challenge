@@ -448,19 +448,20 @@ export async function getAppointment(service: StartedService, id: string): Promi
   return await request(`${service.baseUrl}/appointments/${id}`, { method: 'GET' });
 }
 
-// ─────────────────────────────────────────────────────── slice 08: GET /availability ──
+// ─────────────────────────────────────────────────────── slice 16: GET /availability ──
 
 /**
- * `GET /availability?dealershipId&serviceTypeId&from&to` — `docs/slices/08-availability-query.md`,
- * `docs/slices/08-design.md` §2. `from` and `to` are sent VERBATIM — including a reversed or
- * equal pair — so AC-6 (`to <= from`) is reachable through this one helper rather than needing
- * a second raw-query path the way `postRaw` exists beside `postBooking`.
+ * `GET /availability?dealershipId&serviceTypeId&startsAt` — `docs/slices/
+ * 16-availability-derives-its-own-window.md`, `docs/slices/16-design.md` §3. ADR-0039: the
+ * caller is never asked for a value the server can derive, so `from`/`to` are GONE, not kept
+ * alongside `startsAt` (superseding slice 08's shape, where this helper sent `from`/`to`
+ * verbatim to reach `to <= from`). `startsAt` is sent VERBATIM here too, so a case that wants
+ * an unrenderable instant reaches the route unfiltered.
  */
 export interface AvailabilityQuery {
   readonly dealershipId: string;
   readonly serviceTypeId: string;
-  readonly from: string;
-  readonly to: string;
+  readonly startsAt: string;
 }
 
 export async function getAvailability(
@@ -470,10 +471,23 @@ export async function getAvailability(
   const params = new URLSearchParams({
     dealershipId: query.dealershipId,
     serviceTypeId: query.serviceTypeId,
-    from: query.from,
-    to: query.to,
+    startsAt: query.startsAt,
   });
   return await request(`${service.baseUrl}/availability?${params.toString()}`, { method: 'GET' });
+}
+
+/**
+ * The one case `AvailabilityQuery` cannot express by design: AC-3 needs a request that still
+ * carries `from`/`to` and NO `startsAt`, to prove the retired parameters are no longer
+ * accepted rather than silently ignored. Verbatim query params, no shape enforced — the raw
+ * counterpart to `postRaw` below, for the same reason `postRaw` exists beside `postBooking`.
+ */
+export async function getAvailabilityWithParams(
+  service: StartedService,
+  params: Record<string, string>,
+): Promise<HttpAnswer> {
+  const search = new URLSearchParams(params);
+  return await request(`${service.baseUrl}/availability?${search.toString()}`, { method: 'GET' });
 }
 
 /** A one-line rendering of an answer, for a failure message. */

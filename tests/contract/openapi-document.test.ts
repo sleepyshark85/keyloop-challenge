@@ -64,6 +64,19 @@ import buildStringify from 'fast-json-stringify';
  * type-presence check below is widened past `doc.paths` to `doc.paths` ∪ `doc.components`
  * accordingly; a check that only walked `paths` would false-red a correct implementation that
  * takes that home for the row.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * SLICE 16 AMENDMENT (`docs/slices/16-availability-derives-its-own-window.md` AC-3, AC-7 ·
+ * `16-design.md` rulings 1, 3, 6 · ADR-0039) — "the contract, replaced not extended":
+ * `GET /availability`'s `from`/`to` query parameters are GONE, replaced by `startsAt`
+ * (`EXPECTED_PARAMETERS`, below), and the operation gains a second `400` member —
+ * `outside-opening-hours`, alongside `malformed-request` (`EXPECTED_PAIRS`) — now that
+ * availability inherits the booking path's opening-hours gate rather than answering it. The
+ * old "AC-7 (slice 10)" describe block asserted a rule (`to` strictly later than `from`) that
+ * is UNREACHABLE by a client once `to` cannot be sent; it is replaced, not extended, by "AC-3
+ * (slice 16)" below. "AC-7 (slice 16)" is new: the `200` schema must now REQUIRE `startsAt`/
+ * `endsAt` alongside `bays`/`technicians`/`advisory`/`disclaimer` — the response names the
+ * interval it answered about rather than leaving it to a caller-supplied window.
  */
 
 const REPO_ROOT = process.cwd();
@@ -335,6 +348,7 @@ const EXPECTED_PAIRS: Record<string, readonly string[]> = {
   'GET /availability': [
     '200 application/json',
     '400 /problems/malformed-request',
+    '400 /problems/outside-opening-hours',
     '422 /problems/unknown-reference',
   ],
 };
@@ -609,7 +623,7 @@ const EXPECTED_PARAMETERS: Record<string, readonly string[]> = {
   'GET /appointments/{id}': ['id:path'],
   'PATCH /appointments/{id}': ['id:path'],
   'POST /appointments/{id}/cancellation': ['id:path'],
-  'GET /availability': ['dealershipId:query', 'serviceTypeId:query', 'from:query', 'to:query'],
+  'GET /availability': ['dealershipId:query', 'serviceTypeId:query', 'startsAt:query'],
 };
 
 function requestBodyProperties(op: OperationObject): string[] {
@@ -687,25 +701,19 @@ describe('AC-5b (slice 09) — GET /availability documents AC-5a\'s two facts: n
   });
 });
 
-// ───────────────────────────────────────────────────────────────────────── AC-7 (slice 10) ──
+// ───────────────────────────────────────────────────────────────────────── AC-3 (slice 16) ──
 
 /**
- * `R-09-13` / `10-design.md` §3: `AVAILABILITY_QUERYSTRING_DESCRIPTION` is split into three
- * concatenated contract-prose facts (what the operation answers, the rule, the consequence);
- * the TypeBox rationale stays in the file's own docblock and publishes nothing. `D-08-1`'s
- * three surviving mutants are one per emptied literal — hence three separate `it()` cases
- * below, each bound to exactly one of the three pieces, so that emptying any ONE of them
- * fails that one case (never all three at once, which would be indistinguishable from a
- * single combined assertion and would leave two of the three mutants unkilled, reopening
- * `D-08-1`).
- *
- * The boundary is the ARCHITECT'S CORRECTED wording (mid-slice AC authority, `10-design.md`
- * §3, provisional until the gate): `to` strictly later than `from` — not "at or after" as the
- * slice file's AC-7 literally says. `availability.ts` rejects `to <= from`, so "at or after"
- * would publish a rule the code does not implement; `A-10-4` is the assumption id this
- * correction is filed under.
+ * `docs/slices/16-availability-derives-its-own-window.md` AC-3 · `16-design.md` ruling 1, 3, 6
+ * · ADR-0039. REPLACES the retired "AC-7 (slice 10)" block: that block's rule ("`to` strictly
+ * later than `from`") is unreachable by a client once `to` cannot be sent at all, so asserting
+ * it here would pin a sentence the implementation must not publish. `AVAILABILITY_QUERYSTRING_
+ * DESCRIPTION` is rewritten instead to state what the operation now answers (a window DERIVED
+ * from `startsAt` and the service type's duration) and the two consequences a client can still
+ * reach: an unrenderable `startsAt` (`400 malformed-request`) and a derived interval outside
+ * opening hours (`400 outside-opening-hours` — new to this operation, design ruling 5).
  */
-describe("AC-7 (slice 10) — GET /availability's description states the rule and its consequence, without naming the implementation", () => {
+describe("AC-3 (slice 16) — GET /availability's description reflects a derived window, not a caller-supplied one", () => {
   function availabilityDescriptionText(): { readonly text?: string; readonly error?: string } {
     const { doc, error } = readDocument();
     if (error !== undefined) return { error };
@@ -715,29 +723,33 @@ describe("AC-7 (slice 10) — GET /availability's description states the rule an
     return { text: collectDescriptions(op, doc).toLowerCase() };
   }
 
-  it('states what the operation answers — whether the window has capacity', () => {
+  it('states what the operation answers, naming startsAt rather than a from/to window', () => {
     const { text, error } = availabilityDescriptionText();
     expect(error, error).toBeUndefined();
     if (text === undefined) return;
     expect(
-      /\b(capacity|availab\w*)\b/.test(text) && /\bfrom\b/.test(text) && /\bto\b/.test(text),
-      `expected the description to say what the operation answers — capacity/availability over ` +
-        `the requested from/to window.\n${text}`,
+      /\b(capacity|availab\w*)\b/.test(text) && /\bstartsat\b/.test(text),
+      `expected the description to say what the operation answers, naming 'startsAt'.\n${text}`,
     ).toBe(true);
+    expect(
+      /\bfrom\/to\b/.test(text) || /\bfrom\b\s+and\s+\bto\b/.test(text) || /\brequested from\b/.test(text),
+      `the description must no longer describe a caller-supplied from/to window (ADR-0039, ` +
+        `ruling 1 — replaced, not extended).\n${text}`,
+    ).toBe(false);
   });
 
-  it('states the rule — `to` must be STRICTLY LATER than `from` (A-10-4, not "at or after")', () => {
+  it("states the window is DERIVED from the service type's duration (ADR-0039)", () => {
     const { text, error } = availabilityDescriptionText();
     expect(error, error).toBeUndefined();
     if (text === undefined) return;
     expect(
-      /\bstrictly\s+later\b/.test(text),
-      `expected the description to state the rule as 'to' strictly later than 'from' — the ` +
-        `architect's corrected boundary (A-10-4), not the slice file's own "at or after".\n${text}`,
+      /\bderiv\w*\b/.test(text),
+      `expected the description to say the window is DERIVED from the service type's duration, ` +
+        `the same way POST /appointments derives its own.\n${text}`,
     ).toBe(true);
   });
 
-  it('states the consequence — a violation is 400 /problems/malformed-request', () => {
+  it('states the malformed-request consequence for an unrenderable startsAt', () => {
     const { text, error } = availabilityDescriptionText();
     expect(error, error).toBeUndefined();
     if (text === undefined) return;
@@ -747,11 +759,54 @@ describe("AC-7 (slice 10) — GET /availability's description states the rule an
     ).toBe(true);
   });
 
+  it('states the outside-opening-hours consequence, now reachable through this operation (design ruling 5)', () => {
+    const { text, error } = availabilityDescriptionText();
+    expect(error, error).toBeUndefined();
+    if (text === undefined) return;
+    expect(
+      /outside-opening-hours/.test(text),
+      `expected the description to state that a derived interval outside opening hours answers ` +
+        `400 /problems/outside-opening-hours — availability now inherits the booking path's ` +
+        `gate.\n${text}`,
+    ).toBe(true);
+  });
+
   it('names neither TypeBox nor the schema', () => {
     const { text, error } = availabilityDescriptionText();
     expect(error, error).toBeUndefined();
     if (text === undefined) return;
     expect(/typebox/.test(text), `the published description must not name TypeBox.\n${text}`).toBe(false);
     expect(/\bschema\b/.test(text), `the published description must not name "schema".\n${text}`).toBe(false);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────── AC-7 (slice 16) ──
+
+/**
+ * `docs/slices/16-availability-derives-its-own-window.md` AC-7: "that interval is now the one
+ * named in the same response rather than a window the caller supplied." The document half of
+ * that fact is the `200` schema's `required` list — it must include `startsAt`/`endsAt`
+ * alongside the four members slice 08 established, or a client cannot tell from the contract
+ * alone that the response always names the interval it answered about.
+ */
+describe('AC-7 (slice 16) — the 200 response schema REQUIRES startsAt and endsAt alongside bays, technicians, advisory and disclaimer', () => {
+  it('required equals exactly the six members, by equality', () => {
+    const { doc, error } = readDocument();
+    expect(error, error).toBeUndefined();
+    if (doc === undefined) return;
+    const op = operation(doc, '/availability', 'get');
+    expect(op, 'no GET /availability operation in the document').toBeDefined();
+    if (op === undefined) return;
+
+    const schema = op.responses?.['200']?.content?.['application/json']?.schema as
+      | { readonly required?: readonly string[] }
+      | undefined;
+    const required = [...(schema?.required ?? [])].sort();
+    expect(
+      required,
+      `the 200 schema's required properties must equal exactly these six — the response now ` +
+        `names the interval it answered about rather than leaving it to a caller-supplied ` +
+        `window.\nactual: ${JSON.stringify(required)}`,
+    ).toEqual(['advisory', 'bays', 'disclaimer', 'endsAt', 'startsAt', 'technicians']);
   });
 });

@@ -7,17 +7,39 @@ import {
   at,
   describeScenario,
   getAvailability,
+  member,
   seedScenario,
   uuidNamespaceOf,
 } from '../support/booking.js';
 import type { HttpAnswer, Scenario } from '../support/booking.js';
 
 /**
- * QS-8 / AC-1 — availability agrees with the constraint under quiescence.
+ * QS-8 / AC-5 — availability agrees with the constraint under quiescence.
  *
  * `docs/slices/08-availability-query.md` AC-1 (the architect's exact wording, amended at step 1
  * and again at step 2 under T-08-1/T-08-3) · `docs/slices/08-design.md` §1.1, §2 · arc42 §6.5,
- * §8.2, §10.2 · ADR-0032.
+ * §8.2, §10.2 · ADR-0032 (retired).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * SLICE 16 AMENDMENT (`docs/slices/16-availability-derives-its-own-window.md` AC-5,
+ * `16-design.md` ruling 2, ADR-0039) — carried here rather than in a second file, because the
+ * six mechanics below survive unchanged in kind and a second property asserting the same
+ * schedule/probe machinery over the same endpoint would be the duplication ADR-0039 itself
+ * argues against.
+ *
+ * The generator gives up `to` and gains an arbitrary `startsAt` (`AIM_DURATION_MINUTES` below
+ * — `seedScenario`'s own default duration — is used ONLY to AIM the boundary items and the
+ * cancelled witness onto the instants the server is expected to derive; it is never the probe).
+ * **The probe interval is read from the response and never recomputed** — `answer1`'s own
+ * `startsAt`/`endsAt` become `probeStart`/`probeEnd` below, so a server that derived a wrong
+ * window is probed over the window it actually answered about, not over one this file computes
+ * independently. That is deliberate and is ruling 2's own point: this property is now
+ * internally consistent by construction and CANNOT catch a wrong window — AC-2 (
+ * `tests/acceptance/availability.test.ts`) is the assertion that does, by requiring the
+ * availability and booking answers to name the same two instants. What this property still
+ * catches, exactly as before: a candidate reported free that the constraint refuses, or a
+ * candidate omitted that the constraint would accept — now measured against whichever window
+ * the response actually named.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * WHY THIS FILE IS `*.db.test.ts` WHEN ARC42 §10.2 AND THE SLICE FILE BOTH NAME IT WITHOUT THE
@@ -127,10 +149,20 @@ interface ScheduleItemSpec {
 interface RunSpec {
   readonly bayCount: number;
   readonly technicianCount: number;
-  readonly windowStartMinutes: number;
-  readonly windowDurationMinutes: number;
+  /** The query's own `startsAt`, arbitrary — the slice-16 amendment. There is no arbitrary
+   * window width any more: the width is `AIM_DURATION_MINUTES`, `seedScenario`'s own service
+   * duration, because the server derives it and the caller no longer states one. */
+  readonly startsAtMinutes: number;
   readonly items: readonly ScheduleItemSpec[];
 }
+
+/**
+ * `seedScenario`'s default `durationMinutes` (booking.ts), restated as a constant so the
+ * generator can AIM boundary items onto the instants the server is expected to derive —
+ * `startsAtMinutes` and `startsAtMinutes + AIM_DURATION_MINUTES` — without ever standing in
+ * for the probe itself (ruling 2: aiming and probing are different privileges).
+ */
+const AIM_DURATION_MINUTES = 60;
 
 /**
  * Mechanic 6, corrected (T-08-7): every OTHER item (i.e. every item but the witness, below)
@@ -141,9 +173,9 @@ interface RunSpec {
  * simply draw their index from the REMAINING ones (1..count-1), leaving index 0 to the witness
  * alone regardless of kind. With only one bay or one technician there IS no remaining index —
  * every item is forced onto it — so the only way to stay clear of the window is the kind
- * itself: mechanic 5 already places 'boundaryEnd'/'boundaryStart' items outside `[from, to)`
- * by construction, so restricting to those two kinds keeps the pair unshared without an index
- * to fall back on.
+ * itself: mechanic 5 already places 'boundaryEnd'/'boundaryStart' items outside the AIMED
+ * `[startsAt, startsAt + AIM_DURATION_MINUTES)` by construction, so restricting to those two
+ * kinds keeps the pair unshared without an index to fall back on.
  */
 const otherScheduleItemArbitrary = (
   bayCount: number,
@@ -151,10 +183,10 @@ const otherScheduleItemArbitrary = (
 ): fc.Arbitrary<ScheduleItemSpec> => {
   const mustStayOutOfWindow = bayCount === 1 || technicianCount === 1;
   return fc.record({
-    // Boundary-biased (mechanic 5): pinned to end exactly at the query's `from` or start
-    // exactly at its `to`, which uniform random generation would hit only by chance. AC-2 (the
-    // acceptance file) pins the concrete example this exists to reach by design rather than by
-    // luck.
+    // Boundary-biased (mechanic 5): pinned to end exactly at the AIMED derived start or start
+    // exactly at the AIMED derived end, which uniform random generation would hit only by
+    // chance. AC-1 (`tests/acceptance/availability.test.ts`) pins the concrete example this
+    // exists to reach by design rather than by luck.
     kind: mustStayOutOfWindow
       ? fc.oneof(
           fc.constant<'boundaryEnd'>('boundaryEnd'),
@@ -182,23 +214,23 @@ const otherScheduleItemArbitrary = (
 
 /**
  * The witness itself (T-08-7): always `cancelled`, always at (bayIndex=0, technicianIndex=0),
- * and always starting inside `[from, to)` — `randomStartOffsetMinutes` is the ABSOLUTE offset
- * from t=0 that a 'random'-kind item reads (see the assembly loop below), so it is drawn
- * directly from `[windowStartMinutes, windowStartMinutes + windowDurationMinutes)` here rather
- * than shifted later. Any positive duration keeps the interval overlapping the window, since
- * only the START needs to land inside it.
+ * and always starting inside the AIMED `[startsAtMinutes, startsAtMinutes +
+ * AIM_DURATION_MINUTES)` — `randomStartOffsetMinutes` is the ABSOLUTE offset from t=0 that a
+ * 'random'-kind item reads (see the assembly loop below), so it is drawn directly from that
+ * range here rather than shifted later. Any positive duration keeps the interval overlapping
+ * the aimed window, since only the START needs to land inside it.
  */
 const witnessItemArbitrary = (
-  windowStartMinutes: number,
-  windowDurationMinutes: number,
+  startsAtMinutes: number,
+  aimDurationMinutes: number,
 ): fc.Arbitrary<ScheduleItemSpec> =>
   fc.record({
     kind: fc.constant<'random'>('random'),
     bayIndex: fc.constant(0),
     technicianIndex: fc.constant(0),
     randomStartOffsetMinutes: fc.integer({
-      min: windowStartMinutes,
-      max: windowStartMinutes + windowDurationMinutes - 1,
+      min: startsAtMinutes,
+      max: startsAtMinutes + aimDurationMinutes - 1,
     }),
     durationMinutes: fc.integer({ min: 15, max: 90 }),
     status: fc.constant<'cancelled'>('cancelled'),
@@ -208,13 +240,12 @@ const runArbitrary: fc.Arbitrary<RunSpec> = fc
   .record({
     bayCount: fc.integer({ min: 1, max: MAX_BAYS }),
     technicianCount: fc.integer({ min: 1, max: MAX_TECHNICIANS }),
-    windowStartMinutes: fc.integer({ min: 0, max: 240 }),
-    windowDurationMinutes: fc.integer({ min: 15, max: 120 }),
+    startsAtMinutes: fc.integer({ min: 0, max: 240 }),
   })
   .chain((base) =>
     fc
       .record({
-        witness: witnessItemArbitrary(base.windowStartMinutes, base.windowDurationMinutes),
+        witness: witnessItemArbitrary(base.startsAtMinutes, AIM_DURATION_MINUTES),
         // MAX_SCHEDULE_ITEMS bounds the run's total size; the witness now occupies one slot of
         // it, so the other population's own ceiling drops by one to keep that total unchanged.
         others: fc.array(otherScheduleItemArbitrary(base.bayCount, base.technicianCount), {
@@ -333,7 +364,7 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
   });
 
   it(
-    'AC-1 — over the candidate universe, every pair reported free is accepted by an INSERT of exactly [from, to), and every pair omitted is rejected with 23P01',
+    'AC-5 — over the candidate universe, every pair reported free is accepted by an INSERT of exactly the interval the response named, and every pair omitted is rejected with 23P01',
     async () => {
       await withService(async (service) => {
         let runIndex = 0;
@@ -348,8 +379,13 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
             });
             const where = `\n${describeScenario(scenario)}`;
 
-            const windowStart = at(run.windowStartMinutes);
-            const windowEnd = at(run.windowStartMinutes + run.windowDurationMinutes);
+            // AIMED, not probed: the schedule is built before any response exists, so
+            // boundary items are placed at the instants the server is EXPECTED to derive
+            // (`seedScenario`'s own duration, `AIM_DURATION_MINUTES`) — ruling 2's "aiming and
+            // probing are different privileges". A generator that aims wrong produces dull
+            // cases; the probe below never uses these two values.
+            const aimedStart = at(run.startsAtMinutes);
+            const aimedEnd = at(run.startsAtMinutes + AIM_DURATION_MINUTES);
 
             // ── build an arbitrary schedule by direct INSERT, autocommitted per statement ──
             //
@@ -368,9 +404,9 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
               ] as string;
               const [startsAt, endsAt] =
                 item.kind === 'boundaryEnd'
-                  ? [at(run.windowStartMinutes - item.durationMinutes), windowStart]
+                  ? [at(run.startsAtMinutes - item.durationMinutes), aimedStart]
                   : item.kind === 'boundaryStart'
-                    ? [windowEnd, at(run.windowStartMinutes + run.windowDurationMinutes + item.durationMinutes)]
+                    ? [aimedEnd, at(run.startsAtMinutes + AIM_DURATION_MINUTES + item.durationMinutes)]
                     : [
                         at(item.randomStartOffsetMinutes),
                         at(item.randomStartOffsetMinutes + item.durationMinutes),
@@ -396,16 +432,35 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
             }
 
             // ── the query, once, before any probe touches the table ──────────────────────
-            const answer1 = await getAvailability(service, {
+            const query = {
               dealershipId: scenario.dealershipId,
               serviceTypeId: scenario.serviceTypeId,
-              from: windowStart.toISOString(),
-              to: windowEnd.toISOString(),
-            });
+              startsAt: aimedStart.toISOString(),
+            };
+            const answer1 = await getAvailability(service, query);
             expect(
               answer1.status,
-              `AC-1 ARRANGE — GET /availability did not answer 200.\n${describeAnswer(answer1)}${where}`,
+              `AC-5 ARRANGE — GET /availability did not answer 200.\n${describeAnswer(answer1)}${where}`,
             ).toBe(200);
+
+            // THE PROBE INTERVAL IS READ FROM THE RESPONSE, NEVER RECOMPUTED (ruling 2). A
+            // server that derived a wrong window is probed over the window it actually
+            // answered about — this property cannot catch a wrong window (AC-2 does); it can
+            // still catch a candidate the CONSTRAINT disagrees with the RESPONSE about, over
+            // whatever window the response named.
+            const probeStartRaw = member(answer1, 'startsAt');
+            const probeEndRaw = member(answer1, 'endsAt');
+            expect(
+              typeof probeStartRaw === 'string' && typeof probeEndRaw === 'string',
+              `AC-5 ARRANGE — the 200 must name the interval it answered about as string ` +
+                `'startsAt'/'endsAt'.\n${describeAnswer(answer1)}${where}`,
+            ).toBe(true);
+            const probeStart = new Date(String(probeStartRaw));
+            const probeEnd = new Date(String(probeEndRaw));
+            expect(
+              !Number.isNaN(probeStart.getTime()) && !Number.isNaN(probeEnd.getTime()),
+              `AC-5 ARRANGE — the named startsAt/endsAt must both render as instants.\n${describeAnswer(answer1)}${where}`,
+            ).toBe(true);
 
             const freeBays = new Set(stringArray(answer1, 'bays'));
             const freeTechnicians = new Set(stringArray(answer1, 'technicians'));
@@ -428,15 +483,15 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
                     probeId,
                     bayId,
                     technicianId,
-                    windowStart,
-                    windowEnd,
+                    probeStart,
+                    probeEnd,
                   );
                   const label =
                     `(bay=${bayId}, technician=${technicianId}) reportedFree=${String(reportedFree)} ` +
                     `verdict=${verdict.accepted ? 'accepted' : verdict.code}`;
 
                   if (!verdict.accepted && verdict.code !== '23P01') {
-                    // Mechanic 2, and the "distinct" half of AC-1: a 23503/23514/40P01 inside
+                    // Mechanic 2, and the "distinct" half of AC-5: a 23503/23514/40P01 inside
                     // the candidate universe is a failure of a DIFFERENT kind from a QS-8
                     // disagreement, and must not be silently accepted as "an error, so the
                     // pair must be busy".
@@ -450,8 +505,8 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
                   if (reportedFree && !verdict.accepted) {
                     // direction A: reported free ⇒ must be accepted
                     freeButRejected.push(
-                      `${label} — reported FREE but the INSERT of exactly [from, to) was ` +
-                        `REJECTED with 23P01`,
+                      `${label} — reported FREE but the INSERT of exactly the named interval ` +
+                        `was REJECTED with 23P01`,
                     );
                   }
                   if (!reportedFree && verdict.accepted) {
@@ -469,12 +524,7 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
             }
 
             // ── quiescence, WITNESSED (mechanic 3) ────────────────────────────────────────
-            const answer2 = await getAvailability(service, {
-              dealershipId: scenario.dealershipId,
-              serviceTypeId: scenario.serviceTypeId,
-              from: windowStart.toISOString(),
-              to: windowEnd.toISOString(),
-            });
+            const answer2 = await getAvailability(service, query);
             const witnessAfter = await quiescenceWitness(client, scenario.dealershipId);
 
             const quiescenceHeld =
@@ -489,16 +539,16 @@ describe('QS-8 — availability agrees with the constraint under quiescence', ()
 
             expect(
               invalidVerdict,
-              `AC-1 — one or more probes left the candidate universe.\n${invalidVerdict.join('\n')}${where}`,
+              `AC-5 — one or more probes left the candidate universe.\n${invalidVerdict.join('\n')}${where}`,
             ).toEqual([]);
             expect(
               freeButRejected,
-              `AC-1 direction A (free ⇒ accepted) — one or more pairs reported free were ` +
+              `AC-5 direction A (free ⇒ accepted) — one or more pairs reported free were ` +
                 `rejected.\n${freeButRejected.join('\n')}${where}`,
             ).toEqual([]);
             expect(
               busyButAccepted,
-              `AC-1 direction B (omitted ⇒ rejected 23P01) — one or more pairs reported busy ` +
+              `AC-5 direction B (omitted ⇒ rejected 23P01) — one or more pairs reported busy ` +
                 `were actually free.\n${busyButAccepted.join('\n')}${where}`,
             ).toEqual([]);
           }),
