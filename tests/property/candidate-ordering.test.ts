@@ -44,6 +44,33 @@ import fc from 'fast-check';
  * an id that is not in it. The loop only ever prunes what `nextCandidate` just returned, so
  * the case is unreachable and inventing a rule for it here would be this file deciding a
  * design question that belongs to the architect.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * SLICE 19 AMENDMENT (`docs/slices/19-attempt-cap-sized-against-occupancy.md` AC-3a/AC-3b,
+ * AC-7 · `19-design.md` §3, §4, §6 ruling 10 · ADR-0040) — carried here rather than in a
+ * second file, because P1-P7 already characterise `orderCandidates` and a duplicate file
+ * asserting the same algebra against the same seam would be the ADR-0039 duplication this
+ * codebase declines elsewhere.
+ *
+ * `orderCandidates` gains a third parameter, `busy: OccupancySnapshot`, inserted BEFORE
+ * `seed` (design §3: "the call reads what, what, what is taken, how"). P1-P7 below now pass
+ * `EMPTY_OCCUPANCY` where they used to pass nothing — which is not a weakening of what they
+ * assert: design P4 proves `busy = EMPTY_OCCUPANCY` makes `freeFirst` shuffle the same list on
+ * the same stream and return element-for-element what the three-argument function used to, so
+ * re-running P1-P7 under `EMPTY_OCCUPANCY` IS the black-box form of **AC-7**'s identity claim
+ * — a literal comparison against "the old code" is neither necessary nor possible from outside
+ * (there is only ever one compiled `orderCandidates`, and pinning its exact permutation would
+ * be the transcription this file's own header already forbids).
+ *
+ * **P8, P9 and P10 are new and are AC-3b**: `busy` PERMUTES the two lists and never REMOVES
+ * from them, over arbitrary `busy` — including ids absent from both lists, `busy` a SUPERSET
+ * of a whole list, and `busy = EMPTY_OCCUPANCY` itself — and `null` is returned **iff** an
+ * input list is empty, regardless of what `busy` says. This is the point ruling 10 makes about
+ * `T-19-1`'s refused seam: nothing else in the repository would catch a later edit that turned
+ * the ordering READ into a FILTER (removing a busy candidate rather than merely reordering it)
+ * — §2.1 cannot, because ADR-0018's per-resource lock makes a reintroduced check-then-act
+ * *correct* rather than merely harmless, so no concurrency test would ever see it fail. A
+ * property over the multiset is the only guard that would.
  */
 
 // ─────────────────────────────────────────────────────────────── the seam: load dist/ ──
@@ -77,9 +104,17 @@ interface Candidate {
   readonly bayId: string;
   readonly technicianId: string;
 }
+/** `19-design.md` §3, verbatim: "what the ordering is told is taken". */
+interface OccupancySnapshot {
+  readonly bays: readonly string[];
+  readonly technicians: readonly string[];
+}
+/** `19-design.md` §3: "the ordering with nothing known to be busy — reschedule's argument". */
+const EMPTY_OCCUPANCY: OccupancySnapshot = { bays: [], technicians: [] };
 type OrderCandidates = (
   bays: readonly string[],
   technicians: readonly string[],
+  busy: OccupancySnapshot,
   seed: number,
 ) => CandidateOrder | null;
 type NextCandidate = (order: CandidateOrder) => Candidate;
@@ -124,8 +159,8 @@ describe('AC-5 — candidate ordering is a deterministic pure function of (bays,
     const { orderCandidates } = await api();
     fc.assert(
       fc.property(ids(1, 12), ids(1, 12), seeds, (bays, technicians, seed) => {
-        const first = orderCandidates(bays, technicians, seed);
-        const second = orderCandidates(bays, technicians, seed);
+        const first = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed);
+        const second = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed);
         expect(second, 'a second call with identical arguments must return an identical order').toEqual(
           first,
         );
@@ -138,7 +173,7 @@ describe('AC-5 — candidate ordering is a deterministic pure function of (bays,
     const { orderCandidates } = await api();
     fc.assert(
       fc.property(ids(1, 12), ids(1, 12), seeds, (bays, technicians, seed) => {
-        const order = orderCandidates(bays, technicians, seed);
+        const order = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed);
         expect(order, 'both lists are non-empty, so an order must exist').not.toBeNull();
         const got = order as CandidateOrder;
         // Sorted equality, not set equality: a shuffle that duplicated one bay and dropped
@@ -157,7 +192,7 @@ describe('AC-5 — candidate ordering is a deterministic pure function of (bays,
     const { orderCandidates } = await api();
     fc.assert(
       fc.property(ids(0, 8), ids(0, 8), seeds, (bays, technicians, seed) => {
-        const order = orderCandidates(bays, technicians, seed);
+        const order = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed);
         const expectedNull = bays.length === 0 || technicians.length === 0;
         expect(
           order === null,
@@ -175,7 +210,7 @@ describe('AC-5 — candidate ordering is a deterministic pure function of (bays,
     const { orderCandidates, nextCandidate } = await api();
     fc.assert(
       fc.property(ids(1, 12), ids(1, 12), seeds, (bays, technicians, seed) => {
-        const order = orderCandidates(bays, technicians, seed) as CandidateOrder;
+        const order = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed) as CandidateOrder;
         const candidate = nextCandidate(order);
         // Totality is the point of §3's tuple carrier: `readonly [string, ...string[]]` is
         // what removes the index assertion, so this must never throw and never be undefined.
@@ -196,7 +231,7 @@ describe('AC-5 — candidate ordering is a deterministic pure function of (bays,
         fc.constantFrom<'bay' | 'technician'>('bay', 'technician'),
         fc.nat(),
         (bays, technicians, seed, resource, pick) => {
-          const order = orderCandidates(bays, technicians, seed) as CandidateOrder;
+          const order = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed) as CandidateOrder;
           const target = resource === 'bay' ? order.bays : order.technicians;
           const other = resource === 'bay' ? order.technicians : order.bays;
           const id = target[pick % target.length] as string;
@@ -240,7 +275,7 @@ describe('AC-5 — candidate ordering is a deterministic pure function of (bays,
     const heads = new Set<string>();
     const orders = new Set<string>();
     for (let seed = 0; seed < 512; seed += 1) {
-      const order = orderCandidates(bays, technicians, seed) as CandidateOrder;
+      const order = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed) as CandidateOrder;
       heads.add(`${String(order.bays[0])}/${String(order.technicians[0])}`);
       orders.add(`${order.bays.join(',')}|${order.technicians.join(',')}`);
     }
@@ -274,7 +309,7 @@ describe('AC-5 — candidate ordering is a deterministic pure function of (bays,
           // The loop of arc42 §6.2 with an adversary choosing which constraint fires each
           // time. Bound-2's claim is that the header |bays| + |technicians| is enough and its
           // tail is unreachable; this is that claim, exercised against the real functions.
-          let order: CandidateOrder | null = orderCandidates(bays, technicians, seed);
+          let order: CandidateOrder | null = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed);
           let steps = 0;
           const bound = bays.length + technicians.length;
           while (order !== null) {
@@ -299,5 +334,118 @@ describe('AC-5 — candidate ordering is a deterministic pure function of (bays,
       ),
       { numRuns: 400 },
     );
+  });
+
+  // ─────────────────────────────────────────── slice 19: AC-3b — busy permutes, never removes ──
+
+  /**
+   * Ids drawn from `pool` (a subset — `[]` and the WHOLE pool are both in `fc.subarray`'s
+   * range, so "busy = EMPTY_OCCUPANCY" and "busy is a SUPERSET of the whole list" are both
+   * reachable through this alone) unioned with ids that name NOTHING in either list — AC-3b's
+   * three named cases in one generator: absent ids, a superset, and empty.
+   */
+  const busyFrom = (pool: readonly string[]): fc.Arbitrary<string[]> =>
+    fc
+      .tuple(fc.subarray([...pool]), fc.uniqueArray(fc.uuid(), { maxLength: 5 }))
+      .map(([subset, absent]) => [...subset, ...absent]);
+
+  const scenarioWithBusy = fc
+    .tuple(ids(1, 10), ids(1, 10), seeds)
+    .chain(([bays, technicians, seed]) =>
+      fc.tuple(
+        fc.constant(bays),
+        fc.constant(technicians),
+        fc.constant(seed),
+        fc.record({ bays: busyFrom(bays), technicians: busyFrom(technicians) }),
+      ),
+    );
+
+  it('P8 — busy PERMUTES and never REMOVES: an equal multiset to orderCandidates(..., EMPTY_OCCUPANCY, seed), for arbitrary busy — including ids absent from the lists and busy a SUPERSET of a whole list', async () => {
+    const { orderCandidates } = await api();
+    fc.assert(
+      fc.property(scenarioWithBusy, ([bays, technicians, seed, busy]) => {
+        const withBusy = orderCandidates(bays, technicians, busy, seed);
+        const empty = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed);
+        expect(withBusy, 'both lists are non-empty, so busy must not empty either').not.toBeNull();
+        expect(empty, 'the EMPTY_OCCUPANCY call is the control and must also be non-null').not.toBeNull();
+        const got = withBusy as CandidateOrder;
+        const control = empty as CandidateOrder;
+        // Sorted equality, not set equality — the same anti-vacuity reasoning as P2: a
+        // partition that duplicated a busy id and dropped a free one would satisfy a Set
+        // comparison while quietly leaving a candidate untried, which is the spurious refusal
+        // this whole slice exists to remove.
+        expect(
+          sorted(got.bays),
+          'busy may reorder the bays but the SET of bays is unchanged — this is what makes ' +
+            "a wrong or stale snapshot (T-19-1) cost attempts and never a refusal",
+        ).toEqual(sorted(control.bays));
+        expect(sorted(got.technicians), 'and the set of technicians').toEqual(sorted(control.technicians));
+      }),
+      { numRuns: 400 },
+    );
+  });
+
+  it('P9 — null iff an input list is empty, for ANY busy: busy cannot reach the null exit that bookAppointment routes to 500/422', async () => {
+    const { orderCandidates } = await api();
+    fc.assert(
+      fc.property(
+        fc
+          .tuple(ids(0, 8), ids(0, 8), seeds)
+          .chain(([bays, technicians, seed]) =>
+            fc.tuple(
+              fc.constant(bays),
+              fc.constant(technicians),
+              fc.constant(seed),
+              fc.record({ bays: busyFrom(bays), technicians: busyFrom(technicians) }),
+            ),
+          ),
+        ([bays, technicians, seed, busy]) => {
+          const order = orderCandidates(bays, technicians, busy, seed);
+          const expectedNull = bays.length === 0 || technicians.length === 0;
+          expect(
+            order === null,
+            'null iff no candidate exists, REGARDLESS of busy — including busy declaring every ' +
+              'remaining candidate taken. A build where busy can empty a non-empty list has ' +
+              'turned the ordering read into a FILTER (ADR-0040\'s refused Filter-1), which is ' +
+              "§2.1's forbidden shape with the `if` moved into the query planner",
+          ).toBe(expectedNull);
+        },
+      ),
+      { numRuns: 300 },
+    );
+  });
+
+  it('P10 — concrete edge cases named by AC-3b: ids absent from the lists, busy a SUPERSET of the whole list, and busy = EMPTY_OCCUPANCY', async () => {
+    const { orderCandidates } = await api();
+    const bays = ['bay-0', 'bay-1', 'bay-2'];
+    const technicians = ['tech-0', 'tech-1'];
+    const seed = 20_260_910;
+    const baseline = orderCandidates(bays, technicians, EMPTY_OCCUPANCY, seed) as CandidateOrder;
+    expect(baseline, 'the control call itself must be non-null').not.toBeNull();
+
+    const cases: Record<string, OccupancySnapshot> = {
+      'busy = EMPTY_OCCUPANCY': EMPTY_OCCUPANCY,
+      'ids absent from both lists': {
+        bays: ['not-a-bay-1', 'not-a-bay-2'],
+        technicians: ['not-a-technician'],
+      },
+      'busy is a SUPERSET of the whole list (every candidate reported taken)': {
+        bays: [...bays, 'not-a-bay'],
+        technicians: [...technicians, 'not-a-technician'],
+      },
+    };
+
+    for (const [label, busy] of Object.entries(cases)) {
+      const order = orderCandidates(bays, technicians, busy, seed);
+      expect(order, `${label}: busy must never empty a non-empty list`).not.toBeNull();
+      const got = order as CandidateOrder;
+      expect(sorted(got.bays), `${label}: the same multiset of bays as EMPTY_OCCUPANCY`).toEqual(
+        sorted(baseline.bays),
+      );
+      expect(
+        sorted(got.technicians),
+        `${label}: the same multiset of technicians as EMPTY_OCCUPANCY`,
+      ).toEqual(sorted(baseline.technicians));
+    }
   });
 });
