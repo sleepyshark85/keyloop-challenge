@@ -36,9 +36,10 @@ three signals are carried by code this project wrote rather than by an instrumen
 **D-09-4** — twenty racers occasionally answered `500` on a connection
 timeout, never in isolation, never in CI: **resolved on evidence, not disproved**. **D-09-5** — ADR-0035
 exits `proposed` permanently, its remedy being a backlog slice a final slice cannot cut. **D-09-6** —
-**QS-14's headroom is the regression baseline**, ≈9 ms against a 200 ms ceiling, so a regression halving
-throughput passes in silence. **D-10-1** — §8.6's operations column and the contract test's matrix are
-two transcriptions tied by nothing.
+**QS-14's headroom is the regression baseline**: the derived-window availability query measures **p95
+10.5 ms** against a 200 ms ceiling on `cpus=16` i5-13400F, `totalMemMB=15801` — 10.50 and 10.45 ms on
+two runs, so a regression halving throughput passes in silence. **D-10-1** — §8.6's operations
+column and the contract test's matrix are two transcriptions tied by nothing.
 
 **D-14-1** — the log seam's `StreamEntry` carries a `level` **nothing asserts**: delete it and the suite
 stays green, because the one seam test runs at `info`, where the omitted-level default is

@@ -73,8 +73,8 @@ source of truth and the window is observable rather than assumed.
 - **AC-6** — *(QS-14, amended and measured)* The performance scenario's *one-day availability
   query* is replaced by an availability query over the derived window against the unchanged fixture
   (5 bays, 20 technicians, 500 appointments over a week): p95 < 200 ms over 100 runs. The measured
-  p95 is recorded in arc42 §11 at step 7 beside its machine class, because the range this now
-  measures is narrower than the one the budget was set against.
+  p95 is recorded in arc42 §11 beside its machine class, on this branch and before step 5's review,
+  because the range this now measures is narrower than the one the budget was set against.
 - **AC-7** — *(regression guard)* Any `200` still carries `advisory` — `Type.Boolean()`, never a
   literal type — and a `disclaimer` (`Type.String()`) carrying both of slice 08's facts: that a
   free result is not a reservation, and that it is true only of one interval. That interval is now
@@ -141,6 +141,11 @@ Beyond `CLAUDE.md` §10:
   `tests/unit/persistence/appointmentRepository.test.ts:533` are the **implementer's** under §5,
   which is NON-NEGOTIABLE. Acting on the original count would have been a §5 breach — in the slice
   whose whole subject is two things agreeing.
+
+## `F-16-2` — step 4/5 DCR, outcome (a)
+
+**No loopback; `loopbacks` stays 0.** *"At step 7"* read as post-merge; it lands on the branch
+(`7519274` precedes `d3699bd`), so AC-6's wording failed, not the loop. Reasoning on PR #24.
 
 ## Known limits, recorded at step 1
 
