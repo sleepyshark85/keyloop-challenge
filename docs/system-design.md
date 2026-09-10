@@ -98,6 +98,7 @@ without taking anyone's word for it.
 - [**ADR-0037**](adr/0037-bridge-pino-to-opentelemetry-in-process.md) — Bridge pino to OpenTelemetry in-process, on the thread that emitted the line *(accepted)*
 - [**ADR-0038**](adr/0038-the-harness-fixture-carries-data-never-schema.md) — The harness fixture carries data, never schema *(accepted)*
 - [**ADR-0039**](adr/0039-availability-takes-a-start-not-a-window.md) — Availability takes a start, not a window *(accepted)*
+- [**ADR-0040**](adr/0040-order-candidates-free-first-from-one-advisory-read.md) — Order candidates free-first from one advisory read, and keep the cap at 16 *(proposed)*
 
 ---
 

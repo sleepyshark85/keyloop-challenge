@@ -4,7 +4,7 @@ title: Order candidates by a seeded shuffle, prune by the constraint that fired,
 status: accepted
 date: 2026-09-04
 supersedes: null
-superseded_by: null
+superseded_by: "0040"
 arc42: ["§4.1", "§5.2", "§6.2", "§8.4", "§10", "§11"]
 
 # AI provenance — evidence for the assessment's verification criterion.
