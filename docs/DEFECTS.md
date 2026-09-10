@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **395** |
-| Severity | 14 blocking · 184 major · 197 minor |
-| Verdicts | 21 narrowed · 133 accepted · 3 escalated · 33 deferred · 4 rejected |
-| Raised by | architect 90 · orchestrator 81 · test-engineer 77 · reviewer 66 · implementer 63 · scribe 12 · human 6 |
-| Awaiting a ruling | **201** |
+| Findings recorded | **400** |
+| Severity | 14 blocking · 186 major · 200 minor |
+| Verdicts | 22 narrowed · 133 accepted · 3 escalated · 33 deferred · 4 rejected |
+| Raised by | architect 94 · orchestrator 81 · test-engineer 77 · reviewer 66 · implementer 63 · scribe 12 · human 7 |
+| Awaiting a ruling | **205** |
 | Mean escape distance | 1.44 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2724,6 +2724,41 @@ rather than narrated.*
 - *scenario:* A reader auditing whether slice 16 was genuinely test-first follows the only derived evidence in the log. It names a commit that does not exist in the branch history and a CI run whose red-proof job FAILED -- so the artifact appears to certify test-first discipline using the one run that certified nothing, while the run that did certify it is present only as prose. Anyone checking the chain concludes either that the check is broken or that the discipline was faked; both readings are wrong, and neither can be settled from the log alone.
 - *file:* `docs/team-log/events.jsonl`
 - *deferred* by architect — OUTCOME (b) DEFERRED IMPROVEMENT. TO BLOCK, AN ACCEPTANCE CRITERION, A QS OR A SECTION 2 INVARIANT MUST BE NAMED THAT FAILS -- AND NONE DOES: section 2.4 DID happen and CI DID observe it. Run 34427199266 at 762f824, an ancestor of HEAD, concluded verify success, suite failure and RED-PROOF SUCCESS, which is verifiable from outside this repository in thirty seconds. The work is correct under the agreed rules, so the architect own criterion makes this (b) rather than (c), AND IT SAID SO RATHER THAN REACHING FOR THE HARSHER VERDICT TO LOOK RIGOROUS. Recorded at MAJOR anyway because a Definition-of-Done check that is green on a substitute is the precise failure this project keeps cataloguing. THE DURABLE FIX IS DELIBERATELY NOT MADE HERE: widening collect-ci.mjs dedupe from run_id to (run_id, source) is backlog slice 18, because CHANGING A COLLECTOR SO A FAILING CHECK TURNS GREEN, INSIDE THE SLICE WHOSE CHECK IT TURNS GREEN, IS THE MOVE THE FINDING EXISTS TO WARN ABOUT.
+
+</details>
+
+## Slice 19
+
+| ref | sev | step | raised by | claim | verdict |
+|---|---|---|---|---|---|
+| **H-19-1** | MAJOR | 1 | human | ADR-0009 sizes the attempt cap against contention depth, calling it the only driver Bound-2 leaves. Occupancy is a second driver, independent of concurrency and additive with it: Bound-2 spends one attempt per busy candidate resource discovered, and the loop cannot distinguish a resource a racer took microseconds ago from one booked last week. On a dealership where bays plus technicians minus one exceeds the cap of 16, a heavily-booked interval exhausts the cap before it exhausts the candidates, so the request is refused while a free bay and a free technician both exist. This contradicts arc42 section 4.1 by name: a 409 therefore means the dealership was full rather than that the allocator guessed badly. | narrowed |
+| **A-19-1** | MINOR | 1 | architect | The ordering read uses the OCCUPANCY interval (derivation.occupancyStartsAt / occupancyEndsAt), which is what the exclusion constraint sees, not the appointment interval the response names. | **open** |
+| **A-19-2** | MINOR | 1 | architect | busyResources is scoped by dealership and by status <> cancelled, so a cancelled appointment does not make its bay look busy. Free-first depends on that conjunct. | **open** |
+| **OQ-19-1** | MINOR | 1 | architect | Whether the ordering read is separately span-instrumented under arc42 section 8.4, or rides the existing availability.candidates span. | **open** |
+| **OQ-19-2** | MAJOR | 1 | architect | Replay is weakened. A recorded seed no longer reproduces a run on its own, because the permutation now depends on the occupancy snapshot as well as the seed. | **open** |
+
+<details><summary>Failure scenarios and rulings</summary>
+
+**H-19-1** — ADR-0009 sizes the attempt cap against contention depth, calling it the only driver Bound-2 leaves. Occupancy is a second driver, independent of concurrency and additive with it: Bound-2 spends one attempt per busy candidate resource discovered, and the loop cannot distinguish a resource a racer took microseconds ago from one booked last week. On a dealership where bays plus technicians minus one exceeds the cap of 16, a heavily-booked interval exhausts the cap before it exhausts the candidates, so the request is refused while a free bay and a free technician both exist. This contradicts arc42 section 4.1 by name: a 409 therefore means the dealership was full rather than that the allocator guessed badly.
+
+- *scenario:* 12 bays, 12 technicians, cap 16, ZERO concurrency. 11 bays and 11 technicians pre-booked over the target interval, leaving exactly one of each free. One booking issued for that interval. Simulated over 2000 seeds mirroring attemptLoop.ts semantics: median 12 attempts, p95 16, and 372 of 2000 seeds (18.6 percent) refused with exit capped while capacity was free. No QS-3 tuple varies occupancy - every one fixes M free and varies only N concurrent - so no scenario in section 10 reaches this.
+- *narrowed* by architect — Finding AGREED and now executed: 35 of 200 single-threaded bookings refused 409 with one bay and one technician free at 12+12 with 11 pairs pre-booked. ADR-0009's sentence that contention depth is the only driver Bound-2 leaves is false. NARROWED rather than accepted on two counts the architect raised against the orchestrator. First, the fact is not new - arc42 section 11 R-4 has stated it since slice 04 and the code implements R-4 faithfully; what is new is the magnitude, and a residual that is one-in-a-thousand and one that is one-in-six are different decisions wearing the same words. Second, two claims in the orchestrator's slice draft are false and were struck: raising the cap DOES close the defect structurally at or above bays plus technicians, because Bound-2 guarantees a list empties by then, so it must be rejected on latency rather than dismissed; and free-first ordering IS coarse load-aware allocation, so the slice may not claim ADR-0009's Order-D is still given up. Remedy accepted CONDITIONALLY, judged separately from the finding per section 6.2. DCR outcome (b): no acceptance criterion, section 10 quality scenario or section 2 invariant could be named that would fail - QS-3's tuples all sit at zero occupancy, QS-14 passes only because its fixture reserves slots deliberately unused by the filler, and the candidate-retry AC-4 test pins today's behaviour on an all-17-blocked fixture whose refusal is not in fact spurious. The architect declined to reach for section 2.1 to manufacture a name.
+
+**A-19-1** — The ordering read uses the OCCUPANCY interval (derivation.occupancyStartsAt / occupancyEndsAt), which is what the exclusion constraint sees, not the appointment interval the response names.
+
+- *scenario:* A-4 makes the two identical today. If the buffer ever becomes non-zero this read must follow the occupancy interval or free-first would partition against a window the constraint does not use. Same rule and same reason as slice 16 T-16-1.
+
+**A-19-2** — busyResources is scoped by dealership and by status <> cancelled, so a cancelled appointment does not make its bay look busy. Free-first depends on that conjunct.
+
+- *scenario:* If the conjunct were dropped, a cancelled appointment would demote a genuinely free bay to the busy tail. That costs attempts and never a refusal, so it degrades the remedy rather than breaking it - which is exactly the fail-safe property AC-3a asserts.
+
+**OQ-19-1** — Whether the ordering read is separately span-instrumented under arc42 section 8.4, or rides the existing availability.candidates span.
+
+- *scenario:* Open. Settled at step 4 by AC-6 measurement: if the read is a few milliseconds against a 100ms budget it needs no span of its own.
+
+**OQ-19-2** — Replay is weakened. A recorded seed no longer reproduces a run on its own, because the permutation now depends on the occupancy snapshot as well as the seed.
+
+- *scenario:* ADR-0009 consequence four - concurrency tests are reproducible, a seeded order plus a recorded seed makes a failing interleaving re-runnable - is narrowed by ADR-0040. Whether booking.refused should carry the snapshot, or the weakened guarantee is acceptable, is ADR-0040 residual and is NOT closed by this slice.
 
 </details>
 
