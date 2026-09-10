@@ -1,7 +1,7 @@
 ---
 id: "19"
 title: Size the attempt cap against occupancy, not contention depth alone
-status: speccing
+status: done
 depends_on: ["16"]
 arc42: ["§4.1", "§5.2", "§6.2", "§8.4", "§10", "§11.1"]
 adr: ["0040"]
