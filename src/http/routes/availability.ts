@@ -2,16 +2,16 @@
  * `GET /availability` — design §2. The whole of this slice's client surface.
  *
  * Same discipline as `routes/appointments.ts`: ONE exhaustive `switch` over `AvailabilityOutcome`
- * decides the status code, so a fourth member cannot be added to the union without this file
+ * decides the status code, so a sixth member cannot be added to the union without this file
  * failing to build, and nothing about `pg`, SQLSTATE or a connection reaches here
  * (`http-must-not-reach-persistence`).
  *
- * ── `to <= from` IS A ROUTE-LEVEL GUARD, NOT A SCHEMA ONE (AC-6, F-08-3) ──────────────────────
+ * ── ADR-0039: `startsAt` ONLY, AND THE RESPONSE NAMES THE INTERVAL IT ANSWERED ABOUT ──────────
  *
- * TypeBox validates each querystring member against its own pattern; it cannot compare two
- * properties to each other, so there is no schema shape that rejects `to <= from` before a
- * handler runs. `queryAvailability` decides it — `malformed-window` — and this route only renders
- * what it is handed, exactly as `malformed-instant` already works on the booking path.
+ * `from`/`to` are gone, not kept alongside `startsAt` — a REPLACEMENT, not an addition (design
+ * ruling 1). `queryAvailability` derives the window through `deriveInterval`, the function
+ * `bookAppointment` calls unedited, so the `200` can carry the `startsAt`/`endsAt` it actually
+ * derived rather than echoing a caller-chosen window back.
  *
  * ── AC-5: THE ADVISORY FLAG AND THE TWO FACTS, IN THE BODY AND IN THE SCHEMA'S OWN DESCRIPTION ─
  *
@@ -42,17 +42,17 @@
  * ── `R-09-13`'s SPLIT — CONTRACT PROSE, NOT AN IMPLEMENTATION NOTE ────────────────────────────
  *
  * {@link AVAILABILITY_QUERYSTRING_DESCRIPTION} is three concatenated string literals — what the
- * operation answers, the rule, and the consequence — each its OWN literal so `D-08-1`'s three
- * surviving mutants (one per emptied piece) stay separately killable; a single combined literal
- * would leave two of three unkillable. None of the three names TypeBox or "schema": that
- * rationale is this file's own, stated above, and publishing it to a client is what the split
- * removes.
+ * operation answers (now: a window DERIVED from `startsAt`), and the two consequences a client
+ * can still reach (`malformed-request`, `outside-opening-hours`) — each its OWN literal so
+ * `D-08-1`'s surviving mutants (one per emptied piece) stay separately killable. None of the
+ * three names TypeBox or "schema": that rationale is this file's own, stated above, and
+ * publishing it to a client is what the split removes.
  */
 import { Type } from '@sinclair/typebox';
 import type { Static } from '@sinclair/typebox';
 import type { FastifyInstance } from 'fastify';
 import { problem, problemResponse, sendProblem } from '../problem.js';
-import { RFC3339_PATTERN, UUID_PATTERN } from './appointments.js';
+import { RFC3339_PATTERN, UUID_PATTERN, outsideOpeningHours } from './appointments.js';
 import type { AvailabilityOutcome, AvailabilityQuery } from '../../application/queryAvailability.js';
 
 export interface AvailabilityRouteDeps {
@@ -62,40 +62,41 @@ export interface AvailabilityRouteDeps {
 /**
  * AC-5's two facts, present as free text a client (and the acceptance test, by keyword) can read
  * without parsing anything beyond the JSON body: this is not a reservation, and it holds only for
- * the interval this request named.
+ * the interval named in THIS response (ADR-0039) — no longer a window the caller chose.
  */
 const DISCLAIMER =
   'This result is advisory only: it is not a reservation, and it is true only of the interval ' +
-  'queried (the from/to window on this request) at the instant this response was generated — a ' +
+  'named in this response (startsAt/endsAt) at the instant this response was generated — a ' +
   'concurrent booking can make it stale immediately afterwards. Only POST /appointments makes an ' +
   'adjudicated decision.';
 
 /**
  * §8.6's contract prose for this operation, published ONLY at `operation.description` (see the
  * file docblock's two sections above) — three concatenated facts, one per literal, bound to
- * `D-08-1`'s three surviving mutants: what the operation answers, the rule (`A-10-4`: `to`
- * strictly later than `from`, not "at or after"), and the consequence. Names neither TypeBox
- * nor "schema" — that rationale is this file's own, not a client's concern.
+ * `D-08-1`'s surviving mutants: what the operation answers (ADR-0039: a window derived from
+ * `startsAt` and the service type's duration, the same derivation `POST /appointments` uses),
+ * and the two consequences a client can still reach. Names neither TypeBox nor "schema" — that
+ * rationale is this file's own, not a client's concern.
  */
 const AVAILABILITY_QUERYSTRING_DESCRIPTION =
-  'Reports availability — capacity free for this dealership and service type over the ' +
-  'requested from/to window. ' +
-  'to must be strictly later than from. ' +
-  'A violation is 400 /problems/malformed-request.';
+  'Reports availability — capacity free for this dealership and service type over the window ' +
+  "derived from startsAt and the service type's duration, the same derivation POST " +
+  '/appointments uses. ' +
+  'An unrenderable startsAt is 400 /problems/malformed-request. ' +
+  "A derived interval outside the dealership's opening hours is 400 /problems/outside-opening-hours.";
 
 const AvailabilityQuerystring = Type.Object(
   {
     dealershipId: Type.String({ pattern: UUID_PATTERN }),
     serviceTypeId: Type.String({ pattern: UUID_PATTERN }),
-    from: Type.String({ pattern: RFC3339_PATTERN }),
-    to: Type.String({ pattern: RFC3339_PATTERN }),
+    startsAt: Type.String({ pattern: RFC3339_PATTERN }),
   },
   // Stryker disable next-line ObjectLiteral : {} here changes nothing observable — Fastify's ajv
   // removeAdditional strips an unknown query key regardless of this object's own
-  // additionalProperties (I-08-6); the dist/ recipe (R-08-3) shows no boundary difference. No
-  // `description` here at all (`R-09-13`, `10-design.md` §3): `@fastify/swagger` drops an object
-  // querystring schema's own `description` when it explodes it into per-parameter entries (see
-  // the file docblock), so one placed here would render nowhere and only cost AC-7 a mutant.
+  // additionalProperties (I-08-6). No `description` here at all (`R-09-13`): `@fastify/swagger`
+  // drops an object querystring schema's own `description` when it explodes it into per-parameter
+  // entries (see the file docblock), so one placed here would render nowhere and only cost AC-7 a
+  // mutant.
   {
     // Stryker disable next-line BooleanLiteral : same boundary as above — removeAdditional
     // already strips unknown keys whether this reads false or true (I-08-6).
@@ -107,6 +108,10 @@ type AvailabilityQuerystringType = Static<typeof AvailabilityQuerystring>;
 
 const AvailabilityBody = Type.Object(
   {
+    /** AC-2, AC-7: the interval this response answered about — `deriveInterval`'s own bounds,
+     * never a caller-supplied window (ADR-0039). Required, alongside the other five members. */
+    startsAt: Type.String(),
+    endsAt: Type.String(),
     bays: Type.Array(Type.String()),
     technicians: Type.Array(Type.String()),
     /** AC-5. `Type.Boolean()`, deliberately not `Type.Literal(true)` — see the file docblock. */
@@ -116,28 +121,44 @@ const AvailabilityBody = Type.Object(
   },
   // Stryker disable next-line ObjectLiteral : {} here changes nothing observable either — the
   // response serializer already drops keys not named in `AvailabilityBody`'s own properties
-  // regardless of this options object's additionalProperties/description (I-08-6); the dist/
-  // recipe (R-08-3) shows no boundary difference, and the only killer left would assert this
-  // description string verbatim.
+  // regardless of this options object's additionalProperties/description (I-08-6).
   {
     // Stryker disable next-line BooleanLiteral : same boundary as the querystring schema's
     // additionalProperties above — the response serializer already drops unlisted keys whether
     // this reads false or true (I-08-6).
     additionalProperties: false,
     description:
-      'The bays and technicians free over the queried interval, as of the instant this response ' +
-      'was generated. Advisory only: it is not a reservation, and it is true only of the ' +
-      'interval queried — a concurrent booking can make it stale immediately afterwards. Only ' +
-      'POST /appointments performs an adjudicated, database-verified booking.',
+      'The interval named by startsAt/endsAt, and the bays and technicians free over it, as of ' +
+      'the instant this response was generated. Advisory only: it is not a reservation, and it ' +
+      'is true only of the interval queried — a concurrent booking can make it stale ' +
+      'immediately afterwards. Only POST /appointments performs an adjudicated, ' +
+      'database-verified booking.',
   },
 );
 
 /**
+ * The last-resort body for this operation. `I-16-1` (design §5 ruling 6): rebuilt LOCALLY rather
+ * than imported, because `/problems/internal` is already duplicated by construction site and held
+ * in agreement by `tests/contract/error-taxonomy.test.ts` — not by shared code. The two existing
+ * sites are `src/http/server.ts` (the escaped-exception handler) and
+ * `src/http/routes/appointments.ts` (booking/reschedule's identical arm); this is the third. The
+ * `500` deliberately carries no response schema (`appointments.ts`'s own docblock, I-02-5), so
+ * there is nothing here to share beyond this frozen string.
+ */
+const INTERNAL = problem('/problems/internal', 500, 'The request could not be completed', {
+  detail: 'the service could not complete this request; the failure has been logged',
+});
+
+/**
  * `vehicle-not-owned` is gone from here (`10-design.md` §1): §8.6's matrix names it `book only`,
  * and this operation books nothing.
+ *
+ * TWO MEMBERS AT `400` IS LOAD-BEARING, NOT INCIDENTAL (I-10-1, design §5 ruling 6): a
+ * one-member `Type.Union` collapses to a `Literal` and silently substitutes. No `500` entry — the
+ * catch-all cannot afford a schema of its own (I-02-5).
  */
 const PROBLEM_RESPONSES = {
-  400: problemResponse('/problems/malformed-request'),
+  400: problemResponse('/problems/malformed-request', '/problems/outside-opening-hours'),
   422: problemResponse('/problems/unknown-reference'),
 } as const;
 
@@ -155,40 +176,42 @@ export function registerAvailabilityRoute(
         description: AVAILABILITY_QUERYSTRING_DESCRIPTION,
         querystring: AvailabilityQuerystring,
         // Stryker disable next-line ObjectLiteral : {} here drops response-schema validation
-        // entirely, but nothing this route ever sends carries a field it would strip (I-08-6) —
-        // the dist/ recipe (R-08-3) shows no boundary difference, and the only killer left would
-        // assert this response map's own shape.
+        // entirely, but nothing this route ever sends carries a field it would strip (I-08-6).
         response: { 200: AvailabilityBody, ...PROBLEM_RESPONSES },
       },
     },
     async (request, reply) => {
-      const { dealershipId, serviceTypeId, from, to } = request.query;
+      const { dealershipId, serviceTypeId, startsAt } = request.query;
       const outcome = await deps.queryAvailability({
         dealershipId,
         serviceTypeId,
         // Same construction as the booking and reschedule routes': the pattern guarantees an
         // explicit offset, so this names an instant, and an unparsable value's `NaN` is
-        // `malformed-window`'s subject rather than this handler's.
-        fromMillis: Date.parse(from),
-        toMillis: Date.parse(to),
+        // `malformed-instant`'s subject rather than this handler's.
+        startsAtMillis: Date.parse(startsAt),
       });
 
       switch (outcome.kind) {
         case 'available':
           return await reply.code(200).send({
+            startsAt: new Date(outcome.startsAt).toISOString(),
+            endsAt: new Date(outcome.endsAt).toISOString(),
             bays: outcome.bays,
             technicians: outcome.technicians,
             advisory: true,
             disclaimer: DISCLAIMER,
           });
 
-        case 'malformed-window':
+        case 'malformed-instant':
           return await sendProblem(
             reply,
             problem('/problems/malformed-request', 400, 'The request could not be understood', {
-              detail: 'to must be strictly later than from',
+              detail: 'startsAt is not a usable instant',
             }),
           );
+
+        case 'outside-opening-hours':
+          return await sendProblem(reply, outsideOpeningHours(outcome.verdict));
 
         case 'unknown-reference':
           return await sendProblem(
@@ -198,6 +221,11 @@ export function registerAvailabilityRoute(
               detail: `no ${outcome.reference} matches the id in this request`,
             }),
           );
+
+        case 'reference-data-invalid':
+          // The system's fault, never the client's — same taxonomy row `bookAppointment`'s
+          // identical arm renders (design §5 ruling 3).
+          return await sendProblem(reply, INTERNAL);
 
         default: {
           const unhandled: never = outcome;
