@@ -11,21 +11,20 @@ That is the whole mechanism. Everything else is record: an ADR superseding
 [ADR-0009](../adr/0009-candidate-ordering-and-attempt-cap.md), two quality scenarios for a dimension
 §10 has never varied, and two sentences — [§4.1](../arc42/04-solution-strategy.md)'s and §6.2's — that
 have contradicted [§11 R-4](../arc42/11-risks-technical-debt.md) since slice 04 inside the single source
-of truth. The remedy's shape is **not new**: ADR-0040's provenance carries the ADR-0033 → slice 09
-history and the reopening criterion — *"reopen only on a measurement"* — that `H-19-1` satisfies.
+of truth.
 
 ## 2 · Building blocks touched
 
 | Block | Change |
 |---|---|
 | `src/domain/candidates.ts` | `orderCandidates` gains a `busy` parameter (§3) and the free-first partition (§4). `prune`, `nextCandidate`, `mulberry32`, `shuffle` — **unedited** |
-| `src/application/bookAppointment.ts` | One `busyResources` call before `orderCandidates`, never inside `runAttemptLoop`, over the **occupancy** interval already derived. No step *number*: the file and arc42 §6.2 number these differently (`I-19-1`). *As built, concurrent with `candidateResources` (§9)* |
-| `src/application/attemptLoop.ts` | `CandidateStrategy`'s `'incumbent'` arm gains `readonly busy: OccupancySnapshot`, threaded into its lazy `orderCandidates` call. The `'shuffled'` arm is **unchanged** — booking hands the loop a built order |
+| `src/application/bookAppointment.ts` | One `busyResources` call before `orderCandidates`, never inside `runAttemptLoop`, over the **occupancy** interval (`A-19-1`; no step *number* — ruling 8). *As built, concurrent with `candidateResources` (§9)* |
+| `src/application/attemptLoop.ts` | `CandidateStrategy`'s `'incumbent'` arm gains `readonly busy: OccupancySnapshot`, threaded into its lazy `orderCandidates` call; the `'shuffled'` arm is **unchanged** |
 | `src/application/rescheduleAppointment.ts` | **One line**: `busy: EMPTY_OCCUPANCY` (ruling 5) |
 | `src/persistence/appointmentRepository.ts` | **Not edited.** `busyResources` is reused verbatim, the function `queryAvailability` already calls; a second reader is the mechanism, as at slice 16 |
 | `src/persistence/candidateRepository.ts` | **Not edited**, and that is an assertion: it still cannot see `appointment`, so the `appointment-table-access` marker keeps its one-file list |
-| `tests/integration/telemetry-booking.test.ts` | **Added at step 4** by ruling 13; the test-engineer's, under **AC-8** |
-| `docs/api/openapi.json`, `harness/` | **Not touched** — no wire member moves |
+| `tests/integration/telemetry-booking.test.ts` | **Added at step 4** (ruling 13); the test-engineer's, **AC-8** |
+| `docs/api/openapi.json`, `harness/` | **Not touched** |
 
 ## 3 · Interfaces
 
@@ -50,16 +49,14 @@ export function orderCandidates(
 ): CandidateOrder | null;
 ```
 
-**`src/domain` imports nothing** — `domain-is-pure` is `to: {}`, absolute — so `busy` **arrives as a
-parameter** and the domain declares its own shape, structurally assignable to
-`persistence.BusyResources`, so no adapter and no cast. Moving `BusyResources` into `src/domain` is
-refused; `seed` stays **last**, still Order-C's parameter (arc42 §5.2).
+`domain-is-pure` is absolute, so `busy` **arrives as a parameter** and the domain declares its own
+shape, structurally assignable to `persistence.BusyResources` — no adapter, no cast, and no move of
+`BusyResources` into `src/domain`. `seed` stays **last** (arc42 §5.2).
 
-Booking hands the loop `{ kind: 'shuffled', seed, order }`, so that arm needs nothing. Reschedule does: ADR-0027 defers its shuffle until the incumbent pair conflicts, so the
-call sits in the loop's `23P01` arm, which gains `strategy.busy` from `rescheduleAppointment` (ruling 5),
-never defaulted inside the loop. `orderCandidates` and `prune` remain `CandidateOrder`'s **only two
-minting sites**, both still returning `null` rather than an empty list, so `null` still *means* a list
-emptied and `busy` cannot reach that exit (P2, AC-3b).
+Booking hands the loop `{ kind: 'shuffled', seed, order }`; reschedule's arm gains `strategy.busy`
+from its own call site (ruling 5), ADR-0027 deferring that shuffle to the `23P01` arm. `orderCandidates`
+and `prune` remain `CandidateOrder`'s **only two minting sites**, both returning `null` rather than an
+empty list, so `null` still *means* a list emptied and `busy` cannot reach that exit (P2, AC-3b).
 
 ## 4 · The algorithm — precisely, because the de-synchronisation is the trap
 
@@ -98,11 +95,11 @@ Five properties. Breaking any of them is wrong even if the acceptance test is gr
 - **P5 · `prune` must not learn the snapshot.** `filter` preserves order, so the free prefix survives
   pruning; re-partitioning would need a snapshot the loop does not carry.
 
-**Why this is not check-then-act (§2.1).** Membership is invariant — `orderCandidates(b, t, busy, s)`
-returns an **equal multiset** to `orderCandidates(b, t, EMPTY_OCCUPANCY, s)` — so the `null` exit is
-unreachable from `busy` and **the insert is still the only adjudicator** (**AC-3a**). The removing read
-that *would* breach §2.1 is ADR-0040's `Filter-1`. **AC-3b earns its place on a point §2.1 cannot
-cover** — §11.1 D-02-1 — so only a multiset property would fail.
+**Why this is not check-then-act (§2.1).** Membership is invariant — an **equal multiset** to
+`orderCandidates(b, t, EMPTY_OCCUPANCY, s)` — so the `null` exit is unreachable from `busy` and **the
+insert is still the only adjudicator** (**AC-3a**, ADR-0040's Decision; the removing read that *would*
+breach §2.1 is its `Filter-1`). **AC-3b earns its place on a point §2.1 cannot cover** — §11.1 D-02-1 —
+so only a multiset property would fail.
 
 ## 5 · Data-model delta
 
@@ -121,18 +118,17 @@ ADR-0004's retry policy are untouched. The finding is about which candidate is t
    implements the documented behaviour. **I declined to reach for §2.1 to manufacture a name.** Were
    "arc42 asserts the opposite of what the system does" admissible under (c), this would be (c).
 2. **Supersede, not amend.** ADR-0009's decision is immutable (§4), so ADR-0040 supersedes it and
-   ADR-0009 receives `superseded_by: "0040"` in **frontmatter only**. **Carried forward unchanged:**
-   Order-C, Bound-2, the cap's **value of 16**, both refusal exits and their labels, and the cap tested
-   inside the `23P01` arm. **Changed:** the order *within* Order-C's shuffle, and the only-driver claim.
+   ADR-0009 receives `superseded_by: "0040"` in **frontmatter only**. **Carried forward unchanged**, as
+   ADR-0040's Decision lists them: Order-C, Bound-2, the cap at 16, both refusal exits and their
+   labels. **Changed:** the order *within* the shuffle, and the only-driver claim.
 3. **The cap stays 16.** Raising it works **structurally** and is rejected on **latency** rather than
    dismissed; ADR-0040's `Cap-1` row is that argument's one home.
 4. **The `capped` signal is restored probabilistically, not structurally**, attempt 16 requiring fifteen
    conflicts among candidates the snapshot called free. R-4 must say exactly that and **must not claim
    the counter is now clean**.
 5. **Reschedule passes an empty busy set — and passes it itself.** A snapshot over the **new** interval
-   would be wrong about the requester: ADR-0030 has the move **vacating its own pair**, so the row's own
-   bay and technician are reported busy by their own appointment and sorted **last** — the two
-   candidates most likely to be free. By P4 the empty snapshot is byte-identical to today's ordering, so
+   would be wrong about the requester (§11.1 D-19-1): the mover's own pair, which ADR-0030 has it
+   vacating, would sort **last**. By P4 the empty snapshot is byte-identical to today's ordering, so
    **AC-7** holds by construction. Supplied at `rescheduleAppointment`'s call site rather than defaulted
    inside `attemptLoop`, because a shared loop silently choosing its caller's allocation policy is a
    place the fix would have no address. §11.1 D-19-1 — and, unforeseen at step 1, the one path that
@@ -167,17 +163,16 @@ taken further, one agreed in finding and refused in remedy, one deferred.
     and injecting `busy` *replaces* the read, so no test would exercise `A-19-1`'s wiring. I decline to
     name **§2.2** — the substituted read is advisory and the adjudicating `INSERT` stays real.
     **Provenance:** the seam came from the role that had just read the composition root (ruling 12); it
-    carries no weight, the remedy failing on its merits, but had I accepted it the gate could fairly
-    have asked whether it was derivable without that read.
+    carries no weight, the remedy failing on its merits, but had I accepted it the gate could fairly ask
+    whether it was derivable without that read.
 11. **`T-19-2` — AGREED, additively.** `(20, 8, 4)` joins, `(8, 8, 4)` stays: my §8 argument is
     free-group size **combined with** contention, and the set varied one at a time. Eight free pairs
     exist at the new tuple, so exactly 8 confirm and 12 refuse honestly. *Ruling 18: neither tuple can falsify free-first.*
 12. **`T-19-3` — (d), provisional. No taint; nothing downstream is re-authored.** The read-only `grep`
     of `src/main.ts` and `src/platform/config.ts` was a lapse and **materially void**:
-    `tests/support/service.ts` already carries `BOOKING_SEED`'s name, ADR, semantics and env wiring
-    beside `DB_POOL_MAX` and the `OTEL_*` pair — the whole composition-root env surface, inside the
-    role's own directory. AC-2's measured red stands; step 3 is not re-run. **The disclosure is the part
-    worth keeping**: unprompted, and what made ruling 10's provenance question answerable. Second
+    `tests/support/service.ts` already carries `BOOKING_SEED`'s name, ADR, semantics and env wiring —
+    the whole composition-root env surface, inside the role's own directory. AC-2's measured red
+    stands; step 3 is not re-run. **The disclosure is the part worth keeping**: unprompted, and what made ruling 10's provenance question answerable. Second
     instance of the class (`T-15-1`); two instances is a pattern, and whether `guard-paths.mjs` grows a
     Bash read branch is the human's call.
 
@@ -200,11 +195,10 @@ taken further, one agreed in finding and refused in remedy, one deferred.
     the letter leaves it open. The rationale does not: it is outside-in evidence of what *done* means for
     telemetry, and the implementer has now written the free-first code. A role rewriting the criterion
     its own diff must meet is the boundary §5 exists for; the implementer raised rather than edited.
-15. **AC-8 — QS-13's claims are re-sourced, not weakened.** The **alignment** is permanent:
-    `busyResources` shares the constraint's range predicate, dealership scope and `status <> 'cancelled'`
-    filter, and `A-4` makes the intervals identical, so free-first heads both lists with a free resource
-    whenever one exists: **no single-threaded interleaving conflicts while capacity remains.**
-    The mechanism working; its cost is that a waterfall now needs a **refusal** or **concurrency**. Rewritten [QS-13](../arc42/10-quality-requirements.md) carries the three re-sourced
+15. **AC-8 — QS-13's claims are re-sourced, not weakened.** The **alignment** is permanent and
+    ADR-0040's consequence states why: **no single-threaded interleaving conflicts while capacity
+    remains**, so a waterfall now needs a **refusal** or **concurrency**. Rewritten
+    [QS-13](../arc42/10-quality-requirements.md) carries the three re-sourced
     claims, **AC-8** is their acceptance form, and its third leg —
     `booking_conflicts_total{outcome=absorbed}` — is **ruled in rather than traded away**: without it a
     §10 metric claim drops silently to a unit test, evidence of the counting rule and not of the export
@@ -212,75 +206,86 @@ taken further, one agreed in finding and refused in remedy, one deferred.
     technician coin-flip, and reschedule's **lazy** seed draw.
 16. **`OQ-19-1` — settled, no dedicated span**, the implementer's reasoning confirmed on all three legs:
     `busyResources` already rides unspanned on `GET /availability`; the only place to add one is
-    `appointmentRepository.ts`, which §2 marks not-edited; and **AC-6** measured 18.37 ms p95 against a
-    100 ms budget. §8.4 records it.
+    `appointmentRepository.ts`, which §2 marks not-edited; and **AC-6** measured 18.37 ms p95. §8.4 records it.
 
 ## 7 · Quality scenarios
 
-**QS-3, QS-8, QS-10, QS-12** unchanged and asserted so, QS-8's mechanic 6 witnessing `A-19-2` by
-construction. **QS-14** re-measured (AC-6); **QS-15/QS-16** added to §10 at step 1 so the
+**QS-3, QS-8, QS-10, QS-12** unchanged and asserted so (QS-8's mechanic 6 witnesses `A-19-2`).
+**QS-14** re-measured (AC-6); **QS-15/QS-16** added to §10 at step 1 so the
 test-engineer cites §10, not a slice file; **QS-13** rewritten at step 4 (ruling 15).
 
 ## 8 · The live risk — pre-committed at step 1, corrected at step 7
 
-ADR-0004's snapshot is read **once and never refreshed**, so under a burst every racer reads the *same*
-snapshot, **agrees** which group to try first, and front-loads exactly what the winners just took —
-ADR-0009's rejection of Order-D at binary granularity, weakened only because racers still disagree
-*within* the free group, which shrinks as occupancy rises. QS-16 was pre-committed as its falsifier
-(ruling 11) and measured **exactly `min(N, M)` at all four tuples**.
-
-**That was not a falsification, and ruling 18 corrects this section rather than deleting it.** No tuple
-can produce a spurious refusal under free-first; the residual is **unmeasured**, not unfalsified.
+The mechanism is ADR-0040's residual bullet and §11 R-4's bound; only the slice history is here. QS-16
+was pre-committed as its falsifier (ruling 11), measured **exactly `min(N, M)` at all four tuples** —
+and **that was not a falsification**: no tuple can produce a spurious refusal at the shipped cap, so the
+residual is **unmeasured**, not unfalsified. Ruling 18 corrects this section rather than deleting it.
 `Refresh-1`, a bounded free prefix and the `(9, 9, 3)` tuple stay on the table, **undesigned**.
 
 ## 9 · As-built — step 7
 
-arc42 now carries this slice, so §9's proposals are gone rather than restated: §4.1, §5.2, §6.2, §8.4,
+arc42 carries this slice, so §9's proposals are gone rather than restated: §4.1, §5.2, §6.2, §8.4,
 §10 QS-15/QS-16, §11 R-4 and D-09-6, and four new debt rows. Paying for those inside §11's ratchet cost
-~300 words condensed out of six older ones — the register's rule that a budget is not raised to fit
-a document, applied to me.
+**558 words condensed out of 13 older rows** (`R-19-11`'s measurement; my first self-report said ~300
+across six, half of it), and this round's corrections cost **119 more out of 12 rows**, plus ~290 in
+this file.
 
-- **`D-19-1`** — a move orders from an empty snapshot; QS-13's `absorbed` leg depends on it (ruling 5)
-- **`D-19-2`** — a recorded seed no longer replays a refusal (ruling 19)
-- **`D-19-3`** — the burst residual has no falsifier; `(9, 9, 3)` would be (ruling 18)
-- **`D-19-4`** — ADR-0040 stays `proposed` (20)
+- **`D-19-1` · `D-19-2` · `D-19-3` · `D-19-4`** — the move's empty snapshot, the seed that no longer
+  replays, the missing burst falsifier, ADR-0040 unratified (rulings 5, 19, 18, 20; §11.1 in full).
 
 **As-designed versus as-built.** (1) **The read is concurrent, not sequential.** §2 said *after
 `candidateResources`*; it ships in one `Promise.all` (`bookAppointment.ts:257-259`) — better than
-specified, adding no round trip, which is why AC-6 measured 18.37 ms. §6.2 and ADR-0040 now say so.
+specified: no extra round trip (AC-6, 18.37 ms). §6.2 and ADR-0040 now say so.
 (2) **§8's pre-committed falsifier was not one** (ruling 18). (3) **§11 gained an unforeseen row**
-(D-19-3) and merged two: QS-13's `absorbed` leg folds into D-19-1, its determinism and the reschedule
-snapshot being one debt twice. (4) **The red figure is 163, not 165** (ruling 17).
+(D-19-3) and merged QS-13's `absorbed` leg into D-19-1. (4) **The red figure is 163, not 165**
+(ruling 17).
 
 ### Step 7 — four rulings
 
 17. **`R-19-5` — agreed; the documents state the executed figure *and* that it is a sample.** Neither
-    163 nor 165 is reproducible — `BOOKING_SEED` is unset, so each run draws fresh seeds — and preferring
-    the repository's number swaps one quoted constant for another, meeting the DoD clause in letter only.
-    §10 QS-15 and §11 R-4 now carry **163 of 200 in the red run (CI `34464606313`)**, name 165 as the
-    hand probe, and say both are samples of roughly a one-in-six refusal. ADR-0040 keeps its own 35 of
-    200 and adds the fixture's 37.
+    163 nor 165 is reproducible, so preferring the repository's number swaps one quoted constant for
+    another and meets the DoD clause in letter only. §10 QS-15 and §11 R-4 now carry **163 of 200 in the
+    red run (CI `34464606313`)**, name 165 as the hand probe, and say both are samples of roughly a
+    one-in-six refusal. ADR-0040 keeps its own 35 of 200 and adds the fixture's 37.
 18. **`R-19-6` — agreed and taken further; the tuple set stays and arc42 now carries why.** The masking
     argument generalises past where it stopped: a spurious refusal must reach the cap on candidates the
     snapshot called **free**; other racers can occupy at most `2(N − 1)` of those, and at most `2M − 2`
-    can be spent without emptying a free list and making the refusal honest. It needs **`N ≥ 9` and
-    `M ≥ 9`**, and **every tuple has `M ≤ 8`** — `(8,8,4)` included. Unreachable at all four, not merely
-    masked at three, so **my §8 claim that QS-16 was free-first's falsifier is false**, as is ADR-0040's
-    consequence repeating it. Both corrected. The tuples were not badly chosen — against ADR-0009's blind
-    ordering the bound does not hold, and `(8,8,4)` fired in 3 of 8 runs — and they stay, a new tuple
-    being a new concurrency test §2.4 wants red first while this slice's red is spent. `(9, 9, 3)` would falsify free-first.
+    can be spent without emptying a free list and making the refusal honest. It needs
+    **`N, M ≥ ⌈cap/2⌉ + 1`** — 9 at the shipped cap, ruling 21 correcting the encoding — and **every
+    tuple has `M ≤ 8`**. Unreachable at all four, not merely masked at three, so **my §8 claim that
+    QS-16 was free-first's falsifier is false**, as is ADR-0040's consequence repeating it. Both
+    corrected. The tuples were not badly chosen — §10 QS-16 records what they discriminate against — and
+    they stay: a new tuple is a new concurrency test, and §2.4 wants it red first while this slice's red
+    is spent.
 19. **`OQ-19-2` — the weakened replay guarantee is accepted, not closed.** The snapshot on
     `booking.refused` would restore it and is one attribute; I decline to ship it here on **§2.4** — no
     failing test, and a `src/` edit riding on prose in a slice whose red is spent is what §2.4 refuses.
-    What narrowed is smaller than it reads: `orderCandidates` stays pure, so only replay from a
-    production line weakened, and no log ever replayed an interleaving. ADR-0019 destination — the slice
-    reopening `booking.refused`'s payload for **D-14-2**'s missing `exception.*`. It needs a backlog
-    slice: a row is not scheduled (F-16-1).
+    What narrowed is smaller than it reads, and §11.1 D-19-2 carries both the scope and the ADR-0019
+    destination. It needs a backlog slice: a row is not scheduled (F-16-1).
 20. **ADR-0040 stays `proposed` — a decision, not a lapse.** A merge does not move an ADR out of
-    `proposed`, and I decline the standing delegation for a nameable reason: the record rejects **Cap-1**
-    — one config value, making the spurious refusal *structurally* unreachable where Order-E makes it
-    merely unlikely — on a **latency cost nobody measured**. Every figure here supports Order-E and none
-    prices its rival. Ratification is the human's.
+    `proposed`, and I decline the standing delegation for the reason §11.1 D-19-4 states: every figure
+    here supports Order-E and none prices `Cap-1`, its one-config-value rival. Ratification is the
+    human's.
+
+### Step 7, second pass — four rulings
+
+21. **`R-19-8` — agreed; the bound is `⌈cap/2⌉ + 1` and my `9` encoded the cap.** Ruled **(b)**: the
+    code is correct under ADR-0040 and QS-16 green at the shipped cap, so nothing nameable fails today.
+    But `BOOKING_ATTEMPT_CAP` is settable 1–1000 and no fixture pins it — at 14 the bound is 8 and
+    `(8,8,4)`, a tuple §10 called unreachable, goes spurious in ~2.3 % of simulated bursts: D-15-1's
+    class. §10, §11 and ADR-0040 are parametric now; pinning the cap is the test-engineer's, red first
+    (§2.4), on D-19-3's slice. R-4 takes the corollary: only the `capped` arm can be spurious.
+22. **`R-19-9` — agreed on the reviewer's grounds, not on mine.** `A-19-3` was wrong that §4.1 is
+    quantified only backwards — pointing at R-4 for the figure is one-home-per-fact working. The defect
+    is the **adjective**: *"unlikely"* over the one regime nothing here measures. §4.1 now names the
+    regime, says it is not small inside it, and leaves the regime's own likelihood to load. Third
+    instance in two slices (rulings 7, 18), in the sentence read first.
+23. **`R-19-10` — agreed.** My condensation broke `F-16-1`'s arithmetic: five citations, three
+    enumerated. Both `(retired)` sites restored; slice 17 sweeps five.
+24. **`R-19-11` — agreed, the one material loss.** D-16-4's remedy shape — a **generated** block,
+    §11.1's register the precedent — is back. **The ratchet is the human's, not mine:** §11's length
+    tracks the count of slices, so from slice 20 a new row is paid for by deleting an older one's
+    reasoning. Raise the override or split the register — not mine to do mid-slice.
 
 ## 10 · Assumptions and open questions
 

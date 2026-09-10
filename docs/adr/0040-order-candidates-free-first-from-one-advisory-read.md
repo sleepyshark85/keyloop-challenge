@@ -38,9 +38,8 @@ a racer took microseconds ago from one booked last week. Occupancy is a second d
 concurrency and additive with it.
 
 Executed at 12 bays and 12 technicians, 11 pairs confirmed, **zero concurrency**: **35 of 200 seeds
-refused `409` with one bay and one technician free** — reproduced by QS-15's own fixture at 37 of
-200, both samples of one rate (`R-19-5`). §11 R-4 has said so since slice 04 and the code is
-faithful to it; the **magnitude** is new.
+refused `409` with one bay and one technician free** — reproduced by QS-15's fixture at 37 of 200,
+both samples of one rate (`R-19-5`). §11 R-4 has said so since slice 04; the **magnitude** is new.
 One-in-a-thousand and one-in-six are different decisions in the same words; §4.1 promises the
 first.
 
@@ -71,7 +70,7 @@ binary granularity. What stays given up is continuous utilisation ordering.
 
 **Good**
 
-- A `409` means what §4.1 says it means, at the occupancy that refused 35/200.
+- A `409` means what §4.1 says, at the occupancy that refused 35/200.
 - Ordering stays pure: `busy` arrives as a parameter, `domain-is-pure` admitting nothing.
 
 **Bad, or deferred**
@@ -80,12 +79,12 @@ binary granularity. What stays given up is continuous utilisation ordering.
   **occupancy** 17 too, without concurrency. *"work is not balanced across resources … knowingly
   given up"*: now partly taken. A third weakens — a recorded seed no longer reproduces a run alone,
   the permutation depending on the snapshot too (§11.1 D-19-2).
-- **`capped` becomes unlikely, not impossible.** Attempt 16 needs fifteen conflicts among candidates
+- **`capped` becomes burst-only, not impossible.** Attempt 16 needs fifteen conflicts among candidates
   the snapshot called free — probabilistic where Cap-1 is structural.
 - **The residual this record does not close.** Under a burst every racer reads the same snapshot, so
   each loser front-loads what the winners took — Refresh-1's case, refused on Cap-1's latency argument. **QS-16 was written as its falsifier and is not one**: a spurious refusal needs
-  `N ≥ 9` and `M ≥ 9`, which no tuple has (`R-19-6`). The count was exact at all four; the
-  residual is **unmeasured**, not absent.
+  `N, M ≥ ⌈cap/2⌉ + 1` — 9 here, and moving with the cap — which none has (`R-19-6`, `R-19-8`).
+  The count was exact at all four; the residual is **unmeasured**, not absent.
 - **A conflict is no longer constructible single-threaded while capacity exists.** `busyResources`
   shares the constraint's predicate, scope and `status <> 'cancelled'` filter, and `A-4` makes the
   intervals identical, so free-first heads both lists with a free resource whenever one exists. The

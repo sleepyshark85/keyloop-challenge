@@ -65,10 +65,12 @@ prunes the **whole resource** the violated constraint names, making a cap of **1
 [ADR-0040](../adr/0040-order-candidates-free-first-from-one-advisory-read.md), superseding
 [ADR-0009](../adr/0009-candidate-ordering-and-attempt-cap.md)). That read **reorders and never removes**,
 so the insert stays the only adjudicator and a stale snapshot can cost attempts but not a refusal.
-A `409` therefore means the dealership was full rather than that the allocator guessed badly — **all but
-always**, and §11.2 R-4 owns the qualifier: the cap is a latency guard rather than a termination bound,
-so a refusal while capacity remains is now *unlikely*, where before this ordering it was measured at
-roughly one booking in six at high occupancy.
+A `409` therefore means the dealership was full rather than that the allocator guessed badly **outside one
+regime**, and §11.2 R-4 owns it: the cap is a latency guard rather than a termination bound, so a refusal
+while capacity remains now needs a **burst** — at least `⌈cap/2⌉ + 1` concurrent requests against that
+many free pairs. Single-threaded it is gone, where before this ordering it was measured at roughly one
+booking in six at high occupancy; **inside** that burst regime R-4 shows it is not small. Whether the
+regime arises at all is a claim about load, which §1.1's traffic answers and this sentence does not make.
 
 ### And requirement 2's other half
 
