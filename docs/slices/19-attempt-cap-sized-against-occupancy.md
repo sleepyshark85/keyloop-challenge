@@ -45,7 +45,9 @@ This slice makes a `409` mean what §4.1 says it means, and makes arc42 agree wi
   60-minute service type (so `|bays| + |technicians| - 1 = 23`, above the cap of 16), and an interval
   over which **11 bay/technician pairs are already `confirmed`**, when a single booking is requested
   for that interval with **no concurrency at all**, then it is **confirmed** — for each of **200
-  distinct seeds**. *Measured red at 165/200 on the shipped ordering.*
+  distinct seeds**. *Measured red at 163/200 by this criterion's own fixture (CI 34464606313); the
+  hand probe that opened the finding measured 165. `BOOKING_SEED` is unset, so seeds are drawn fresh
+  each run and the figure is a sample, not a constant.*
 - **AC-2** — Given the same dealership, when a booking is requested for that interval, then the
   **attempts made are p95 ≤ 2** for every `k ∈ {0, 3, 6, 9, 11}` pre-booked pairs.
 - **AC-3a** — A wrong or stale occupancy snapshot changes only which candidate is tried **first**: it can

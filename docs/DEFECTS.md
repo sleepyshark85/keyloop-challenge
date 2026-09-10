@@ -19,11 +19,11 @@ drift from the record, and `npm run log:audit` reconciles the record against git
 
 | | |
 |---|---|
-| Findings recorded | **409** |
-| Severity | 14 blocking · 191 major · 204 minor |
-| Verdicts | 23 narrowed · 137 accepted · 3 escalated · 34 deferred · 4 rejected |
-| Raised by | architect 94 · orchestrator 83 · test-engineer 82 · reviewer 66 · implementer 65 · scribe 12 · human 7 |
-| Awaiting a ruling | **208** |
+| Findings recorded | **411** |
+| Severity | 14 blocking · 192 major · 205 minor |
+| Verdicts | 23 narrowed · 137 accepted · 3 escalated · 35 deferred · 4 rejected |
+| Raised by | architect 96 · orchestrator 83 · test-engineer 82 · reviewer 66 · implementer 65 · scribe 12 · human 7 |
+| Awaiting a ruling | **209** |
 | Mean escape distance | 1.44 step(s) |
 
 *Escape distance is the number of loop steps between where a defect entered and where it was
@@ -2735,7 +2735,7 @@ rather than narrated.*
 | **A-19-1** | MINOR | 1 | architect | The ordering read uses the OCCUPANCY interval (derivation.occupancyStartsAt / occupancyEndsAt), which is what the exclusion constraint sees, not the appointment interval the response names. | **open** |
 | **A-19-2** | MINOR | 1 | architect | busyResources is scoped by dealership and by status <> cancelled, so a cancelled appointment does not make its bay look busy. Free-first depends on that conjunct. | **open** |
 | **OQ-19-1** | MINOR | 1 | architect | Whether the ordering read is separately span-instrumented under arc42 section 8.4, or rides the existing availability.candidates span. | **open** |
-| **OQ-19-2** | MAJOR | 1 | architect | Replay is weakened. A recorded seed no longer reproduces a run on its own, because the permutation now depends on the occupancy snapshot as well as the seed. | **open** |
+| **OQ-19-2** | MAJOR | 1 | architect | Replay is weakened. A recorded seed no longer reproduces a run on its own, because the permutation now depends on the occupancy snapshot as well as the seed. | deferred |
 | **I-19-1** | MINOR | 2 | implementer | 19-design.md mixes two step-numbering schemes in adjacent statements without saying which. The building-blocks table says the busyResources call goes between step 5 and step 6 of bookAppointment.ts, but that file numbers step 5 as the orderCandidates call itself, which now takes busy as an argument - so the read cannot come after it. Line 249 uses arc42 section 6.2 numbering, where step 5 IS candidateResources and step 6 is orderCandidates, and under that scheme the same sentence is correct. | accepted |
 | **O-19-1** | MAJOR | 2 | orchestrator | The false claim AC-5 exists to correct appears in a THIRD file that AC-5 does not name. arc42 section 6.2 opens with: the same path when the dealership still has capacity - the reason a 409 means the dealership was full rather than the allocator guessed badly. That is section 4.1 sentence restated, and the executed measurement falsifies it the same way. | accepted |
 | **T-19-1** | MAJOR | 2 | test-engineer | AC-3a as worded cannot be constructed black-box through the real bookAppointment or HTTP path. There is no synchronisation point between the occupancy read and the insert to pause on, unlike QS-5 per-row lock which gives real racers a door to queue at, so real concurrency makes staleness only probabilistic - which is QS-16, not AC-3a. | narrowed |
@@ -2745,6 +2745,8 @@ rather than narrated.*
 | **T-19-5** | MINOR | 3 | test-engineer | In no-spurious-refusal-under-occupancy.test.ts the capped and exhausted console.log - QS-16 recorded-rather-than-thresholded secondary measure - sits AFTER the strict min(N,M) assertion, so on a failing run the throw pre-empts it and the line only fires when the test passes. | **open** |
 | **I-19-2** | MAJOR | 4 | implementer | ADR-0040 makes a single-threaded retry-then-succeed UNCONSTRUCTIBLE while capacity exists, and slice 09 telemetry fixture depends on one. tests/integration/telemetry-booking.test.ts manufactures its waterfall by pre-occupying bay-0 with two bays and relying on ADR-0009 blind shuffle to draw the occupied bay first anyway at BOOKING_SEED 7. Free-first ordering now correctly avoids that bay, the booking confirms on attempt 1, and three assertions fail: exactly one failed attempt span, two distinct booking.attempt values, and at least one booking.conflict line. Measured 3 failed and 11 passed in that file; the rest of the db project passes. | accepted |
 | **O-19-2** | MINOR | 5 | orchestrator | The orchestrator wrote every claim survives into commit d4f7a54 message, describing the test-engineer AC-8 work, without auditing the diff assertion by assertion. R-19-4 shows three claims did not survive on the export path. | **open** |
+| **A-19-3** | MAJOR | 7 | architect | Ruling 18 replaces a WRONG claim with an UNVERIFIED one, and arc42 now states it as fact. The N at least 9 and M at least 9 bound is the architect own derivation, produced at step 7, downstream of nothing. It is load-bearing in three places - arc42 section 10 QS-16, section 11 D-19-3 and ADR-0040 residual - and NOTHING IN THE REPOSITORY ASSERTS IT; the test that would, (9,9,3), is booked rather than written. | **open** |
+| **A-19-4** | MINOR | 7 | architect | Slice 19 commit rewrites other slices history prose. Paying arc42 section 11 word ratchet for four new debt rows cost roughly 300 words condensed out of SIX ROWS BELONGING TO EARLIER SLICES - D-15-4, D-16-3, D-16-4, D-16-5, R-11 and section 11.3. | **open** |
 
 <details><summary>Failure scenarios and rulings</summary>
 
@@ -2768,6 +2770,7 @@ rather than narrated.*
 **OQ-19-2** — Replay is weakened. A recorded seed no longer reproduces a run on its own, because the permutation now depends on the occupancy snapshot as well as the seed.
 
 - *scenario:* ADR-0009 consequence four - concurrency tests are reproducible, a seeded order plus a recorded seed makes a failing interleaving re-runnable - is narrowed by ADR-0040. Whether booking.refused should carry the snapshot, or the weakened guarantee is acceptable, is ADR-0040 residual and is NOT closed by this slice.
+- *deferred* by architect — ACCEPT the weakened replay guarantee; do not fix it here. Adding the snapshot to booking.refused is one attribute and would work - DECLINED ON SECTION 2.4, NOT ON COST. There is no failing test for it, and a src/ edit riding on prose in a slice whose one red commit is already spent is exactly what section 2.4 exists to refuse. What actually narrowed is also smaller than the wording suggests: orderCandidates stays pure and total, so replay FROM A TEST is untouched because P8 and P9 supply busy directly; what weakened is replay from a PRODUCTION LINE, and no log ever replayed a concurrent interleaving anyway. ADR-0019 destination named because a deferral that cannot say where it went is an omission wearing a routing clothes: the slice that reopens booking.refused payload for D-14-2 missing exception attributes, so that record attribute set is decided once instead of twice. Booked as D-19-2. Needs a backlog slice from the orchestrator; a row is not scheduled - F-16-1 own lesson.
 
 **I-19-1** — 19-design.md mixes two step-numbering schemes in adjacent statements without saying which. The building-blocks table says the busyResources call goes between step 5 and step 6 of bookAppointment.ts, but that file numbers step 5 as the orderCandidates call itself, which now takes busy as an argument - so the read cannot come after it. Line 249 uses arc42 section 6.2 numbering, where step 5 IS candidateResources and step 6 is orderCandidates, and under that scheme the same sentence is correct.
 
@@ -2810,6 +2813,14 @@ rather than narrated.*
 **O-19-2** — The orchestrator wrote every claim survives into commit d4f7a54 message, describing the test-engineer AC-8 work, without auditing the diff assertion by assertion. R-19-4 shows three claims did not survive on the export path.
 
 - *scenario:* A commit message is part of the graded record and this one asserted a property of another role diff that the orchestrator had not checked. The reviewer performed the audit the orchestrator should have and found the three. Recorded against the orchestrator rather than the test-engineer: AC-8 wording came from the architect, the implementation from the test-engineer, and the unverified claim about it from the orchestrator. Remedy landed at eb10625; the false sentence stands in d4f7a54 message because the log is append-only and history is not rewritten.
+
+**A-19-3** — Ruling 18 replaces a WRONG claim with an UNVERIFIED one, and arc42 now states it as fact. The N at least 9 and M at least 9 bound is the architect own derivation, produced at step 7, downstream of nothing. It is load-bearing in three places - arc42 section 10 QS-16, section 11 D-19-3 and ADR-0040 residual - and NOTHING IN THE REPOSITORY ASSERTS IT; the test that would, (9,9,3), is booked rather than written.
+
+- *scenario:* Self-raised, unprompted, at step 7. The architect words: I caught a false claim by reasoning and then wrote a second claim by the same method, which is precisely the move this project distrusts. A reviewer should re-derive the counting argument before the gate, not read it. SECOND CONSEQUENCE the architect named: arc42 section 4.1 new headline is quantified only BACKWARDS - it gives one-in-six for the OLD ordering and calls the new residual unlikely with no number, and by ruling 18 own arithmetic no test in the suite can produce one. The system most user-visible claim now rests on an argument.
+
+**A-19-4** — Slice 19 commit rewrites other slices history prose. Paying arc42 section 11 word ratchet for four new debt rows cost roughly 300 words condensed out of SIX ROWS BELONGING TO EARLIER SLICES - D-15-4, D-16-3, D-16-4, D-16-5, R-11 and section 11.3.
+
+- *scenario:* Self-raised at step 7 so the gate sees it rather than notices it. No decision or citation was dropped and docs:refs confirms 129 identifiers cited and all defined, but the judgement to condense another slice record to pay for this one was made by the architect alone.
 
 </details>
 
