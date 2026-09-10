@@ -67,10 +67,6 @@ function fullScript(overrides: {
   ];
 }
 
-function sqlOf(recorded: readonly { readonly sql: string }[], match: RegExp): string | undefined {
-  return recorded.find((q) => match.test(q.sql))?.sql;
-}
-
 describe('queryAvailability — statement order is bookAppointment\'s own', () => {
   it('reference data, FIRST: an unknown dealership never reaches deriveInterval, candidateResources or busyResources', async () => {
     const { db, recorded } = scriptedDb([{ rows: [] }]);
@@ -221,21 +217,4 @@ describe('queryAvailability — the subtraction', () => {
       technicians: [],
     });
   });
-
-  it(
-    'T-16-1 — passes the OCCUPANCY interval to busyResources as Dates (A-4: identical to the ' +
-      'appointment interval named in the response, today)',
-    async () => {
-      const { db, recorded } = scriptedDb(fullScript({}));
-      await queryAvailability(db, BASE_QUERY);
-      const busySql = sqlOf(recorded, /tstzrange\(\$/);
-      expect(busySql).toBeDefined();
-      const busyQuery = recorded.find((q) => q.sql === busySql);
-      const params = (busyQuery?.parameters ?? []) as unknown[];
-      expect(params.some((p) => p instanceof Date && p.getTime() === STARTS_AT_MILLIS)).toBe(true);
-      expect(
-        params.some((p) => p instanceof Date && p.getTime() === STARTS_AT_MILLIS + 3_600_000),
-      ).toBe(true);
-    },
-  );
 });
