@@ -1260,7 +1260,7 @@
     },
     "/availability": {
       "get": {
-        "description": "Reports availability — capacity free for this dealership and service type over the requested from/to window. to must be strictly later than from. A violation is 400 /problems/malformed-request.",
+        "description": "Reports availability — capacity free for this dealership and service type over the window derived from startsAt and the service type's duration, the same derivation POST /appointments uses. An unrenderable startsAt is 400 /problems/malformed-request. A derived interval outside the dealership's opening hours is 400 /problems/outside-opening-hours.",
         "parameters": [
           {
             "schema": {
@@ -1286,35 +1286,34 @@
               "type": "string"
             },
             "in": "query",
-            "name": "from",
-            "required": true
-          },
-          {
-            "schema": {
-              "pattern": "^\\d{4}-\\d{2}-\\d{2}[Tt]\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([Zz]|[+-]\\d{2}:\\d{2})$",
-              "type": "string"
-            },
-            "in": "query",
-            "name": "to",
+            "name": "startsAt",
             "required": true
           }
         ],
         "responses": {
           "200": {
-            "description": "The bays and technicians free over the queried interval, as of the instant this response was generated. Advisory only: it is not a reservation, and it is true only of the interval queried — a concurrent booking can make it stale immediately afterwards. Only POST /appointments performs an adjudicated, database-verified booking.",
+            "description": "The interval named by startsAt/endsAt, and the bays and technicians free over it, as of the instant this response was generated. Advisory only: it is not a reservation, and it is true only of the interval queried — a concurrent booking can make it stale immediately afterwards. Only POST /appointments performs an adjudicated, database-verified booking.",
             "content": {
               "application/json": {
                 "schema": {
                   "additionalProperties": false,
-                  "description": "The bays and technicians free over the queried interval, as of the instant this response was generated. Advisory only: it is not a reservation, and it is true only of the interval queried — a concurrent booking can make it stale immediately afterwards. Only POST /appointments performs an adjudicated, database-verified booking.",
+                  "description": "The interval named by startsAt/endsAt, and the bays and technicians free over it, as of the instant this response was generated. Advisory only: it is not a reservation, and it is true only of the interval queried — a concurrent booking can make it stale immediately afterwards. Only POST /appointments performs an adjudicated, database-verified booking.",
                   "type": "object",
                   "required": [
+                    "startsAt",
+                    "endsAt",
                     "bays",
                     "technicians",
                     "advisory",
                     "disclaimer"
                   ],
                   "properties": {
+                    "startsAt": {
+                      "type": "string"
+                    },
+                    "endsAt": {
+                      "type": "string"
+                    },
                     "bays": {
                       "type": "array",
                       "items": {
@@ -1358,6 +1357,12 @@
                           "type": "string",
                           "enum": [
                             "/problems/malformed-request"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "/problems/outside-opening-hours"
                           ]
                         }
                       ]
