@@ -34,6 +34,35 @@ const technicians = (n: number): string[] =>
   Array.from({ length: n }, (_unused, i) => `tech-${String(i)}`);
 
 /**
+ * `referenceMulberry32`/`referenceShuffle` — the pre-slice-19 generator, restated independently
+ * (R-19-2) rather than imported. `src/domain/candidates.ts` has no exported seam for its internal
+ * stream, and `domain-is-pure` gives this module no import to borrow one through even if it did;
+ * restating six lines is what "possible from outside" means here, and it is the only way P4's
+ * element-for-element claim can be checked rather than merely sized. Used by the P4 test below
+ * only — every other test in this file compares `orderCandidates` outputs to each other, never to
+ * this.
+ */
+function referenceMulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return (): number => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 0x1_0000_0000;
+  };
+}
+
+function referenceShuffle(ids: readonly string[], next: () => number): string[] {
+  const pool = [...ids];
+  const ordered: string[] = [];
+  while (pool.length > 0) {
+    ordered.push(...pool.splice(Math.floor(next() * pool.length), 1));
+  }
+  return ordered;
+}
+
+/**
  * The nth id, refused rather than asserted when it is absent.
  *
  * `CandidateOrder` is a `readonly [string, ...string[]]`, so index 0 is a `string` and every other
@@ -179,13 +208,22 @@ describe('orderCandidates — free-first (ADR-0040 Order-E)', () => {
     // freeFirst(ids, [], next) partitions everything into "free" and shuffles [] second, which
     // consumes no draws — so the stream position and the returned order are identical to a plain
     // shuffle of the whole list. This is the unit-level form of AC-7 / P4.
-    const withBusy = order(bays(8), technicians(8), 555, EMPTY_OCCUPANCY);
-    // A direct call to the pre-slice-19 shape is not reachable any more (the signature changed),
-    // so the control is the same call repeated — determinism (already covered above) plus this
-    // shape check is what P4 reduces to at the unit level: free is the WHOLE list, in input
-    // order, before any shuffle.
-    expect(withBusy.bays.length).toBe(8);
-    expect(withBusy.technicians.length).toBe(8);
+    const b = bays(8);
+    const t = technicians(8);
+    const withBusy = order(b, t, 555, EMPTY_OCCUPANCY);
+
+    // R-19-2: a length check leaves the reverse-filter mutant alive (`ids.filter(…)` ->
+    // `[...ids].reverse().filter(…)` still produces two length-8 lists). `src/domain` imports
+    // nothing, so nothing forbids restating the six-line pre-slice-19 generator here and
+    // comparing element-for-element against it — the same technique `tests/property/
+    // candidate-ordering.test.ts` and the scratchpad probe already use. This is a reference
+    // reimplementation, not an import: it pins AC-7's identity claim for the EMPTY_OCCUPANCY
+    // case specifically, not "the algorithm never changes" generally.
+    const next = referenceMulberry32(555);
+    const referenceBays = referenceShuffle(b, next);
+    const referenceTechnicians = referenceShuffle(t, next);
+    expect(withBusy.bays).toEqual(referenceBays);
+    expect(withBusy.technicians).toEqual(referenceTechnicians);
   });
 
   it('every free candidate precedes every busy one, in both lists', () => {
