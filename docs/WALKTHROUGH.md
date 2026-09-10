@@ -9,9 +9,12 @@ with the command, the response actually returned, and one line on what it proves
 Every response shown below is output this walkthrough actually saw, on a clean checkout, on
 2026-09-08 — see the report that accompanies this document for the one thing that did not behave
 on the first try. Scenario 2b and the fixture-driven half of Scenario 7 were captured against
-`86542a2` on 2026-09-10 (slice 15). If you follow the same steps your ids and timestamps will
-differ (everything is seeded fresh, per `harness/seed.mjs`), but the shapes and status codes will
-not.
+`86542a2` on 2026-09-10 (slice 15). Scenario 3 was recaptured against `b6c1eac` on 2026-09-10
+(slice 16), against a build restarted for the occasion — the service on the well-known port is
+easy to leave running from a prior slice, and an unrestarted one answers the *previous* contract
+convincingly enough to fool a quick read. If you follow the same steps your ids and timestamps
+will differ (everything is seeded fresh, per `harness/seed.mjs`), but the shapes and status codes
+will not.
 
 ## Before you start
 
@@ -178,41 +181,54 @@ that test, not a substitute for it.
 
 ## Scenario 3 — Availability is advisory, and can go stale between the read and the write
 
+As of slice 16 (ADR-0039), the caller no longer names a window — it names `startsAt`, the same
+value the booking path takes, and the response names the interval it derived and answered about:
+
 ```bash
 curl -sS -i -G "$BASE_URL/availability" \
   --data-urlencode "dealershipId=$DEALERSHIP_ID" --data-urlencode "serviceTypeId=$SERVICE_TYPE_ID" \
-  --data-urlencode "from=$STARTS_AT" --data-urlencode "to=2026-09-09T10:00:00.000Z"
+  --data-urlencode "startsAt=$STARTS_AT"
 ```
 
 ```
 HTTP/1.1 200 OK
-{"bays":["4e1c64bf-6ca1-4347-b7d3-6a58469df495"],"technicians":["1dfd00c0-d43d-4b57-b896-f81fd5021595"],
+{"startsAt":"2026-09-11T09:00:00.000Z","endsAt":"2026-09-11T10:00:00.000Z",
+ "bays":["b497bda4-25d0-46be-bc5b-94377f67db18"],"technicians":["a7a25363-da8c-4836-b1c8-7ef17db427c6"],
  "advisory":true,"disclaimer":"This result is advisory only: it is not a reservation, and it is
- true only of the interval queried ... a concurrent booking can make it stale immediately
- afterwards. Only POST /appointments makes an adjudicated decision."}
+ true only of the interval named in this response (startsAt/endsAt) at the instant this response
+ was generated — a concurrent booking can make it stale immediately afterwards. Only POST
+ /appointments makes an adjudicated decision."}
 ```
 
-The bay is reported free. Immediately after reading that response — no pause, no thinking time —
+The bay is reported free, for the interval `startsAt`/`endsAt` the response itself names — not a
+window the caller guessed. Immediately after reading that response — no pause, no thinking time —
 two concurrent bookings raced for that exact slot:
 
 ```
-racer 1: HTTP 201  {"id":"f5388b9c-...","status":"confirmed", ...}
-racer 2: HTTP 409  {"type":"/problems/no-capacity", ..., "resource":"bay"}
+racer 1: HTTP 201  {"id":"2f5099c8-2ab5-4f6b-8290-a6a9d8464b0c","startsAt":"2026-09-11T09:00:00.000Z",
+ "endsAt":"2026-09-11T10:00:00.000Z","status":"confirmed", ...}
+racer 2: HTTP 409  {"type":"/problems/no-capacity","title":"No bay and technician are both free",
+ "status":409,"detail":"every candidate bay was already occupied for this interval","resource":"bay"}
 ```
 
-Querying the identical interval again immediately afterwards:
+Querying the identical `startsAt` again immediately afterwards:
 
 ```
-{"bays":[],"technicians":[],"advisory":true,"disclaimer":"..."}
+{"startsAt":"2026-09-11T09:00:00.000Z","endsAt":"2026-09-11T10:00:00.000Z",
+ "bays":[],"technicians":[],"advisory":true,"disclaimer":"..."}
 ```
 
 The bay that was free a moment ago is gone. Nothing here is a bug: the disclaimer said this would
-happen, and the contract (`docs/api/openapi.json`) says so out loud in the `200` description. The
-only adjudicated decision in this system is the `INSERT` in Scenario 1/2 — `GET /availability` is
-a UX affordance, never a reservation.
+happen, and the contract (`docs/api/openapi.json`) says so out loud in the `200` description. What
+changed at slice 16 is only *whose* interval this is — the server's, derived by the same
+`deriveInterval` the booking path uses and named in the response, rather than a window the caller
+supplied — not whether the read can go stale before the write; it still can, immediately, as above.
+The only adjudicated decision in this system is the `INSERT` in Scenario 1/2 — `GET /availability`
+is a UX affordance, never a reservation.
 
 **Proves:** arc42 §6.5 and requirement 2's honoured-as-UX reading (§1.1); QS-8 pins the query and
-the constraint agree only under quiescence, never under concurrent writers.
+the constraint agree only under quiescence, never under concurrent writers; ADR-0039's ruling that
+a caller is never asked for a value the server can derive.
 
 ---
 
