@@ -15,18 +15,18 @@
 
 | | |
 |---|---|
-| Last commit | `b0ebe74 docs(phase-6): diagrams for the slice loop, the domain model and the booking trace` |
-| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E, process |
-| Agent runs recorded | 249 |
-| ADRs accepted | 15 |
-| Slices defined | 11 |
+| Last commit | `d7e953f chore(19): slice 19 closed, post-merge runs collected` |
+| Gates decided | A, B, C, E, E, E, D, E, process, process, process, process, process, E, process, process, E, light, E, E, process, E, E, process, E, process, scope, E, E, E, E |
+| Agent runs recorded | 330 |
+| ADRs accepted | 19 |
+| Slices defined | 17 |
 | Open DCRs | none |
 
 ## What happens next
 
-- **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md), [`10`](slices/10-openapi-and-curl-harness.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
+- **Slice [`08`](slices/08-availability-query.md), [`09`](slices/09-observability.md), [`10`](slices/10-openapi-and-curl-harness.md), [`14`](slices/14-otlp-logs-and-service-identity.md), [`15`](slices/15-seed-fixtures-and-capacity-harness.md), [`16`](slices/16-availability-derives-its-own-window.md), [`19`](slices/19-attempt-cap-sized-against-occupancy.md) is in flight** — Availability — advisory by contract, and provably in agreement with the constraint.
 - **WIP limit is 1** (`CLAUDE.md` §8): nothing else starts until its **Gate E**.
-- 3 slice(s) remain of 11 defined; Gate D folded 4 (03, 12, 13, 11) into their successors.
+- 9 slice(s) remain of 17 defined; Gate D folded 4 (03, 12, 13, 11) into their successors.
 - **Gate E** on each, then `npm run slice:close`.
 
 ## Gate decisions
@@ -135,6 +135,34 @@
 
 > HUMAN RULING, 2026-09-08. Section 4 said ADRs ARE IMMUTABLE, NEVER EDIT AN ACCEPTED ADR — AND THAT HAD BEEN FALSE IN PRACTICE SINCE BEFORE THIS SESSION. PR 19 rewrote all sixteen surviving ADRs' prose on the human's own ruling, and adr-invariants.mjs and budget.mjs BOTH ALREADY CARRIED HEADERS CITING A 2026-09-05 OVERRIDE THE CONSTITUTION NEVER RECORDED — two tools built on a rule the governing document did not contain, which is the exact defect class this session caught four separate times. THE SHORT FORM IS ADOPTED: an ADR's DECISION is immutable and its PROSE is not; never change what an accepted ADR decided — chosen option, option set, verdict, consequence, measurement — supersede it instead; wording may be improved at any time, AND docs:adr-check IS THE CHECK THAT THE BOUNDARY HELD. Naming the machine check inside the rule is the point: the boundary is falsifiable rather than a promise, and a prose pass that turns the check red HAS changed a decision. THE AMENDMENT WAS PAID FOR RATHER THAN GRANTED AN EXEMPTION. CLAUDE.md was 1536 against a 1500 budget and already over, so the ratchet permits it to shrink or hold and NOT TO GROW: the fifteen words were found by compressing the section 6 passage explaining why section 2 sits on the design-defect list, WITHOUT LOSING THE CLAIM — the incident it narrates is in the log and the rule it supports is stated above it. Landed at the ceiling, not through it.
 
+**Gate scope** · 2026-09-09 · build
+
+> HUMAN RULING, 2026-09-09: slice 14 starts. 14-design.md declined to rule whether the slice should exist during phase 6 and put a binary to the human -- build the OTLP log pipeline arc42 8.4 already claims, or amend 8.4 to retract the claim. The human ruled build, taking the architect's non-binding recommendation. The drafted retraction sentence is not used. Scope ruled before step 2; nothing else about the design was overridden.
+
+**Gate E** · 2026-09-09 · approved
+
+> HUMAN GATE, 2026-09-09: APPROVED FOR MERGE. The human ran the exploratory pass and OBSERVED THE TRACES, which is the half of this slice no acceptance criterion reads: every AC asserts against the test collector, and none of them opens Grafana. The reviewer approved after verifying all three of its step-5 findings by measurement rather than by a green run -- the four new logger tests were shown to FAIL against pre-fix src/, and the last surviving mutant (otelLogStream.ts:95, the parsed === null disjunct) was established EQUIVALENT rather than untested. Three slice:check items remain red and all three were shown to the gate rather than tidied: arc42-edits-match-declaration is a merge-base baselining artifact (check.mjs baselines on merge-base(main, HEAD) rather than the slice start, attributing 14 pre-slice phase-6 commits here; this diff touches NO arc42 file), and the other two are step 7 and this gate itself. Step 7 is dispatched with four obligations, one of which is now load-bearing: the implementer's PR comment CITES ADR-0037 as settled reasoning while the ADR is still an inline draft, so leaving it undrafted would leave a dangling citation on the graded artifact.
+
+**Gate E** · 2026-09-09 · approved
+
+> HUMAN GATE, 2026-09-10: APPROVED AND THE MERGE DELEGATED TO THE ORCHESTRATOR -- 'keep the loop going and merge the PR once you and the team finished with the slice'. THE APPROVAL IS RECORDED FOR WHAT IT WAS. Section 6 step 6 is 'human exploratory testing, then approval and merge', AND NO HUMAN EXPLORATORY PASS HAPPENED ON THIS SLICE. That is a real difference from slice 14, where the human ran the stack and OBSERVED THE TRACES in Grafana, and it is the more pointed absence here because THIS SLICE'S ENTIRE DELIVERABLE IS A RUNNABLE DEMONSTRATION. The orchestrator put the exact commands to the human before merging and was told to carry on; the gap is booked as D-15-5 in arc42 section 11.1 rather than glossed. WHAT DOES STAND BEHIND IT, ALL AGENT-RUN: the implementer ran spurious-refusal.sh against a live service (10 racers, exactly 3 confirmed, 3 distinct bays, 3 distinct technicians) and hand-built 22 invalid fixtures plus 3 CHECK-constraint fixtures; the reviewer rebuilt the container twice and settled its MAJOR by a mutant that went 4/6 to 6/6, then DISPROVED ITS OWN INSTRUMENT with a second mutant showing the pre-fix filename was 0/6 and fully vacuous; the scribe ran every documented command live before writing it and reported no deviation. THE HUMAN ALSO RULED T-15-1 SEPARATELY AT THIS GATE -- recorded, no consequence, no new work -- declining both a tooling read-guard and a re-authored red commit. Loopbacks 0 of 2. DCR-15-1 ruled (a) and cost a return to step 3 with no implementation change.
+
+**Gate E** · 2026-09-10 · approved-with-conditions
+
+> GATE E HELD BY THE ARCHITECT UNDER EXPLICIT HUMAN DELEGATION -- "go for the fix, merge it" and "I will go afk now, the architect can decide on behalf of me". RECORDED FOR WHAT IT WAS: NO HUMAN EXPLORATORY PASS AND NO HUMAN APPROVAL. The architect approved a design it authored, against criteria it wrote, having ruled on every objection raised to it, with the five rulings section 6 makes PROVISIONAL UNTIL THE GATE reviewed by the role that made them. IT WAS ASKED WHAT IT WOULD NOT SIGN IF IT WERE NOT ALSO THE AUTHOR AND IT NAMED SOMETHING REAL -- against the orchestrator, not itself: slice:check test-first proven is GREEN ON A SUBSTITUTE (O-16-5). It defended both unrequested decisions rather than trimming them under its own signature: the opening-hours gate stays because EXCLUDING IT COSTS MORE THAN INCLUDING IT -- deriveInterval refuses to return an interval without it, so exclusion means a second derivation or widening a core signature to weaken a query endpoint -- and the response naming its interval stays because REMOVING IT DELETES AC-2 AND AC-5, and AC-2 is the ONLY assertion in the slice that can fail if the two paths ever derive differently. It STATED AN UNRAISED DOWNSIDE rather than waiting to be asked: a GET that answered 200 with empty lists at 03:00 Sunday now answers 400, awkward for a caller sweeping a day, mitigated because that 400 carries opensAt and closesAt. A-16-1 CLOSED RATHER THAN CARRIED, and the architect corrected its own step-1 framing: it is not an unverifiable assumption, because CLAUDE.md section 1 makes the client layer stubbed BY CONSTITUTIONAL CONSTRAINT. OQ-16-1 refused a third time WITH THE ARCHITECT OWN NOTE THAT IT IS THE ITEM ON WHICH IT IS LEAST ENTITLED TO THE LAST WORD. ONE NEW DEFECT FOUND AT THE GATE THAT NOBODY HAD CAUGHT: GET /availability can now return 500 reference-data-invalid because reusing deriveInterval gave it a failure path it never had, and openapi.json declares only 200, 400 and 422 (D-16-6). THREE CONDITIONS: condition 1 discharged before merge as O-16-5; condition 2 booked as backlog slice 18; condition 3 landed at step 7.
+
+**Gate E** · 2026-09-10 · approved
+
+> GATE E HELD BY THE ORCHESTRATOR UNDER EXPLICIT HUMAN DELEGATION - go for everything, including the merge once you verify everything is good enough, then I will go afk now, you and the architect can decide the remaining. RECORDED FOR WHAT IT WAS: NO HUMAN EXPLORATORY PASS AND NO HUMAN APPROVAL. An agent-run exploratory pass was performed and is recorded separately at s-19-gate-explore; it is weaker than slice 14, where the human observed the traces in Grafana, and stronger than slice 15, where the deliverable was a runnable demonstration nobody ran.
+
+WHY IT IS APPROVED, ON RECORDS RATHER THAN NARRATION. Definition of Done is met on every criterion slice:check computes: test-first proven with the red at 10:15 and a green after, both derived from CI rather than reported; tests green at run 34490806188 on b513324; mutation on changed files 90.36 to 100 against a threshold of 0.75; dependency-cruiser clean; arc42 reconciled at step 7; every MAJOR and BLOCKING finding ruled or resolved; every dispatch reached the log at 15 captures each with an agent event; every role that ran is attributed on PR 27; 18 finding refs minted each with a finding.raised; 0 of 2 loopbacks.
+
+THE ADJUDICATION IS THE ARTIFACT AND IT DID NOT DEFER. Eighteen findings across five roles. Step 2 produced five objections and the architect REFUSED the test-engineer preferred remedy on two independent grounds while agreeing its finding. The test-engineer disclosed two weaknesses in its own red unprompted and a section 5 breach nobody would have seen. The implementer found a collateral failure in another role file and raised rather than edited it. The reviewer did not block, discharged T-19-4 by hand-mutating compiled dist/ rather than accepting reasoning, and caught the orchestrator asserting every claim survives about a diff it had not audited - three claims had in fact descended from the export path to a unit test. THE ARCHITECT RULED AGAINST ITSELF THREE TIMES: it owned that arc42 section 4.1 contradicted section 11 R-4 since slice 04; it declined (c) twice where it could have reached for section 2.1 or arc42 prose to manufacture a name; and at step 7 it discovered its own step-1 claim that QS-16 was free-first falsifier was FALSE, corrected it in arc42 and ADR-0040, then asked a reviewer to re-derive its replacement bound rather than read it - which found the replacement stated as a bare constant when it is ceil(cap/2) + 1, falsifiable at a legal BOOKING_ATTEMPT_CAP of 14.
+
+WHAT IS SHIPPING KNOWN-OPEN, NOT HIDDEN. ADR-0040 stays proposed DELIBERATELY: it rejects raising the cap - one config value, a structural fix - on a latency cost nobody measured, and the gate should see that option set rather than inherit a ratification. The burst re-synchronisation residual is UNFALSIFIED, not measured absent: no QS-16 tuple can reach it and (9,9,3) is booked as D-19-3. Replay is weakened and accepted as D-19-2 with a named destination. arc42 section 11 sits at 2499 of 2500 and every future debt row must be paid by deleting older reasoning - carried to the human as O-19-3, not decided here.
+
+WHAT THE HUMAN SHOULD LOOK AT WHEN BACK, STATED BECAUSE THE ORCHESTRATOR IS NOT NEUTRAL ON IT: the orchestrator raised the finding, made the scope call to jump slices 17 and 18, wrote a commit message the reviewer had to correct, and is now approving its own slice. The architect is a counterweight on architecture; on SCOPE there was none.
+
 ## Decisions on record
 
 | ADR | Title | Status | AI input |
@@ -157,6 +185,11 @@
 | [0030](adr/0030-a-move-locks-the-pair-it-leaves-as-well-as-the-pair-it-takes.md) | A move locks the pair it leaves as well as the pair it takes | accepted | — |
 | [0034](adr/0034-the-caller-is-a-user-and-the-system-does-not-name-the-role.md) | The caller is "a user" and the system does not name the role; authentication is out of scope because the client is stubbed | accepted | — |
 | [0035](adr/0035-one-conflict-counted-per-exclusion-violation.md) | Count one conflict per exclusion violation, not one per contended request | proposed | — |
+| [0036](adr/0036-overlap-is-unrepresentable-the-database-adjudicates.md) | Make overlap unrepresentable — every booking is adjudicated by the database, never by application code | accepted | — |
+| [0037](adr/0037-bridge-pino-to-opentelemetry-in-process.md) | Bridge pino to OpenTelemetry in-process, on the thread that emitted the line | accepted | — |
+| [0038](adr/0038-the-harness-fixture-carries-data-never-schema.md) | The harness fixture carries data, never schema | accepted | — |
+| [0039](adr/0039-availability-takes-a-start-not-a-window.md) | Availability takes a start, not a window | accepted | — |
+| [0040](adr/0040-order-candidates-free-first-from-one-advisory-read.md) | Order candidates free-first from one advisory read, and keep the cap at 16 | proposed | — |
 
 ## Agent runs
 
@@ -411,7 +444,88 @@
 | 2026-09-09 07:23 | architect | 10m52 | 80 / 12,006 / 3,139,332 | `derived` |
 | 2026-09-09 07:34 | architect | 12m42 | 124 / 9,845 / 6,876,837 | `derived` |
 | 2026-09-09 07:34 | scribe | 9m21 | 280 / 21,260 / 13,193,471 | `derived` |
-| | **total** | **9214m51** | **66,938 / 4,555,933 / 6,050,978,840** | |
+| 2026-09-09 08:12 | architect | 18m42 | 224 / 32,810 / 14,549,323 | `derived` |
+| 2026-09-09 08:47 | architect | 1m18 | 34 / 1,540 / 547,619 | `derived` |
+| 2026-09-09 09:18 | architect | 4m55 | 112 / 10,459 / 3,387,304 | `derived` |
+| 2026-09-09 09:29 | architect | 6m16 | 104 / 10,847 / 3,500,691 | `derived` |
+| 2026-09-09 10:09 | architect | 10m20 | 112 / 28,852 / 3,998,634 | `derived` |
+| 2026-09-09 12:41 | architect | 8m30 | 144 / 5,067 / 5,945,282 | `derived` |
+| 2026-09-09 12:52 | implementer | 2m53 | 82 / 8,764 / 2,311,363 | `derived` |
+| 2026-09-09 12:52 | test-engineer | 3m34 | 48 / 971 / 1,067,983 | `derived` |
+| 2026-09-09 13:49 | test-engineer | 60m46 | 404 / 39,223 / 34,344,843 | `derived` |
+| 2026-09-09 13:51 | test-engineer | 62m37 | 442 / 42,191 / 38,600,231 | `derived` |
+| 2026-09-09 14:14 | architect | 3m40 | 70 / 6,100 / 1,970,738 | `derived` |
+| 2026-09-09 14:19 | implementer | 26m47 | 624 / 48,900 / 63,564,094 | `derived` |
+| 2026-09-09 14:28 | test-engineer | 99m42 | 596 / 58,656 / 61,278,222 | `derived` |
+| 2026-09-09 14:52 | reviewer | 22m24 | 198 / 12,614 / 9,844,155 | `derived` |
+| 2026-09-09 14:58 | implementer | 66m06 | 770 / 58,252 / 87,746,347 | `derived` |
+| 2026-09-09 15:31 | reviewer | 9m49 | 196 / 11,691 / 6,549,345 | `derived` |
+| 2026-09-09 15:34 | implementer | 34s | 22 / 470 / 318,888 | `derived` |
+| 2026-09-09 15:34 | test-engineer | 39s | 30 / 2,550 / 577,656 | `derived` |
+| 2026-09-09 15:48 | architect | 8m15 | 166 / 15,234 / 7,419,381 | `derived` |
+| 2026-09-09 15:57 | scribe | 7m50 | 266 / 13,034 / 12,425,859 | `derived` |
+| 2026-09-09 16:11 | scribe | 22m23 | 346 / 17,104 / 17,977,735 | `derived` |
+| 2026-09-09 16:42 | architect | 8m12 | 84 / 28,212 / 3,058,832 | `derived` |
+| 2026-09-09 16:47 | implementer | 3m59 | 32 / 20,383 / 677,307 | `derived` |
+| 2026-09-09 16:48 | test-engineer | 5m18 | 36 / 24,969 / 750,876 | `derived` |
+| 2026-09-09 16:55 | architect | 21m51 | 120 / 57,508 / 5,223,222 | `derived` |
+| 2026-09-09 17:14 | test-engineer | 31m16 | 180 / 81,741 / 13,511,934 | `derived` |
+| 2026-09-09 17:33 | implementer | 49m30 | 262 / 88,451 / 21,577,078 | `derived` |
+| 2026-09-09 17:39 | architect | 65m21 | 148 / 77,118 / 7,123,182 | `derived` |
+| 2026-09-09 17:53 | test-engineer | 70m17 | 362 / 104,579 / 39,182,234 | `derived` |
+| 2026-09-09 18:02 | reviewer | 7m43 | 150 / 23,018 / 6,652,257 | `derived` |
+| 2026-09-09 18:04 | implementer | 80m22 | 276 / 91,404 / 22,852,862 | `derived` |
+| 2026-09-09 18:04 | architect | 90m51 | 172 / 78,722 / 8,875,655 | `derived` |
+| 2026-09-09 18:13 | test-engineer | 90m12 | 490 / 123,773 / 60,196,719 | `derived` |
+| 2026-09-09 18:17 | reviewer | 23m10 | 212 / 25,977 / 10,730,543 | `derived` |
+| 2026-09-09 18:23 | architect | 109m14 | 238 / 79,939 / 15,022,378 | `derived` |
+| 2026-09-09 18:29 | scribe | 5m17 | 180 / 23,158 / 7,979,545 | `derived` |
+| 2026-09-10 01:05 | architect | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 01:13 | implementer | 3m02 | 80 / 14,409 / 2,944,946 | `derived` |
+| 2026-09-10 01:14 | test-engineer | 4m29 | 82 / 22,965 / 2,613,065 | `derived` |
+| 2026-09-10 01:18 | architect | 3m43 | 48 / 9,918 / 983,998 | `derived` |
+| 2026-09-10 01:20 | implementer | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 01:23 | architect | 4m40 | 132 / 14,289 / 4,374,427 | `derived` |
+| 2026-09-10 01:24 | test-engineer | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 01:24 | architect | 5m50 | 150 / 16,671 / 5,207,591 | `derived` |
+| 2026-09-10 01:32 | architect | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 01:55 | test-engineer | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 02:10 | implementer | 12m03 | 286 / 52,527 / 20,394,263 | `derived` |
+| 2026-09-10 02:14 | architect | 2m33 | 52 / 8,004 / 974,874 | `derived` |
+| 2026-09-10 02:14 | scribe | 2m31 | 92 / 10,341 / 2,760,518 | `derived` |
+| 2026-09-10 02:20 | implementer | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 02:20 | scribe | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 02:20 | architect | 8m22 | 150 / 19,476 / 4,539,131 | `derived` |
+| 2026-09-10 02:39 | reviewer | 16m38 | 322 / 25,444 / 16,430,760 | `derived` |
+| 2026-09-10 02:43 | architect | 3m16 | 66 / 7,356 / 1,564,836 | `derived` |
+| 2026-09-10 02:44 | implementer | 4m05 | 92 / 4,229 / 1,852,393 | `derived` |
+| 2026-09-10 02:48 | implementer | 8m17 | 130 / 10,235 / 2,971,857 | `derived` |
+| 2026-09-10 02:51 | test-engineer | 11m10 | 218 / 36,591 / 9,918,424 | `derived` |
+| 2026-09-10 02:56 | architect | 3m04 | 66 / 4,707 / 1,367,130 | `derived` |
+| 2026-09-10 03:07 | architect | 9m36 | 168 / 11,134 / 6,729,360 | `derived` |
+| 2026-09-10 03:23 | architect | 5m40 | 110 / 5,448 / 3,931,791 | `derived` |
+| 2026-09-10 03:43 | architect | 18m39 | 318 / 12,247 / 20,515,480 | `derived` |
+| 2026-09-10 04:05 | test-engineer | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 04:50 | architect | — | 0 / 0 / 0 | `reported` |
+| 2026-09-10 09:12 | architect | 7m45 | 82 / 16,286 / 2,940,863 | `derived` |
+| 2026-09-10 09:26 | architect | 11m11 | 164 / 20,749 / 8,406,217 | `derived` |
+| 2026-09-10 09:32 | implementer | 4m29 | 40 / 25,184 / 966,067 | `derived` |
+| 2026-09-10 09:35 | test-engineer | 7m17 | 90 / 16,594 / 2,613,200 | `derived` |
+| 2026-09-10 09:46 | architect | 9m38 | 128 / 18,696 / 4,731,974 | `derived` |
+| 2026-09-10 10:07 | test-engineer | 17m25 | 256 / 85,346 / 20,190,806 | `derived` |
+| 2026-09-10 10:12 | test-engineer | 22m13 | 316 / 103,793 / 27,239,836 | `derived` |
+| 2026-09-10 10:40 | implementer | 22m24 | 624 / 104,674 / 62,908,442 | `derived` |
+| 2026-09-10 10:58 | architect | 15m55 | 180 / 39,664 / 8,930,995 | `derived` |
+| 2026-09-10 11:19 | test-engineer | 19m03 | 222 / 40,588 / 14,331,265 | `derived` |
+| 2026-09-10 11:59 | reviewer | 39m10 | 376 / 36,108 / 26,758,624 | `derived` |
+| 2026-09-10 12:07 | test-engineer | 5m53 | 138 / 15,376 / 3,979,525 | `derived` |
+| 2026-09-10 12:07 | implementer | 6m45 | 236 / 17,933 / 8,931,234 | `derived` |
+| 2026-09-10 12:10 | implementer | 9m15 | 358 / 22,651 / 15,697,363 | `derived` |
+| 2026-09-10 12:12 | implementer | 11m42 | 392 / 27,331 / 17,786,679 | `derived` |
+| 2026-09-10 13:54 | architect | 27m55 | 352 / 80,351 / 25,253,089 | `derived` |
+| 2026-09-10 14:16 | reviewer | 19m34 | 172 / 21,314 / 8,630,627 | `derived` |
+| 2026-09-10 14:40 | architect | 23m13 | 316 / 54,425 / 20,763,423 | `derived` |
+| | **total** | **10733m49** | **81,874 / 6,943,268 / 7,043,454,230** | |
 
 Cache-read dominates fresh input by orders of magnitude, which is why the collector keeps the
 breakdown rather than summing it. Figures are reconstructed from session transcripts and are not a
