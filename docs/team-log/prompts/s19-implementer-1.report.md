@@ -1,0 +1,26 @@
+# Report · slice 19 · implementer · invocation 1
+
+Extracted from the agent transcript by `.claude/hooks/log-agent-finish.mjs`.
+This is the report **as returned** — it is derived, not retyped, so it cannot drift.
+
+- Task: Step 2 review of slice 19 design
+- Returned: 2026-09-10T09:32:51.186Z
+- Duration: 269s
+
+---
+
+I read `docs/slices/19-attempt-cap-sized-against-occupancy.md`, `docs/slices/19-design.md`, ADR-0040, `src/domain/candidates.ts`, `src/application/attemptLoop.ts`, `src/application/bookAppointment.ts`, `src/application/rescheduleAppointment.ts`, `src/persistence/appointmentRepository.ts` (`busyResources`/`BusyResources`), `src/persistence/candidateRepository.ts`, `.dependency-cruiser.js`, and the existing `tests/property/candidate-ordering.test.ts` seam. No writes made — review only.
+
+**1. Buildable without a new cast — AGREE.** `freeFirst` returns plain `string[]`, exactly the type `shuffle` already returns today. `[bayHead, ...bayTail] = freeFirst(bays, busy.bays, next)` destructures identically to the currently-shipping `[bayHead, ...bayTail] = shuffle(bays, next)`, which already compiles under `noUncheckedIndexedAccess` with the existing `bayHead === undefined` narrowing (that's I-04-3/I-04-4's resolved shape, verbatim). No new assertion is needed anywhere in §4's algorithm; the cast count stays at 3 (`orderCandidates`'s one brand cast, `prune`'s two), matching the module's own docblock claim.
+
+**2. `OccupancySnapshot` vs `BusyResources` — AGREE.** Both are `{ readonly bays: readonly string[]; readonly technicians: readonly string[] }`, structurally identical. TS structural typing accepts a `BusyResources` value anywhere `OccupancySnapshot` is expected with no adapter and no cast — same pattern already in production for `prune`'s unbranded `resource` parameter accepting `pgError.classify`'s return. Verified, not merely plausible.
+
+**3. Read placement in `bookAppointment` — OBJECT (wording, not substance).** The interval choice is unambiguous and I agree with it: **occupancy interval** (`derivation.occupancyStartsAt`/`occupancyEndsAt`), per `A-19-1`, same rule as slice 16's `T-16-1` — the constraint sees that interval, not the appointment interval the response renders. But "between step 5 and step 6" is infeasible as literally written against the current file's numbering (1-2 reference, 3 derivation, 4 candidates, 5 order, 6 loop): step 5 *is* the `orderCandidates` call, which now requires `busy` as an argument, so the read cannot come after it. Requested change: state explicitly that the `busyResources` call goes **after step 4 (`candidateResources`) and step 3 (`deriveInterval`), before the `orderCandidates` call** (old step 5), once per request, never inside `runAttemptLoop`. Cheap to resolve — likely just a renumbering slip in the design table.
+
+**4. `EMPTY_OCCUPANCY` identity claim for reschedule — AGREE, verified against code.** `freeFirst(ids, [], next)`: `taken` is an empty `Set`, so `free = ids.filter(() => true)` (order preserved) and `rest = []`; `shuffle([], next)` consumes zero draws. So `freeFirst(ids, [], next) === shuffle(ids, next)` byte-for-byte, with identical stream consumption (one draw per element, zero for the empty rest group). Chaining bays then technicians through one `mulberry32(seed)` reproduces exactly `orderCandidates(bays, technicians, seed)`'s old two-argument behavior. `attemptLoop.ts`'s lazy call site only needs `strategy.busy` threaded into the existing `orderCandidates(...)` call — the `'shuffled'` arm is untouched, confirmed by reading it. AC-7 holds by construction as claimed.
+
+**5. Seams for the seven ACs — AGREE, no gap.** AC-3b needs nothing new: `tests/property/candidate-ordering.test.ts` already uses the ADR-0013 `dist/domain/candidates.js` dynamic-import seam (not a static `src/` import, so `outside-in-tests-do-not-import-src` is respected), and `orderCandidates`/`EMPTY_OCCUPANCY` are ordinary exports reachable the same way. AC-3a ("stale or wrong snapshot, booking still confirmed") doesn't need an injection seam either — since `busy` only permutes (AC-3b), the HTTP-level guarantee is a corollary the test-engineer can exercise either via the same domain-level seam or via genuine concurrent DB writes (already the class of tooling `tests/concurrency` owns) with no code seam from me. AC-2's attempts-per-request figure is already available from the existing `booking_attempts` histogram recorded unconditionally at loop exit — nothing new needed.
+
+**6. QS-14/AC-6 cost — AGREE.** `busyResources` is the identical query/index shape already measured under `GET /availability`'s `< 200 ms` p95 (QS-14 today); adding one more call of it on the booking path should be a few ms, not a budget risk. One cheaper-placement note within my own authority, not a design change: `candidateResources` and `busyResources` are independent of each other's result (both need only `dealershipId`/`serviceTypeId`/interval), so I intend to issue them via `Promise.all` rather than serially — shaves one round trip, no interface change, flagging it rather than asking permission.
+
+**Overall: agreed, with one objection (item 3) on the read's stated position** — a cheap step-2 clarification, not a DCR; nothing here rises to a §2/AC/QS defect.

@@ -48,9 +48,15 @@ This slice makes a `409` mean what §4.1 says it means, and makes arc42 agree wi
   distinct seeds**. *Measured red at 165/200 on the shipped ordering.*
 - **AC-2** — Given the same dealership, when a booking is requested for that interval, then the
   **attempts made are p95 ≤ 2** for every `k ∈ {0, 3, 6, 9, 11}` pre-booked pairs.
-- **AC-3a** — Given an occupancy snapshot that is **stale or wrong** — a resource it reports free is in
-  fact taken, and one it reports busy is in fact free — when a booking is requested, then the request is
-  still confirmed if any capacity exists. A wrong snapshot costs attempts and never a refusal.
+- **AC-3a** — A wrong or stale occupancy snapshot changes only which candidate is tried **first**: it can
+  cost attempts, and it cannot remove a candidate, empty a list, or mint a refusal of its own. Asserted
+  **jointly and without a test-only seam** — structurally by **AC-3b**, over *arbitrary* `busy` including
+  content contradicting the database, and behaviourally by **QS-16**, where the staleness is real because
+  the racers make it so. *No fixture can pin a stale snapshot black-box: unlike QS-5's per-row lock there
+  is no synchronisation point between the read and the insert to pause at, so staleness under real
+  concurrency is probabilistic — which is QS-16 (`T-19-1`). And the guarantee is bounded rather than
+  absolute: under a cap of 16 a sufficiently adversarial snapshot can still exhaust the cap while capacity
+  exists — §11 R-4's residual, which ruling 4 reduces probabilistically and does not remove.*
 - **AC-3b** — For every `(bays, technicians, busy, seed)`: `orderCandidates` returns lists that are an
   **equal multiset** to `orderCandidates(bays, technicians, [], seed)` — `busy` permutes and never
   removes — and returns `null` **iff** an input list is empty, so `busy` cannot reach the `null` exit
@@ -59,11 +65,16 @@ This slice makes a `409` mean what §4.1 says it means, and makes arc42 agree wi
   a reintroduced check-then-act correct rather than merely harmless.*
 - **AC-4** — QS-3 holds unchanged at every tuple it names, **and** QS-16's tuples hold: at 12+12 with
   `k` pairs pre-booked and *M* free of each remaining, *N* concurrent bookings released from a barrier
-  confirm exactly `min(N, M)` for `(N, M, k) ∈ {(20, 1, 11), (20, 4, 8), (8, 8, 4)}`. *QS-3's own tuples
-  all sit at zero occupancy and cannot see a burst at high occupancy; this criterion is the falsifier
-  for the re-synchronisation risk and it may fail.*
+  confirm exactly `min(N, M)` for `(N, M, k) ∈ {(20, 1, 11), (20, 4, 8), (8, 8, 4), (20, 8, 4)}`. *QS-3's
+  own tuples all sit at zero occupancy and cannot see a burst at high occupancy; this criterion is the
+  falsifier for the re-synchronisation risk and it may fail. `(8,8,4)` and `(20,8,4)` share the largest
+  free group, where the additive bound `2M − 1 = 15` sits one below the cap: the first is where a
+  spurious refusal is most visible, the second where it is most likely to be produced (`T-19-2`).*
 - **AC-5** — arc42 states what a `409` means under the amended mechanism, **§4.1's sentence is
-  corrected**, **§11 R-4 is rewritten against the executed figure**, and the *"refusal is spurious BY
+  corrected**, **§6.2's opening sentence is corrected with it** — *"the reason a `409` means the
+  dealership was full rather than the allocator guessed badly"* is §4.1's claim restated and the same
+  measurement falsifies it (`O-19-1`); these two are the complete set in arc42 — **§11 R-4 is rewritten
+  against the executed figure**, and the *"refusal is spurious BY
   DESIGN"* comment in `tests/acceptance/candidate-retry.test.ts` AC-4 is corrected — its fixture blocks
   all 17 bays **and** all 17 technicians, so its refusal is honest in outcome and merely mislabelled in
   `exit`. ADR-0009's successor records the option set; no accepted ADR's decision is edited.
