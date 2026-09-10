@@ -300,6 +300,14 @@ describe("runAttemptLoop — the 'incumbent' strategy threads its busy snapshot 
     // says that shuffle must be free-first against `strategy.busy`, never a default. Here `bay-0`
     // (the incumbent) is the only one reported busy, so `bay-1` is the sole free candidate and is
     // guaranteed the head of the redrawn order whatever the seed says.
+    //
+    // `drawSeed: () => 0` rather than `1` (R-19-1): at seed 1, `orderCandidates` against this
+    // `busy` and against `EMPTY_OCCUPANCY` both happen to head with `bay-1` — the free-first bias
+    // and the blind shuffle coincide, so forcing `strategy.busy` to `EMPTY_OCCUPANCY` (Stryker's
+    // `ConditionalExpression -> false` on `incumbentBusy`) left this test passing. Seed 0
+    // separates them: `orderCandidates(['bay-0','bay-1'], ['tech-0'], busy, 0).bays` is
+    // `['bay-1','bay-0']` but the same call against `EMPTY_OCCUPANCY` is `['bay-0','bay-1']` —
+    // verified by probe, not asserted here.
     let attemptCount = 0;
     const params = baseParams({
       bays: ['bay-0', 'bay-1'],
@@ -309,7 +317,7 @@ describe("runAttemptLoop — the 'incumbent' strategy threads its busy snapshot 
         bayId: 'bay-0',
         technicianId: 'tech-0',
         busy: { bays: ['bay-0'], technicians: [] },
-        drawSeed: () => 1,
+        drawSeed: () => 0,
       },
       runAttempt: async (_trx, bayId, technicianId) => {
         attemptCount += 1;
